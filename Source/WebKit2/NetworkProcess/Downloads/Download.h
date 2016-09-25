@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2010-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,7 +29,11 @@
 #include "DownloadID.h"
 #include "MessageSender.h"
 #include "SandboxExtension.h"
+#include <WebCore/ResourceHandle.h>
+#include <WebCore/ResourceHandleClient.h>
 #include <WebCore/ResourceRequest.h>
+#include <WebCore/SessionID.h>
+#include <memory>
 #include <wtf/Noncopyable.h>
 
 #if PLATFORM(COCOA)
@@ -41,12 +45,6 @@ OBJC_CLASS NSURLSessionDownloadTask;
 OBJC_CLASS NSURLDownload;
 OBJC_CLASS WKDownloadAsDelegate;
 #endif
-#endif
-
-#if PLATFORM(GTK) || PLATFORM(EFL)
-#include <WebCore/ResourceHandle.h>
-#include <WebCore/ResourceHandleClient.h>
-#include <memory>
 #endif
 
 #if USE(CFNETWORK)
@@ -67,38 +65,38 @@ class ResourceResponse;
 
 namespace WebKit {
 
-class DownloadAuthenticationClient;
 class DownloadManager;
 class NetworkSession;
 class WebPage;
 
 class Download : public IPC::MessageSender {
-    WTF_MAKE_NONCOPYABLE(Download);
+    WTF_MAKE_NONCOPYABLE(Download); WTF_MAKE_FAST_ALLOCATED;
 public:
-#if USE(NETWORK_SESSION)
-    Download(DownloadManager&, DownloadID);
-#else
-    Download(DownloadManager&, DownloadID, const WebCore::ResourceRequest&);
+#if USE(NETWORK_SESSION) && PLATFORM(COCOA)
+    Download(DownloadManager&, DownloadID, NSURLSessionDownloadTask*, const WebCore::SessionID& sessionID, const String& suggestedFilename = { });
 #endif
+    Download(DownloadManager&, DownloadID, const WebCore::ResourceRequest&, const String& suggestedFilename = { });
+
     ~Download();
 
-#if USE(NETWORK_SESSION) && PLATFORM(COCOA)
-    void dataTaskDidBecomeDownloadTask(const NetworkSession&, RetainPtr<NSURLSessionDownloadTask>&&);
-#else
     void start();
+
+#if !USE(NETWORK_SESSION)
     void startWithHandle(WebCore::ResourceHandle*, const WebCore::ResourceResponse&);
 #endif
     void resume(const IPC::DataReference& resumeData, const String& path, const SandboxExtension::Handle&);
     void cancel();
 
     DownloadID downloadID() const { return m_downloadID; }
+    const String& suggestedName() const { return m_suggestedName; }
+    const WebCore::ResourceRequest& request() const { return m_request; }
 
 #if USE(NETWORK_SESSION)
-    void didStart(const WebCore::ResourceRequest&);
+    void setSandboxExtension(RefPtr<SandboxExtension>&& sandboxExtension) { m_sandboxExtension = WTFMove(sandboxExtension); }
 #else
-    void didStart();
     void didReceiveAuthenticationChallenge(const WebCore::AuthenticationChallenge&);
 #endif
+    void didStart();
     void didReceiveResponse(const WebCore::ResourceResponse&);
     void didReceiveData(uint64_t length);
     bool shouldDecodeSourceDataOfMIMEType(const String& mimeType);
@@ -109,41 +107,29 @@ public:
     void didFail(const WebCore::ResourceError&, const IPC::DataReference& resumeData);
     void didCancel(const IPC::DataReference& resumeData);
 
-#if USE(CFNETWORK)
-    DownloadAuthenticationClient* authenticationClient();
-#endif
-
-#if !USE(NETWORK_SESSION)
-    // Authentication
-    static void receivedCredential(const WebCore::AuthenticationChallenge&, const WebCore::Credential&);
-    static void receivedRequestToContinueWithoutCredential(const WebCore::AuthenticationChallenge&);
-    static void receivedCancellation(const WebCore::AuthenticationChallenge&);
-    static void receivedRequestToPerformDefaultHandling(const WebCore::AuthenticationChallenge&);
-    static void receivedChallengeRejection(const WebCore::AuthenticationChallenge&);
-
-    void useCredential(const WebCore::AuthenticationChallenge&, const WebCore::Credential&);
-    void continueWithoutCredential(const WebCore::AuthenticationChallenge&);
-    void cancelAuthenticationChallenge(const WebCore::AuthenticationChallenge&);
-#endif
-
 private:
     // IPC::MessageSender
-    virtual IPC::Connection* messageSenderConnection() override;
-    virtual uint64_t messageSenderDestinationID() override;
+    IPC::Connection* messageSenderConnection() override;
+    uint64_t messageSenderDestinationID() override;
+
+#if !USE(NETWORK_SESSION)
+    void startNetworkLoad();
+#endif
 
     void platformInvalidate();
 
+    bool isAlwaysOnLoggingAllowed() const;
+
     DownloadManager& m_downloadManager;
     DownloadID m_downloadID;
-#if !USE(NETWORK_SESSION)
     WebCore::ResourceRequest m_request;
-#endif
 
     RefPtr<SandboxExtension> m_sandboxExtension;
 
 #if PLATFORM(COCOA)
 #if USE(NETWORK_SESSION)
     RetainPtr<NSURLSessionDownloadTask> m_download;
+    WebCore::SessionID m_sessionID;
 #else
     RetainPtr<NSURLDownload> m_nsURLDownload;
     RetainPtr<WKDownloadAsDelegate> m_delegate;
@@ -151,12 +137,11 @@ private:
 #endif
 #if USE(CFNETWORK)
     RetainPtr<CFURLDownloadRef> m_download;
-    RefPtr<DownloadAuthenticationClient> m_authenticationClient;
 #endif
-#if PLATFORM(GTK) || PLATFORM(EFL)
     std::unique_ptr<WebCore::ResourceHandleClient> m_downloadClient;
     RefPtr<WebCore::ResourceHandle> m_resourceHandle;
-#endif
+    String m_suggestedName;
+    bool m_hasReceivedData { false };
 };
 
 } // namespace WebKit

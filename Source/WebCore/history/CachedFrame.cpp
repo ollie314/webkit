@@ -33,7 +33,6 @@
 #include "DocumentLoader.h"
 #include "EventNames.h"
 #include "ExceptionCode.h"
-#include "FocusController.h"
 #include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "FrameView.h"
@@ -128,7 +127,8 @@ void CachedFrameBase::restore()
     m_document->enqueuePageshowEvent(PageshowEventPersisted);
 
     HistoryItem* historyItem = frame.loader().history().currentItem();
-    m_document->enqueuePopstateEvent(historyItem && historyItem->stateObject() ? historyItem->stateObject() : SerializedScriptValue::nullValue());
+    if (historyItem && historyItem->stateObject())
+        m_document->enqueuePopstateEvent(historyItem->stateObject());
 
 #if ENABLE(TOUCH_EVENTS) && !PLATFORM(IOS)
     if (m_document->hasTouchEventHandlers())
@@ -147,13 +147,10 @@ CachedFrame::CachedFrame(Frame& frame)
     ASSERT(m_documentLoader);
     ASSERT(m_view);
 
-    if (frame.page()->focusController().focusedFrame() == &frame)
-        frame.page()->focusController().setFocusedFrame(&frame.mainFrame());
-
     // Custom scrollbar renderers will get reattached when the document comes out of the page cache
     m_view->detachCustomScrollbars();
 
-    ASSERT(m_document->inPageCache());
+    ASSERT(m_document->pageCacheState() == Document::InPageCache);
 
     // Create the CachedFrames for all Frames in the FrameTree.
     for (Frame* child = frame.tree().firstChild(); child; child = child->tree().nextSibling())
@@ -171,7 +168,8 @@ CachedFrame::CachedFrame(Frame& frame)
     if (m_isComposited && PageCache::singleton().shouldClearBackingStores())
         frame.view()->clearBackingStores();
 
-    frame.view()->clearScrollableAreas();
+    // documentWillSuspendForPageCache() can set up a layout timer on the FrameView, so clear timers after that.
+    frame.clearTimers();
 
     // Deconstruct the FrameTree, to restore it later.
     // We do this for two reasons:
@@ -222,7 +220,7 @@ void CachedFrame::clear()
     // This means the CachedFrame has been:
     // 1 - Successfully restore()'d by going back/forward.
     // 2 - destroy()'ed because the PageCache is pruning or the WebView was closed.
-    ASSERT(!m_document->inPageCache());
+    ASSERT(m_document->pageCacheState() == Document::NotInPageCache);
     ASSERT(m_view);
     ASSERT(!m_document->frame() || m_document->frame() == &m_view->frame());
 
@@ -243,7 +241,7 @@ void CachedFrame::destroy()
         return;
     
     // Only CachedFrames that are still in the PageCache should be destroyed in this manner
-    ASSERT(m_document->inPageCache());
+    ASSERT(m_document->pageCacheState() == Document::InPageCache);
     ASSERT(m_view);
     ASSERT(m_document->frame() == &m_view->frame());
 
@@ -266,7 +264,7 @@ void CachedFrame::destroy()
     // fully anyway, because the document won't be able to access its DOMWindow object (due to being frameless).
     m_document->removeAllEventListeners();
 
-    m_document->setInPageCache(false);
+    m_document->setPageCacheState(Document::NotInPageCache);
     m_document->prepareForDestruction();
 
     clear();
@@ -280,6 +278,11 @@ void CachedFrame::setCachedFramePlatformData(std::unique_ptr<CachedFramePlatform
 CachedFramePlatformData* CachedFrame::cachedFramePlatformData()
 {
     return m_cachedFramePlatformData.get();
+}
+
+void CachedFrame::setHasInsecureContent(HasInsecureContent hasInsecureContent)
+{
+    m_hasInsecureContent = hasInsecureContent;
 }
 
 int CachedFrame::descendantFrameCount() const

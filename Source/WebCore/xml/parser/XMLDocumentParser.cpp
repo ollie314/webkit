@@ -26,6 +26,7 @@
 #include "config.h"
 #include "XMLDocumentParser.h"
 
+#include "AuthorStyleSheets.h"
 #include "CDATASection.h"
 #include "CachedScript.h"
 #include "Comment.h"
@@ -199,7 +200,7 @@ void XMLDocumentParser::end()
         insertErrorMessageBlock();
     else {
         updateLeafTextNode();
-        document()->styleResolverChanged(RecalcStyleImmediately);
+        document()->authorStyleSheets().didChange(RecalcStyleImmediately);
     }
 
     if (isParsing())
@@ -246,7 +247,7 @@ void XMLDocumentParser::notifyFinished(CachedResource* unusedResource)
     ASSERT(scriptElement);
 
     // JavaScript can detach this parser, make sure it's kept alive even if detached.
-    Ref<XMLDocumentParser> protect(*this);
+    Ref<XMLDocumentParser> protectedThis(*this);
     
     if (errorOccurred)
         scriptElement->dispatchErrorEvent();

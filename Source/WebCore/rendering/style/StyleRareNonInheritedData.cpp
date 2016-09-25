@@ -63,6 +63,7 @@ StyleRareNonInheritedData::StyleRareNonInheritedData()
 #endif
     , m_willChange(RenderStyle::initialWillChange())
     , m_mask(FillLayer(MaskFillLayer))
+    , m_objectPosition(RenderStyle::initialObjectPosition())
 #if ENABLE(CSS_SHAPES)
     , m_shapeOutside(RenderStyle::initialShapeOutside())
     , m_shapeMargin(RenderStyle::initialShapeMargin())
@@ -74,7 +75,7 @@ StyleRareNonInheritedData::StyleRareNonInheritedData()
     , m_flowThread(RenderStyle::initialFlowThread())
     , m_regionThread(RenderStyle::initialRegionThread())
     , m_alignContent(RenderStyle::initialContentAlignment())
-    , m_alignItems(RenderStyle::initialSelfAlignment())
+    , m_alignItems(RenderStyle::initialDefaultAlignment())
     , m_alignSelf(RenderStyle::initialSelfAlignment())
     , m_justifyContent(RenderStyle::initialContentAlignment())
     , m_justifyItems(RenderStyle::initialSelfAlignment())
@@ -103,10 +104,17 @@ StyleRareNonInheritedData::StyleRareNonInheritedData()
     , m_effectiveBlendMode(RenderStyle::initialBlendMode())
     , m_isolation(RenderStyle::initialIsolation())
 #endif
+#if ENABLE(APPLE_PAY)
+    , m_applePayButtonStyle(static_cast<unsigned>(RenderStyle::initialApplePayButtonStyle()))
+    , m_applePayButtonType(static_cast<unsigned>(RenderStyle::initialApplePayButtonType()))
+#endif
     , m_objectFit(RenderStyle::initialObjectFit())
     , m_breakBefore(RenderStyle::initialBreakBetween())
     , m_breakAfter(RenderStyle::initialBreakBetween())
     , m_breakInside(RenderStyle::initialBreakInside())
+    , m_resize(RenderStyle::initialResize())
+    , m_hasAttrContent(false)
+    , m_isPlaceholderStyle(false)
 {
     m_maskBoxImage.setMaskDefaults();
 }
@@ -148,6 +156,7 @@ inline StyleRareNonInheritedData::StyleRareNonInheritedData(const StyleRareNonIn
     , m_mask(o.m_mask)
     , m_maskBoxImage(o.m_maskBoxImage)
     , m_pageSize(o.m_pageSize)
+    , m_objectPosition(o.m_objectPosition)
 #if ENABLE(CSS_SHAPES)
     , m_shapeOutside(o.m_shapeOutside)
     , m_shapeMargin(o.m_shapeMargin)
@@ -195,10 +204,17 @@ inline StyleRareNonInheritedData::StyleRareNonInheritedData(const StyleRareNonIn
     , m_effectiveBlendMode(o.m_effectiveBlendMode)
     , m_isolation(o.m_isolation)
 #endif
+#if ENABLE(APPLE_PAY)
+    , m_applePayButtonStyle(o.m_applePayButtonStyle)
+    , m_applePayButtonType(o.m_applePayButtonType)
+#endif
     , m_objectFit(o.m_objectFit)
     , m_breakBefore(o.m_breakBefore)
     , m_breakAfter(o.m_breakAfter)
     , m_breakInside(o.m_breakInside)
+    , m_resize(o.m_resize)
+    , m_hasAttrContent(o.m_hasAttrContent)
+    , m_isPlaceholderStyle(o.m_isPlaceholderStyle)
 {
 }
 
@@ -242,6 +258,7 @@ bool StyleRareNonInheritedData::operator==(const StyleRareNonInheritedData& o) c
 #endif
         && contentDataEquivalent(o)
         && arePointingToEqualData(m_counterDirectives, o.m_counterDirectives)
+        && m_altText == o.m_altText
         && arePointingToEqualData(m_boxShadow, o.m_boxShadow)
         && arePointingToEqualData(m_willChange, o.m_willChange)
         && arePointingToEqualData(m_boxReflect, o.m_boxReflect)
@@ -250,6 +267,7 @@ bool StyleRareNonInheritedData::operator==(const StyleRareNonInheritedData& o) c
         && m_mask == o.m_mask
         && m_maskBoxImage == o.m_maskBoxImage
         && m_pageSize == o.m_pageSize
+        && m_objectPosition == o.m_objectPosition
 #if ENABLE(CSS_SHAPES)
         && arePointingToEqualData(m_shapeOutside, o.m_shapeOutside)
         && m_shapeMargin == o.m_shapeMargin
@@ -296,11 +314,18 @@ bool StyleRareNonInheritedData::operator==(const StyleRareNonInheritedData& o) c
         && m_effectiveBlendMode == o.m_effectiveBlendMode
         && m_isolation == o.m_isolation
 #endif
+#if ENABLE(APPLE_PAY)
+        && m_applePayButtonStyle == o.m_applePayButtonStyle
+        && m_applePayButtonType == o.m_applePayButtonType
+#endif
         && m_aspectRatioType == o.m_aspectRatioType
         && m_objectFit == o.m_objectFit
         && m_breakAfter == o.m_breakAfter
         && m_breakBefore == o.m_breakBefore
-        && m_breakInside == o.m_breakInside;
+        && m_breakInside == o.m_breakInside
+        && m_resize == o.m_resize
+        && m_hasAttrContent == o.m_hasAttrContent
+        && m_isPlaceholderStyle == o.m_isPlaceholderStyle;
 }
 
 bool StyleRareNonInheritedData::contentDataEquivalent(const StyleRareNonInheritedData& o) const

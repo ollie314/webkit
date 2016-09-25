@@ -1,3 +1,4 @@
+'use strict';
 
 class TestGroup extends LabeledObject {
 
@@ -7,6 +8,7 @@ class TestGroup extends LabeledObject {
         this._taskId = object.task;
         this._authorName = object.author;
         this._createdAt = new Date(object.createdAt);
+        this._isHidden = object.hidden;
         this._buildRequests = [];
         this._requestsAreInOrder = false;
         this._repositories = null;
@@ -17,7 +19,19 @@ class TestGroup extends LabeledObject {
         this._platform = object.platform;
     }
 
+    updateSingleton(object)
+    {
+        super.updateSingleton(object);
+
+        console.assert(this._taskId == object.task);
+        console.assert(+this._createdAt == +object.createdAt);
+        console.assert(this._platform == object.platform);
+
+        this._isHidden = object.hidden;
+    }
+
     createdAt() { return this._createdAt; }
+    isHidden() { return this._isHidden; }
     buildRequests() { return this._buildRequests; }
     addBuildRequest(request)
     {
@@ -86,14 +100,19 @@ class TestGroup extends LabeledObject {
         this._allRootSets = null;
     }
 
-    hasCompleted()
+    hasFinished()
     {
-        return this._buildRequests.every(function (request) { return request.hasCompleted(); });
+        return this._buildRequests.every(function (request) { return request.hasFinished(); });
     }
 
     hasStarted()
     {
         return this._buildRequests.some(function (request) { return request.hasStarted(); });
+    }
+
+    hasPending()
+    {
+        return this._buildRequests.some(function (request) { return request.isPending(); });
     }
 
     compareTestResults(rootSetA, rootSetB)
@@ -108,7 +127,7 @@ class TestGroup extends LabeledObject {
 
         var result = {changeType: null, status: 'failed', label: 'Failed', fullLabel: 'Failed', isStatisticallySignificant: false};
 
-        var hasCompleted = this.hasCompleted();
+        var hasCompleted = this.hasFinished();
         if (!hasCompleted) {
             if (this.hasStarted()) {
                 result.status = 'running';
@@ -165,6 +184,19 @@ class TestGroup extends LabeledObject {
         });
     }
 
+    updateHiddenFlag(hidden)
+    {
+        var self = this;
+        var id = this.id();
+        return PrivilegedAPI.sendRequest('update-test-group', {
+            group: id,
+            hidden: !!hidden,
+        }).then(function (data) {
+            return TestGroup.cachedFetch(`../api/test-groups/${id}`, {}, true)
+                .then(TestGroup._createModelsFromFetchedTestGroups.bind(TestGroup));
+        });
+    }
+
     static createAndRefetchTestGroups(task, name, repetitionCount, rootSets)
     {
         var self = this;
@@ -190,21 +222,11 @@ class TestGroup extends LabeledObject {
             return TestGroup.ensureSingleton(row.id, row);
         });
 
-        var rootIdMap = {};
-        for (var root of data['roots'])
-            rootIdMap[root.id] = root;
-
-        var rootSets = data['rootSets'].map(function (row) {
-            row.roots = row.roots.map(function (rootId) { return rootIdMap[rootId]; });
-            return RootSet.ensureSingleton(row.id, row);
-        });
-
-        var buildRequests = data['buildRequests'].map(function (rawData) {
-            rawData.testGroup = TestGroup.findById(rawData.testGroup);
-            rawData.rootSet = RootSet.findById(rawData.rootSet);
-            return BuildRequest.ensureSingleton(rawData.id, rawData);
-        });
+        BuildRequest.constructBuildRequestsFromData(data);
 
         return testGroups;
     }
 }
+
+if (typeof module != 'undefined')
+    module.exports.TestGroup = TestGroup;

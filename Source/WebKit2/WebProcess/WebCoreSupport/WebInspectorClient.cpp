@@ -51,7 +51,7 @@ public:
     }
     virtual ~RepaintIndicatorLayerClient() { }
 private:
-    virtual void notifyAnimationEnded(const GraphicsLayer* layer, const String&) override
+    void notifyAnimationEnded(const GraphicsLayer* layer, const String&) override
     {
         m_inspectorClient.animationEndedForLayer(layer);
     }
@@ -107,9 +107,9 @@ void WebInspectorClient::highlight()
 {
 #if !PLATFORM(IOS)
     if (!m_highlightOverlay) {
-        RefPtr<PageOverlay> highlightOverlay = PageOverlay::create(*this);
-        m_highlightOverlay = highlightOverlay.get();
-        m_page->mainFrame()->pageOverlayController().installPageOverlay(highlightOverlay.release(), PageOverlay::FadeMode::Fade);
+        auto highlightOverlay = PageOverlay::create(*this);
+        m_highlightOverlay = highlightOverlay.ptr();
+        m_page->mainFrame()->pageOverlayController().installPageOverlay(WTFMove(highlightOverlay), PageOverlay::FadeMode::Fade);
         m_highlightOverlay->setNeedsDisplay();
     } else {
         m_highlightOverlay->stopFadeOutAnimation();
@@ -192,8 +192,10 @@ void WebInspectorClient::didSetSearchingForNode(bool enabled)
 }
 #endif
 
-void WebInspectorClient::pageOverlayDestroyed(PageOverlay&)
+void WebInspectorClient::elementSelectionChanged(bool active)
 {
+    if (m_page->inspector())
+        m_page->inspector()->elementSelectionChanged(active);
 }
 
 void WebInspectorClient::willMoveToPage(PageOverlay&, Page* page)

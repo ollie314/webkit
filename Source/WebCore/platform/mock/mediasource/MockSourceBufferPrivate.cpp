@@ -20,7 +20,7 @@
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "config.h"
@@ -39,12 +39,13 @@
 #include <map>
 #include <runtime/ArrayBuffer.h>
 #include <wtf/PrintStream.h>
+#include <wtf/StringPrintStream.h>
 
 namespace WebCore {
 
 class MockMediaSample final : public MediaSample {
 public:
-    static RefPtr<MockMediaSample> create(const MockSampleBox& box) { return adoptRef(new MockMediaSample(box)); }
+    static Ref<MockMediaSample> create(const MockSampleBox& box) { return adoptRef(*new MockMediaSample(box)); }
     virtual ~MockMediaSample() { }
 
 private:
@@ -54,17 +55,21 @@ private:
     {
     }
 
-    virtual MediaTime presentationTime() const override { return m_box.presentationTimestamp(); }
-    virtual MediaTime decodeTime() const override { return m_box.decodeTimestamp(); }
-    virtual MediaTime duration() const override { return m_box.duration(); }
-    virtual AtomicString trackID() const override { return m_id; }
-    virtual size_t sizeInBytes() const override { return sizeof(m_box); }
-    virtual SampleFlags flags() const override;
-    virtual PlatformSample platformSample() override;
-    virtual FloatSize presentationSize() const override { return FloatSize(); }
-    virtual void dump(PrintStream&) const override;
-    virtual void offsetTimestampsBy(const MediaTime& offset) override { m_box.offsetTimestampsBy(offset); }
-    virtual void setTimestamps(const MediaTime& presentationTimestamp, const MediaTime& decodeTimestamp) override { m_box.setTimestamps(presentationTimestamp, decodeTimestamp); }
+    MediaTime presentationTime() const override { return m_box.presentationTimestamp(); }
+    MediaTime decodeTime() const override { return m_box.decodeTimestamp(); }
+    MediaTime duration() const override { return m_box.duration(); }
+    AtomicString trackID() const override { return m_id; }
+    void setTrackID(const String& id) override { m_id = id; }
+    size_t sizeInBytes() const override { return sizeof(m_box); }
+    SampleFlags flags() const override;
+    PlatformSample platformSample() override;
+    FloatSize presentationSize() const override { return FloatSize(); }
+    void dump(PrintStream&) const override;
+    void offsetTimestampsBy(const MediaTime& offset) override { m_box.offsetTimestampsBy(offset); }
+    void setTimestamps(const MediaTime& presentationTimestamp, const MediaTime& decodeTimestamp) override { m_box.setTimestamps(presentationTimestamp, decodeTimestamp); }
+    bool isDivisable() const override { return false; }
+    std::pair<RefPtr<MediaSample>, RefPtr<MediaSample>> divide(const MediaTime&) override { return {nullptr, nullptr}; }
+
 
     unsigned generation() const { return m_box.generation(); }
 
@@ -96,10 +101,10 @@ public:
     static RefPtr<MockMediaDescription> create(const MockTrackBox& box) { return adoptRef(new MockMediaDescription(box)); }
     virtual ~MockMediaDescription() { }
 
-    virtual AtomicString codec() const override { return m_box.codec(); }
-    virtual bool isVideo() const override { return m_box.kind() == MockTrackBox::Video; }
-    virtual bool isAudio() const override { return m_box.kind() == MockTrackBox::Audio; }
-    virtual bool isText() const override { return m_box.kind() == MockTrackBox::Text; }
+    AtomicString codec() const override { return m_box.codec(); }
+    bool isVideo() const override { return m_box.kind() == MockTrackBox::Video; }
+    bool isAudio() const override { return m_box.kind() == MockTrackBox::Audio; }
+    bool isText() const override { return m_box.kind() == MockTrackBox::Text; }
 
 protected:
     MockMediaDescription(const MockTrackBox& box) : m_box(box) { }
@@ -221,8 +226,14 @@ void MockSourceBufferPrivate::setActive(bool isActive)
         m_mediaSource->sourceBufferPrivateDidChangeActiveState(this, isActive);
 }
 
-void MockSourceBufferPrivate::enqueueSample(PassRefPtr<MediaSample> sample, AtomicString)
+Vector<String> MockSourceBufferPrivate::enqueuedSamplesForTrackID(AtomicString)
 {
+    return m_enqueuedSamples;
+}
+
+void MockSourceBufferPrivate::enqueueSample(PassRefPtr<MediaSample> prpSample, AtomicString)
+{
+    RefPtr<MediaSample> sample = prpSample;
     if (!m_mediaSource || !sample)
         return;
 
@@ -241,6 +252,8 @@ void MockSourceBufferPrivate::enqueueSample(PassRefPtr<MediaSample> sample, Atom
         m_mediaSource->incrementDroppedFrames();
     if (box->isDelayed())
         m_mediaSource->incrementTotalFrameDelayBy(MediaTime(1, 1));
+
+    m_enqueuedSamples.append(toString(sample));
 }
 
 bool MockSourceBufferPrivate::hasVideo() const

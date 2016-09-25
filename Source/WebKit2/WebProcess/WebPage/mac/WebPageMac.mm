@@ -70,6 +70,7 @@
 #import <WebCore/KeyboardEvent.h>
 #import <WebCore/MIMETypeRegistry.h>
 #import <WebCore/MainFrame.h>
+#import <WebCore/NetworkStorageSession.h>
 #import <WebCore/NetworkingContext.h>
 #import <WebCore/Page.h>
 #import <WebCore/PageOverlayController.h>
@@ -87,6 +88,7 @@
 #import <WebCore/WindowsKeyboardCodes.h>
 #import <WebCore/htmlediting.h>
 #import <WebKitSystemInterface.h>
+#import <wtf/TemporaryChange.h>
 
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
 #include <WebCore/MediaPlaybackTargetMac.h>
@@ -138,7 +140,7 @@ void WebPage::platformEditorState(Frame& frame, EditorState& result, IncludePost
 
     postLayoutData.candidateRequestStartPosition = TextIterator::rangeLength(makeRange(paragraphStart, selectionStart).get());
     postLayoutData.selectedTextLength = TextIterator::rangeLength(makeRange(paragraphStart, selectionEnd).get()) - postLayoutData.candidateRequestStartPosition;
-    postLayoutData.paragraphContextForCandidateRequest = plainText(makeRange(paragraphStart, paragraphEnd).get());
+    postLayoutData.paragraphContextForCandidateRequest = plainText(frame.editor().contextRangeForCandidateRequest().get());
     postLayoutData.stringForCandidateRequest = frame.editor().stringForCandidateRequest();
 
     IntRect rectForSelectionCandidates;
@@ -352,7 +354,15 @@ void WebPage::attributedSubstringForCharacterRangeAsync(const EditingRange& edit
         result.string = [attributedString attributedSubstringFromRange:NSMakeRange(0, editingRange.length)];
     }
 
-    send(Messages::WebPageProxy::AttributedStringForCharacterRangeCallback(result, EditingRange(editingRange.location, [result.string length]), callbackID));
+    EditingRange rangeToSend(editingRange.location, [result.string length]);
+    ASSERT(rangeToSend.isValid());
+    if (!rangeToSend.isValid()) {
+        // Send an empty EditingRange as a last resort for <rdar://problem/27078089>.
+        send(Messages::WebPageProxy::AttributedStringForCharacterRangeCallback(result, EditingRange(), callbackID));
+        return;
+    }
+
+    send(Messages::WebPageProxy::AttributedStringForCharacterRangeCallback(result, rangeToSend, callbackID));
 }
 
 void WebPage::fontAtSelection(uint64_t callbackID)
@@ -363,11 +373,11 @@ void WebPage::fontAtSelection(uint64_t callbackID)
     Frame& frame = m_page->focusController().focusedOrMainFrame();
     
     if (!frame.selection().selection().isNone()) {
-        const Font* font = frame.editor().fontForSelection(selectionHasMultipleFonts);
-        NSFont *nsFont = font ? font->getNSFont() : nil;
-        if (nsFont) {
-            fontName = nsFont.fontName;
-            fontSize = nsFont.pointSize;
+        if (auto* font = frame.editor().fontForSelection(selectionHasMultipleFonts)) {
+            if (auto ctFont = font->getCTFont()) {
+                fontName = adoptCF(CTFontCopyPostScriptName(ctFont)).get();
+                fontSize = CTFontGetSize(ctFont);
+            }
         }
     }
     send(Messages::WebPageProxy::FontAtSelectionCallback(fontName, fontSize, selectionHasMultipleFonts, callbackID));
@@ -408,6 +418,8 @@ void WebPage::performDictionaryLookupOfCurrentSelection()
 
 DictionaryPopupInfo WebPage::dictionaryPopupInfoForRange(Frame* frame, Range& range, NSDictionary **options, TextIndicatorPresentationTransition presentationTransition)
 {
+    TemporaryChange<bool> isGettingDictionaryPopupInfoChange { m_isGettingDictionaryPopupInfo, true };
+
     DictionaryPopupInfo dictionaryPopupInfo;
     if (range.text().stripWhiteSpace().isEmpty())
         return dictionaryPopupInfo;
@@ -443,7 +455,7 @@ DictionaryPopupInfo WebPage::dictionaryPopupInfoForRange(Frame* frame, Range& ra
         [scaledNSAttributedString addAttributes:scaledAttributes.get() range:range];
     }];
 
-    TextIndicatorOptions indicatorOptions = TextIndicatorOptionDefault;
+    TextIndicatorOptions indicatorOptions = TextIndicatorOptionUseBoundingRectAndPaintAllContentForComplexRanges;
     if (presentationTransition == TextIndicatorPresentationTransition::BounceAndCrossfade)
         indicatorOptions |= TextIndicatorOptionIncludeSnapshotWithSelectionHighlight;
 
@@ -523,7 +535,7 @@ bool WebPage::performNonEditingBehaviorForSelector(const String& selector, Keybo
 {
     // First give accessibility a chance to handle the event.
     Frame* frame = frameForEvent(event);
-    frame->eventHandler().handleKeyboardSelectionMovementForAccessibility(event);
+    frame->eventHandler().handleKeyboardSelectionMovementForAccessibility(*event);
     if (event->defaultHandled())
         return true;
 
@@ -551,13 +563,13 @@ bool WebPage::performNonEditingBehaviorForSelector(const String& selector, Keybo
     else if (selector == "moveWordLeft:")
         didPerformAction = scroll(m_page.get(), ScrollLeft, ScrollByPage);
     else if (selector == "moveToLeftEndOfLine:")
-        didPerformAction = m_page->backForward().goBack();
+        didPerformAction = m_userInterfaceLayoutDirection == WebCore::UserInterfaceLayoutDirection::LTR ? m_page->backForward().goBack() : m_page->backForward().goForward();
     else if (selector == "moveRight:")
         didPerformAction = scroll(m_page.get(), ScrollRight, ScrollByLine);
     else if (selector == "moveWordRight:")
         didPerformAction = scroll(m_page.get(), ScrollRight, ScrollByPage);
     else if (selector == "moveToRightEndOfLine:")
-        didPerformAction = m_page->backForward().goForward();
+        didPerformAction = m_userInterfaceLayoutDirection == WebCore::UserInterfaceLayoutDirection::LTR ? m_page->backForward().goForward() : m_page->backForward().goBack();
 
     return didPerformAction;
 }
@@ -832,7 +844,10 @@ static void drawPDFPage(PDFDocument *pdfDocument, CFIndex pageIndex, CGContextRe
 
     [NSGraphicsContext saveGraphicsState];
     [NSGraphicsContext setCurrentContext:[NSGraphicsContext graphicsContextWithGraphicsPort:context flipped:NO]];
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     [pdfPage drawWithBox:kPDFDisplayBoxCropBox];
+#pragma clang diagnostic pop
     [NSGraphicsContext restoreGraphicsState];
 
     CGAffineTransform transform = CGContextGetCTM(context);
@@ -841,7 +856,10 @@ static void drawPDFPage(PDFDocument *pdfDocument, CFIndex pageIndex, CGContextRe
         if (![annotation isKindOfClass:pdfAnnotationLinkClass()])
             continue;
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
         PDFAnnotationLink *linkAnnotation = (PDFAnnotationLink *)annotation;
+#pragma clang diagnostic pop
         NSURL *url = [linkAnnotation URL];
         if (!url)
             continue;
@@ -969,7 +987,7 @@ void WebPage::performImmediateActionHitTestAtLocation(WebCore::FloatPoint locati
     Element *URLElement = hitTestResult.URLElement();
     if (!absoluteLinkURL.isEmpty() && URLElement) {
         RefPtr<Range> linkRange = rangeOfContents(*URLElement);
-        immediateActionResult.linkTextIndicator = TextIndicator::createWithRange(*linkRange, TextIndicatorOptionDefault, TextIndicatorPresentationTransition::FadeIn);
+        immediateActionResult.linkTextIndicator = TextIndicator::createWithRange(*linkRange, TextIndicatorOptionUseBoundingRectAndPaintAllContentForComplexRanges, TextIndicatorPresentationTransition::FadeIn);
     }
 
     NSDictionary *options = nil;
@@ -1005,7 +1023,7 @@ void WebPage::performImmediateActionHitTestAtLocation(WebCore::FloatPoint locati
             detectedDataBoundingBox.unite(frameView->contentsToWindow(quad.enclosingBoundingBox()));
 
         immediateActionResult.detectedDataBoundingBox = detectedDataBoundingBox;
-        immediateActionResult.detectedDataTextIndicator = TextIndicator::createWithRange(*mainResultRange, TextIndicatorOptionDefault, TextIndicatorPresentationTransition::FadeIn);
+        immediateActionResult.detectedDataTextIndicator = TextIndicator::createWithRange(*mainResultRange, TextIndicatorOptionUseBoundingRectAndPaintAllContentForComplexRanges, TextIndicatorPresentationTransition::FadeIn);
         immediateActionResult.detectedDataOriginatingPageOverlay = overlay->pageOverlayID();
 
         break;
@@ -1018,7 +1036,7 @@ void WebPage::performImmediateActionHitTestAtLocation(WebCore::FloatPoint locati
         immediateActionResult.detectedDataActionContext = DataDetection::detectItemAroundHitTestResult(hitTestResult, detectedDataBoundingBox, detectedDataRange);
         if (immediateActionResult.detectedDataActionContext && detectedDataRange) {
             immediateActionResult.detectedDataBoundingBox = detectedDataBoundingBox;
-            immediateActionResult.detectedDataTextIndicator = TextIndicator::createWithRange(*detectedDataRange, TextIndicatorOptionDefault, TextIndicatorPresentationTransition::FadeIn);
+            immediateActionResult.detectedDataTextIndicator = TextIndicator::createWithRange(*detectedDataRange, TextIndicatorOptionUseBoundingRectAndPaintAllContentForComplexRanges, TextIndicatorPresentationTransition::FadeIn);
         }
     }
 

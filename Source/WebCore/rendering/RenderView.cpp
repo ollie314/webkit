@@ -115,22 +115,10 @@ private:
     Vector<RenderMultiColumnSpannerPlaceholder*> m_spannerStack;
 };
 
-RenderView::RenderView(Document& document, Ref<RenderStyle>&& style)
+RenderView::RenderView(Document& document, RenderStyle&& style)
     : RenderBlockFlow(document, WTFMove(style))
     , m_frameView(*document.view())
-    , m_selectionUnsplitStart(nullptr)
-    , m_selectionUnsplitEnd(nullptr)
-    , m_selectionUnsplitStartPos(-1)
-    , m_selectionUnsplitEndPos(-1)
     , m_lazyRepaintTimer(*this, &RenderView::lazyRepaintTimerFired)
-    , m_pageLogicalHeight(0)
-    , m_pageLogicalHeightChanged(false)
-    , m_layoutState(nullptr)
-    , m_layoutStateDisableCount(0)
-    , m_renderQuoteHead(nullptr)
-    , m_renderCounterCount(0)
-    , m_selectionWasCaret(false)
-    , m_hasSoftwareFilters(false)
 #if ENABLE(SERVICE_CONTROLS)
     , m_selectionRectGatherer(*this)
 #endif
@@ -177,7 +165,7 @@ void RenderView::unscheduleLazyRepaint(RenderBox& renderer)
 
 void RenderView::lazyRepaintTimerFired()
 {
-    bool shouldRepaint = !document().inPageCache();
+    bool shouldRepaint = document().pageCacheState() == Document::NotInPageCache;
 
     for (auto& renderer : m_renderersNeedingLazyRepaint) {
         if (shouldRepaint)
@@ -277,7 +265,8 @@ void RenderView::initializeLayoutState(LayoutState& state)
 
     state.m_pageLogicalHeight = m_pageLogicalHeight;
     state.m_pageLogicalHeightChanged = m_pageLogicalHeightChanged;
-    state.m_isPaginated = state.m_pageLogicalHeight;
+    ASSERT(state.m_pageLogicalHeight >= 0);
+    state.m_isPaginated = state.m_pageLogicalHeight > 0;
 }
 
 // The algorithm below assumes this is a full layout. In case there are previously computed values for regions, supplemental steps are taken
@@ -612,7 +601,11 @@ void RenderView::repaintRootContents()
         layer()->setBackingNeedsRepaint(GraphicsLayer::DoNotClipToLayer);
         return;
     }
-    repaint();
+
+    // Always use layoutOverflowRect() to fix rdar://problem/27182267.
+    // This should be cleaned up via webkit.org/b/159913 and webkit.org/b/159914.
+    RenderLayerModelObject* repaintContainer = containerForRepaint();
+    repaintUsingContainer(repaintContainer, computeRectForRepaint(layoutOverflowRect(), repaintContainer));
 }
 
 void RenderView::repaintViewRectangle(const LayoutRect& repaintRect) const
@@ -635,6 +628,16 @@ void RenderView::repaintViewRectangle(const LayoutRect& repaintRect) const
 #endif
         adjustedRect.moveBy(-viewRect.location());
         adjustedRect.moveBy(ownerBox->contentBoxRect().location());
+
+        // A dirty rect in an iframe is relative to the contents of that iframe.
+        // When we traverse between parent frames and child frames, we need to make sure
+        // that the coordinate system is mapped appropriately between the iframe's contents
+        // and the Renderer that contains the iframe. This transformation must account for a
+        // left scrollbar (if one exists).
+        FrameView& frameView = this->frameView();
+        if (frameView.shouldPlaceBlockDirectionScrollbarOnLeft() && frameView.verticalScrollbar())
+            adjustedRect.move(LayoutSize(frameView.verticalScrollbar()->occupiedWidth(), 0));
+
         ownerBox->repaintRectangle(adjustedRect);
         return;
     }
@@ -680,7 +683,7 @@ LayoutRect RenderView::visualOverflowRect() const
     return RenderBlockFlow::visualOverflowRect();
 }
 
-LayoutRect RenderView::computeRectForRepaint(const LayoutRect& rect, const RenderLayerModelObject* repaintContainer, bool fixed) const
+LayoutRect RenderView::computeRectForRepaint(const LayoutRect& rect, const RenderLayerModelObject* repaintContainer, RepaintContext context) const
 {
     // If a container was specified, and was not nullptr or the RenderView,
     // then we should have found it by now.
@@ -699,7 +702,7 @@ LayoutRect RenderView::computeRectForRepaint(const LayoutRect& rect, const Rende
             adjustedRect.setX(viewWidth() - adjustedRect.maxX());
     }
 
-    if (fixed)
+    if (context.m_hasPositionFixedDescendant)
         adjustedRect.moveBy(frameView().scrollPositionRespectingCustomFixedPosition());
     
     // Apply our transform if we have one (because of full page zooming).
@@ -757,14 +760,17 @@ LayoutRect RenderView::subtreeSelectionBounds(const SelectionSubtreeRoot& root, 
     SelectionMap selectedObjects;
 
     RenderObject* os = root.selectionData().selectionStart();
-    RenderObject* stop = rendererAfterPosition(root.selectionData().selectionEnd(), root.selectionData().selectionEndPos());
+    auto* selectionEnd = root.selectionData().selectionEnd();
+    RenderObject* stop = nullptr;
+    if (selectionEnd)
+        stop = rendererAfterPosition(selectionEnd, root.selectionData().selectionEndPos().value());
     SelectionIterator selectionIterator(os);
     while (os && os != stop) {
         if ((os->canBeSelectionLeaf() || os == root.selectionData().selectionStart() || os == root.selectionData().selectionEnd()) && os->selectionState() != SelectionNone) {
             // Blocks are responsible for painting line gaps and margin gaps. They must be examined as well.
             selectedObjects.set(os, std::make_unique<RenderSelectionInfo>(*os, clipToVisibleContent));
             RenderBlock* cb = os->containingBlock();
-            while (cb && !cb->isRenderView()) {
+            while (cb && !is<RenderView>(*cb)) {
                 std::unique_ptr<RenderSelectionInfo>& blockInfo = selectedObjects.add(cb, nullptr).iterator->value;
                 if (blockInfo)
                     break;
@@ -806,7 +812,10 @@ void RenderView::repaintSubtreeSelection(const SelectionSubtreeRoot& root) const
 {
     HashSet<RenderBlock*> processedBlocks;
 
-    RenderObject* end = rendererAfterPosition(root.selectionData().selectionEnd(), root.selectionData().selectionEndPos());
+    auto* selectionEnd = root.selectionData().selectionEnd();
+    RenderObject* end = nullptr;
+    if (selectionEnd)
+        end = rendererAfterPosition(selectionEnd, root.selectionData().selectionEndPos().value());
     SelectionIterator selectionIterator(root.selectionData().selectionStart());
     for (RenderObject* o = selectionIterator.current(); o && o != end; o = selectionIterator.next()) {
         if (!o->canBeSelectionLeaf() && o != root.selectionData().selectionStart() && o != root.selectionData().selectionEnd())
@@ -817,7 +826,7 @@ void RenderView::repaintSubtreeSelection(const SelectionSubtreeRoot& root) const
         RenderSelectionInfo(*o, true).repaint();
 
         // Blocks are responsible for painting line gaps and margin gaps. They must be examined as well.
-        for (RenderBlock* block = o->containingBlock(); block && !block->isRenderView(); block = block->containingBlock()) {
+        for (RenderBlock* block = o->containingBlock(); block && !is<RenderView>(*block); block = block->containingBlock()) {
             if (!processedBlocks.add(block).isNewEntry)
                 break;
             RenderSelectionInfo(*block, true).repaint();
@@ -825,7 +834,7 @@ void RenderView::repaintSubtreeSelection(const SelectionSubtreeRoot& root) const
     }
 }
 
-void RenderView::setSelection(RenderObject* start, int startPos, RenderObject* end, int endPos, SelectionRepaintMode blockRepaintMode)
+void RenderView::setSelection(RenderObject* start, Optional<unsigned> startPos, RenderObject* end, Optional<unsigned> endPos, SelectionRepaintMode blockRepaintMode)
 {
     // Make sure both our start and end objects are defined.
     // Check www.msnbc.com and try clicking around to find the case where this happened.
@@ -862,7 +871,7 @@ void RenderView::setSelection(RenderObject* start, int startPos, RenderObject* e
     splitSelectionBetweenSubtrees(start, startPos, end, endPos, blockRepaintMode);
 }
 
-void RenderView::splitSelectionBetweenSubtrees(const RenderObject* start, int startPos, const RenderObject* end, int endPos, SelectionRepaintMode blockRepaintMode)
+void RenderView::splitSelectionBetweenSubtrees(const RenderObject* start, Optional<unsigned> startPos, const RenderObject* end, Optional<unsigned> endPos, SelectionRepaintMode blockRepaintMode)
 {
     // Compute the visible selection end points for each of the subtrees.
     RenderSubtreesMap renderSubtreesMap;
@@ -887,14 +896,16 @@ void RenderView::splitSelectionBetweenSubtrees(const RenderObject* start, int st
             SelectionSubtreeData selectionData = renderSubtreesMap.get(&root);
             if (selectionData.selectionClear()) {
                 selectionData.setSelectionStart(node->renderer());
-                selectionData.setSelectionStartPos(node == startNode ? startPos : 0);
+                selectionData.setSelectionStartPos(node == startNode ? startPos : Optional<unsigned>(0));
             }
 
             selectionData.setSelectionEnd(node->renderer());
             if (node == endNode)
                 selectionData.setSelectionEndPos(endPos);
-            else
-                selectionData.setSelectionEndPos(node->offsetInCharacters() ? node->maxCharacterOffset() : node->countChildNodes());
+            else {
+                unsigned newEndPos = node->offsetInCharacters() ? node->maxCharacterOffset() : node->countChildNodes();
+                selectionData.setSelectionEndPos(newEndPos);
+            }
 
             renderSubtreesMap.set(&root, selectionData);
         }
@@ -945,7 +956,10 @@ void RenderView::clearSubtreeSelection(const SelectionSubtreeRoot& root, Selecti
     // the union of those rects might remain the same even when changes have occurred.
 
     RenderObject* os = root.selectionData().selectionStart();
-    RenderObject* stop = rendererAfterPosition(root.selectionData().selectionEnd(), root.selectionData().selectionEndPos());
+    auto* selectionEnd = root.selectionData().selectionEnd();
+    RenderObject* stop = nullptr;
+    if (selectionEnd)
+        stop = rendererAfterPosition(selectionEnd, root.selectionData().selectionEndPos().value());
     SelectionIterator selectionIterator(os);
     while (os && os != stop) {
         if (isValidObjectForNewSelection(root, *os)) {
@@ -953,7 +967,7 @@ void RenderView::clearSubtreeSelection(const SelectionSubtreeRoot& root, Selecti
             oldSelectionData.selectedObjects.set(os, std::make_unique<RenderSelectionInfo>(*os, true));
             if (blockRepaintMode == RepaintNewXOROld) {
                 RenderBlock* cb = os->containingBlock();
-                while (cb && !cb->isRenderView()) {
+                while (cb && !is<RenderView>(*cb)) {
                     std::unique_ptr<RenderBlockSelectionInfo>& blockInfo = oldSelectionData.selectedBlocks.add(cb, nullptr).iterator->value;
                     if (blockInfo)
                         break;
@@ -983,7 +997,10 @@ void RenderView::applySubtreeSelection(const SelectionSubtreeRoot& root, Selecti
     }
 
     RenderObject* selectionStart = root.selectionData().selectionStart();
-    RenderObject* selectionEnd = rendererAfterPosition(root.selectionData().selectionEnd(), root.selectionData().selectionEndPos());
+    auto* selectionDataEnd = root.selectionData().selectionEnd();
+    RenderObject* selectionEnd = nullptr;
+    if (selectionDataEnd)
+        selectionEnd = rendererAfterPosition(selectionDataEnd, root.selectionData().selectionEndPos().value());
     SelectionIterator selectionIterator(selectionStart);
     for (RenderObject* currentRenderer = selectionStart; currentRenderer && currentRenderer != selectionEnd; currentRenderer = selectionIterator.next()) {
         if (currentRenderer == root.selectionData().selectionStart() || currentRenderer == root.selectionData().selectionEnd())
@@ -1018,7 +1035,7 @@ void RenderView::applySubtreeSelection(const SelectionSubtreeRoot& root, Selecti
             newSelectedObjects.set(currentRenderer, WTFMove(selectionInfo));
 
             RenderBlock* containingBlock = currentRenderer->containingBlock();
-            while (containingBlock && !containingBlock->isRenderView()) {
+            while (containingBlock && !is<RenderView>(*containingBlock)) {
                 std::unique_ptr<RenderBlockSelectionInfo>& blockInfo = newSelectedBlocks.add(containingBlock, nullptr).iterator->value;
                 if (blockInfo)
                     break;
@@ -1074,7 +1091,7 @@ void RenderView::applySubtreeSelection(const SelectionSubtreeRoot& root, Selecti
         selectedBlockInfo.value->repaint();
 }
 
-void RenderView::getSelection(RenderObject*& startRenderer, int& startOffset, RenderObject*& endRenderer, int& endOffset) const
+void RenderView::getSelection(RenderObject*& startRenderer, Optional<unsigned>& startOffset, RenderObject*& endRenderer, Optional<unsigned>& endOffset) const
 {
     startRenderer = m_selectionUnsplitStart;
     startOffset = m_selectionUnsplitStartPos;
@@ -1085,7 +1102,7 @@ void RenderView::getSelection(RenderObject*& startRenderer, int& startOffset, Re
 void RenderView::clearSelection()
 {
     layer()->repaintBlockSelectionGaps();
-    setSelection(nullptr, -1, nullptr, -1, RepaintNewMinusOld);
+    setSelection(nullptr, Nullopt, nullptr, Nullopt, RepaintNewMinusOld);
 }
 
 bool RenderView::printing() const
@@ -1120,7 +1137,7 @@ bool RenderView::rootBackgroundIsEntirelyFixed() const
     if (!rootObject)
         return false;
 
-    return rootObject->rendererForRootBackground().hasEntirelyFixedBackground();
+    return rootObject->rendererForRootBackground().style().hasEntirelyFixedBackground();
 }
     
 LayoutRect RenderView::unextendedBackgroundRect() const
@@ -1186,17 +1203,6 @@ void RenderView::pushLayoutState(RenderObject& root)
     pushLayoutStateForCurrentFlowThread(root);
 }
 
-bool RenderView::shouldDisableLayoutStateForSubtree(RenderObject* renderer) const
-{
-    RenderObject* o = renderer;
-    while (o) {
-        if (o->hasTransform() || o->hasReflection())
-            return true;
-        o = o->container();
-    }
-    return false;
-}
-
 IntSize RenderView::viewportSizeForCSSViewportUnits() const
 {
     return frameView().viewportSizeForCSSViewportUnits();
@@ -1241,7 +1247,7 @@ void RenderView::setBestTruncatedAt(int y, RenderBoxModelObject* forRenderer, bo
     }
 
     // Prefer the widest object that tries to move the pagination point
-    IntRect boundingBox = forRenderer->borderBoundingBox();
+    LayoutRect boundingBox = forRenderer->borderBoundingBox();
     if (boundingBox.width() > m_legacyPrinting.m_truncatorWidth) {
         m_legacyPrinting.m_truncatorWidth = boundingBox.width();
         m_legacyPrinting.m_bestTruncatedAt = y;

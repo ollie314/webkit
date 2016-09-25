@@ -41,6 +41,7 @@
 #include "RenderBox.h"
 #include "RenderStyle.h"
 #include "RenderView.h"
+#include "SpringSolver.h"
 #include "UnitBezier.h"
 #include <algorithm>
 #include <wtf/CurrentTime.h>
@@ -70,10 +71,16 @@ static inline double solveStepsFunction(int numSteps, bool stepAtStart, double t
     return floor(numSteps * t) / numSteps;
 }
 
-AnimationBase::AnimationBase(Animation& animation, RenderElement* renderer, CompositeAnimation* compositeAnimation)
+static inline double solveSpringFunction(double mass, double stiffness, double damping, double initialVelocity, double t, double duration)
+{
+    SpringSolver solver(mass, stiffness, damping, initialVelocity);
+    return solver.solve(t * duration);
+}
+
+AnimationBase::AnimationBase(const Animation& animation, RenderElement* renderer, CompositeAnimation* compositeAnimation)
     : m_object(renderer)
     , m_compositeAnimation(compositeAnimation)
-    , m_animation(animation)
+    , m_animation(const_cast<Animation&>(animation))
 {
     // Compute the total duration
     if (m_animation->iterationCount() > 0)
@@ -82,7 +89,7 @@ AnimationBase::AnimationBase(Animation& animation, RenderElement* renderer, Comp
 
 void AnimationBase::setNeedsStyleRecalc(Element* element)
 {
-    ASSERT(!element || !element->document().inPageCache());
+    ASSERT(!element || element->document().pageCacheState() == Document::NotInPageCache);
     if (element)
         element->setNeedsStyleRecalc(SyntheticStyleChange);
 }
@@ -219,6 +226,7 @@ void AnimationBase::updateStateMachine(AnimationStateInput input, double param)
                 // We are pausing before we even started.
                 LOG(Animations, "%p AnimationState %s -> AnimationState::PausedNew", this, nameForState(m_animationState));
                 m_animationState = AnimationState::PausedNew;
+                m_pauseTime = 0;
             }
 
 #if ENABLE(CSS_ANIMATIONS_LEVEL_2)
@@ -388,7 +396,7 @@ void AnimationBase::updateStateMachine(AnimationStateInput input, double param)
             // AnimationState::PausedWaitResponse, we don't yet have a valid startTime, so we send 0 to startAnimation.
             // When the AnimationStateInput::StartTimeSet comes in and we were in AnimationState::PausedRun, we will notice
             // that we have already set the startTime and will ignore it.
-            ASSERT(input == AnimationStateInput::PlayStateRunning || input == AnimationStateInput::StartTimeSet || input == AnimationStateInput::StyleAvailable || input == AnimationStateInput::StartAnimation);
+            ASSERT(input == AnimationStateInput::PlayStatePaused || input == AnimationStateInput::PlayStateRunning || input == AnimationStateInput::StartTimeSet || input == AnimationStateInput::StyleAvailable || input == AnimationStateInput::StartAnimation);
             ASSERT(paused());
 
             if (input == AnimationStateInput::PlayStateRunning) {
@@ -397,6 +405,7 @@ void AnimationBase::updateStateMachine(AnimationStateInput input, double param)
                     // to start, so jump back to the New state and reset.
                     LOG(Animations, "%p AnimationState %s -> AnimationState::New", this, nameForState(m_animationState));
                     m_animationState = AnimationState::New;
+                    m_pauseTime = -1;
                     updateStateMachine(input, param);
                     break;
                 }
@@ -406,6 +415,7 @@ void AnimationBase::updateStateMachine(AnimationStateInput input, double param)
                     m_startTime += beginAnimationUpdateTime() - m_pauseTime;
                 else
                     m_startTime = 0;
+
                 m_pauseTime = -1;
 
                 if (m_animationState == AnimationState::PausedWaitStyleAvailable) {
@@ -446,7 +456,7 @@ void AnimationBase::updateStateMachine(AnimationStateInput input, double param)
                 break;
             }
 
-            ASSERT(m_animationState == AnimationState::PausedWaitStyleAvailable);
+            ASSERT(m_animationState == AnimationState::PausedNew || m_animationState == AnimationState::PausedWaitStyleAvailable);
             // We are paused but we got the callback that notifies us that style has been updated.
             // We move to the AnimationState::PausedWaitResponse state
             LOG(Animations, "%p AnimationState %s -> PausedWaitResponse", this, nameForState(m_animationState));
@@ -473,7 +483,7 @@ void AnimationBase::fireAnimationEventsIfNeeded()
     // during an animation callback that might get called. Since the owner is a CompositeAnimation
     // and it ref counts this object, we will keep a ref to that instead. That way the AnimationBase
     // can still access the resources of its CompositeAnimation as needed.
-    Ref<AnimationBase> protect(*this);
+    Ref<AnimationBase> protectedThis(*this);
     Ref<CompositeAnimation> protectCompositeAnimation(*m_compositeAnimation);
     
     // Check for start timeout
@@ -557,7 +567,7 @@ double AnimationBase::timeToNextService()
 {
     // Returns the time at which next service is required. -1 means no service is required. 0 means 
     // service is required now, and > 0 means service is required that many seconds in the future.
-    if (paused() || isNew() || m_animationState == AnimationState::FillingForwards)
+    if (paused() || isNew() || postActive() || fillingForwards())
         return -1;
     
     if (m_animationState == AnimationState::StartWaitTimer) {
@@ -645,12 +655,16 @@ double AnimationBase::progress(double scale, double offset, const TimingFunction
 
     switch (timingFunction->type()) {
     case TimingFunction::CubicBezierFunction: {
-        const CubicBezierTimingFunction* function = static_cast<const CubicBezierTimingFunction*>(timingFunction);
-        return solveCubicBezierFunction(function->x1(), function->y1(), function->x2(), function->y2(), fractionalTime, m_animation->duration());
+        auto& function = *static_cast<const CubicBezierTimingFunction*>(timingFunction);
+        return solveCubicBezierFunction(function.x1(), function.y1(), function.x2(), function.y2(), fractionalTime, m_animation->duration());
     }
     case TimingFunction::StepsFunction: {
-        const StepsTimingFunction* stepsTimingFunction = static_cast<const StepsTimingFunction*>(timingFunction);
-        return solveStepsFunction(stepsTimingFunction->numberOfSteps(), stepsTimingFunction->stepAtStart(), fractionalTime);
+        auto& function = *static_cast<const StepsTimingFunction*>(timingFunction);
+        return solveStepsFunction(function.numberOfSteps(), function.stepAtStart(), fractionalTime);
+    }
+    case TimingFunction::SpringFunction: {
+        auto& function = *static_cast<const SpringTimingFunction*>(timingFunction);
+        return solveSpringFunction(function.mass(), function.stiffness(), function.damping(), function.initialVelocity(), fractionalTime, m_animation->duration());
     }
     case TimingFunction::LinearFunction:
         return fractionalTime;
@@ -741,10 +755,14 @@ double AnimationBase::getElapsedTime() const
     }
 #endif
 
-    if (paused())
-        return m_pauseTime - m_startTime;
+    if (paused()) {
+        double delayOffset = (!m_startTime && m_animation->delay() < 0) ? m_animation->delay() : 0;
+        return m_pauseTime - m_startTime - delayOffset;
+    }
+
     if (m_startTime <= 0)
         return 0;
+
     if (postActive() || fillingForwards())
         return m_totalDuration;
 

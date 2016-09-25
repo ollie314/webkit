@@ -1,6 +1,25 @@
 var Headers = {
-    testName: [{ title: Strings.text.testName }],
-    score: [{ title: Strings.text.score, text: Strings.json.score }]
+    testName: [
+        {
+            title: "<span onclick='benchmarkController.showDebugInfo()'>" + Strings.text.testName + "</span>",
+            text: Strings.text.testName
+        }
+    ],
+    score: [
+        {
+            title: Strings.text.score,
+            text: Strings.json.score
+        }
+    ],
+    details: [
+        {
+            title: "&nbsp;",
+            text: function(data) {
+                var bootstrap = data[Strings.json.complexity][Strings.json.bootstrap];
+                return "<span>±" + (Statistics.largestDeviationPercentage(bootstrap.confidenceLow, bootstrap.median, bootstrap.confidenceHigh) * 100).toFixed(2) + "%</span>";
+            }
+        }
+    ]
 };
 
 var Suite = function(name, tests) {
@@ -18,15 +37,19 @@ Suites.push(new Suite("Animometer",
         },
         {
             url: "master/canvas-stage.html?pathType=arcs",
-            name: "Canvas arcs"
+            name: "Canvas Arcs"
         },
         {
-            url: "master/canvas-stage.html?pathType=linePath&lineJoin=round&lineCap=round",
-            name: "Canvas line path, round join"
+            url: "master/leaves.html",
+            name: "Leaves"
+        },
+        {
+            url: "master/canvas-stage.html?pathType=linePath",
+            name: "Paths"
         },
         {
             url: "master/canvas-stage.html?pathType=line&lineCap=square",
-            name: "Canvas line segments"
+            name: "Canvas Lines"
         },
         {
             url: "master/focus.html",
@@ -37,8 +60,12 @@ Suites.push(new Suite("Animometer",
             name: "Images"
         },
         {
-            url: "master/particles.html",
-            name: "DOM particles, SVG masks"
+            url: "master/text.html",
+            name: "Design"
+        },
+        {
+            url: "master/svg-particles.html",
+            name: "Suits"
         },
     ]
 ));

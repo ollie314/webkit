@@ -24,7 +24,6 @@
  */
 
 #import <UIKit/UIKit.h>
-#import <UIKit/UITouch.h>
 
 #if USE(APPLE_INTERNAL_SDK)
 
@@ -89,6 +88,7 @@ typedef NS_ENUM(NSInteger, UIPreviewItemType) {
     UIPreviewItemTypeLink,
     UIPreviewItemTypeImage,
     UIPreviewItemTypeText,
+    UIPreviewItemTypeAttachment,
 };
 
 @class UIPreviewItemController;
@@ -224,6 +224,7 @@ typedef enum {
 + (UIKeyboardImpl *)sharedInstance;
 + (CGSize)defaultSizeForInterfaceOrientation:(UIInterfaceOrientation)orientation;
 - (void)addInputString:(NSString *)string withFlags:(NSUInteger)flags;
+- (void)addInputString:(NSString *)string withFlags:(NSUInteger)flags withInputManagerHint:(NSString *)hint;
 - (BOOL)autocorrectSpellingEnabled;
 - (void)deleteFromInput;
 - (void)deleteFromInputWithFlags:(NSUInteger)flags;
@@ -232,7 +233,6 @@ typedef enum {
 @end
 
 @interface UIGestureRecognizer ()
-- (void)requireOtherGestureToFail:(UIGestureRecognizer *)gestureRecognizer;
 #if __IPHONE_OS_VERSION_MAX_ALLOWED < 90200
 @property(nonatomic, copy) NSArray<NSNumber *> *allowedTouchTypes;
 #endif
@@ -316,8 +316,10 @@ typedef enum {
 @end
 
 @interface UITapGestureRecognizer ()
+@property (nonatomic, getter=_allowableSeparation, setter=_setAllowableSeparation:) CGFloat allowableSeparation; 
 @property (nonatomic, readonly) CGPoint location;
-@property (nonatomic, readonly) NSArray  *touches;
+@property (nonatomic) CGFloat allowableMovement;
+@property (nonatomic, readonly) CGPoint centroid;
 @end
 
 @class WebEvent;
@@ -368,6 +370,14 @@ typedef enum {
 - (void)setGestureRecognizers;
 - (void)willStartScrollingOverflow;
 @end
+
+#if __IPHONE_OS_VERSION_MIN_REQUIRED >= 100000
+@class UITextSuggestion;
+
+@protocol UITextInputSuggestionDelegate <UITextInputDelegate>
+- (void)setSuggestions:(NSArray <UITextSuggestion*> *)suggestions;
+@end
+#endif
 
 @interface UIViewController ()
 + (UIViewController *)_viewControllerForFullScreenPresentationFromView:(UIView *)view;
@@ -531,7 +541,12 @@ typedef NS_ENUM(NSInteger, UIWKHandlePosition) {
 @property (nonatomic, assign) NSRange rangeInMarkedText;
 @end
 
-@interface UIWKTextInteractionAssistant : UITextInteractionAssistant
+#if __IPHONE_OS_VERSION_MAX_ALLOWED < 100000
+@protocol UIResponderStandardEditActions
+@end
+#endif
+
+@interface UIWKTextInteractionAssistant : UITextInteractionAssistant <UIResponderStandardEditActions>
 @end
 
 @interface UIWKTextInteractionAssistant (UIWKTextInteractionAssistantDetails)
@@ -541,8 +556,8 @@ typedef NS_ENUM(NSInteger, UIWKHandlePosition) {
 - (void)showTextStyleOptions;
 - (void)hideTextStyleOptions;
 
-@property (nonatomic, readonly, retain) UITapGestureRecognizer *singleTapGesture;
-@property (nonatomic, readonly, retain) UILongPressGestureRecognizer *loupeGesture;
+@property (nonatomic, readonly, assign) UILongPressGestureRecognizer *loupeGesture;
+@property (nonatomic, readonly, assign) UITapGestureRecognizer *singleTapGesture;
 @end
 
 @protocol UIWKInteractionViewProtocol
@@ -628,12 +643,22 @@ typedef enum {
     UIWebTouchEventTouchCancel = 3,
 } UIWebTouchEventType;
 
+typedef enum {
+    UIWebTouchPointTypeDirect = 0,
+    UIWebTouchPointTypeStylus
+} UIWebTouchPointType;
+
 struct _UIWebTouchPoint {
     CGPoint locationInScreenCoordinates;
     CGPoint locationInDocumentCoordinates;
     unsigned identifier;
     UITouchPhase phase;
-    CGFloat majorRadiusInScreenCoordinates;
+#if __IPHONE_OS_VERSION_MIN_REQUIRED > 100000
+    CGFloat force;
+    CGFloat altitudeAngle;
+    CGFloat azimuthAngle;
+    UIWebTouchPointType touchType;
+#endif
 };
 
 struct _UIWebTouchEvent {
@@ -815,6 +840,10 @@ typedef enum {
 - (CGRect)accessibilityConvertRectToSceneReferenceCoordinates:(CGRect)rect;
 @end
 
+@interface UIResponder ()
+- (UIResponder *)firstResponder;
+@end
+
 WTF_EXTERN_C_BEGIN
 
 BOOL UIKeyboardEnabledInputModesAllowOneToManyShortcuts();
@@ -851,5 +880,10 @@ extern NSString *const UIKeyInputPageDown;
 extern const NSString *UIPreviewDataLink;
 extern const NSString *UIPreviewDataDDResult;
 extern const NSString *UIPreviewDataDDContext;
+
+#if __IPHONE_OS_VERSION_MIN_REQUIRED >= 100000
+extern const NSString *UIPreviewDataAttachmentList;
+extern const NSString *UIPreviewDataAttachmentIndex;
+#endif
 
 WTF_EXTERN_C_END

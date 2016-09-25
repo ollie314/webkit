@@ -42,15 +42,18 @@
 
 using namespace WebCore;
 
+#define RELEASE_LOG_IF_ALLOWED(fmt, ...) RELEASE_LOG_IF(isAlwaysOnLoggingAllowed(), Network, "%p - WebResourceLoader::" fmt, this, ##__VA_ARGS__)
+
 namespace WebKit {
 
-Ref<WebResourceLoader> WebResourceLoader::create(PassRefPtr<ResourceLoader> coreLoader)
+Ref<WebResourceLoader> WebResourceLoader::create(Ref<ResourceLoader>&& coreLoader, const TrackingParameters& trackingParameters)
 {
-    return adoptRef(*new WebResourceLoader(coreLoader));
+    return adoptRef(*new WebResourceLoader(WTFMove(coreLoader), trackingParameters));
 }
 
-WebResourceLoader::WebResourceLoader(PassRefPtr<WebCore::ResourceLoader> coreLoader)
-    : m_coreLoader(coreLoader)
+WebResourceLoader::WebResourceLoader(Ref<WebCore::ResourceLoader>&& coreLoader, const TrackingParameters& trackingParameters)
+    : m_coreLoader(WTFMove(coreLoader))
+    , m_trackingParameters(trackingParameters)
 {
 }
 
@@ -60,7 +63,7 @@ WebResourceLoader::~WebResourceLoader()
 
 IPC::Connection* WebResourceLoader::messageSenderConnection()
 {
-    return WebProcess::singleton().networkConnection()->connection();
+    return &WebProcess::singleton().networkConnection().connection();
 }
 
 uint64_t WebResourceLoader::messageSenderDestinationID()
@@ -73,21 +76,21 @@ void WebResourceLoader::detachFromCoreLoader()
     m_coreLoader = nullptr;
 }
 
-void WebResourceLoader::willSendRequest(const ResourceRequest& proposedRequest, const ResourceResponse& redirectResponse)
+void WebResourceLoader::willSendRequest(ResourceRequest&& proposedRequest, ResourceResponse&& redirectResponse)
 {
-    LOG(Network, "(WebProcess) WebResourceLoader::willSendRequest to '%s'", proposedRequest.url().string().utf8().data());
+    LOG(Network, "(WebProcess) WebResourceLoader::willSendRequest to '%s'", proposedRequest.url().string().latin1().data());
+    RELEASE_LOG_IF_ALLOWED("willSendRequest: (pageID = %llu, frameID = %llu, resourceID = %llu)", m_trackingParameters.pageID, m_trackingParameters.frameID, m_trackingParameters.resourceID);
 
-    RefPtr<WebResourceLoader> protect(this);
+    RefPtr<WebResourceLoader> protectedThis(this);
 
-    ResourceRequest newRequest = proposedRequest;
-    if (m_coreLoader->documentLoader()->applicationCacheHost()->maybeLoadFallbackForRedirect(m_coreLoader.get(), newRequest, redirectResponse))
+    if (m_coreLoader->documentLoader()->applicationCacheHost()->maybeLoadFallbackForRedirect(m_coreLoader.get(), proposedRequest, redirectResponse))
         return;
-    // FIXME: Do we need to update NetworkResourceLoader clientCredentialPolicy in case loader policy is DoNotAskClientForCrossOriginCredentials?
-    m_coreLoader->willSendRequest(WTFMove(newRequest), redirectResponse, [protect](ResourceRequest&& request) {
-        if (!protect->m_coreLoader)
+
+    m_coreLoader->willSendRequest(WTFMove(proposedRequest), redirectResponse, [protectedThis](ResourceRequest&& request) {
+        if (!protectedThis->m_coreLoader)
             return;
 
-        protect->send(Messages::NetworkResourceLoader::ContinueWillSendRequest(request));
+        protectedThis->send(Messages::NetworkResourceLoader::ContinueWillSendRequest(request));
     });
 }
 
@@ -98,7 +101,8 @@ void WebResourceLoader::didSendData(uint64_t bytesSent, uint64_t totalBytesToBeS
 
 void WebResourceLoader::didReceiveResponse(const ResourceResponse& response, bool needsContinueDidReceiveResponseMessage)
 {
-    LOG(Network, "(WebProcess) WebResourceLoader::didReceiveResponse for '%s'. Status %d.", m_coreLoader->url().string().utf8().data(), response.httpStatusCode());
+    LOG(Network, "(WebProcess) WebResourceLoader::didReceiveResponse for '%s'. Status %d.", m_coreLoader->url().string().latin1().data(), response.httpStatusCode());
+    RELEASE_LOG_IF_ALLOWED("didReceiveResponse: (pageID = %llu, frameID = %llu, resourceID = %llu, status = %d)", m_trackingParameters.pageID, m_trackingParameters.frameID, m_trackingParameters.resourceID, response.httpStatusCode());
 
     Ref<WebResourceLoader> protect(*this);
 
@@ -129,7 +133,12 @@ void WebResourceLoader::didReceiveResponse(const ResourceResponse& response, boo
 
 void WebResourceLoader::didReceiveData(const IPC::DataReference& data, int64_t encodedDataLength)
 {
-    LOG(Network, "(WebProcess) WebResourceLoader::didReceiveData of size %i for '%s'", (int)data.size(), m_coreLoader->url().string().utf8().data());
+    LOG(Network, "(WebProcess) WebResourceLoader::didReceiveData of size %lu for '%s'", data.size(), m_coreLoader->url().string().latin1().data());
+
+    if (!m_hasReceivedData) {
+        RELEASE_LOG_IF_ALLOWED("didReceiveData: Started receiving data (pageID = %llu, frameID = %llu, resourceID = %llu)", m_trackingParameters.pageID, m_trackingParameters.frameID, m_trackingParameters.resourceID);
+        m_hasReceivedData = true;
+    }
 
 #if USE(QUICK_LOOK)
     if (QuickLookHandle* quickLookHandle = m_coreLoader->documentLoader()->quickLookHandle()) {
@@ -142,7 +151,8 @@ void WebResourceLoader::didReceiveData(const IPC::DataReference& data, int64_t e
 
 void WebResourceLoader::didFinishResourceLoad(double finishTime)
 {
-    LOG(Network, "(WebProcess) WebResourceLoader::didFinishResourceLoad for '%s'", m_coreLoader->url().string().utf8().data());
+    LOG(Network, "(WebProcess) WebResourceLoader::didFinishResourceLoad for '%s'", m_coreLoader->url().string().latin1().data());
+    RELEASE_LOG_IF_ALLOWED("didFinishResourceLoad: (pageID = %llu, frameID = %llu, resourceID = %llu)", m_trackingParameters.pageID, m_trackingParameters.frameID, m_trackingParameters.resourceID);
 
 #if USE(QUICK_LOOK)
     if (QuickLookHandle* quickLookHandle = m_coreLoader->documentLoader()->quickLookHandle()) {
@@ -155,8 +165,9 @@ void WebResourceLoader::didFinishResourceLoad(double finishTime)
 
 void WebResourceLoader::didFailResourceLoad(const ResourceError& error)
 {
-    LOG(Network, "(WebProcess) WebResourceLoader::didFailResourceLoad for '%s'", m_coreLoader->url().string().utf8().data());
-    
+    LOG(Network, "(WebProcess) WebResourceLoader::didFailResourceLoad for '%s'", m_coreLoader->url().string().latin1().data());
+    RELEASE_LOG_IF_ALLOWED("didFailResourceLoad: (pageID = %llu, frameID = %llu, resourceID = %llu)", m_trackingParameters.pageID, m_trackingParameters.frameID, m_trackingParameters.resourceID);
+
 #if USE(QUICK_LOOK)
     if (QuickLookHandle* quickLookHandle = m_coreLoader->documentLoader()->quickLookHandle())
         quickLookHandle->didFail();
@@ -169,7 +180,8 @@ void WebResourceLoader::didFailResourceLoad(const ResourceError& error)
 #if ENABLE(SHAREABLE_RESOURCE)
 void WebResourceLoader::didReceiveResource(const ShareableResource::Handle& handle, double finishTime)
 {
-    LOG(Network, "(WebProcess) WebResourceLoader::didReceiveResource for '%s'", m_coreLoader->url().string().utf8().data());
+    LOG(Network, "(WebProcess) WebResourceLoader::didReceiveResource for '%s'", m_coreLoader->url().string().latin1().data());
+    RELEASE_LOG_IF_ALLOWED("didReceiveResource: (pageID = %llu, frameID = %llu, resourceID = %llu)", m_trackingParameters.pageID, m_trackingParameters.frameID, m_trackingParameters.resourceID);
 
     RefPtr<SharedBuffer> buffer = handle.tryWrapInSharedBuffer();
 
@@ -194,8 +206,8 @@ void WebResourceLoader::didReceiveResource(const ShareableResource::Handle& hand
     Ref<WebResourceLoader> protect(*this);
 
     // Only send data to the didReceiveData callback if it exists.
-    if (buffer->size())
-        m_coreLoader->didReceiveBuffer(buffer.get(), buffer->size(), DataPayloadWholeResource);
+    if (unsigned bufferSize = buffer->size())
+        m_coreLoader->didReceiveBuffer(buffer.releaseNonNull(), bufferSize, DataPayloadWholeResource);
 
     if (!m_coreLoader)
         return;
@@ -204,13 +216,9 @@ void WebResourceLoader::didReceiveResource(const ShareableResource::Handle& hand
 }
 #endif
 
-#if USE(PROTECTION_SPACE_AUTH_CALLBACK)
-void WebResourceLoader::canAuthenticateAgainstProtectionSpace(const ProtectionSpace& protectionSpace)
+bool WebResourceLoader::isAlwaysOnLoggingAllowed() const
 {
-    bool result = m_coreLoader ? m_coreLoader->canAuthenticateAgainstProtectionSpace(protectionSpace) : false;
-
-    send(Messages::NetworkResourceLoader::ContinueCanAuthenticateAgainstProtectionSpace(result));
+    return resourceLoader() && resourceLoader()->isAlwaysOnLoggingAllowed();
 }
-#endif
 
 } // namespace WebKit

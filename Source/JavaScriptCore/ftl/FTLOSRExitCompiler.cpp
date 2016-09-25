@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -99,11 +99,7 @@ static void reboxAccordingToFormat(
 
 static void compileRecovery(
     CCallHelpers& jit, const ExitValue& value,
-#if FTL_USES_B3
     Vector<B3::ValueRep>& valueReps,
-#else // FTL_USES_B3
-    StackMaps::Record* record, StackMaps& stackmaps,
-#endif // FTL_USES_B3
     char* registerScratch,
     const HashMap<ExitTimeObjectMaterialization*, EncodedJSValue*>& materializationToPointer)
 {
@@ -117,13 +113,8 @@ static void compileRecovery(
         break;
             
     case ExitValueArgument:
-#if FTL_USES_B3
         Location::forValueRep(valueReps[value.exitArgument().argument()]).restoreInto(
             jit, registerScratch, GPRInfo::regT0);
-#else // FTL_USES_B3
-        record->locations[value.exitArgument().argument()].restoreInto(
-            jit, stackmaps, registerScratch, GPRInfo::regT0);
-#endif // FTL_USES_B3
         break;
             
     case ExitValueInJSStack:
@@ -134,17 +125,10 @@ static void compileRecovery(
         break;
             
     case ExitValueRecovery:
-#if FTL_USES_B3
         Location::forValueRep(valueReps[value.rightRecoveryArgument()]).restoreInto(
             jit, registerScratch, GPRInfo::regT1);
         Location::forValueRep(valueReps[value.leftRecoveryArgument()]).restoreInto(
             jit, registerScratch, GPRInfo::regT0);
-#else // FTL_USES_B3
-        record->locations[value.rightRecoveryArgument()].restoreInto(
-            jit, stackmaps, registerScratch, GPRInfo::regT1);
-        record->locations[value.leftRecoveryArgument()].restoreInto(
-            jit, stackmaps, registerScratch, GPRInfo::regT0);
-#endif // FTL_USES_B3
         switch (value.recoveryOpcode()) {
         case AddRecovery:
             switch (value.recoveryFormat()) {
@@ -194,13 +178,6 @@ static void compileRecovery(
 static void compileStub(
     unsigned exitID, JITCode* jitCode, OSRExit& exit, VM* vm, CodeBlock* codeBlock)
 {
-#if FTL_USES_B3
-    UNUSED_PARAM(jitCode);
-#else // FTL_USES_B3
-    StackMaps::Record* record = &jitCode->stackmaps.records[exit.m_stackmapRecordIndex];
-    RELEASE_ASSERT(record->patchpointID == exit.m_descriptor->m_stackmapID);
-#endif // FTL_USES_B3
-
     // This code requires framePointerRegister is the same as callFrameRegister
     static_assert(MacroAssembler::framePointerRegister == GPRInfo::callFrameRegister, "MacroAssembler::framePointerRegister and GPRInfo::callFrameRegister must be the same");
 
@@ -209,15 +186,10 @@ static void compileStub(
     // The first thing we need to do is restablish our frame in the case of an exception.
     if (exit.isGenericUnwindHandler()) {
         RELEASE_ASSERT(vm->callFrameForCatch); // The first time we hit this exit, like at all other times, this field should be non-null.
-        jit.restoreCalleeSavesFromVMCalleeSavesBuffer();
+        jit.restoreCalleeSavesFromVMEntryFrameCalleeSavesBuffer();
         jit.loadPtr(vm->addressOfCallFrameForCatch(), MacroAssembler::framePointerRegister);
         jit.addPtr(CCallHelpers::TrustedImm32(codeBlock->stackPointerOffset() * sizeof(Register)),
             MacroAssembler::framePointerRegister, CCallHelpers::stackPointerRegister);
-
-#if !FTL_USES_B3
-        if (exit.needsRegisterRecoveryOnGenericUnwindOSRExitPath())
-            exit.recoverRegistersFromSpillSlot(jit, jitCode->osrExitFromGenericUnwindStackSpillSlot);
-#endif // !FTL_USES_B3
 
         // Do a pushToSave because that's what the exit compiler below expects the stack
         // to look like because that's the last thing the ExitThunkGenerator does. The code
@@ -225,11 +197,6 @@ static void compileStub(
         // general shape of the stack being as it is in the non-exception OSR case.
         jit.pushToSaveImmediateWithoutTouchingRegisters(CCallHelpers::TrustedImm32(0xbadbeef));
     }
-#if !FTL_USES_B3
-    if (exit.willArriveAtOSRExitFromCallOperation())
-        exit.recoverRegistersFromSpillSlot(jit, jitCode->osrExitFromGenericUnwindStackSpillSlot);
-#endif // !FTL_USES_B3
-    
 
     // We need scratch space to save all registers, to build up the JS stack, to deal with unwind
     // fixup, pointers to all of the objects we materialize, and the elements inside those objects
@@ -267,15 +234,11 @@ static void compileStub(
     auto recoverValue = [&] (const ExitValue& value) {
         compileRecovery(
             jit, value,
-#if FTL_USES_B3
             exit.m_valueReps,
-#else // FTL_USES_B3
-            record, jitCode->stackmaps,
-#endif // FTL_USES_B3
             registerScratch, materializationToPointer);
     };
     
-    // Note that we come in here, the stack used to be as LLVM left it except that someone called pushToSave().
+    // Note that we come in here, the stack used to be as B3 left it except that someone called pushToSave().
     // We don't care about the value they saved. But, we do appreciate the fact that they did it, because we use
     // that slot for saveAllRegisters().
 
@@ -285,9 +248,9 @@ static void compileStub(
     jit.popToRestore(GPRInfo::regT0);
     jit.checkStackPointerAlignment();
     
-    if (vm->m_perBytecodeProfiler && codeBlock->jitCode()->dfgCommon()->compilation) {
+    if (vm->m_perBytecodeProfiler && jitCode->dfgCommon()->compilation) {
         Profiler::Database& database = *vm->m_perBytecodeProfiler;
-        Profiler::Compilation* compilation = codeBlock->jitCode()->dfgCommon()->compilation.get();
+        Profiler::Compilation* compilation = jitCode->dfgCommon()->compilation.get();
         
         Profiler::OSRExit* profilerExit = compilation->addOSRExit(
             exitID, Profiler::OriginStack(database, codeBlock, exit.m_codeOrigin),
@@ -305,11 +268,7 @@ static void compileStub(
     
     // Do some value profiling.
     if (exit.m_descriptor->m_profileDataFormat != DataFormatNone) {
-#if FTL_USES_B3
         Location::forValueRep(exit.m_valueReps[0]).restoreInto(jit, registerScratch, GPRInfo::regT0);
-#else // FTL_USES_B3
-        record->locations[0].restoreInto(jit, jitCode->stackmaps, registerScratch, GPRInfo::regT0);
-#endif // FTL_USES_B3
         reboxAccordingToFormat(
             exit.m_descriptor->m_profileDataFormat, jit, GPRInfo::regT0, GPRInfo::regT1, GPRInfo::regT2);
         
@@ -325,8 +284,8 @@ static void compileStub(
             }
         }
 
-        if (!!exit.m_descriptor->m_valueProfile)
-            jit.store64(GPRInfo::regT0, exit.m_descriptor->m_valueProfile.getSpecFailBucket(0));
+        if (exit.m_descriptor->m_valueProfile)
+            exit.m_descriptor->m_valueProfile.emitReportValue(jit, JSValueRegs(GPRInfo::regT0));
     }
 
     // Materialize all objects. Don't materialize an object until all
@@ -435,7 +394,7 @@ static void compileStub(
         jit.store64(GPRInfo::regT0, unwindScratch + i);
     }
     
-    jit.load32(CCallHelpers::payloadFor(JSStack::ArgumentCount), GPRInfo::regT2);
+    jit.load32(CCallHelpers::payloadFor(CallFrameSlot::argumentCount), GPRInfo::regT2);
     
     // Let's say that the FTL function had failed its arity check. In that case, the stack will
     // contain some extra stuff.
@@ -482,8 +441,10 @@ static void compileStub(
     RegisterAtOffsetList* baselineCalleeSaves = baselineCodeBlock->calleeSaveRegisters();
     RegisterAtOffsetList* vmCalleeSaves = vm->getAllCalleeSaveRegisterOffsets();
     RegisterSet vmCalleeSavesToSkip = RegisterSet::stackRegisters();
-    if (exit.isExceptionHandler())
-        jit.move(CCallHelpers::TrustedImmPtr(vm->calleeSaveRegistersBuffer), GPRInfo::regT1);
+    if (exit.isExceptionHandler()) {
+        jit.loadPtr(&vm->topVMEntryFrame, GPRInfo::regT1);
+        jit.addPtr(CCallHelpers::TrustedImm32(VMEntryFrame::calleeSaveRegistersBufferOffset()), GPRInfo::regT1);
+    }
 
     for (Reg reg = Reg::first(); reg <= Reg::last(); reg = reg.next()) {
         if (!allFTLCalleeSaves.get(reg)) {
@@ -561,7 +522,6 @@ static void compileStub(
     adjustAndJumpToTarget(jit, exit);
     
     LinkBuffer patchBuffer(*vm, jit, codeBlock);
-#if FTL_USES_B3
     exit.m_code = FINALIZE_CODE_IF(
         shouldDumpDisassembly() || Options::verboseOSR() || Options::verboseFTLOSRExit(),
         patchBuffer,
@@ -570,23 +530,10 @@ static void compileStub(
             exitKindToString(exit.m_kind), toCString(*codeBlock).data(),
             toCString(ignoringContext<DumpContext>(exit.m_descriptor->m_values)).data())
         );
-#else // FTL_USES_B3
-    exit.m_code = FINALIZE_CODE_IF(
-        shouldDumpDisassembly() || Options::verboseOSR() || Options::verboseFTLOSRExit(),
-        patchBuffer,
-        ("FTL OSR exit #%u (%s, %s) from %s, with operands = %s, and record = %s",
-            exitID, toCString(exit.m_codeOrigin).data(),
-            exitKindToString(exit.m_kind), toCString(*codeBlock).data(),
-            toCString(ignoringContext<DumpContext>(exit.m_descriptor->m_values)).data(),
-            toCString(*record).data())
-        );
-#endif // FTL_USES_B3
 }
 
 extern "C" void* compileFTLOSRExit(ExecState* exec, unsigned exitID)
 {
-    SamplingRegion samplingRegion("FTL OSR Exit Compilation");
-
     if (shouldDumpDisassembly() || Options::verboseOSR() || Options::verboseFTLOSRExit())
         dataLog("Compiling OSR exit with exitID = ", exitID, "\n");
 
@@ -612,19 +559,11 @@ extern "C" void* compileFTLOSRExit(ExecState* exec, unsigned exitID)
         dataLog("    Origin: ", exit.m_codeOrigin, "\n");
         if (exit.m_codeOriginForExitProfile != exit.m_codeOrigin)
             dataLog("    Origin for exit profile: ", exit.m_codeOriginForExitProfile, "\n");
-#if !FTL_USES_B3
-        dataLog("    Exit stackmap ID: ", exit.m_descriptor->m_stackmapID, "\n");
-#endif // !FTL_USES_B3
         dataLog("    Current call site index: ", exec->callSiteIndex().bits(), "\n");
         dataLog("    Exit is exception handler: ", exit.isExceptionHandler(), "\n");
         dataLog("    Is unwind handler: ", exit.isGenericUnwindHandler(), "\n");
-#if !FTL_USES_B3
-        dataLog("    Will arrive at exit from lazy slow path: ", exit.m_exceptionType == ExceptionType::LazySlowPath, "\n");
-#endif // !FTL_USES_B3
         dataLog("    Exit values: ", exit.m_descriptor->m_values, "\n");
-#if FTL_USES_B3
         dataLog("    Value reps: ", listDump(exit.m_valueReps), "\n");
-#endif // FTL_USES_B3
         if (!exit.m_descriptor->m_materializations.isEmpty()) {
             dataLog("    Materializations:\n");
             for (ExitTimeObjectMaterialization* materialization : exit.m_descriptor->m_materializations)

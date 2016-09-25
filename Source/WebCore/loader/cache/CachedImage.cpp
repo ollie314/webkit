@@ -45,7 +45,6 @@
 #include <wtf/CurrentTime.h>
 #include <wtf/NeverDestroyed.h>
 #include <wtf/StdLibExtras.h>
-#include <wtf/Vector.h>
 
 #if PLATFORM(IOS)
 #include "SystemMemory.h"
@@ -57,8 +56,8 @@
 
 namespace WebCore {
 
-CachedImage::CachedImage(const ResourceRequest& resourceRequest, SessionID sessionID)
-    : CachedResource(resourceRequest, ImageResource, sessionID)
+CachedImage::CachedImage(CachedResourceRequest&& request, SessionID sessionID)
+    : CachedResource(WTFMove(request), ImageResource, sessionID)
     , m_image(nullptr)
     , m_isManuallyCached(false)
     , m_shouldPaintBrokenImage(true)
@@ -67,7 +66,7 @@ CachedImage::CachedImage(const ResourceRequest& resourceRequest, SessionID sessi
 }
 
 CachedImage::CachedImage(Image* image, SessionID sessionID)
-    : CachedResource(ResourceRequest(), ImageResource, sessionID)
+    : CachedResource(CachedResourceRequest(ResourceRequest()), ImageResource, sessionID)
     , m_image(image)
     , m_isManuallyCached(false)
     , m_shouldPaintBrokenImage(true)
@@ -77,7 +76,7 @@ CachedImage::CachedImage(Image* image, SessionID sessionID)
 }
 
 CachedImage::CachedImage(const URL& url, Image* image, SessionID sessionID)
-    : CachedResource(ResourceRequest(url), ImageResource, sessionID)
+    : CachedResource(CachedResourceRequest(ResourceRequest(url)), ImageResource, sessionID)
     , m_image(image)
     , m_isManuallyCached(false)
     , m_shouldPaintBrokenImage(true)
@@ -87,7 +86,7 @@ CachedImage::CachedImage(const URL& url, Image* image, SessionID sessionID)
 }
 
 CachedImage::CachedImage(const URL& url, Image* image, CachedImage::CacheBehaviorType type, SessionID sessionID)
-    : CachedResource(ResourceRequest(url), ImageResource, sessionID)
+    : CachedResource(CachedResourceRequest(ResourceRequest(url)), ImageResource, sessionID)
     , m_image(image)
     , m_isManuallyCached(type == CachedImage::ManuallyCached)
     , m_shouldPaintBrokenImage(true)
@@ -107,21 +106,32 @@ CachedImage::~CachedImage()
     clearImage();
 }
 
-void CachedImage::load(CachedResourceLoader& cachedResourceLoader, const ResourceLoaderOptions& options)
+void CachedImage::load(CachedResourceLoader& loader)
 {
-    if (cachedResourceLoader.shouldPerformImageLoad(url()))
-        CachedResource::load(cachedResourceLoader, options);
+    if (loader.shouldPerformImageLoad(url()))
+        CachedResource::load(loader);
     else
         setLoading(false);
+}
+
+void CachedImage::setBodyDataFrom(const CachedResource& resource)
+{
+    ASSERT(resource.type() == type());
+    const CachedImage& image = static_cast<const CachedImage&>(resource);
+
+    m_image = image.m_image;
+
+    if (m_image && is<SVGImage>(*m_image))
+        m_svgImageCache = std::make_unique<SVGImageCache>(&downcast<SVGImage>(*m_image));
 }
 
 void CachedImage::didAddClient(CachedResourceClient* client)
 {
     if (m_data && !m_image && !errorOccurred()) {
         createImage();
-        m_image->setData(m_data, true);
+        m_image->setData(m_data.copyRef(), true);
     }
-    
+
     ASSERT(client->resourceClientType() == CachedImageClient::expectedType());
     if (m_image && !m_image->isNull())
         static_cast<CachedImageClient*>(client)->imageChanged(this);
@@ -267,27 +277,19 @@ bool CachedImage::imageHasRelativeHeight() const
     return false;
 }
 
-LayoutSize CachedImage::imageSizeForRenderer(const RenderObject* renderer, float multiplier, SizeType sizeType)
+LayoutSize CachedImage::imageSizeForRenderer(const RenderElement* renderer, float multiplier, SizeType sizeType)
 {
     if (!m_image)
         return LayoutSize();
 
-    LayoutSize imageSize(m_image->size());
+    LayoutSize imageSize;
 
-#if ENABLE(CSS_IMAGE_ORIENTATION)
-    if (renderer && is<BitmapImage>(*m_image)) {
-        ImageOrientationDescription orientationDescription(renderer->shouldRespectImageOrientation(), renderer->style().imageOrientation());
-        if (orientationDescription.respectImageOrientation() == RespectImageOrientation)
-            imageSize = LayoutSize(downcast<BitmapImage>(*m_image).sizeRespectingOrientation(orientationDescription));
-    }
-#else
-    if (is<BitmapImage>(*m_image) && (renderer && renderer->shouldRespectImageOrientation() == RespectImageOrientation))
+    if (is<BitmapImage>(*m_image) && renderer && renderer->shouldRespectImageOrientation() == RespectImageOrientation)
         imageSize = LayoutSize(downcast<BitmapImage>(*m_image).sizeRespectingOrientation());
-#endif // ENABLE(CSS_IMAGE_ORIENTATION)
-
-    else if (is<SVGImage>(*m_image) && sizeType == UsedSize) {
+    else if (is<SVGImage>(*m_image) && sizeType == UsedSize)
         imageSize = LayoutSize(m_svgImageCache->imageSizeForRenderer(renderer));
-    }
+    else
+        imageSize = LayoutSize(m_image->size());
 
     if (multiplier == 1.0f)
         return imageSize;
@@ -342,9 +344,9 @@ inline void CachedImage::createImage()
         m_image = PDFDocumentImage::create(this);
 #endif
     else if (m_response.mimeType() == "image/svg+xml") {
-        RefPtr<SVGImage> svgImage = SVGImage::create(*this, url());
-        m_svgImageCache = std::make_unique<SVGImageCache>(svgImage.get());
-        m_image = svgImage.release();
+        auto svgImage = SVGImage::create(*this, url());
+        m_svgImageCache = std::make_unique<SVGImageCache>(svgImage.ptr());
+        m_image = WTFMove(svgImage);
     } else {
         m_image = BitmapImage::create(this);
         downcast<BitmapImage>(*m_image).setAllowSubsampling(m_loader && m_loader->frameLoader()->frame().settings().imageSubsamplingEnabled());
@@ -409,7 +411,7 @@ void CachedImage::addDataBuffer(SharedBuffer& data)
 void CachedImage::addData(const char* data, unsigned length)
 {
     ASSERT(dataBufferingPolicy() == DoNotBufferData);
-    addIncrementalDataBuffer(*SharedBuffer::create(data, length));
+    addIncrementalDataBuffer(SharedBuffer::create(data, length));
     CachedResource::addData(data, length);
 }
 

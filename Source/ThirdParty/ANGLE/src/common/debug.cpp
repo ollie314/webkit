@@ -34,7 +34,7 @@ void output(bool traceInDebugOnly, MessageType messageType, DebugTraceOutputType
 {
     if (DebugAnnotationsActive())
     {
-        static std::vector<char> buffer(512);
+        static auto& buffer = *new std::vector<char>(512);
         size_t len = FormatStringIntoVector(format, vararg, buffer);
         std::wstring formattedWideMessage(buffer.begin(), buffer.begin() + len);
 
@@ -44,16 +44,16 @@ void output(bool traceInDebugOnly, MessageType messageType, DebugTraceOutputType
           case DebugTraceOutputTypeNone:
             break;
           case DebugTraceOutputTypeBeginEvent:
-            g_debugAnnotator->beginEvent(formattedWideMessage);
+            g_debugAnnotator->beginEvent(formattedWideMessage.c_str());
             break;
           case DebugTraceOutputTypeSetMarker:
-            g_debugAnnotator->setMarker(formattedWideMessage);
+            g_debugAnnotator->setMarker(formattedWideMessage.c_str());
             break;
         }
     }
 
     std::string formattedMessage;
-    UNUSED_TRACE_VARIABLE(formattedMessage);
+    UNUSED_VARIABLE(formattedMessage);
 
 #if !defined(NDEBUG) && defined(_MSC_VER)
     if (messageType == MESSAGE_ERR)

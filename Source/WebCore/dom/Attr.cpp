@@ -23,6 +23,7 @@
 #include "config.h"
 #include "Attr.h"
 
+#include "AttributeChangeInvalidation.h"
 #include "Event.h"
 #include "ExceptionCode.h"
 #include "ScopedEventQueue.h"
@@ -51,18 +52,18 @@ Attr::Attr(Document& document, const QualifiedName& name, const AtomicString& st
 {
 }
 
-RefPtr<Attr> Attr::create(Element* element, const QualifiedName& name)
+Ref<Attr> Attr::create(Element* element, const QualifiedName& name)
 {
-    RefPtr<Attr> attr = adoptRef(new Attr(element, name));
+    Ref<Attr> attr = adoptRef(*new Attr(element, name));
     attr->createTextChild();
-    return attr.release();
+    return attr;
 }
 
-RefPtr<Attr> Attr::create(Document& document, const QualifiedName& name, const AtomicString& value)
+Ref<Attr> Attr::create(Document& document, const QualifiedName& name, const AtomicString& value)
 {
-    RefPtr<Attr> attr = adoptRef(new Attr(document, name, value));
+    Ref<Attr> attr = adoptRef(*new Attr(document, name, value));
     attr->createTextChild();
-    return attr.release();
+    return attr;
 }
 
 Attr::~Attr()
@@ -108,9 +109,10 @@ void Attr::setValue(const AtomicString& value)
     EventQueueScope scope;
     m_ignoreChildrenChanged++;
     removeChildren();
-    if (m_element)
+    if (m_element) {
+        Style::AttributeChangeInvalidation styleInvalidation(*m_element, qualifiedName(), elementAttribute().value(), value);
         elementAttribute().setValue(value);
-    else
+    } else
         m_standaloneValue = value;
     createTextChild();
     m_ignoreChildrenChanged--;
@@ -118,7 +120,7 @@ void Attr::setValue(const AtomicString& value)
     invalidateNodeListAndCollectionCachesInAncestors(&m_name, m_element);
 }
 
-void Attr::setValue(const AtomicString& value, ExceptionCode&)
+void Attr::setValueForBindings(const AtomicString& value)
 {
     AtomicString oldValue = this->value();
     if (m_element)
@@ -130,9 +132,9 @@ void Attr::setValue(const AtomicString& value, ExceptionCode&)
         m_element->didModifyAttribute(qualifiedName(), oldValue, value);
 }
 
-void Attr::setNodeValue(const String& v, ExceptionCode& ec)
+void Attr::setNodeValue(const String& v, ExceptionCode&)
 {
-    setValue(v, ec);
+    setValueForBindings(v);
 }
 
 Ref<Node> Attr::cloneNodeInternal(Document& targetDocument, CloningOperation)
@@ -163,9 +165,10 @@ void Attr::childrenChanged(const ChildChange&)
     if (m_element)
         m_element->willModifyAttribute(qualifiedName(), oldValue, newValue);
 
-    if (m_element)
+    if (m_element) {
+        Style::AttributeChangeInvalidation styleInvalidation(*m_element, qualifiedName(), oldValue, newValue);
         elementAttribute().setValue(newValue);
-    else
+    } else
         m_standaloneValue = newValue;
 
     if (m_element)

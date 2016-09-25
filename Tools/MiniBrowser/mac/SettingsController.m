@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2014-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,6 +27,11 @@
 
 #import "AppDelegate.h"
 #import "BrowserWindowController.h"
+#import <WebKit/WKPreferencesPrivate.h>
+
+#if WK_API_ENABLED
+#import <WebKit/_WKExperimentalFeature.h>
+#endif
 
 static NSString * const defaultURL = @"http://www.webkit.org/";
 static NSString * const DefaultURLPreferenceKey = @"DefaultURL";
@@ -36,9 +41,11 @@ static NSString * const LayerBordersVisiblePreferenceKey = @"LayerBordersVisible
 static NSString * const SimpleLineLayoutDebugBordersEnabledPreferenceKey = @"SimpleLineLayoutDebugBordersEnabled";
 static NSString * const TiledScrollingIndicatorVisiblePreferenceKey = @"TiledScrollingIndicatorVisible";
 static NSString * const ResourceUsageOverlayVisiblePreferenceKey = @"ResourceUsageOverlayVisible";
+static NSString * const UsesGameControllerFrameworkKey = @"UsesGameControllerFramework";
 static NSString * const IncrementalRenderingSuppressedPreferenceKey = @"IncrementalRenderingSuppressed";
 static NSString * const AcceleratedDrawingEnabledPreferenceKey = @"AcceleratedDrawingEnabled";
 static NSString * const DisplayListDrawingEnabledPreferenceKey = @"DisplayListDrawingEnabled";
+static NSString * const ResourceLoadStatisticsEnabledPreferenceKey = @"ResourceLoadStatisticsEnabled";
 
 static NSString * const NonFastScrollableRegionOverlayVisiblePreferenceKey = @"NonFastScrollableRegionOverlayVisible";
 static NSString * const WheelEventHandlerRegionOverlayVisiblePreferenceKey = @"WheelEventHandlerRegionOverlayVisible";
@@ -47,6 +54,8 @@ static NSString * const UseTransparentWindowsPreferenceKey = @"UseTransparentWin
 static NSString * const UsePaginatedModePreferenceKey = @"UsePaginatedMode";
 static NSString * const EnableSubPixelCSSOMMetricsPreferenceKey = @"EnableSubPixelCSSOMMetrics";
 
+static NSString * const VisualViewportEnabledPreferenceKey = @"VisualViewportEnabled";
+
 // This default name intentionally overlaps with the key that WebKit2 checks when creating a view.
 static NSString * const UseRemoteLayerTreeDrawingAreaPreferenceKey = @"WebKit2UseRemoteLayerTreeDrawingArea";
 
@@ -54,7 +63,10 @@ static NSString * const PerWindowWebProcessesDisabledKey = @"PerWindowWebProcess
 
 typedef NS_ENUM(NSInteger, DebugOverylayMenuItemTag) {
     NonFastScrollableRegionOverlayTag = 100,
-    WheelEventHandlerRegionOverlayTag
+    WheelEventHandlerRegionOverlayTag,
+#if WK_API_ENABLED
+    ExperimentalFeatureTag,
+#endif
 };
 
 @implementation SettingsController
@@ -112,6 +124,8 @@ typedef NS_ENUM(NSInteger, DebugOverylayMenuItemTag) {
     [self _addItemWithTitle:@"Suppress Incremental Rendering in New Windows" action:@selector(toggleIncrementalRenderingSuppressed:) indented:NO];
     [self _addItemWithTitle:@"Enable Accelerated Drawing" action:@selector(toggleAcceleratedDrawingEnabled:) indented:NO];
     [self _addItemWithTitle:@"Enable Display List Drawing" action:@selector(toggleDisplayListDrawingEnabled:) indented:NO];
+    [self _addItemWithTitle:@"Enable Visual Viewport" action:@selector(toggleVisualViewportEnabled:) indented:NO];
+    [self _addItemWithTitle:@"Enable Resource Load Statistics" action:@selector(toggleResourceLoadStatisticsEnabled:) indented:NO];
 
     [self _addHeaderWithTitle:@"WebKit2-only Settings"];
 
@@ -119,6 +133,7 @@ typedef NS_ENUM(NSInteger, DebugOverylayMenuItemTag) {
     [self _addItemWithTitle:@"Use UI-Side Compositing" action:@selector(toggleUseUISideCompositing:) indented:YES];
     [self _addItemWithTitle:@"Disable Per-Window Web Processes" action:@selector(togglePerWindowWebProcessesDisabled:) indented:YES];
     [self _addItemWithTitle:@"Show Resource Usage Overlay" action:@selector(toggleShowResourceUsageOverlay:) indented:YES];
+    [self _addItemWithTitle:@"Use GameController.framework on macOS (Restart required)" action:@selector(toggleUsesGameControllerFramework:) indented:YES];
 
     NSMenuItem *debugOverlaysSubmenuItem = [[NSMenuItem alloc] initWithTitle:@"Debug Overlays" action:nil keyEquivalent:@""];
     NSMenu *debugOverlaysMenu = [[NSMenu alloc] initWithTitle:@"Debug Overlays"];
@@ -137,6 +152,26 @@ typedef NS_ENUM(NSInteger, DebugOverylayMenuItemTag) {
     
     [_menu addItem:debugOverlaysSubmenuItem];
     [debugOverlaysSubmenuItem release];
+
+#if WK_API_ENABLED
+    NSMenuItem *experimentalFeaturesSubmenuItem = [[NSMenuItem alloc] initWithTitle:@"Experimental Features" action:nil keyEquivalent:@""];
+    NSMenu *experimentalFeaturesMenu = [[NSMenu alloc] initWithTitle:@"Experimental Features"];
+    [experimentalFeaturesSubmenuItem setSubmenu:experimentalFeaturesMenu];
+
+    NSArray<_WKExperimentalFeature *> *features = [WKPreferences _experimentalFeatures];
+
+    for (_WKExperimentalFeature *feature in features) {
+        NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:feature.name action:@selector(toggleExperimentalFeature:) keyEquivalent:@""];
+        item.representedObject = feature;
+
+        [item setTag:ExperimentalFeatureTag];
+        [item setTarget:self];
+        [experimentalFeaturesMenu addItem:[item autorelease]];
+    }
+
+    [_menu addItem:experimentalFeaturesSubmenuItem];
+    [experimentalFeaturesSubmenuItem release];
+#endif // WK_API_ENABLED
 
     [self _addHeaderWithTitle:@"WebKit1-only Settings"];
     [self _addItemWithTitle:@"Enable Subpixel CSSOM Metrics" action:@selector(toggleEnableSubPixelCSSOMMetrics:) indented:YES];
@@ -162,10 +197,16 @@ typedef NS_ENUM(NSInteger, DebugOverylayMenuItemTag) {
         [menuItem setState:[self acceleratedDrawingEnabled] ? NSOnState : NSOffState];
     else if (action == @selector(toggleDisplayListDrawingEnabled:))
         [menuItem setState:[self displayListDrawingEnabled] ? NSOnState : NSOffState];
+    else if (action == @selector(toggleResourceLoadStatisticsEnabled:))
+        [menuItem setState:[self resourceLoadStatisticsEnabled] ? NSOnState : NSOffState];
+    else if (action == @selector(toggleVisualViewportEnabled:))
+        [menuItem setState:[self visualViewportEnabled] ? NSOnState : NSOffState];
     else if (action == @selector(toggleShowTiledScrollingIndicator:))
         [menuItem setState:[self tiledScrollingIndicatorVisible] ? NSOnState : NSOffState];
     else if (action == @selector(toggleShowResourceUsageOverlay:))
         [menuItem setState:[self resourceUsageOverlayVisible] ? NSOnState : NSOffState];
+    else if (action == @selector(toggleUsesGameControllerFramework:))
+        [menuItem setState:[self usesGameControllerFramework] ? NSOnState : NSOffState];
     else if (action == @selector(toggleUseUISideCompositing:))
         [menuItem setState:[self useUISideCompositing] ? NSOnState : NSOffState];
     else if (action == @selector(togglePerWindowWebProcessesDisabled:))
@@ -174,6 +215,13 @@ typedef NS_ENUM(NSInteger, DebugOverylayMenuItemTag) {
         [menuItem setState:[self subPixelCSSOMMetricsEnabled] ? NSOnState : NSOffState];
     else if (action == @selector(toggleDebugOverlay:))
         [menuItem setState:[self debugOverlayVisible:menuItem] ? NSOnState : NSOffState];
+
+#if WK_API_ENABLED
+    if (menuItem.tag == ExperimentalFeatureTag) {
+        _WKExperimentalFeature *feature = menuItem.representedObject;
+        [menuItem setState:[defaultPreferences() _isEnabledForFeature:feature] ? NSOnState : NSOffState];
+    }
+#endif
 
     return YES;
 }
@@ -306,6 +354,16 @@ typedef NS_ENUM(NSInteger, DebugOverylayMenuItemTag) {
     [self _toggleBooleanDefault:ResourceUsageOverlayVisiblePreferenceKey];
 }
 
+- (BOOL)usesGameControllerFramework
+{
+    return [[NSUserDefaults standardUserDefaults] boolForKey:UsesGameControllerFrameworkKey];
+}
+
+- (void)toggleUsesGameControllerFramework:(id)sender
+{
+    [self _toggleBooleanDefault:UsesGameControllerFrameworkKey];
+}
+
 - (BOOL)tiledScrollingIndicatorVisible
 {
     return [[NSUserDefaults standardUserDefaults] boolForKey:TiledScrollingIndicatorVisiblePreferenceKey];
@@ -314,6 +372,26 @@ typedef NS_ENUM(NSInteger, DebugOverylayMenuItemTag) {
 - (BOOL)resourceUsageOverlayVisible
 {
     return [[NSUserDefaults standardUserDefaults] boolForKey:ResourceUsageOverlayVisiblePreferenceKey];
+}
+
+- (void)toggleResourceLoadStatisticsEnabled:(id)sender
+{
+    [self _toggleBooleanDefault:ResourceLoadStatisticsEnabledPreferenceKey];
+}
+
+- (BOOL)visualViewportEnabled
+{
+    return [[NSUserDefaults standardUserDefaults] boolForKey:VisualViewportEnabledPreferenceKey];
+}
+
+- (void)toggleVisualViewportEnabled:(id)sender
+{
+    [self _toggleBooleanDefault:VisualViewportEnabledPreferenceKey];
+}
+
+- (BOOL)resourceLoadStatisticsEnabled
+{
+    return [[NSUserDefaults standardUserDefaults] boolForKey:ResourceLoadStatisticsEnabledPreferenceKey];
 }
 
 - (void)toggleEnableSubPixelCSSOMMetrics:(id)sender
@@ -354,6 +432,19 @@ typedef NS_ENUM(NSInteger, DebugOverylayMenuItemTag) {
     if (preferenceKey)
         [self _toggleBooleanDefault:preferenceKey];
 }
+
+#if WK_API_ENABLED
+- (void)toggleExperimentalFeature:(id)sender
+{
+    _WKExperimentalFeature *feature = ((NSMenuItem *)sender).representedObject;
+    WKPreferences *preferences = defaultPreferences();
+
+    BOOL currentlyEnabled = [preferences _isEnabledForFeature:feature];
+    [preferences _setEnabled:!currentlyEnabled forFeature:feature];
+
+    [[NSUserDefaults standardUserDefaults] setBool:!currentlyEnabled forKey:feature.key];
+}
+#endif
 
 - (BOOL)debugOverlayVisible:(NSMenuItem *)menuItem
 {

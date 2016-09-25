@@ -24,7 +24,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// @conditional=ENABLE(STREAMS_API)
+// @conditional=ENABLE(READABLE_STREAM_API)
 
 function initializeReadableStream(underlyingSource, strategy)
 {
@@ -41,27 +41,25 @@ function initializeReadableStream(underlyingSource, strategy)
     if (strategy !== @undefined && !@isObject(strategy))
         throw new @TypeError("ReadableStream constructor takes an object as second argument, if any");
 
-    this.@underlyingSource = underlyingSource;
-
-    this.@queue = @newQueue();
     this.@state = @streamReadable;
-    this.@started = false;
-    this.@closeRequested = false;
-    this.@pullAgain = false;
-    this.@pulling = false;
     this.@reader = @undefined;
     this.@storedError = @undefined;
     this.@disturbed = false;
-    this.@controller = new @ReadableStreamController(this);
-    this.@strategy = @validateAndNormalizeQueuingStrategy(strategy.size, strategy.highWaterMark);
+    // Initialized with null value to enable distinction with undefined case.
+    this.@readableStreamController = null;
 
-    @promiseInvokeOrNoopNoCatch(underlyingSource, "start", [this.@controller]).@then(() => {
-        this.@started = true;
-        @requestReadableStreamPull(this);
-    }, (error) => {
-        if (this.@state === @streamReadable)
-            @errorReadableStream(this, error);
-    });
+    const type = underlyingSource.type;
+    const typeString = @String(type);
+
+    if (typeString === "bytes") {
+         // FIXME: Implement support of ReadableByteStreamController.
+        throw new @TypeError("ReadableByteStreamController is not implemented");
+    } else if (type === @undefined) {
+        if (strategy.highWaterMark === @undefined)
+            strategy.highWaterMark = 1;
+        this.@readableStreamController = new @ReadableStreamDefaultController(this, underlyingSource, strategy.size, strategy.highWaterMark);
+    } else
+        throw new @RangeError("Invalid type for underlying source");
 
     return this;
 }
@@ -71,7 +69,7 @@ function cancel(reason)
     "use strict";
 
     if (!@isReadableStream(this))
-        return @Promise.@reject(new @TypeError("Function should be called on a ReadableStream"));
+        return @Promise.@reject(@makeThisTypeError("ReadableStream", "cancel"));
 
     if (@isReadableStreamLocked(this))
         return @Promise.@reject(new @TypeError("ReadableStream is locked"));
@@ -79,14 +77,25 @@ function cancel(reason)
     return @cancelReadableStream(this, reason);
 }
 
-function getReader()
+function getReader(options)
 {
     "use strict";
 
     if (!@isReadableStream(this))
-        throw new @TypeError("Function should be called on a ReadableStream");
+        throw @makeThisTypeError("ReadableStream", "getReader");
 
-    return new @ReadableStreamReader(this);
+    if (options === @undefined)
+         options = { };
+
+    if (options.mode === 'byob') {
+        // FIXME: Update once ReadableByteStreamContoller and ReadableStreamBYOBReader are implemented.
+        throw new @TypeError("ReadableStreamBYOBReader is not implemented");
+    }
+
+    if (options.mode === @undefined)
+        return new @ReadableStreamDefaultReader(this);
+
+    throw new @RangeError("Invalid mode is specified");
 }
 
 function pipeThrough(streams, options)
@@ -99,9 +108,13 @@ function pipeThrough(streams, options)
     return readable;
 }
 
-function pipeTo(destination, options)
+function pipeTo(destination)
 {
     "use strict";
+
+    // FIXME: https://bugs.webkit.org/show_bug.cgi?id=159869.
+    // Built-in generator should be able to parse function signature to compute the function length correctly.
+    const options = arguments[1];
 
     // FIXME: rewrite pipeTo so as to require to have 'this' as a ReadableStream and destination be a WritableStream.
     // See https://github.com/whatwg/streams/issues/407.
@@ -182,7 +195,7 @@ function pipeTo(destination, options)
     );
 
     doPipe();
-    
+
     return promiseCapability.@promise;
 }
 
@@ -191,7 +204,7 @@ function tee()
     "use strict";
 
     if (!@isReadableStream(this))
-        throw new @TypeError("Function should be called on a ReadableStream");
+        throw @makeThisTypeError("ReadableStream", "tee");
 
     return @teeReadableStream(this, false);
 }
@@ -201,7 +214,7 @@ function locked()
     "use strict";
 
     if (!@isReadableStream(this))
-        throw new @TypeError("Function should be called on a ReadableStream");
+        throw @makeGetterTypeError("ReadableStream", "locked");
 
     return @isReadableStreamLocked(this);
 }

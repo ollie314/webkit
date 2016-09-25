@@ -109,6 +109,9 @@ class DashboardPage extends PageWithHeading {
             this._needsTableConstruction = false;
         }
 
+        for (var chart of this._charts)
+            chart.enqueueToRender();
+
         if (this._needsStatusUpdate) {
             for (var statusView of this._statusViews)
                 statusView.render();
@@ -125,13 +128,13 @@ class DashboardPage extends PageWithHeading {
         if (!platformId || !metricId)
             return '';
 
-        var result = ChartStyles.createChartSourceList(platformId, metricId);
+        var result = ChartStyles.resolveConfiguration(platformId, metricId);
         if (result.error)
             return result.error;
 
         var options = ChartStyles.dashboardOptions(result.metric.makeFormatter(3));
         options.ondata = this._fetchedData.bind(this);
-        var chart = new TimeSeriesChart(result.sourceList, options);
+        var chart = new TimeSeriesChart(ChartStyles.createSourceList(result.platform, result.metric, false, false, true), options);
         this._charts.push(chart);
 
         var statusView = new ChartStatusView(result.metric, chart);

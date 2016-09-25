@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2015 Andy VanWagoner (thetalecrafter@gmail.com)
  * Copyright (C) 2015 Sukolsak Sakshuwong (sukolsak@gmail.com)
+ * Copyright (C) 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -48,6 +49,8 @@
 #include <unicode/unumsys.h>
 #include <wtf/Assertions.h>
 #include <wtf/NeverDestroyed.h>
+#include <wtf/PlatformUserPreferredLanguages.h>
+#include <wtf/text/StringBuilder.h>
 
 namespace JSC {
 
@@ -114,14 +117,6 @@ Structure* IntlObject::createStructure(VM& vm, JSGlobalObject* globalObject, JSV
     return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info());
 }
 
-String defaultLocale()
-{
-    // 6.2.4 DefaultLocale ()
-    String locale = uloc_getDefault();
-    convertICULocaleToBCP47LanguageTag(locale);
-    return locale;
-}
-
 void convertICULocaleToBCP47LanguageTag(String& locale)
 {
     locale.replace('_', '-');
@@ -129,6 +124,9 @@ void convertICULocaleToBCP47LanguageTag(String& locale)
 
 bool intlBooleanOption(ExecState& state, JSValue options, PropertyName property, bool& usesFallback)
 {
+    VM& vm = state.vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     // 9.2.9 GetOption (options, property, type, values, fallback)
     // For type="boolean". values is always undefined.
 
@@ -136,14 +134,14 @@ bool intlBooleanOption(ExecState& state, JSValue options, PropertyName property,
     JSObject* opts = options.toObject(&state);
 
     // 2. ReturnIfAbrupt(opts).
-    if (state.hadException())
+    if (UNLIKELY(scope.exception()))
         return false;
 
     // 3. Let value be Get(opts, property).
     JSValue value = opts->get(&state, property);
 
     // 4. ReturnIfAbrupt(value).
-    if (state.hadException())
+    if (UNLIKELY(scope.exception()))
         return false;
 
     // 5. If value is not undefined, then
@@ -168,6 +166,9 @@ bool intlBooleanOption(ExecState& state, JSValue options, PropertyName property,
 
 String intlStringOption(ExecState& state, JSValue options, PropertyName property, std::initializer_list<const char*> values, const char* notFound, const char* fallback)
 {
+    VM& vm = state.vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     // 9.2.9 GetOption (options, property, type, values, fallback)
     // For type="string".
 
@@ -175,14 +176,14 @@ String intlStringOption(ExecState& state, JSValue options, PropertyName property
     JSObject* opts = options.toObject(&state);
 
     // 2. ReturnIfAbrupt(opts).
-    if (state.hadException())
+    if (UNLIKELY(scope.exception()))
         return { };
 
     // 3. Let value be Get(opts, property).
     JSValue value = opts->get(&state, property);
 
     // 4. ReturnIfAbrupt(value).
-    if (state.hadException())
+    if (UNLIKELY(scope.exception()))
         return { };
 
     // 5. If value is not undefined, then
@@ -195,13 +196,13 @@ String intlStringOption(ExecState& state, JSValue options, PropertyName property
         String stringValue = value.toWTFString(&state);
 
         // ii. ReturnIfAbrupt(value).
-        if (state.hadException())
+        if (UNLIKELY(scope.exception()))
             return { };
 
         // d. If values is not undefined, then
         // i. If values does not contain an element equal to value, throw a RangeError exception.
         if (values.size() && std::find(values.begin(), values.end(), stringValue) == values.end()) {
-            state.vm().throwException(&state, createRangeError(&state, notFound));
+            throwException(&state, scope, createRangeError(&state, notFound));
             return { };
         }
 
@@ -215,19 +216,22 @@ String intlStringOption(ExecState& state, JSValue options, PropertyName property
 
 unsigned intlNumberOption(ExecState& state, JSValue options, PropertyName property, unsigned minimum, unsigned maximum, unsigned fallback)
 {
+    VM& vm = state.vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     // 9.2.9 GetNumberOption (options, property, minimum, maximum, fallback) (ECMA-402 2.0)
     // 1. Let opts be ToObject(options).
     JSObject* opts = options.toObject(&state);
 
     // 2. ReturnIfAbrupt(opts).
-    if (state.hadException())
+    if (UNLIKELY(scope.exception()))
         return 0;
 
     // 3. Let value be Get(opts, property).
     JSValue value = opts->get(&state, property);
 
     // 4. ReturnIfAbrupt(value).
-    if (state.hadException())
+    if (UNLIKELY(scope.exception()))
         return 0;
 
     // 5. If value is not undefined, then
@@ -235,11 +239,11 @@ unsigned intlNumberOption(ExecState& state, JSValue options, PropertyName proper
         // a. Let value be ToNumber(value).
         double doubleValue = value.toNumber(&state);
         // b. ReturnIfAbrupt(value).
-        if (state.hadException())
+        if (UNLIKELY(scope.exception()))
             return 0;
         // 1. If value is NaN or less than minimum or greater than maximum, throw a RangeError exception.
         if (!(doubleValue >= minimum && doubleValue <= maximum)) {
-            state.vm().throwException(&state, createRangeError(&state, *property.publicName() + " is out of range"));
+            throwException(&state, scope, createRangeError(&state, *property.publicName() + " is out of range"));
             return 0;
         }
 
@@ -257,7 +261,7 @@ static String privateUseLangTag(const Vector<String>& parts, size_t startIndex)
     size_t currentIndex = startIndex;
 
     // Check for privateuse.
-    // privateuse = "x" 1*("-" (2*8alphanum))
+    // privateuse = "x" 1*("-" (1*8alphanum))
     StringBuilder privateuse;
     while (currentIndex < numParts) {
         const String& singleton = parts[currentIndex];
@@ -276,7 +280,7 @@ static String privateUseLangTag(const Vector<String>& parts, size_t startIndex)
             const String& extPart = parts[currentIndex];
             unsigned extPartLength = extPart.length();
 
-            bool isValid = (extPartLength >= 2 && extPartLength <= 8 && extPart.isAllSpecialCharacters<isASCIIAlphanumeric>());
+            bool isValid = (extPartLength >= 1 && extPartLength <= 8 && extPart.isAllSpecialCharacters<isASCIIAlphanumeric>());
             if (!isValid)
                 break;
 
@@ -530,6 +534,8 @@ Vector<String> canonicalizeLocaleList(ExecState& state, JSValue locales)
 {
     // 9.2.1 CanonicalizeLocaleList (locales)
     VM& vm = state.vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     JSGlobalObject* globalObject = state.callee()->globalObject();
     Vector<String> seen;
 
@@ -554,16 +560,16 @@ Vector<String> canonicalizeLocaleList(ExecState& state, JSValue locales)
     }
 
     // 5. ReturnIfAbrupt(O).
-    if (state.hadException())
+    if (UNLIKELY(scope.exception()))
         return Vector<String>();
 
     // 6. Let len be ToLength(Get(O, "length")).
     JSValue lengthProperty = localesObject->get(&state, vm.propertyNames->length);
-    if (state.hadException())
+    if (UNLIKELY(scope.exception()))
         return Vector<String>();
 
     double length = lengthProperty.toLength(&state);
-    if (state.hadException())
+    if (UNLIKELY(scope.exception()))
         return Vector<String>();
 
     // Keep track of locales that have been added to the list.
@@ -579,7 +585,7 @@ Vector<String> canonicalizeLocaleList(ExecState& state, JSValue locales)
         bool kPresent = localesObject->hasProperty(&state, k);
 
         // c. ReturnIfAbrupt(kPresent).
-        if (state.hadException())
+        if (UNLIKELY(scope.exception()))
             return Vector<String>();
 
         // d. If kPresent is true, then
@@ -588,12 +594,12 @@ Vector<String> canonicalizeLocaleList(ExecState& state, JSValue locales)
             JSValue kValue = localesObject->get(&state, k);
 
             // ii. ReturnIfAbrupt(kValue).
-            if (state.hadException())
+            if (UNLIKELY(scope.exception()))
                 return Vector<String>();
 
             // iii. If Type(kValue) is not String or Object, throw a TypeError exception.
             if (!kValue.isString() && !kValue.isObject()) {
-                throwTypeError(&state, ASCIILiteral("locale value must be a string or object"));
+                throwTypeError(&state, scope, ASCIILiteral("locale value must be a string or object"));
                 return Vector<String>();
             }
 
@@ -601,14 +607,14 @@ Vector<String> canonicalizeLocaleList(ExecState& state, JSValue locales)
             JSString* tag = kValue.toString(&state);
 
             // v. ReturnIfAbrupt(tag).
-            if (state.hadException())
+            if (UNLIKELY(scope.exception()))
                 return Vector<String>();
 
             // vi. If IsStructurallyValidLanguageTag(tag) is false, throw a RangeError exception.
             // vii. Let canonicalizedTag be CanonicalizeLanguageTag(tag).
             String canonicalizedTag = canonicalizeLanguageTag(tag->value(&state));
             if (canonicalizedTag.isNull()) {
-                state.vm().throwException(&state, createRangeError(&state, String::format("invalid language tag: %s", tag->value(&state).utf8().data())));
+                throwException(&state, scope, createRangeError(&state, String::format("invalid language tag: %s", tag->value(&state).utf8().data())));
                 return Vector<String>();
             }
 
@@ -650,6 +656,32 @@ String bestAvailableLocale(const HashSet<String>& availableLocales, const String
     return String();
 }
 
+String defaultLocale(ExecState& state)
+{
+    // 6.2.4 DefaultLocale ()
+    
+    // WebCore's global objects will have their own ideas of how to determine the language. It may
+    // be determined by WebCore-specific logic like some WK settings. Usually this will return the
+    // same thing as platformUserPreferredLanguages()[0].
+    if (auto defaultLanguage = state.callee()->globalObject()->globalObjectMethodTable()->defaultLanguage) {
+        String locale = defaultLanguage();
+        if (!locale.isEmpty())
+            return canonicalizeLanguageTag(locale);
+    }
+    
+    // If WebCore isn't around to tell us how to get the language then fall back to our own way of
+    // doing it, which mostly follows what WebCore would have done.
+    Vector<String> languages = platformUserPreferredLanguages();
+    if (!languages.isEmpty() && !languages[0].isEmpty())
+        return canonicalizeLanguageTag(languages[0]);
+    
+    // If all else fails, ask ICU. It will probably say something bogus like en_us even if the user
+    // has configured some other language, but being wrong is better than crashing.
+    String locale = uloc_getDefault();
+    convertICULocaleToBCP47LanguageTag(locale);
+    return locale;
+}
+
 String removeUnicodeLocaleExtension(const String& locale)
 {
     Vector<String> parts;
@@ -672,7 +704,7 @@ String removeUnicodeLocaleExtension(const String& locale)
     return builder.toString();
 }
 
-static MatcherResult lookupMatcher(const HashSet<String>& availableLocales, const Vector<String>& requestedLocales)
+static MatcherResult lookupMatcher(ExecState& state, const HashSet<String>& availableLocales, const Vector<String>& requestedLocales)
 {
     // 9.2.3 LookupMatcher (availableLocales, requestedLocales) (ECMA-402 2.0)
     String locale;
@@ -709,25 +741,25 @@ static MatcherResult lookupMatcher(const HashSet<String>& availableLocales, cons
             result.extensionIndex = extensionIndex;
         }
     } else
-        result.locale = defaultLocale();
+        result.locale = defaultLocale(state);
     return result;
 }
 
-static MatcherResult bestFitMatcher(const HashSet<String>& availableLocales, const Vector<String>& requestedLocales)
+static MatcherResult bestFitMatcher(ExecState& state, const HashSet<String>& availableLocales, const Vector<String>& requestedLocales)
 {
     // 9.2.4 BestFitMatcher (availableLocales, requestedLocales) (ECMA-402 2.0)
     // FIXME: Implement something better than lookup.
-    return lookupMatcher(availableLocales, requestedLocales);
+    return lookupMatcher(state, availableLocales, requestedLocales);
 }
 
-HashMap<String, String> resolveLocale(const HashSet<String>& availableLocales, const Vector<String>& requestedLocales, const HashMap<String, String>& options, const char* const relevantExtensionKeys[], size_t relevantExtensionKeyCount, Vector<String> (*localeData)(const String&, size_t))
+HashMap<String, String> resolveLocale(ExecState& state, const HashSet<String>& availableLocales, const Vector<String>& requestedLocales, const HashMap<String, String>& options, const char* const relevantExtensionKeys[], size_t relevantExtensionKeyCount, Vector<String> (*localeData)(const String&, size_t))
 {
     // 9.2.5 ResolveLocale (availableLocales, requestedLocales, options, relevantExtensionKeys, localeData) (ECMA-402 2.0)
     // 1. Let matcher be the value of options.[[localeMatcher]].
     const String& matcher = options.get(ASCIILiteral("localeMatcher"));
 
     // 2. If matcher is "lookup", then
-    MatcherResult (*matcherOperation)(const HashSet<String>&, const Vector<String>&);
+    MatcherResult (*matcherOperation)(ExecState&, const HashSet<String>&, const Vector<String>&);
     if (matcher == "lookup") {
         // a. Let MatcherOperation be the abstract operation LookupMatcher.
         matcherOperation = lookupMatcher;
@@ -737,7 +769,7 @@ HashMap<String, String> resolveLocale(const HashSet<String>& availableLocales, c
     }
 
     // 4. Let r be MatcherOperation(availableLocales, requestedLocales).
-    MatcherResult matcherResult = matcherOperation(availableLocales, requestedLocales);
+    MatcherResult matcherResult = matcherOperation(state, availableLocales, requestedLocales);
 
     // 5. Let foundLocale be the value of r.[[locale]].
     String foundLocale = matcherResult.locale;
@@ -850,6 +882,9 @@ HashMap<String, String> resolveLocale(const HashSet<String>& availableLocales, c
 
 static JSArray* lookupSupportedLocales(ExecState& state, const HashSet<String>& availableLocales, const Vector<String>& requestedLocales)
 {
+    VM& vm = state.vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     // 9.2.6 LookupSupportedLocales (availableLocales, requestedLocales)
 
     // 1. Let rLocales be CreateArrayFromList(requestedLocales).
@@ -859,11 +894,10 @@ static JSArray* lookupSupportedLocales(ExecState& state, const HashSet<String>& 
     size_t len = requestedLocales.size();
 
     // 3. Let subset be an empty List.
-    VM& vm = state.vm();
     JSGlobalObject* globalObject = state.callee()->globalObject();
     JSArray* subset = JSArray::tryCreateUninitialized(vm, globalObject->arrayStructureForIndexingTypeDuringAllocation(ArrayWithUndecided), 0);
     if (!subset) {
-        throwOutOfMemoryError(&state);
+        throwOutOfMemoryError(&state, scope);
         return nullptr;
     }
 
@@ -903,6 +937,7 @@ JSValue supportedLocales(ExecState& state, const HashSet<String>& availableLocal
 {
     // 9.2.8 SupportedLocales (availableLocales, requestedLocales, options)
     VM& vm = state.vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
     String matcher;
 
     // 1. If options is not undefined, then
@@ -910,7 +945,7 @@ JSValue supportedLocales(ExecState& state, const HashSet<String>& availableLocal
         // a. Let matcher be GetOption(options, "localeMatcher", "string", « "lookup", "best fit" », "best fit").
         matcher = intlStringOption(state, options, vm.propertyNames->localeMatcher, { "lookup", "best fit" }, "localeMatcher must be either \"lookup\" or \"best fit\"", "best fit");
         // b. ReturnIfAbrupt(matcher).
-        if (state.hadException())
+        if (UNLIKELY(scope.exception()))
             return jsUndefined();
     } else {
         // 2. Else, let matcher be "best fit".
@@ -930,7 +965,7 @@ JSValue supportedLocales(ExecState& state, const HashSet<String>& availableLocal
         supportedLocales = lookupSupportedLocales(state, availableLocales, requestedLocales);
     }
 
-    if (state.hadException())
+    if (UNLIKELY(scope.exception()))
         return jsUndefined();
 
     // 6. Let subset be CreateArrayFromList(supportedLocales).
@@ -939,6 +974,8 @@ JSValue supportedLocales(ExecState& state, const HashSet<String>& availableLocal
     // 7. Let keys be subset.[[OwnPropertyKeys]]().
     PropertyNameArray keys(&state, PropertyNameMode::Strings);
     supportedLocales->getOwnPropertyNames(supportedLocales, &state, keys, EnumerationMode());
+    if (UNLIKELY(scope.exception()))
+        return jsUndefined();
 
     PropertyDescriptor desc;
     desc.setConfigurable(false);
@@ -954,7 +991,7 @@ JSValue supportedLocales(ExecState& state, const HashSet<String>& availableLocal
         supportedLocales->defineOwnProperty(supportedLocales, &state, keys[i], desc, true);
 
         // c. Assert: status is not abrupt completion.
-        if (state.hadException())
+        if (UNLIKELY(scope.exception()))
             return jsUndefined();
     }
 
@@ -967,22 +1004,20 @@ Vector<String> numberingSystemsForLocale(const String& locale)
     static NeverDestroyed<Vector<String>> cachedNumberingSystems;
     Vector<String>& availableNumberingSystems = cachedNumberingSystems.get();
     if (availableNumberingSystems.isEmpty()) {
-        UErrorCode status(U_ZERO_ERROR);
+        UErrorCode status = U_ZERO_ERROR;
         UEnumeration* numberingSystemNames = unumsys_openAvailableNames(&status);
         ASSERT(U_SUCCESS(status));
-        status = U_ZERO_ERROR;
 
         int32_t resultLength;
         // Numbering system names are always ASCII, so use char[].
         while (const char* result = uenum_next(numberingSystemNames, &resultLength, &status)) {
             ASSERT(U_SUCCESS(status));
-            status = U_ZERO_ERROR;
             availableNumberingSystems.append(String(result, resultLength));
         }
         uenum_close(numberingSystemNames);
     }
 
-    UErrorCode status(U_ZERO_ERROR);
+    UErrorCode status = U_ZERO_ERROR;
     UNumberingSystem* defaultSystem = unumsys_open(locale.utf8().data(), &status);
     ASSERT(U_SUCCESS(status));
     String defaultSystemName(unumsys_getName(defaultSystem));

@@ -47,7 +47,6 @@ public:
 private:
     enum class TagId {
         // These tags are scanned by the StartTagScanner.
-        Iframe,
         Img,
         Input,
         Link,
@@ -80,9 +79,7 @@ private:
     
     Vector<bool> m_pictureSourceState;
 
-#if ENABLE(TEMPLATE_ELEMENT)
     unsigned m_templateCount { 0 };
-#endif
 };
 
 class HTMLPreloadScanner {

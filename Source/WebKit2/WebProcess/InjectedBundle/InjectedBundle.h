@@ -56,7 +56,7 @@ class Data;
 }
 
 namespace IPC {
-class ArgumentDecoder;
+class Decoder;
 class Connection;
 class DataReference;
 }
@@ -107,6 +107,7 @@ public:
     void setPluginsEnabled(WebPageGroupProxy*, bool);
     void setJavaScriptCanAccessClipboard(WebPageGroupProxy*, bool);
     void setPrivateBrowsingEnabled(WebPageGroupProxy*, bool);
+    void setUseDashboardCompatibilityMode(WebPageGroupProxy*, bool);
     void setPopupBlockingEnabled(WebPageGroupProxy*, bool);
     void setAuthorAndUserStylesEnabled(WebPageGroupProxy*, bool);
     void setSpatialNavigationEnabled(WebPageGroupProxy*, bool);
@@ -153,8 +154,6 @@ public:
     void setSerialLoadingEnabled(bool);
     void setCSSAnimationTriggersEnabled(bool);
     void setWebAnimationsEnabled(bool);
-    void setCSSRegionsEnabled(bool);
-    void setCSSCompositingEnabled(bool);
     void dispatchPendingLoadRequests();
 
 #if PLATFORM(COCOA) && WK_API_ENABLED

@@ -23,8 +23,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef URLUtils_h
-#define URLUtils_h
+#pragma once
 
 #include "SecurityOrigin.h"
 
@@ -284,13 +283,12 @@ template <typename T>
 void URLUtils<T>::setHash(const String& value)
 {
     URL url = href();
-    if (value[0U] == '#')
-        url.setFragmentIdentifier(value.substring(1));
+    String newFragment = value[0U] == '#' ? value.substring(1) : value;
+    if (newFragment.isEmpty())
+        url.removeFragmentIdentifier();
     else
-        url.setFragmentIdentifier(value);
+        url.setFragmentIdentifier(newFragment);
     setHref(url.string());
 }
 
 } // namespace WebCore
-
-#endif // URLUtils_h

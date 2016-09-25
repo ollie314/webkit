@@ -1,3 +1,4 @@
+'use strict';
 
 class Metric extends LabeledObject {
     constructor(id, object)
@@ -32,10 +33,7 @@ class Metric extends LabeledObject {
 
     path() { return this._test.path().concat([this]); }
 
-    fullName()
-    {
-        return this._test.path().map(function (test) { return test.label(); }).join(' \u220B ') + ' : ' + this.label();
-    }
+    fullName() { return this._test.fullName() + ' : ' + this.label(); }
 
     label()
     {
@@ -70,8 +68,11 @@ class Metric extends LabeledObject {
             isMiliseconds = true;
             unit = 's';
         }
-        var divisor = unit == 'B' ? 1024 : 1000;
 
+        if (!unit)
+            return function (value) { return value.toFixed(2) + ' ' + (unit || ''); }
+
+        var divisor = unit == 'B' ? 1024 : 1000;
         var suffix = ['\u03BC', 'm', '', 'K', 'M', 'G', 'T', 'P', 'E'];
         var threshold = sigFig >= 3 ? divisor : (divisor / 10);
         return function (value) {
@@ -86,3 +87,6 @@ class Metric extends LabeledObject {
         }
     };
 }
+
+if (typeof module != 'undefined')
+    module.exports.Metric = Metric;

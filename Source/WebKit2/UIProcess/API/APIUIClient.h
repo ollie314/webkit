@@ -55,7 +55,6 @@ class UserMediaPermissionCheckProxy;
 class UserMediaPermissionRequestProxy;
 class WebColorPickerResultListenerProxy;
 class WebFrameProxy;
-class WebOpenPanelParameters;
 class WebOpenPanelResultListenerProxy;
 class WebPageProxy;
 struct NavigationActionData;
@@ -70,6 +69,7 @@ namespace API {
 class Data;
 class Dictionary;
 class Object;
+class OpenPanelParameters;
 class SecurityOrigin;
 
 class UIClient {
@@ -87,9 +87,9 @@ public:
     virtual void focus(WebKit::WebPageProxy*) { }
     virtual void unfocus(WebKit::WebPageProxy*) { }
 
-    virtual void runJavaScriptAlert(WebKit::WebPageProxy*, const WTF::String&, WebKit::WebFrameProxy*, const WebCore::SecurityOriginData&, std::function<void ()> completionHandler) { completionHandler(); }
-    virtual void runJavaScriptConfirm(WebKit::WebPageProxy*, const WTF::String&, WebKit::WebFrameProxy*, const WebCore::SecurityOriginData&, std::function<void (bool)> completionHandler) { completionHandler(false); }
-    virtual void runJavaScriptPrompt(WebKit::WebPageProxy*, const WTF::String&, const WTF::String&, WebKit::WebFrameProxy*, const WebCore::SecurityOriginData&, std::function<void (const WTF::String&)> completionHandler) { completionHandler(WTF::String()); }
+    virtual void runJavaScriptAlert(WebKit::WebPageProxy*, const WTF::String&, WebKit::WebFrameProxy*, const WebCore::SecurityOriginData&, Function<void ()>&& completionHandler) { completionHandler(); }
+    virtual void runJavaScriptConfirm(WebKit::WebPageProxy*, const WTF::String&, WebKit::WebFrameProxy*, const WebCore::SecurityOriginData&, Function<void (bool)>&& completionHandler) { completionHandler(false); }
+    virtual void runJavaScriptPrompt(WebKit::WebPageProxy*, const WTF::String&, const WTF::String&, WebKit::WebFrameProxy*, const WebCore::SecurityOriginData&, Function<void (const WTF::String&)>&& completionHandler) { completionHandler(WTF::String()); }
 
     virtual void setStatusText(WebKit::WebPageProxy*, const WTF::String&) { }
     virtual void mouseDidMoveOverElement(WebKit::WebPageProxy*, const WebKit::WebHitTestResultData&, WebKit::WebEvent::Modifiers, API::Object*) { }
@@ -116,24 +116,24 @@ public:
     virtual WebCore::FloatRect windowFrame(WebKit::WebPageProxy*) { return WebCore::FloatRect(); }
 
     virtual bool canRunBeforeUnloadConfirmPanel() const { return false; }
-    virtual bool runBeforeUnloadConfirmPanel(WebKit::WebPageProxy*, const WTF::String&, WebKit::WebFrameProxy*) { return true; }
+    virtual void runBeforeUnloadConfirmPanel(WebKit::WebPageProxy*, const WTF::String&, WebKit::WebFrameProxy*, Function<void (bool)>&& completionHandler) { completionHandler(true); }
 
     virtual void pageDidScroll(WebKit::WebPageProxy*) { }
 
-    virtual void exceededDatabaseQuota(WebKit::WebPageProxy*, WebKit::WebFrameProxy*, SecurityOrigin*, const WTF::String&, const WTF::String&, unsigned long long currentQuota, unsigned long long, unsigned long long, unsigned long long, std::function<void (unsigned long long)> completionHandler)
+    virtual void exceededDatabaseQuota(WebKit::WebPageProxy*, WebKit::WebFrameProxy*, SecurityOrigin*, const WTF::String&, const WTF::String&, unsigned long long currentQuota, unsigned long long, unsigned long long, unsigned long long, Function<void (unsigned long long)>&& completionHandler)
     {
         completionHandler(currentQuota);
     }
 
-    virtual void reachedApplicationCacheOriginQuota(WebKit::WebPageProxy*, const WebCore::SecurityOrigin&, uint64_t currentQuota, uint64_t, std::function<void (unsigned long long)> completionHandler)
+    virtual void reachedApplicationCacheOriginQuota(WebKit::WebPageProxy*, const WebCore::SecurityOrigin&, uint64_t currentQuota, uint64_t, Function<void (unsigned long long)>&& completionHandler)
     {
         completionHandler(currentQuota);
     }
 
-    virtual bool runOpenPanel(WebKit::WebPageProxy*, WebKit::WebFrameProxy*, WebKit::WebOpenPanelParameters*, WebKit::WebOpenPanelResultListenerProxy*) { return false; }
+    virtual bool runOpenPanel(WebKit::WebPageProxy*, WebKit::WebFrameProxy*, const WebCore::SecurityOriginData&, OpenPanelParameters*, WebKit::WebOpenPanelResultListenerProxy*) { return false; }
     virtual bool decidePolicyForGeolocationPermissionRequest(WebKit::WebPageProxy*, WebKit::WebFrameProxy*, SecurityOrigin*, WebKit::GeolocationPermissionRequestProxy*) { return false; }
-    virtual bool decidePolicyForUserMediaPermissionRequest(WebKit::WebPageProxy&, WebKit::WebFrameProxy&, SecurityOrigin&, WebKit::UserMediaPermissionRequestProxy&) { return false; }
-    virtual bool checkUserMediaPermissionForOrigin(WebKit::WebPageProxy&, WebKit::WebFrameProxy&, SecurityOrigin&, WebKit::UserMediaPermissionCheckProxy&) { return false; }
+    virtual bool decidePolicyForUserMediaPermissionRequest(WebKit::WebPageProxy&, WebKit::WebFrameProxy&, SecurityOrigin&, SecurityOrigin&, WebKit::UserMediaPermissionRequestProxy&) { return false; }
+    virtual bool checkUserMediaPermissionForOrigin(WebKit::WebPageProxy&, WebKit::WebFrameProxy&, SecurityOrigin&, SecurityOrigin&, WebKit::UserMediaPermissionCheckProxy&) { return false; }
     virtual bool decidePolicyForNotificationPermissionRequest(WebKit::WebPageProxy*, SecurityOrigin*, WebKit::NotificationPermissionRequest*) { return false; }
 
     // Printing.
@@ -163,6 +163,9 @@ public:
     virtual RetainPtr<NSArray> actionsForElement(_WKActivatedElementInfo *, RetainPtr<NSArray> defaultActions) { return defaultActions; }
     virtual void didNotHandleTapAsClick(const WebCore::IntPoint&) { }
     virtual UIViewController *presentingViewController() { return nullptr; }
+#endif
+#if PLATFORM(COCOA)
+    virtual NSDictionary *dataDetectionContext() { return nullptr; }
 #endif
 
     virtual void didClickAutoFillButton(WebKit::WebPageProxy&, API::Object*) { }

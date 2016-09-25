@@ -32,17 +32,37 @@
 namespace WebCore {
 
 #define WEBCORE_COMMON_PRIVATE_IDENTIFIERS_EACH_PROPERTY_NAME(macro)\
+    macro(addTrack) \
     macro(appendFromJS) \
+    macro(body) \
+    macro(cloneForJS) \
     macro(closeRequested) \
     macro(closedPromiseCapability) \
+    macro(consume) \
+    macro(consumeChunk) \
     macro(controlledReadableStream) \
     macro(controller) \
+    macro(createReadableStreamSource) \
     macro(disturbed) \
-    macro(getUserMediaFromJS) \
+    macro(fetchRequest) \
+    macro(fillFromJS) \
+    macro(finishConsumingStream) \
+    macro(firstReadCallback) \
+    macro(getUserMedia) \
+    macro(getRemoteStreams) \
+    macro(getSenders) \
+    macro(getTracks) \
     macro(initializeWith) \
+    macro(isDisturbed) \
+    macro(isLoading) \
+    macro(localStreams) \
+    macro(makeThisTypeError) \
+    macro(makeGetterTypeError) \
+    macro(mediaStreamTrackConstraints) \
     macro(operations) \
     macro(ownerReadableStream) \
     macro(privateGetStats) \
+    macro(pull) \
     macro(pulling) \
     macro(pullAgain) \
     macro(queue) \
@@ -53,8 +73,16 @@ namespace WebCore {
     macro(queuedSetRemoteDescription) \
     macro(reader) \
     macro(readRequests) \
+    macro(readableStreamController) \
     macro(readyPromiseCapability) \
+    macro(removeTrack) \
+    macro(responseCacheIsValid) \
+    macro(retrieveResponse) \
+    macro(response) \
+    macro(setBody) \
+    macro(setStatus) \
     macro(state) \
+    macro(startConsumingStream) \
     macro(started) \
     macro(startedPromise) \
     macro(storedError) \
@@ -65,15 +93,22 @@ namespace WebCore {
     macro(streamReadable) \
     macro(streamWaiting) \
     macro(streamWritable) \
+    macro(structuredCloneArrayBuffer) \
+    macro(structuredCloneArrayBufferView) \
     macro(underlyingSink) \
     macro(underlyingSource) \
     macro(writing) \
+    macro(Headers) \
+    macro(MediaStream) \
     macro(MediaStreamTrack) \
     macro(ReadableStream) \
-    macro(ReadableStreamReader) \
-    macro(ReadableStreamController) \
+    macro(ReadableStreamDefaultController) \
+    macro(ReadableStreamDefaultReader) \
+    macro(Request) \
+    macro(Response) \
     macro(RTCIceCandidate) \
     macro(RTCSessionDescription) \
+    macro(XMLHttpRequest)
 
 class WebCoreBuiltinNames {
 public:

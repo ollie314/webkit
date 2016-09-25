@@ -25,6 +25,7 @@
 
 #include "config.h"
 #include "IDBObjectStoreInfo.h"
+#include <wtf/text/StringBuilder.h>
 
 #if ENABLE(INDEXED_DATABASE)
 
@@ -88,8 +89,13 @@ IDBObjectStoreInfo IDBObjectStoreInfo::isolatedCopy() const
 {
     IDBObjectStoreInfo result = { m_identifier, m_name.isolatedCopy(), m_keyPath.isolatedCopy(), m_autoIncrement };
 
-    for (auto& iterator : m_indexMap)
+    for (auto& iterator : m_indexMap) {
         result.m_indexMap.set(iterator.key, iterator.value.isolatedCopy());
+        if (iterator.key > result.m_maxIndexID)
+            result.m_maxIndexID = iterator.key;
+    }
+
+    ASSERT(result.m_maxIndexID == m_maxIndexID);
 
     return result;
 }
@@ -118,18 +124,22 @@ void IDBObjectStoreInfo::deleteIndex(uint64_t indexIdentifier)
     m_indexMap.remove(indexIdentifier);
 }
 
-#ifndef NDEBUG
+#if !LOG_DISABLED
 String IDBObjectStoreInfo::loggingString(int indent) const
 {
-    String indentString;
+    StringBuilder builder;
     for (int i = 0; i < indent; ++i)
-        indentString.append(" ");
+        builder.append(' ');
 
-    String top = makeString(indentString, "Object store: ", m_name, String::format(" (%" PRIu64 ") \n", m_identifier));
-    for (auto index : m_indexMap.values())
-        top.append(makeString(index.loggingString(indent + 1), "\n"));
+    builder.appendLiteral("Object store: ");
+    builder.append(m_name);
+    builder.appendNumber(m_identifier);
+    for (auto index : m_indexMap.values()) {
+        builder.append(index.loggingString(indent + 1));
+        builder.append('\n');
+    }
 
-    return top; 
+    return builder.toString();
 }
 #endif
 

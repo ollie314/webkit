@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003-2006, 2010, 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2003-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,10 +32,18 @@
 #include <cmath>
 #include <unicode/uchar.h>
 #include <wtf/Forward.h>
+#include <wtf/Optional.h>
 #include <wtf/text/LChar.h>
 
 #if USE(CG)
 typedef struct CGColor* CGColorRef;
+#endif
+
+#if PLATFORM(WIN)
+struct _D3DCOLORVALUE;
+typedef _D3DCOLORVALUE D3DCOLORVALUE;
+typedef D3DCOLORVALUE D2D_COLOR_F;
+typedef D2D_COLOR_F D2D1_COLOR_F;
 #endif
 
 #if PLATFORM(GTK)
@@ -54,7 +62,12 @@ typedef unsigned RGBA32; // Deprecated: Type for an RGBA quadruplet. Use RGBA cl
 WEBCORE_EXPORT RGBA32 makeRGB(int r, int g, int b);
 WEBCORE_EXPORT RGBA32 makeRGBA(int r, int g, int b, int a);
 
+RGBA32 makePremultipliedRGBA(int r, int g, int b, int a);
+RGBA32 makeUnPremultipliedRGBA(int r, int g, int b, int a);
+
 WEBCORE_EXPORT RGBA32 colorWithOverrideAlpha(RGBA32 color, float overrideAlpha);
+RGBA32 colorWithOverrideAlpha(RGBA32 color, Optional<float> overrideAlpha);
+
 WEBCORE_EXPORT RGBA32 makeRGBA32FromFloats(float r, float g, float b, float a);
 RGBA32 makeRGBAFromHSLA(double h, double s, double l, double a);
 RGBA32 makeRGBAFromCMYKA(float c, float m, float y, float k, float a);
@@ -144,6 +157,7 @@ public:
     WEBCORE_EXPORT void getRGBA(float& r, float& g, float& b, float& a) const;
     WEBCORE_EXPORT void getRGBA(double& r, double& g, double& b, double& a) const;
     WEBCORE_EXPORT void getHSL(double& h, double& s, double& l) const;
+    WEBCORE_EXPORT void getHSV(double& h, double& s, double& v) const;
 
     Color light() const;
     Color dark() const;
@@ -167,7 +181,13 @@ public:
     WEBCORE_EXPORT Color(CGColorRef);
 #endif
 
+#if PLATFORM(WIN)
+    WEBCORE_EXPORT Color(D2D1_COLOR_F);
+    WEBCORE_EXPORT operator D2D1_COLOR_F() const;
+#endif
+
     static bool parseHexColor(const String&, RGBA32&);
+    static bool parseHexColor(const StringView&, RGBA32&);
     static bool parseHexColor(const LChar*, unsigned, RGBA32&);
     static bool parseHexColor(const UChar*, unsigned, RGBA32&);
 
@@ -190,20 +210,6 @@ private:
     bool m_valid;
 };
 
-class OptionalColor : public Color {
-public:
-    OptionalColor();
-    OptionalColor(const Color&);
-
-    explicit operator bool() const;
-
-private:
-    // FIXME: Change to use Optional<Color>?
-    // FIXME: Convert all callers to use Optional<Color>?
-    bool m_isEngaged;
-    Color m_color;
-};
-
 bool operator==(const Color&, const Color&);
 bool operator!=(const Color&, const Color&);
 
@@ -214,6 +220,7 @@ Color blend(const Color& from, const Color& to, double progress, bool blendPremu
 
 int differenceSquared(const Color&, const Color&);
 
+uint16_t fastMultiplyBy255(uint16_t value);
 uint16_t fastDivideBy255(uint16_t);
 
 #if USE(CG)
@@ -286,6 +293,11 @@ inline uint8_t roundAndClampColorChannel(float value)
     return std::max(0.f, std::min(255.f, std::round(value)));
 }
 
+inline uint16_t fastMultiplyBy255(uint16_t value)
+{
+    return (value << 8) - value;
+}
+
 inline uint16_t fastDivideBy255(uint16_t value)
 {
     // While this is an approximate algorithm for division by 255, it gives perfectly accurate results for 16-bit values.
@@ -293,6 +305,11 @@ inline uint16_t fastDivideBy255(uint16_t value)
     uint16_t approximation = value >> 8;
     uint16_t remainder = value - (approximation * 255) + 1;
     return approximation + (remainder >> 8);
+}
+
+inline RGBA32 colorWithOverrideAlpha(RGBA32 color, Optional<float> overrideAlpha)
+{
+    return overrideAlpha ? colorWithOverrideAlpha(color, overrideAlpha.value()) : color;
 }
 
 WEBCORE_EXPORT TextStream& operator<<(TextStream&, const Color&);

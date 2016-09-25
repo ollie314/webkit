@@ -32,6 +32,7 @@
 #import "CacheModel.h"
 #import "DownloadClient.h"
 #import "SandboxUtilities.h"
+#import "UIGamepadProvider.h"
 #import "WKObject.h"
 #import "WeakObjCPtr.h"
 #import "WebCertificateInfo.h"
@@ -50,6 +51,8 @@
 #import <WebCore/WebCoreThreadSystemInterface.h>
 #import "WKGeolocationProviderIOS.h"
 #endif
+
+static WKProcessPool *sharedProcessPool;
 
 @implementation WKProcessPool {
     WebKit::WeakObjCPtr<id <_WKAutomationDelegate>> _automationDelegate;
@@ -88,6 +91,28 @@
     [super dealloc];
 }
 
+- (void)encodeWithCoder:(NSCoder *)coder
+{
+    if (self == sharedProcessPool) {
+        [coder encodeBool:YES forKey:@"isSharedProcessPool"];
+        return;
+    }
+}
+
+- (instancetype)initWithCoder:(NSCoder *)coder
+{
+    if (!(self = [self init]))
+        return nil;
+
+    if ([coder decodeBoolForKey:@"isSharedProcessPool"]) {
+        [self release];
+
+        return [[WKProcessPool _sharedProcessPool] retain];
+    }
+
+    return self;
+}
+
 - (NSString *)description
 {
     return [NSString stringWithFormat:@"<%@: %p; configuration = %@>", NSStringFromClass(self.class), self, wrapper(_processPool->configuration())];
@@ -115,6 +140,16 @@
 @end
 
 @implementation WKProcessPool (WKPrivate)
+
++ (WKProcessPool *)_sharedProcessPool
+{
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        sharedProcessPool = [[WKProcessPool alloc] init];
+    });
+
+    return sharedProcessPool;
+}
 
 + (NSURL *)_websiteDataURLForContainerWithURL:(NSURL *)containerURL
 {
@@ -249,6 +284,28 @@ static WebKit::HTTPCookieAcceptPolicy toHTTPCookieAcceptPolicy(NSHTTPCookieAccep
 {
     _automationSession = automationSession;
     _processPool->setAutomationSession(automationSession ? automationSession->_session.get() : nullptr);
+}
+
+- (void)_terminateDatabaseProcess
+{
+    _processPool->terminateDatabaseProcess();
+}
+
++ (void)_forceGameControllerFramework
+{
+#if ENABLE(GAMEPAD)
+    WebKit::UIGamepadProvider::setUsesGameControllerFramework();
+#endif
+}
+
+- (BOOL)_isCookieStoragePartitioningEnabled
+{
+    return _processPool->cookieStoragePartitioningEnabled();
+}
+
+- (void)_setCookieStoragePartitioningEnabled:(BOOL)enabled
+{
+    _processPool->setCookieStoragePartitioningEnabled(enabled);
 }
 
 @end

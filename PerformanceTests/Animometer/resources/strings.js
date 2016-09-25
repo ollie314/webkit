@@ -1,43 +1,28 @@
 var Strings = {
     text: {
         testName: "Test Name",
-        score: "Score",
-        samples: "Samples",
-
-        complexity: "Complexity",
-        frameRate: "FPS",
-        mergedRawComplexity: "Merged raw",
-        mergedAverageComplexity: "Merged average",
-        graph: "Graph"
+        score: "Score"
     },
     json: {
-        score: "score",
-        samples: "samples",
-        complexityAverageSamples: "complexityAverageSamples",
         marks: "marks",
-
-        targetFrameLength: "targetFrameLength",
         samplingStartTimeOffset: "Start sampling",
         samplingEndTimeOffset: "End sampling",
 
-        experiments: {
-            complexity: "complexity",
-            frameRate: "frameRate"
-        },
+        samples: "samples",
+        dataFieldMap: "dataFieldMap",
+        controller: "controller",
+        time: "time",
+        complexity: "complexity",
+        complexityAverage: "complexityAverage",
+        frameLength: "frameLength",
+        smoothedFrameLength: "smoothedFrameLength",
 
-        regressions: {
-            timeRegressions: "timeRegressions",
-            complexity: "complexity",
-            maxComplexity: "maxComplexity",
-            startIndex: "startIndex",
-            endIndex: "endIndex",
-
-            complexityRegression: "complexityRegression",
-            complexityAverageRegression: "complexityAverageRegression",
-            segment1: "segment1",
-            segment2: "segment2"
-        },
-
+        result: "result",
+        configuration: "configuration",
+        score: "score",
+        scoreLowerBound: "scoreLowerBound",
+        scoreUpperBound: "scoreUpperBound",
+        bootstrap: "bootstrap",
         measurements: {
             average: "average",
             concern: "concern",
@@ -45,9 +30,21 @@ var Strings = {
             percent: "percent"
         },
 
+        regressions: {
+            startIndex: "startIndex",
+            endIndex: "endIndex",
+            segment1: "segment1",
+            segment2: "segment2",
+            profile: "profile"
+        },
+
+        profiles: {
+            slope: "slope",
+            flat: "flat"
+        },
+
         results: {
             iterations: "iterationsResults",
-            suites: "suitesResults",
             tests: "testsResults"
         }
     }

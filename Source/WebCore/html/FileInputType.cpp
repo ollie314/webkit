@@ -150,12 +150,12 @@ bool FileInputType::appendFormData(FormDataList& encoding, bool multipart) const
     // If no filename at all is entered, return successful but empty.
     // Null would be more logical, but Netscape posts an empty file. Argh.
     if (!numFiles) {
-        encoding.appendBlob(element().name(), File::create(""));
+        encoding.appendBlob(element().name(), File::create(emptyString()));
         return true;
     }
 
     for (unsigned i = 0; i < numFiles; ++i)
-        encoding.appendBlob(element().name(), fileList->item(i));
+        encoding.appendBlob(element().name(), *fileList->item(i));
     return true;
 }
 
@@ -169,7 +169,7 @@ String FileInputType::valueMissingText() const
     return element().multiple() ? validationMessageValueMissingForMultipleFileText() : validationMessageValueMissingForFileText();
 }
 
-void FileInputType::handleDOMActivateEvent(Event* event)
+void FileInputType::handleDOMActivateEvent(Event& event)
 {
     if (element().isDisabledFormControl())
         return;
@@ -180,38 +180,28 @@ void FileInputType::handleDOMActivateEvent(Event* event)
     if (Chrome* chrome = this->chrome()) {
         FileChooserSettings settings;
         HTMLInputElement& input = element();
-        settings.allowsMultipleFiles = input.fastHasAttribute(multipleAttr);
+        settings.allowsMultipleFiles = input.hasAttributeWithoutSynchronization(multipleAttr);
         settings.acceptMIMETypes = input.acceptMIMETypes();
         settings.acceptFileExtensions = input.acceptFileExtensions();
         settings.selectedFiles = m_fileList->paths();
 #if ENABLE(MEDIA_CAPTURE)
-        settings.capture = input.shouldUseMediaCapture();
+        settings.mediaCaptureType = input.mediaCaptureType();
 #endif
 
         applyFileChooserSettings(settings);
         chrome->runOpenPanel(input.document().frame(), m_fileChooser);
     }
 
-    event->setDefaultHandled();
+    event.setDefaultHandled();
 }
 
-RenderPtr<RenderElement> FileInputType::createInputRenderer(Ref<RenderStyle>&& style)
+RenderPtr<RenderElement> FileInputType::createInputRenderer(RenderStyle&& style)
 {
     return createRenderer<RenderFileUploadControl>(element(), WTFMove(style));
 }
 
 bool FileInputType::canSetStringValue() const
 {
-    return false;
-}
-
-bool FileInputType::canChangeFromAnotherType() const
-{
-    // Don't allow the type to be changed to file after the first type change.
-    // In other engines this might mean a JavaScript programmer could set a text
-    // field's value to something like /etc/passwd and then change it to a file input.
-    // I don't think this would actually occur in WebKit, but this rule still may be
-    // important for compatibility.
     return false;
 }
 
@@ -295,8 +285,10 @@ void FileInputType::requestIcon(const Vector<String>& paths)
 #if PLATFORM(IOS)
     UNUSED_PARAM(paths);
 #else
-    if (!paths.size())
+    if (!paths.size()) {
+        updateRendering(nullptr);
         return;
+    }
 
     Chrome* chrome = this->chrome();
     if (!chrome)
@@ -402,7 +394,7 @@ bool FileInputType::receiveDroppedFiles(const DragData& dragData)
     for (auto& path : paths)
         files.append(FileChooserFileInfo(path));
 
-    if (input->fastHasAttribute(multipleAttr))
+    if (input->hasAttributeWithoutSynchronization(multipleAttr))
         filesChosen(files);
     else {
         Vector<FileChooserFileInfo> firstFileOnly;

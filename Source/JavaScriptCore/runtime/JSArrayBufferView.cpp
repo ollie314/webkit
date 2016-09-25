@@ -36,6 +36,22 @@ const ClassInfo JSArrayBufferView::s_info = {
     "ArrayBufferView", &Base::s_info, 0, CREATE_METHOD_TABLE(JSArrayBufferView)
 };
 
+String JSArrayBufferView::toStringName(const JSObject*, ExecState*)
+{
+    return ASCIILiteral("Object");
+}
+
+JSArrayBufferView::ConstructionContext::ConstructionContext(
+    Structure* structure, uint32_t length, void* vector)
+    : m_structure(structure)
+    , m_vector(vector)
+    , m_length(length)
+    , m_mode(FastTypedArray)
+    , m_butterfly(nullptr)
+{
+    RELEASE_ASSERT(length <= fastSizeLimit);
+}
+
 JSArrayBufferView::ConstructionContext::ConstructionContext(
     VM& vm, Structure* structure, uint32_t length, uint32_t elementSize,
     InitializationMode mode)
@@ -45,23 +61,24 @@ JSArrayBufferView::ConstructionContext::ConstructionContext(
 {
     if (length <= fastSizeLimit) {
         // Attempt GC allocation.
-        void* temp = 0;
+        void* temp;
         size_t size = sizeOf(length, elementSize);
-        // CopiedSpace only allows non-zero size allocations.
-        if (size && !vm.heap.tryAllocateStorage(0, size, &temp))
-            return;
+        if (size) {
+            temp = vm.heap.tryAllocateAuxiliary(nullptr, size);
+            if (!temp)
+                return;
+        } else
+            temp = nullptr;
 
         m_structure = structure;
         m_vector = temp;
         m_mode = FastTypedArray;
 
-#if USE(JSVALUE32_64)
         if (mode == ZeroFill) {
             uint64_t* asWords = static_cast<uint64_t*>(m_vector);
             for (unsigned i = size / sizeof(uint64_t); i--;)
                 asWords[i] = 0;
         }
-#endif // USE(JSVALUE32_64)
         
         return;
     }
@@ -113,7 +130,7 @@ JSArrayBufferView::JSArrayBufferView(VM& vm, ConstructionContext& context)
     , m_length(context.length())
     , m_mode(context.mode())
 {
-    m_vector.setWithoutBarrier(static_cast<char*>(context.vector()));
+    m_vector.setWithoutBarrier(context.vector());
 }
 
 void JSArrayBufferView::finishCreation(VM& vm)
@@ -136,73 +153,37 @@ void JSArrayBufferView::finishCreation(VM& vm)
     RELEASE_ASSERT_NOT_REACHED();
 }
 
-bool JSArrayBufferView::getOwnPropertySlot(
-    JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
+void JSArrayBufferView::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
-    JSArrayBufferView* thisObject = jsCast<JSArrayBufferView*>(object);
-    
-    if (propertyName == exec->propertyNames().buffer) {
-        slot.setValue(
-            thisObject, DontDelete | ReadOnly, exec->vm().m_typedArrayController->toJS(
-                exec, thisObject->globalObject(), thisObject->buffer()));
-        return true;
+    JSArrayBufferView* thisObject = jsCast<JSArrayBufferView*>(cell);
+
+    if (thisObject->hasArrayBuffer()) {
+        ArrayBuffer* buffer = thisObject->buffer();
+        RELEASE_ASSERT(buffer);
+        visitor.addOpaqueRoot(buffer);
     }
     
-    return Base::getOwnPropertySlot(thisObject, exec, propertyName, slot);
+    Base::visitChildren(thisObject, visitor);
 }
 
-void JSArrayBufferView::put(
+bool JSArrayBufferView::put(
     JSCell* cell, ExecState* exec, PropertyName propertyName, JSValue value,
     PutPropertySlot& slot)
 {
     JSArrayBufferView* thisObject = jsCast<JSArrayBufferView*>(cell);
-    if (propertyName == exec->propertyNames().buffer) {
-        reject(exec, slot.isStrictMode(), "Attempting to write to read-only typed array property.");
-        return;
-    }
+
+    if (UNLIKELY(isThisValueAltered(slot, thisObject)))
+        return ordinarySetSlow(exec, thisObject, propertyName, value, slot.thisValue(), slot.isStrictMode());
     
-    Base::put(thisObject, exec, propertyName, value, slot);
+    return Base::put(thisObject, exec, propertyName, value, slot);
 }
-
-bool JSArrayBufferView::defineOwnProperty(
-    JSObject* object, ExecState* exec, PropertyName propertyName,
-    const PropertyDescriptor& descriptor, bool shouldThrow)
-{
-    JSArrayBufferView* thisObject = jsCast<JSArrayBufferView*>(object);
-    if (propertyName == exec->propertyNames().buffer)
-        return reject(exec, shouldThrow, "Attempting to define read-only typed array property.");
     
-    return Base::defineOwnProperty(thisObject, exec, propertyName, descriptor, shouldThrow);
-}
-
-bool JSArrayBufferView::deleteProperty(
-    JSCell* cell, ExecState* exec, PropertyName propertyName)
-{
-    JSArrayBufferView* thisObject = jsCast<JSArrayBufferView*>(cell);
-    if (propertyName == exec->propertyNames().buffer)
-        return false;
-    
-    return Base::deleteProperty(thisObject, exec, propertyName);
-}
-
-void JSArrayBufferView::getOwnNonIndexPropertyNames(
-    JSObject* object, ExecState* exec, PropertyNameArray& array, EnumerationMode mode)
-{
-    JSArrayBufferView* thisObject = jsCast<JSArrayBufferView*>(object);
-    
-    if (mode.includeDontEnumProperties())
-        array.add(exec->propertyNames().buffer);
-
-    
-    Base::getOwnNonIndexPropertyNames(thisObject, exec, array, mode);
-}
-
 void JSArrayBufferView::finalize(JSCell* cell)
 {
     JSArrayBufferView* thisObject = static_cast<JSArrayBufferView*>(cell);
     ASSERT(thisObject->m_mode == OversizeTypedArray || thisObject->m_mode == WastefulTypedArray);
     if (thisObject->m_mode == OversizeTypedArray)
-        fastFree(thisObject->m_vector.getWithoutBarrier());
+        fastFree(thisObject->m_vector.get());
 }
 
 } // namespace JSC

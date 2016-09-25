@@ -671,7 +671,7 @@ static RetainPtr<CTFontRef> platformFontLookupWithFamily(const AtomicString& fam
 }
 #endif
 
-static RetainPtr<CTFontRef> fontWithFamily(const AtomicString& family, CTFontSymbolicTraits desiredTraits, FontWeight weight, const FontFeatureSettings& featureSettings, const FontVariantSettings& variantSettings, const TextRenderingMode& textRenderingMode, float size)
+static RetainPtr<CTFontRef> fontWithFamily(const AtomicString& family, CTFontSymbolicTraits desiredTraits, FontWeight weight, const FontFeatureSettings& featureSettings, const FontVariantSettings& variantSettings, const FontFeatureSettings* fontFaceFeatures, const FontVariantSettings* fontFaceVariantSettings, const TextRenderingMode& textRenderingMode, float size)
 {
     if (family.isEmpty())
         return nullptr;
@@ -684,7 +684,7 @@ static RetainPtr<CTFontRef> fontWithFamily(const AtomicString& family, CTFontSym
         foundFont = platformFontWithFamily(family, desiredTraits, weight, textRenderingMode, size);
 #endif
     }
-    return preparePlatformFont(foundFont.get(), textRenderingMode, nullptr, nullptr, featureSettings, variantSettings);
+    return preparePlatformFont(foundFont.get(), textRenderingMode, fontFaceFeatures, fontFaceVariantSettings, featureSettings, variantSettings);
 }
 
 #if PLATFORM(MAC)
@@ -719,12 +719,12 @@ static void autoActivateFont(const String& name, CGFloat size)
 }
 #endif
 
-std::unique_ptr<FontPlatformData> FontCache::createFontPlatformData(const FontDescription& fontDescription, const AtomicString& family)
+std::unique_ptr<FontPlatformData> FontCache::createFontPlatformData(const FontDescription& fontDescription, const AtomicString& family, const FontFeatureSettings* fontFaceFeatures, const FontVariantSettings* fontFaceVariantSettings)
 {
     CTFontSymbolicTraits traits = computeTraits(fontDescription);
     float size = fontDescription.computedPixelSize();
 
-    RetainPtr<CTFontRef> font = fontWithFamily(family, traits, fontDescription.weight(), fontDescription.featureSettings(), fontDescription.variantSettings(), fontDescription.textRenderingMode(), size);
+    RetainPtr<CTFontRef> font = fontWithFamily(family, traits, fontDescription.weight(), fontDescription.featureSettings(), fontDescription.variantSettings(), fontFaceFeatures, fontFaceVariantSettings, fontDescription.textRenderingMode(), size);
 
 #if PLATFORM(MAC)
     if (!font) {
@@ -735,7 +735,7 @@ std::unique_ptr<FontPlatformData> FontCache::createFontPlatformData(const FontDe
         // Ignore the result because we want to use our own algorithm to actually find the font.
         autoActivateFont(family.string(), size);
 
-        font = fontWithFamily(family, traits, fontDescription.weight(), fontDescription.featureSettings(), fontDescription.variantSettings(), fontDescription.textRenderingMode(), size);
+        font = fontWithFamily(family, traits, fontDescription.weight(), fontDescription.featureSettings(), fontDescription.variantSettings(), fontFaceFeatures, fontFaceVariantSettings, fontDescription.textRenderingMode(), size);
     }
 #endif
 
@@ -791,9 +791,69 @@ RefPtr<Font> FontCache::systemFallbackForCharacters(const FontDescription& descr
     bool syntheticBold, syntheticOblique;
     std::tie(syntheticBold, syntheticOblique) = computeNecessarySynthesis(substituteFont, description, isPlatformFont).boldObliquePair();
 
-    FontPlatformData alternateFont(substituteFont, platformData.size(), syntheticBold, syntheticOblique, platformData.m_orientation, platformData.m_widthVariant, platformData.m_textRenderingMode);
+    FontPlatformData alternateFont(substituteFont, platformData.size(), syntheticBold, syntheticOblique, platformData.orientation(), platformData.widthVariant(), platformData.textRenderingMode());
 
     return fontForPlatformData(alternateFont);
+}
+
+const AtomicString& FontCache::platformAlternateFamilyName(const AtomicString& familyName)
+{
+    static const UChar heitiString[] = { 0x9ed1, 0x4f53 };
+    static const UChar songtiString[] = { 0x5b8b, 0x4f53 };
+    static const UChar weiruanXinXiMingTi[] = { 0x5fae, 0x8edf, 0x65b0, 0x7d30, 0x660e, 0x9ad4 };
+    static const UChar weiruanYaHeiString[] = { 0x5fae, 0x8f6f, 0x96c5, 0x9ed1 };
+    static const UChar weiruanZhengHeitiString[] = { 0x5fae, 0x8edf, 0x6b63, 0x9ed1, 0x9ad4 };
+
+    static NeverDestroyed<AtomicString> songtiSC("Songti SC", AtomicString::ConstructFromLiteral);
+    static NeverDestroyed<AtomicString> songtiTC("Songti TC", AtomicString::ConstructFromLiteral);
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED < 101100
+    static NeverDestroyed<AtomicString> heitiSCReplacement("Heiti SC", AtomicString::ConstructFromLiteral);
+    static NeverDestroyed<AtomicString> heitiTCReplacement("Heiti TC", AtomicString::ConstructFromLiteral);
+#else
+    static NeverDestroyed<AtomicString> heitiSCReplacement("PingFang SC", AtomicString::ConstructFromLiteral);
+    static NeverDestroyed<AtomicString> heitiTCReplacement("PingFang TC", AtomicString::ConstructFromLiteral);
+#endif
+
+    switch (familyName.length()) {
+    case 2:
+        if (equal(familyName, songtiString))
+            return songtiSC;
+        if (equal(familyName, heitiString))
+            return heitiSCReplacement;
+        break;
+    case 4:
+        if (equal(familyName, weiruanYaHeiString))
+            return heitiSCReplacement;
+        break;
+    case 5:
+        if (equal(familyName, weiruanZhengHeitiString))
+            return heitiTCReplacement;
+        break;
+    case 6:
+        if (equalLettersIgnoringASCIICase(familyName, "simsun"))
+            return songtiSC;
+        if (equal(familyName, weiruanXinXiMingTi))
+            return songtiTC;
+        break;
+    case 10:
+        if (equalLettersIgnoringASCIICase(familyName, "ms mingliu"))
+            return songtiTC;
+        if (equalIgnoringASCIICase(familyName, "\\5b8b\\4f53"))
+            return songtiSC;
+        break;
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED < 101100
+    case 15:
+        if (equalLettersIgnoringASCIICase(familyName, "microsoft yahei"))
+            return heitiSCReplacement;
+        break;
+#endif
+    case 18:
+        if (equalLettersIgnoringASCIICase(familyName, "microsoft jhenghei"))
+            return heitiTCReplacement;
+        break;
+    }
+
+    return nullAtom;
 }
 
 }

@@ -31,7 +31,6 @@
 #include "LayoutSize.h"
 #include "SVGImageCache.h"
 #include <wtf/HashMap.h>
-#include <wtf/Vector.h>
 
 namespace WebCore {
 
@@ -51,7 +50,7 @@ class CachedImage final : public CachedResource, public ImageObserver {
 public:
     enum CacheBehaviorType { AutomaticallyCached, ManuallyCached };
 
-    CachedImage(const ResourceRequest&, SessionID);
+    CachedImage(CachedResourceRequest&&, SessionID);
     CachedImage(Image*, SessionID);
     CachedImage(const URL&, Image*, SessionID);
     CachedImage(const URL&, Image*, CacheBehaviorType, SessionID);
@@ -63,34 +62,38 @@ public:
     bool currentFrameKnownToBeOpaque(const RenderElement*);
 
     std::pair<Image*, float> brokenImage(float deviceScaleFactor) const; // Returns an image and the image's resolution scale factor.
-    bool willPaintBrokenImage() const; 
+    bool willPaintBrokenImage() const;
 
-    bool canRender(const RenderObject* renderer, float multiplier) { return !errorOccurred() && !imageSizeForRenderer(renderer, multiplier).isEmpty(); }
+    bool canRender(const RenderElement* renderer, float multiplier) { return !errorOccurred() && !imageSizeForRenderer(renderer, multiplier).isEmpty(); }
 
     void setContainerSizeForRenderer(const CachedImageClient*, const LayoutSize&, float);
     bool usesImageContainerSize() const;
     bool imageHasRelativeWidth() const;
     bool imageHasRelativeHeight() const;
 
-    virtual void addDataBuffer(SharedBuffer&) override;
-    virtual void finishLoading(SharedBuffer*) override;
+    void addDataBuffer(SharedBuffer&) override;
+    void finishLoading(SharedBuffer*) override;
 
     enum SizeType {
         UsedSize,
         IntrinsicSize
     };
     // This method takes a zoom multiplier that can be used to increase the natural size of the image by the zoom.
-    LayoutSize imageSizeForRenderer(const RenderObject*, float multiplier, SizeType = UsedSize); // returns the size of the complete image.
+    LayoutSize imageSizeForRenderer(const RenderElement*, float multiplier, SizeType = UsedSize); // returns the size of the complete image.
     void computeIntrinsicDimensions(Length& intrinsicWidth, Length& intrinsicHeight, FloatSize& intrinsicRatio);
 
     bool isManuallyCached() const { return m_isManuallyCached; }
     RevalidationDecision makeRevalidationDecision(CachePolicy) const override;
-    virtual void load(CachedResourceLoader&, const ResourceLoaderOptions&) override;
+    void load(CachedResourceLoader&) override;
 
     bool isOriginClean(SecurityOrigin*);
 
 private:
     void clear();
+
+    CachedImage(CachedImage&, const ResourceRequest&, SessionID);
+
+    void setBodyDataFrom(const CachedResource&) final;
 
     void createImage();
     void clearImage();
@@ -98,30 +101,30 @@ private:
     void notifyObservers(const IntRect* changeRect = nullptr);
     void checkShouldPaintBrokenImage();
 
-    virtual void switchClientsToRevalidatedResource() override;
-    virtual bool mayTryReplaceEncodedData() const override { return true; }
+    void switchClientsToRevalidatedResource() override;
+    bool mayTryReplaceEncodedData() const override { return true; }
 
-    virtual void didAddClient(CachedResourceClient*) override;
-    virtual void didRemoveClient(CachedResourceClient*) override;
+    void didAddClient(CachedResourceClient*) override;
+    void didRemoveClient(CachedResourceClient*) override;
 
-    virtual void allClientsRemoved() override;
-    virtual void destroyDecodedData() override;
+    void allClientsRemoved() override;
+    void destroyDecodedData() override;
 
-    virtual void addData(const char* data, unsigned length) override;
-    virtual void error(CachedResource::Status) override;
-    virtual void responseReceived(const ResourceResponse&) override;
+    void addData(const char* data, unsigned length) override;
+    void error(CachedResource::Status) override;
+    void responseReceived(const ResourceResponse&) override;
 
     // For compatibility, images keep loading even if there are HTTP errors.
-    virtual bool shouldIgnoreHTTPStatusCodeErrors() const override { return true; }
+    bool shouldIgnoreHTTPStatusCodeErrors() const override { return true; }
 
-    virtual bool stillNeedsLoad() const override { return !errorOccurred() && status() == Unknown && !isLoading(); }
+    bool stillNeedsLoad() const override { return !errorOccurred() && status() == Unknown && !isLoading(); }
 
     // ImageObserver
-    virtual void decodedSizeChanged(const Image*, int delta) override;
-    virtual void didDraw(const Image*) override;
+    void decodedSizeChanged(const Image*, int delta) override;
+    void didDraw(const Image*) override;
 
-    virtual void animationAdvanced(const Image*) override;
-    virtual void changedInRect(const Image*, const IntRect&) override;
+    void animationAdvanced(const Image*) override;
+    void changedInRect(const Image*, const IntRect&) override;
 
     void addIncrementalDataBuffer(SharedBuffer&);
 

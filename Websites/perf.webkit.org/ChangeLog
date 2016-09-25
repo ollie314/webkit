@@ -1,3 +1,2847 @@
+2016-08-09  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Don't filter out the latest data point in chart data sampling
+        https://bugs.webkit.org/show_bug.cgi?id=160714
+
+        Reviewed by Chris Dumez.
+
+        Exclude the last data point from sampling so that it's always included in the "sampled" charts data.
+        Without this, the last data point can change as we zoom out the time domain.
+
+        Luckily, we already had a mechanism to exclude the user selected point from sampling. Extend this
+        feature by supporting an array of point IDs instead of a single ID to exclude from filering.
+
+        * public/v3/components/interactive-time-series-chart.js:
+        (InteractiveTimeSeriesChart.prototype._sampleTimeSeries): Replaced exclusionPointID by excludedPoints. 
+
+        * public/v3/components/time-series-chart.js:
+        (TimeSeriesChart.prototype._ensureSampledTimeSeries): Put the last data point in excludedPoints.
+        (TimeSeriesChart.prototype._sampleTimeSeries): Check point's id against the list of IDs.
+
+2016-08-09  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Build fix after r204187. interval has to be a getter, not a method.
+
+        * public/v3/components/time-series-chart.js:
+        (TimeSeriesChart.prototype._renderTimeSeries):
+        * public/v3/models/measurement-adaptor.js:
+        (MeasurementAdaptor.prototype.applyTo):
+
+2016-08-09  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Fix a typo that was supposed to be fixed in r204296 before landing.
+
+        * public/v3/pages/chart-pane.js:
+        (ChartPane):
+        (ChartPane.prototype.updateFromSerializedState):
+        (ChartPane.prototype._analyzeRange):
+        (ChartPane.prototype._renderTrendLinePopover):
+        (ChartPane.prototype._trendLineTypeDidChange):
+
+2016-08-08  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Always show segmentation on v3 charts page
+        https://bugs.webkit.org/show_bug.cgi?id=160576
+
+        Rubber-stamped by Chris Dumez.
+
+        Added "Trend Lines" popover to select and customize a moving average or a segmentation to show on charts page
+        and made Schwarz criterion segmentation the default trend line for all charts.
+
+        Because computing the segmentation is expensive, we use WebWorker to parallelize the computation via AsyncTask.
+        We also compute and cache the segmentation for each cluster separately to avoid processing the entire measurement
+        set as that could take 10-20s total, which was a huge problem in v2 UI. v3 UI's approach is more incremental and
+        even opens up an opportunity to cache the results in the server side.
+
+        Also brought back "shading" for the confidence interval drawing as done in v1 and v2 UI.
+
+        * public/shared/statistics.js:
+        (Statistics.segmentTimeSeriesByMaximizingSchwarzCriterion): Added segmentCountWeight and gridSize as arguments
+        to customize the algorithm.
+        (Statistics.splitIntoSegmentsUntilGoodEnough): Takes segmentCountWeight as BirgeAndMassartC.
+
+        * public/v3/async-task.js: Added.
+        (AsyncTask): Added. This class represents a task such as computing segmentation to be executed in a worker.
+        (AsyncTask.prototype.execute): Added. Returns a promise that gets resolved when the specified task completes.
+        (AsyncTaskWorker.waitForAvailableWorker): Added. Calls the given callback with the first available worker. When
+        all workers are processing some tasks, it waits until one becomes available by putting the callback into a queue.
+        _didRecieveMessage pops an item out of this queue when a worker completes a task. We don't use a promise here
+        because calling this function multiple times synchronously could result in all the returned promises getting
+        resolved with the same worker as none of the callers get to lock away the first available worker until the end
+        of the current micro-task.
+        (AsyncTaskWorker._makeWorkerEventuallyAvailable): Added. A helper function for waitForAvailableWorker. Start
+        a new worker if the number of workers we've started is less than the number of extra cores (e.g. 7 if there are
+        8 cores on the machine). Avoid starting a new worker if we've started a new worker within the last 50 ms since
+        starting a new worker takes some time.
+        (AsyncTaskWorker._findAvailableWorker): Added. Finds a worker that's available right now if there is any.
+        (AsyncTaskWorker): Added. An instance of AsyncTaskWorker represents a Web worker.
+        (AsyncTaskWorker.prototype.id): Added.
+        (AsyncTaskWorker.prototype.sendTask): Added. Sends a task represented by AsyncTask to the worker.
+        (AsyncTaskWorker.prototype._didRecieveMessage): Added. This function gets called when the current task completes
+        in the worker. Pop the next callback if some caller of waitForAvailableWorker is still waiting. Otherwise stop
+        the worker after one second of waiting to avoid worker churning.
+        (AsyncTaskWorker.workerDidRecieveMessage): Added. Called by onmessage on the worker. Executes the specified task
+        and sends back a message upon completion with the appropriate timing data.
+
+        * public/v3/components/chart-pane-base.js:
+        (ChartPaneBase.prototype.configure): Uses _createSourceList.
+        (ChartPaneBase.prototype._createSourceList): Added. Extracted from configure to customize the source list for
+        the main chart and the overview chart.
+        (ChartPaneBase.prototype._updateSourceList): Uses _createSourceList.
+
+        * public/v3/components/chart-styles.js:
+        (ChartStyles.createSourceList): Added a boolean showPoint as an extra argument. This specifies whether circles
+        are drawn for each data point.
+        (ChartStyles.baselineStyle): Added styles for foreground lines and background lines. They're used for trend lines
+        and underlying raw data respectively when trend lines are shown.
+        (ChartStyles.targetStyle): Ditto.
+        (ChartStyles.currentStyle): Ditto.
+
+        * public/v3/components/time-series-chart.js:
+        (TimeSeriesChart): Added _trendLines, _renderedTrendLines, and _fetchedTimeSeries as instance variables.
+        (TimeSeriesChart.prototype.setSourceList): Clear _fetchedTimeSeries before calling setSourceList for consistency.
+        (TimeSeriesChart.prototype.sourceList): Added.
+        (TimeSeriesChart.prototype.clearTrendLines): Added.
+        (TimeSeriesChart.prototype.setTrendLine): Added. Preserves the existing trend lines for other sources. This is
+        necessary because segmentation for "current" and "baseline" lines may become available at different times, and we
+        don't want to clear one or the other when setting one.
+        (TimeSeriesChart.prototype._layout): Added a call to _ensureTrendLines.
+        (TimeSeriesChart.prototype._renderChartContent): Call _renderTimeSeries for trend lines. Trend lines are always
+        foreground lines and "regular" raw data points are drawn as background if there are trend lines.
+        (TimeSeriesChart.prototype._renderTimeSeries): Added layerName as an argument. It could be an empty string,
+        "foreground", or "background". Draw a "shade" just like v1 and v2 UI instead of vertical lines for the confidence
+        intervals. Pick "foreground", "background", or "regular" chart style based on layerName. Also avoid drawing data
+        points when *PointRadius is set to zero to reduce the runtime of this function.
+        (TimeSeriesChart.prototype._sourceOptionWithFallback): Added.
+        (TimeSeriesChart.prototype._ensureSampledTimeSeries): When *PointRadius is 0, show as many points as there are x
+        coordinates as a fallback instead of showing every point.
+        (TimeSeriesChart.prototype._ensureTrendLines): Added. Returns true if the chart contents haven't been re-rendered
+        since the last update to trend lines. This flag is unset by setTrendLine.
+
+        * public/v3/index.html:
+
+        * public/v3/models/measurement-cluster.js:
+        (MeasurementCluster.prototype.addToSeries): Store the data points' index to idMap to help aid MeasurementSet's
+        _cachedClusterSegmentation efficiently re-create the segmentation from the cache.
+
+        * public/v3/models/measurement-set.js:
+        (MeasurementSet): Added _segmentationCache as an instance variable.
+        (MeasurementSet.prototype.fetchSegmentation): Added. Calls _cachedClusterSegmentation on each cluster, and
+        constructs the time series representation of the segmentation from the results.
+        (MeasurementSet.prototype._cachedClusterSegmentation): Computes and caches the segmentation for each cluster.
+        The cache of segmentation stores ID of each measurement set at which segment changes instead of its index since
+        the latter could change in any moment when a new test result is reported, or an existing test result is removed
+        from the time series; e.g. when it's marked as an outlier.
+        (MeasurementSet.prototype._validateSegmentationCache): Added. Checks whether the cached segmentation's name and
+        its parameters match that of the requested one.
+        (MeasurementSet.prototype._invokeSegmentationAlgorithm): Added. Invokes the segmentation algorithm either in the
+        main thread or in a Web worker via AsyncTask API based on the size of the time series. While parallelizing the
+        work is beneficial when the data set is large, the overhead can add up if we keep processing a very small data
+        set in a worker.
+
+        * public/v3/models/time-series.js: Made the file compatible with Node.
+        (TimeSeries.prototype.length): Added.
+        (TimeSeries.prototype.valuesBetweenRange): Added.
+
+        * public/v3/pages/chart-pane.js:
+        (createTrendLineExecutableFromAveragingFunction): Added.
+        (ChartTrendLineTypes): Added. Similar to StatisticsStrategies (statistics-strategies.js) in v2 UI.
+        (ChartPane): Added _trendLineType, _trendLineParameters, _trendLineVersion, and _renderedTrendLineOptions as
+        instance variables.
+        (ChartPane.prototype.serializeState): Serialize the trend line option. This format is compatible with v2 UI.
+        (ChartPane.prototype.updateFromSerializedState): Ditto. Parsing is compatible with v2 UI except that we now have
+        the default trend line set when the specified ID doesn't match an existing type ID.
+        (ChartPane.prototype._renderActionToolbar): Added a call to _renderTrendLinePopover. This is the popover that
+        specifies the type of a trend line to show as well as its parameters.
+        (ChartPane.prototype._renderTrendLinePopover): Added. A popover for specifying and customizing a trend line.
+        (ChartPane.prototype._trendLineTypeDidChange): Added. Called when a new trend line is selected.
+        (ChartPane.prototype._defaultParametersForTrendLine): Added.
+        (ChartPane.prototype._trendLineParameterDidChange): Added. Called when the trend lines' parameters are changed.
+        (ChartPane.prototype._didFetchData): Added. Overrides the one in ChartPaneBase to trigger a trend line update.
+        (ChartPane.prototype._updateTrendLine): Added. Update the trend line. Since segmentation can take an arbitrary
+        long time, avoid updating trend lines if this function had been called again (possibly for a different trend line
+        type or with different parameters) before the results become available; hence the versioning.
+        (ChartPane.paneHeaderTemplate): Added the trend line popover.
+        (ChartPane.cssTemplate): Added styles for the trend line popover. Also use a more opaque background color behind
+        popovers when the -webkit-backdrop-filter property is not supported.
+
+        * public/v3/pages/dashboard-page.js:
+        (DashboardPage.prototype._createChartForCell): Call createSourceList with showPoints set to true to preserve the
+        existing behavior.
+
+        * tools/js/v3-models.js: Include TimeSeries object.
+
+        * unit-tests/measurement-set-tests.js: Added two test cases for MeasurementSet's fetchSegmentation.
+
+        * unit-tests/resources/almost-equal.js: Added.
+        (almostEqual): Extracted out of statistics-tests.js.
+
+        * unit-tests/statistics-tests.js:
+
+2016-08-05  Ryosuke Niwa  <rniwa@webkit.org>
+
+        segmentTimeSeriesByMaximizingSchwarzCriterion returns a bogus result on empty charts
+        https://bugs.webkit.org/show_bug.cgi?id=160575
+
+        Rubber-stamped by Chris Dumez.
+
+        The bug was caused by an early return in segmentTimeSeriesByMaximizingSchwarzCriterion.
+        Removed this early return as the one in splitIntoSegmentsUntilGoodEnough was sufficient.
+
+        Also factored out a few functions in findOptimalSegmentation so that they can be better
+        optimized in JSC's DFG and FTL tiers, and removed unused debuggingTestingRangeNomination.
+
+        * public/shared/statistics.js:
+        (Statistics.segmentTimeSeriesByMaximizingSchwarzCriterion): Removed an early return.
+        (Statistics.splitIntoSegmentsUntilGoodEnough):
+        (.allocateCostUpperTriangularForSegmentation): Extracted from findOptimalSegmentation.
+        (.allocatePreviousNodeForSegmentation): Ditto.
+        (.findOptimalSegmentationInternal): Ditto.
+        (.findOptimalSegmentation):
+
+        * unit-tests/statistics-tests.js: Added a test case.
+
+2016-08-05  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Perf dashboard sometimes tries to fetch a non-existent measurement-set JSON
+        https://bugs.webkit.org/show_bug.cgi?id=160577
+
+        Rubber-stamped by Chris Dumez.
+
+        The bug was caused by findClusters computing the first cluster's endTime incorrectly. Namely, we were
+        multiplying the number of clusters by clusterStart instead of clusterSize with an off-by-one error.
+
+        * public/v3/models/measurement-set.js:
+        (MeasurementSet.prototype.findClusters): Folded computeClusterStart into where clusterEnd is computed
+        for clarity. Also fixed a bug that we were not computing the first cluster to fetch correctly when
+        the fetched time range started before clusterStart (i.e. when startTime - clusterStart is negative).
+        Finally, fixed the main bug by multiplying the number of clusters by clusterSize instead of
+        clusterStart to compute the end time of the very first cluster in this measurement set. Because what
+        we're computing here is the end time of the first cluster, not the start time, we also need to subtract
+        one from the number of clusters. e.g. if there was exactly one cluster, then firstClusterEndTime is
+        identically equal to lastClusterEndTime.
+        (MeasurementSet.prototype.fetchedTimeSeries): Removed the unused argument to TimeSeries's constructor.
+
+        * unit-tests/analysis-task-tests.js: Fixed the tests for the latest version of Mocha which complains if
+        we returned a promise in unit tests when "done" function is used.
+        * unit-tests/checkconfig.js: Ditto.
+        * unit-tests/measurement-set-tests.js: Added a test case for findClusters and a test to make sure
+        fetchBetween doesn't try to fetch a cluster before the first cluster in the set. Also fixed other test
+        cases which were relying on the bug this patch fixed.
+
+2016-08-04  Ryosuke Niwa  <rniwa@webkit.org>
+
+        MeasurementCluster's addToSeries is slow
+        https://bugs.webkit.org/show_bug.cgi?id=160581
+
+        Rubber-stamped by Chris Dumez.
+
+        The bulk of time was spent in MeasurementAdaptor.prototype.applyTo where we computed the interval.
+
+        Since some of data points are filtered out by TimeSeriesChart component before intervals are used,
+        we can significantly reduce the CPU time by lazily compute them. This patch reduces the runtime of
+        applyTo from ~60ms to ~30ms on my machine.
+
+        * public/v3/models/measurement-adaptor.js:
+        (MeasurementAdaptor.prototype.applyTo): Lazily compute and cache the interval. Also cache the build
+        object instead of always creating a new object.
+        * public/v3/models/measurement-cluster.js:
+        (MeasurementCluster.prototype.addToSeries): Call applyTo first before checking whether the point is
+        an outlier or its id to avoid extracting those values twice since they show up in the profiler. Also
+        use "of" instead "forEach" since "of" seems to be faster here.
+
+2016-08-04  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Syncing script's configuration duplicates a lot of boilerplate
+        https://bugs.webkit.org/show_bug.cgi?id=160574
+
+        Rubber-stamped by Chris Dumez.
+
+        This patch makes each configuration accept an array of platforms and types so that we can write:
+
+        {"type": "speedometer", "builder": "mba", "platform": "Trunk El Capitan MacBookAir"},
+        {"type": "speedometer", "builder": "mbp", "platform": "Trunk El Capitan MacBookPro"},
+        {"type": "speedometer", "builder": "mba", "platform": "Trunk Sierra MacBookAir"},
+        {"type": "speedometer", "builder": "mbp", "platform": "Trunk Sierra MacBookPro"},
+        {"type": "jetstream", "builder": "mba", "platform": "Trunk El Capitan MacBookAir"},
+        {"type": "jetstream", "builder": "mbp", "platform": "Trunk El Capitan MacBookPro"},
+        {"type": "jetstream", "builder": "mba", "platform": "Trunk Sierra MacBookAir"},
+        {"type": "jetstream", "builder": "mbp", "platform": "Trunk Sierra MacBookPro"},
+
+        more concisely as:
+
+        {"builder": "mba", "types": ["speedometer", "jetstream"],
+            "platforms": ["Trunk El Capitan MacBookAir", "Trunk Sierra MacBookAir"]},
+        {"builder": "mbp", "types": ["speedometer", "jetstream"],
+            "platforms": ["Trunk El Capitan MacBookPro", "Trunk Sierra MacBookPro"]},
+
+        * tools/js/buildbot-syncer.js:
+        (BuildbotSyncer._loadConfig):
+        (BuildbotSyncer._expandTypesAndPlatforms): Added. Clones a new configuration entry for each type
+        and platform.
+        (BuildbotSyncer._createTestConfiguration): Extracted from _loadConfig.
+        (BuildbotSyncer._validateAndMergeConfig): Added a new argument that specifies a property that
+        shouldn't be merged into the configuration. Also added the support for 'types' and 'platforms',
+        and merged the code for verify an array of strings. Finally, allow the appearance of 'properties'
+        since this function can now be called on a cloned configuration in which 'arguments' had already
+        been renamed to 'properties'.
+
+        * unit-tests/buildbot-syncer-tests.js: Added a test case to parse a consolidated configuration.
+        (sampleiOSConfigWithExpansions): Added.
+
+        * unit-tests/resources/mock-v3-models.js:
+        (MockModels.inject): Added a few more mock models for the newly added test.
+
+2016-07-26  Ryosuke Niwa  <rniwa@webkit.org>
+
+        REGRESSION: Tooltip for analysis tasks doesn't show up on charts
+        https://bugs.webkit.org/show_bug.cgi?id=160221
+
+        Rubber-stamped by Chris Dumez.
+
+        The bug was caused by ChartPaneBase resetting annotation bars every time the current point has moved.
+        Avoid doing this in ChartPaneBase's _renderAnnotations().
+
+        * public/v3/components/chart-pane-base.js:
+        (ChartPaneBase):
+        (ChartPaneBase.prototype.fetchAnalysisTasks):
+        (ChartPaneBase.prototype._renderAnnotations):
+
+2016-07-26  Ryosuke Niwa  <rniwa@webkit.org>
+
+        REGRESSION: The arrow indicating the current page doesn't get updated
+        https://bugs.webkit.org/show_bug.cgi?id=160185
+
+        Reviewed by Chris Dumez.
+
+        The bug was caused by Heading's render() function not updating the DOM more than once. I don't understand
+        how this has ever worked. Fixed the bug by rendering DOM whenever the current page has changed.
+
+        * public/v3/pages/heading.js:
+        (Heading):
+        (Heading.prototype.render):
+
+2016-07-25  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Build fix for Safari 9.
+
+        * public/v3/models/build-request.js:
+        (BuildRequest.prototype.waitingTime): Don't use "const" in strict mode.
+
+2016-07-23  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Perf dashboard should show the list of a pending A/B testing jobs
+        https://bugs.webkit.org/show_bug.cgi?id=160138
+
+        Rubber-stamped by Chris Dumez.
+
+        Add a page to show the list of A/B testing build requests per triggerable. Ideally, we would like to
+        see a queue per builder but that would require changes to database tables and syncing scripts.
+
+        Because this page is most useful when the analysis task with which each build request is associated,
+        JSON API at /api/build-requests/ has been modified to return the analysis task ID for each request.
+
+        Also streamlined the page that shows the list of analysis tasks per Chris' feedback by consolidating
+        "Bisecting" and "Identified" into "Investigated" and moving the toolbar from the upper left corner
+        inside the heading to right beneath the heading above the table. Also made the category page serialize
+        the filter an user had typed in so that reloading the page doesn't clear it.
+
+        * public/api/analysis-tasks.php:
+        (fetch_associated_data_for_tasks): Removed 'category' from the list of columns returned as the notion
+        of 'category' is only relevant in UI, and it's better computed in the front-end.
+        (format_task): Ditto.
+        (determine_category): Deleted.
+
+        * public/api/test-groups.php:
+        (main):
+
+        * public/include/build-requests-fetcher.php:
+        (BuildRequestsFetcher::fetch_for_task): Include the analysis task ID in the rows.
+        (BuildRequestsFetcher::fetch_for_group): Ditto. Ditto.
+        (BuildRequestsFetcher::fetch_incomplete_requests_for_triggerable): Ditto.
+        (BuildRequestsFetcher::results_internal): Ditto.
+
+        * public/v3/index.html:
+
+        * public/v3/main.js:
+        (main): Create a newly introduced BuildRequestQueuePage as a subpage of AnalysisCategoryPage.
+
+        * public/v3/components/ratio-bar-graph.js:
+        (RatioBarGraph.prototype.update): Fixed a bogus assertion here. ratio can be any number. The coercion
+        into [-1, 1] is done inside RatioBarGraph's render() function.
+
+        * public/v3/models/analysis-task.js:
+        (AnalysisTask.prototype.category): Moved the code to compute the analysis task's category from
+        determine_category in analysis-tasks.php. Also merged "bisecting" and "identified" into "investigated".
+        (AnalysisTask.categories): Merged "bisecting" and "identified" into "investigated".
+
+        * public/v3/models/build-request.js:
+        (BuildRequest): Remember the triggerable and the analysis task associated with this request as well as
+        the time at when this request was created.        
+        (BuildRequest.prototype.analysisTaskId): Added.
+        (BuildRequest.prototype.statusLabel): Use a shorter label: "Waiting" for "pending" status.
+        (BuildRequest.prototype.createdAt): Added.
+        (BuildRequest.prototype.waitingTime): Added. Returns a human readable time duration since the creation
+        of this build request such as "2 hours 21 minutes" against a reference time.
+        (BuildRequest.fetchTriggerables): Added.
+        (BuildRequest.cachedRequestsForTriggerableID): Added. Used when navigating back to 
+
+        * public/v3/pages/analysis-category-page.js:
+        (AnalysisCategoryPage): Construct AnalysisCategoryToolbar and store it in this._categoryToolbar since it
+        no longer inherits from Toolbar class, which PageWithHeading recognizes and stores.
+        (AnalysisCategoryPage.prototype.title):
+        (AnalysisCategoryPage.prototype.serializeState): Added.
+        (AnalysisCategoryPage.prototype.stateForCategory): Added. Include the filter in the serialization.
+        (AnalysisCategoryPage.prototype.updateFromSerializedState): Restore the filter from the URL state.
+        (AnalysisCategoryPage.prototype.filterDidChange): Added. Called by AnalysisCategoryToolbar to update
+        the URL state in addition to calling render() as done previously via setFilterCallback.
+        (AnalysisCategoryPage.prototype.render): Always call _categoryToolbar.render() since the hyperlinks for
+        the category pages now include the filter, which can be updated in each call.
+        (AnalysisCategoryPage.cssTemplate):
+
+        * public/v3/pages/analysis-category-toolbar.js:
+        (AnalysisCategoryToolbar): Inherits from ComponentBase instead of Toolbar since AnalysisCategoryToolbar
+        no longer works with Heading class unlike other subclasses of Toolbar class.
+        (AnalysisCategoryToolbar.prototype.setCategoryPage): Added.
+        (AnalysisCategoryToolbar.prototype.setFilterCallback): Deleted.
+        (AnalysisCategoryToolbar.prototype.setFilter): Added. Used to restore from a serialized URL state.
+        (AnalysisCategoryToolbar.prototype.render): Don't recreate the input element as it clears the value as
+        well as the selection of the element. Also use AnalysisCategoryPage's stateForCategory to serialize the
+        category name and the current filter for each hyperlink.
+        (AnalysisCategoryToolbar.prototype._filterMayHaveChanged): Now takes an boolean argument specifying
+        whether the URL state should be updated or not. We update the URL only when a change event is fired to
+        avoid constantly updating it while an user is still typing.
+        (AnalysisCategoryToolbar.cssTemplate): Added.
+        (AnalysisCategoryToolbar.htmlTemplate): Added a button to open the newly added queue page.
+
+        * public/v3/pages/build-request-queue-page.js:
+        (BuildRequestQueuePage): Added.
+        (BuildRequestQueuePage.prototype.routeName): Added.
+        (BuildRequestQueuePage.prototype.pageTitle): Added.
+        (BuildRequestQueuePage.prototype.open): Added. Fetch open build requests for every triggerables using
+        the same API as the syncing scripts.
+        (BuildRequestQueuePage.prototype.render): Added.
+        (BuildRequestQueuePage.prototype._constructBuildRequestTable): Added. Construct a table for the list of
+        pending, scheduled or running build requests in the order syncing scripts would see. Note that the list
+        of build requests returned by /api/build-requests/* can contain completed, canceled, or failed requests
+        since the JSON returns all build requests associated with each test group if one of the requests of the
+        group have not finished. This helps syncing scripts picking the right builder for A/B testing when it
+        had previously been unloaded or crashed in the middle of processing a test group. This characteristics
+        of the API actually helps us here because we can reliably compute the total number of build requests in
+        the group. The first half of this function does this counting as well as collapses all but the first
+        unfinished build requests into a "contraction" row, which just shows the number of build requests that
+        are remaining in the group.
+        (BuildRequestQueuePage.cssTemplate): Added.
+        (BuildRequestQueuePage.htmlTemplate): Added.
+
+        * public/v3/pages/summary-page.js:
+        (SummaryPage.prototype.open): Use one-day median instead of seven-day median to compute the status.
+        (SummaryPageConfigurationGroup): Initialize _ratio to NaN. This was causing assertion failures in
+        RatioBarGraph's update() while measurement sets are being fetched.
+
+        * server-tests/api-build-requests-tests.js: Updated the tests per change in BuildRequest's statusLabel.
+        * unit-tests/analysis-task-tests.js: Ditto.
+        * unit-tests/test-groups-tests.js: Ditto.
+        * unit-tests/build-request-tests.js: Added tests for BuildRequest's waitingTime.
+
+2016-07-22  Ryosuke Niwa  <rniwa@webkit.org>
+
+        REGRESSION(r203035): Marking points as an outlier no longer updates charts
+        https://bugs.webkit.org/show_bug.cgi?id=160106
+
+        Reviewed by Darin Adler.
+
+        The bug was caused by MeasurementSet's fetchBetween clearing previously registered callbacks when noCache
+        option is specified.
+
+        * public/v3/components/time-series-chart.js:
+        (TimeSeriesChart.prototype.setSourceList): Clear this._fetchedTimeSeries when changing chart options.
+        e.g. need to start including or excluding outliers.
+        (TimeSeriesChart.prototype.fetchMeasurementSets): Don't skip the fetching when noCache is true.
+
+        * public/v3/models/measurement-set.js:
+        (MeasurementSet): Added this._callbackMap as an instance variable to keep track of all callbacks on every
+        cluster since we may need to call each callback multiple times per cluster when noCache option is used.
+        (MeasurementSet.prototype.fetchBetween): Moved the code to add _primaryClusterPromise to _allFetches here
+        so that now this function and _ensureClusterPromise are only functions that touch _allFetches.
+        (MeasurementSet.prototype._ensureClusterPromise): Extracted out of fetchBetween. Queue up all callbacks
+        for each cluster when creating a new promise.
+        (MeasurementSet.prototype._fetchPrimaryCluster): Removed the code to add _primaryClusterPromise now that
+        it's done in fetchBetween.
+
+        * public/v3/remote.js:
+        (RemoteAPI.postJSONWithStatus): Removed superfluous call to console.log.
+
+        * unit-tests/measurement-set-tests.js: Updated the test case for noCache. The callback registered before
+        fetchBetween is called with noCache=true is now invoked so callCount must be 3 instead of 2.
+
+2016-07-19  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Perf dashboard always re-generate measurement set JSON
+        https://bugs.webkit.org/show_bug.cgi?id=159951
+
+        Reviewed by Chris Dumez.
+
+        The bug was caused by manifest.json reporting the last modified date of a measurement set in floating point,
+        and a measurement set JSON reporting it as an integer. Fixed the bug by always using an integer.
+
+        * public/api/measurement-set.php:
+        (main): Return 404 when the results is empty.
+        (MeasurementSetFetcher::execute_query): Use "extract(epoch from commit_time)" like ManifestGenerator to improve
+        the generation speed. This is ~10% runtime improvement.
+        (MeasurementSetFetcher::format_map): Updated to reflect the above change.
+        (MeasurementSetFetcher::parse_revisions_array): Ditto.
+
+        * public/include/manifest.php:
+        (ManifestGenerator::platforms): Fixed the bug by coercing lastModified to integer (instead of float).
+
+        * server-tests/api-measurement-set-tests.js: Added a test case for returning empty results, and a test case for
+        making sure lastModified dates in manifest.json and measurement sets match.
+
+        * tools/js/remote.js:
+        (RemoteAPI.prototype.sendHttpRequest): Reject the promise when HTTP status code is not 200.
+
+2016-07-09  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Perf dashboard can consume 50-70% of CPU on MacBook even if user is not interacting at all
+        https://bugs.webkit.org/show_bug.cgi?id=159597
+
+        Reviewed by Chris Dumez.
+
+        TimeSeriesChart and InteractiveTimeSeriesChart had been relying on continually polling on requestAnimationFrame
+        to update itself in response to its canvas resizing. Even though there as an early exit in the case there was
+        nothing to update, this is still causing a significant power drain when the user is not interacting at all.
+
+        Let TimeSeriesChart use the regular top-down render path like other components with exceptions of listening to
+        window's resize eventas well as when new JSONs are fetched from the server. The render() call to the latter case
+        will be coerced into a single callback on requestAnimationFrame to avoid DOM-mutation-layout churn.
+
+        * public/v3/components/base.js:
+        (ComponentBase.isElementInViewport): Deleted.
+        * public/v3/components/chart-pane-base.js:
+        (ChartPaneBase.prototype.render): Enqueue charts to render.
+        * public/v3/components/chart-styles.js:
+        (ChartStyles.dashboardOptions): Removed updateOnRequestAnimationFrame which is no longer an available option.
+        * public/v3/components/time-series-chart.js:
+        (TimeSeriesChart): Replaced the code to register itself for rAF by the code to listen to resize events on window.
+        (TimeSeriesChart._updateOnRAF): Deleted.
+        (TimeSeriesChart._updateAllCharts): Added.
+        (TimeSeriesChart.prototype._enqueueToRender): Added.
+        (TimeSeriesChart._renderEnqueuedCharts): Added.
+        (TimeSeriesChart.prototype.fetchMeasurementSets): Avoid calling fetchBetween when the range had been fetched.
+        Without this change, we can incur a significant number of redundant calls to render() when adjusting the domain
+        in charts page by the slider. When no new JSON is fetched, simply enqueue this chart to render on rAF.
+        (TimeSeriesChart.prototype._didFetchMeasurementSet): Enqueue this chart to render on rAF.
+        (TimeSeriesChart.prototype.render): Removed the check for isElementInViewport since we no longer get render() call
+        when this chart moves into the viewport (as we no longer listen to every rAF or scroll event).
+        * public/v3/models/measurement-set.js:
+        (MeasurementSet.prototype.hasFetchedRange): Fixed various bugs revealed by the new use in fetchMeasurementSets.
+        * public/v3/pages/chart-pane-status-view.js:
+        (ChartPaneStatusView.prototype._updateRevisionListForNewCurrentRepository): Removed the dead code. It was probably
+        copied from when this code was in InteractiveTimeSeries chart. There is no this._forceRender in this component.
+        * public/v3/pages/dashboard-page.js:
+        (DashboardPage.prototype.render): Enqueue charts to render. 
+        * public/v3/pages/heading.js:
+        (SummaryPage.prototype.open): Removed the call to isElementInViewport. This wasn't really doing anything useful in
+        this component.
+        * unit-tests/measurement-set-tests.js: Added tests for hasFetchedRange.
+        (.waitForMeasurementSet): Moved to be used in a newly added test case.
+
+2016-07-09  Ryosuke Niwa  <rniwa@webkit.org>
+
+        REGRESSION: manifest.json generation takes multiple seconds on perf dashboard
+        https://bugs.webkit.org/show_bug.cgi?id=159596
+
+        Reviewed by Chris Dumez.
+
+        The most of CPU time was spent looking for a duplicate entry in an array of metrics by array_search.
+        This patch moves to postgres by using aggregate functions in the query. Also moved the code to convert
+        datetime to UNIX epoch timestamp from PHP to within postgres query.
+
+        These improvements reduce total runtime of Manifest::generate from ~4s to ~350ms on my machine.
+
+        * public/include/manifest.php:
+        (Manifest::generate): No longer fetches test_configurations table as this is done in Manifest::platforms now.
+        Also moved calls to each method in the class to separate lines for easier instrumentation.
+        (Manifest::platforms): Group test configurations (current, baseline, target) by platform and metric.
+        Use the max of the last modified dates in UNIX epoch timestamps (ms to be compatible with JS's representation).
+        A given platform, metric pair is considered to be in the v1 dashboard if any test configuration is in.
+
+2016-07-08  Ryosuke Niwa  <rniwa@webkit.org>
+
+        bundle-v3-scripts.py should compress HTML/CSS templates
+        https://bugs.webkit.org/show_bug.cgi?id=159582
+
+        Reviewed by Joseph Pecoraro.
+
+        Strip leading and trailing whitespaces from HTML and CSS templates. This is a 8% progression on the file size.
+
+        * Install.md: Updated the list of MIME types to apply deflate for newer versions of Apache.
+        * tools/bundle-v3-scripts.py:
+        (main):
+        (compress_template): Added.
+
+2016-06-13  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Build fix. Strip out "use strict" everywhere so that the perf dashboard works on the shipping Safari.
+
+        * tools/bundle-v3-scripts.py:
+        (main):
+
+2016-06-13  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Invalid token error when trying to create an A/B analysis for a range
+        https://bugs.webkit.org/show_bug.cgi?id=158679
+
+        Reviewed by Chris Dumez.
+
+        The problem in this particular case was due to another website overriding cookies for our subdomain.
+        Make PrivilegedAPI robust against its token becoming invalid in general to fix the bug since the cookie
+        is only available under /privileged-api/ and the v3 UI can't access it for security reasons.
+
+        This patch factors out PrivilegedAPI out of remote.js so that it can be tested separately in server tests
+        as well as unit tests even though RemoteAPI itself is implemented differently in each case.
+
+        * init-database.sql: Added a forgotten default value "false" to run_marked_outlier.
+        * public/v3/index.html:
+        * public/v3/privileged-api.js: Added. Extracted out of public/v3/remote.js.
+        (PrivilegedAPI.sendRequest): Fixed the bug. When the initial request fails with "InvalidToken" error,
+        re-generate the token and re-issue the request.
+        (PrivilegedAPI.requestCSRFToken):
+        * public/v3/remote.js:
+        (RemoteAPI.postJSON): Added to match tools/js/remote.js.
+        (RemoteAPI.postJSONWithStatus): Ditto.
+        (PrivilegedAPI): Moved to privileged-api.js.
+        * server-tests/api-measurement-set-tests.js: Removed the unused require for crypto.
+        * server-tests/privileged-api-upate-run-status.js: Added tests for /privileged-api/update-run-status.
+        * server-tests/resources/test-server.js:
+        (TestServer.prototype.inject): Clear the cookies as well as tokens in PrivilegedAPI.
+        * tools/js/remote.js:
+        (RemoteAPI): Added the support for PrivilegedAPI by making cookie set by the server persist.
+        (RemoteAPI.prototype.clearCookies): Added for tests.
+        (RemoteAPI.prototype.postJSON): Make sure sendHttpRequest always sends a valid JSON.
+        (RemoteAPI.prototype.postJSONWithStatus): Added since this API is used PrivilegedAPI.
+        (RemoteAPI.prototype.sendHttpRequest): Retain the cookie set by the server and send it back in each request.
+        * tools/js/v3-models.js:
+        * unit-tests/privileged-api-tests.js: Added unit tests for PrivilegedAPI.
+        * unit-tests/resources/mock-remote-api.js:
+        (MockRemoteAPI.postJSON): Added for unit testing.
+        (MockRemoteAPI.postJSONWithStatus): Ditto.
+
+2016-06-13  Ryosuke Niwa  <rniwa@webkit.org>
+
+        /admin/tests is very slow
+        https://bugs.webkit.org/show_bug.cgi?id=158682
+
+        Reviewed by Chris Dumez.
+
+        The slowness came from TestNameResolver::__construct, which was fetching the entire table of test_configurations,
+        which at this point contains more than 32,000 rows. Don't fetch the entire table in the constructor. Instead,
+        fetch a subset of rows as needed in configurations_for_metric_and_platform. Even though this results in many SQL
+        queries being issued, that's a lot more efficient in practice because we only fetch a few dozen rows in practice.
+
+        Also removed a whole bunch of features from /admin/tests to simplify the page. In particular, the ability to update
+        the list of triggerables has been removed now that sync-buildbot.js automatically updates that for us. This removed
+        the last use of test_exists_on_platform, which was also dependent on fetching test_configurations upfront.
+
+        * public/admin/tests.php:
+        * public/include/test-name-resolver.php:
+        (TestNameResolver::__construct): Don't fetch the entire table of test_configurations.
+        (TestNameResolver::configurations_for_metric_and_platform): Just issue a SQL query for the specified platform and metric.
+        (TestNameResolver::test_exists_on_platform): Removed.
+
+2016-06-08  Ryosuke Niwa  <rniwa@webkit.org>
+
+        sync-buildbot.js should update the list of tests and platforms associated with a triggerable
+        https://bugs.webkit.org/show_bug.cgi?id=158406
+
+        Reviewed by Chris Dumez.
+
+        Add /api/update-triggerable and a test for it, which were supposed to be added in r201718
+        but for which I forgot to run svn add.
+
+        * public/api/update-triggerable.php: Added.
+        (main):
+        * server-tests/api-update-triggerable.js: Added.
+
+2016-06-07  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Build fix after r201739. attachShadow was throwing an exception on this component.
+
+        * public/v3/pages/analysis-category-toolbar.js:
+        (AnalysisCategoryToolbar):
+
+2016-06-06  Ryosuke Niwa  <rniwa@webkit.org>
+
+        sync-buildbot.js should update the list of tests and platforms associated with a triggerable
+        https://bugs.webkit.org/show_bug.cgi?id=158406
+        <rdar://problem/26185737>
+
+        Reviewed by Darin Adler.
+
+        Added /api/update-triggerable to update the list of configurations (platform and test pairs)
+        associated with a given triggerable, and make sync-buildbot.js use this JSON API before each
+        syncing cycle so that the association gets updated automatically by simply updating the JSON.
+
+        * server-tests/api-manifest.js: Use const for imported modules.
+        * server-tests/api-report-commits-tests.js: Removed unnecessary importing of crypto.
+        * server-tests/resources/mock-data.js:
+        (MockData.someTestId): Added.
+        (MockData.somePlatformId): Added.
+        (MockData.addMockData):
+        * server-tests/tools-buildbot-triggerable-tests.js: Use const for imported modules. Also added
+        a test for BuildbotTriggerable's updateTriggerable.
+        * tools/js/buildbot-triggerable.js:
+        (BuildbotTriggerable.prototype.updateTriggerable): Added. Find the list of all configurations
+        associated with this triggeerable and post it to /api/update-triggerable.
+        * tools/js/database.js: Added triggerable_configurations to the list of tables.
+        * tools/js/remote.js:
+        (RemoteAPI.prototype.postJSON): Print the whole response when JSON parsing fails for debugging.
+        * tools/sync-buildbot.js:
+        (syncLoop): Call BuildbotTriggerable's updateTriggerable before syncing.
+
+2016-06-02  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Build fix after r201564.
+
+        * public/v3/pages/analysis-category-page.js:
+        (AnalysisCategoryPage.prototype.updateFromSerializedState):
+        * public/v3/pages/create-analysis-task-page.js:
+        (CreateAnalysisTaskPage.prototype.updateFromSerializedState):
+        (CreateAnalysisTaskPage.prototype.render):
+
+2016-05-31  Ryosuke Niwa  <rniwa@webkit.org>
+
+        v3 UI should support marking and unmarking outliers as well as hiding them
+        https://bugs.webkit.org/show_bug.cgi?id=158248
+
+        Rubber-stamped by Chris Dumez.
+
+        Added the support for marking and unmarking a sequence of points as outliers. Unlike v2, we now support marking
+        multiple points as outliers in a single click. Also fixed a bug that outliers are never explicitly hidden in v3 UI.
+
+        This patch splits ChartStyles.createChartSourceList into two functions: resolveConfiguration and createSourceList
+        to separate the work of resolving platform and metric IDs to their respective model objects, and creating a source
+        list used by TimeSeriesChart to fetch measurement sets. createSourceList is called again when filtering options are
+        changed.
+
+        It also adds noCache option to TimeSeriesChart's fetchMeasurementSets, MeasurementSet's fetchBetween and
+        _fetchPrimaryCluster to update the measurement sets after marking or unmarking points as outliers. In addition, it
+        fixes a bug that the annotation bars for analysis tasks are not updated in charts page after creating an analysis
+        task by adding noCache option to ChartPaneBase's fetchAnalysisTasks, AnalysisTask's fetchByPlatformAndMetric and
+        _fetchSubset.
+
+        Finally, this patch splits ChartPane._makeAnchorToOpenPane into _makePopoverActionItem, _makePopoverOpenOnHover and
+        _setPopoverVisibility for clarity.
+
+        * public/v3/components/chart-pane-base.js:
+        (ChartPaneBase): Added _disableSampling and _showOutliers as instance variables.
+        (ChartPaneBase.prototype.configure):
+        (ChartPaneBase.prototype.isSamplingEnabled): Added.
+        (ChartPaneBase.prototype.setSamplingEnabled): Added. When a filtering option is updated, recreate the source list
+        so that TimeSeriesChart.setSourceList can re-fetch the measurement set JSONs.
+        (ChartPaneBase.prototype.isShowingOutliers): Added.
+        (ChartPaneBase.prototype.setShowOutliers): Added. Ditto for calling _updateSourceList.
+        (ChartPaneBase.prototype._updateSourceList): Added.
+        (ChartPaneBase.prototype.fetchAnalysisTasks): Renamed from _fetchAnalysisTasks. Now takes noCache as an argument
+        instead of platform and metric IDs since they're on instance variables.
+
+        * public/v3/components/chart-styles.js:
+        (ChartStyles.resolveConfiguration): Renamed from createChartSourceList. Just resolves platform and metric IDs.
+        (ChartStyles.createSourceList): Extracted from createChartSourceList since it needs to be called when a filtering
+        option is changed as well as when ChartPaneBase.prototype.configure is called.
+        (ChartStyles.baselineStyle): Now takes filtering options.
+        (ChartStyles.targetStyle): Ditto.
+        (ChartStyles.currentStyle): Ditto.
+
+        * public/v3/components/interactive-time-series-chart.js:
+        (InteractiveTimeSeriesChart.prototype.currentPoint): Find the point in _fetchedTimeSeries when
+        _sampledTimeSeriesData hasn't been computed yet as a fallback (e.g. when the chart hasn't been rendered yet).
+        (InteractiveTimeSeriesChart.prototype.selectedPoints): Added.
+        (InteractiveTimeSeriesChart.prototype.firstSelectedPoint): Added.
+        (InteractiveTimeSeriesChart.prototype.lockedIndicator): Added. Returns the current point if it's locked.
+
+        * public/v3/components/time-series-chart.js:
+        (TimeSeriesChart.prototype.setDomain):
+        (TimeSeriesChart.prototype.setSourceList): Added. Re-create _fetchedTimeSeries when filtering options have changed.
+        Don't re-fetch measurement set JSONs here since showing outliers can be done entirely in the front end.
+        (TimeSeriesChart.prototype.fetchMeasurementSets): Extracted out of setDomain. Now takes noCache as an argument.
+        ChartPane._markAsOutlier
+        (TimeSeriesChart.prototype.firstSampledPointBetweenTime): Added.
+
+        * public/v3/models/analysis-task.js:
+        (AnalysisTask.fetchByPlatformAndMetric): Added noCache as an argument.
+        (AnalysisTask._fetchSubset): Ditto.
+
+        * public/v3/models/measurement-adaptor.js:
+        (MeasurementAdaptor.prototype.isOutlier): Added.
+        (MeasurementAdaptor.prototype.applyToAnalysisResults): Add markedOutlier as a property on each point.
+
+        * public/v3/models/measurement-cluster.js:
+        (MeasurementCluster.prototype.addToSeries): Fixed the bug that filtering outliers was broken as _markedOutlierIndex
+        is undefined here. Use MeasurementAdaptor's isOutlier instead.
+
+        * public/v3/models/measurement-set.js:
+        (MeasurementSet.prototype.fetchBetween): Added noCache as an argument. Reset _primaryClusterPromise and _allFetches
+        when noCache is true since we need to re-fetch the primary cluster as well as all secondary clusters now.
+        (MeasurementSet.prototype._fetchPrimaryCluster): Added noCache as an argument. Directly invoke the JSON API at
+        /api/measurement-set to re-generate all clusters' JSON files instead of first fetching the cached version.
+        (MeasurementSet.prototype._fetchSecondaryCluster):
+        (MeasurementSet.prototype._didFetchJSON): Removed a bogus assertion since this function is called on secondary
+        clusters as well as primary clusters.
+        (MeasurementSet.prototype._addFetchedCluster): Reimplemented this function using an insertion sort. Also remove the
+        existing entry if the fetch cluster should replace it.
+
+        * public/v3/models/time-series.js:
+        (TimeSeries.prototype.dataBetweenPoints): Removed the dead code to filter out outliers. This is done in addToSeries
+        of MeasurementCluster instead.
+
+        * public/v3/pages/chart-pane.js:
+        (ChartPane): Renamed pane to popover since it was confusing to have a pane inside a pane class. As such, renamed
+        _paneOpenedByClick to _lockedPopover.
+        (ChartPane.prototype.serializeState): Added the code to serialize filtering options in the serialized state URL.
+        (ChartPane.prototype.updateFromSerializedState): Ditto for parsing.
+        (ChartPane.prototype._analyzeRange): Extracted out of render(). Also fixed a bug that the charts page don't show
+        the newly created analysis task by invoking fetchAnalysisTasks with noCache set to true.
+        (ChartPane.prototype._markAsOutlier): Added.
+        (ChartPane.prototype._renderActionToolbar): A bunch of changes due to pane -> popover rename. Also added a popover
+        for filtering options.
+        (ChartPane.prototype._makePopoverActionItem): Extracted from _makeAnchorToOpenPane.
+        (ChartPane.prototype._makePopoverOpenOnHover): Ditto.
+        (ChartPane.prototype._setPopoverVisibility): Ditto.
+        (ChartPane.prototype._renderFilteringPopover): Added.
+        (ChartPane.htmlTemplate): Added a popover for specifying filtering options. Also added .popover on each popover.
+        (ChartPane.cssTemplate): Updated the style to make use of .popover.
+
+        * public/v3/pages/charts-page.js:
+        (ChartsPage.prototype.graphOptionsDidChange): Added. Updates the URL state when a filtering option is modified.
+
+        * public/v3/pages/dashboard-page.js:
+        (DashboardPage.prototype._createChartForCell):
+
+        * public/v3/pages/page-router.js:
+        (PageRouter.prototype._serializeHashQueryValue): Serialize a set of strings as | separated tokens.
+        (PageRouter.prototype._deserializeHashQueryValue): Rewrote the function as the serialized URL can no longer be
+        parsed as a JSON as | separated tokens can't be converted into a valid JSON construct with a simple regex.
+
+        * unit-tests/measurement-set-tests.js: Added a test case for fetchBetween with noCache=true.
+
+2016-05-24  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Another build fix after r201307.
+
+        * public/v3/pages/page-router.js:
+        (PageRouter.prototype._deserializeHashQueryValue):
+        (PageRouter.prototype._countOccurrences): Moved from _deserializeHashQueryValue.
+
+2016-05-23  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Build fix after r201307.
+
+        * public/v3/pages/chart-pane.js:
+        (ChartPane.prototype.serializeState):
+
+2016-05-23  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Some applications truncates the last closing parenthesis in perf dashboard URL
+        https://bugs.webkit.org/show_bug.cgi?id=157976
+
+        Reviewed by Tim Horton.
+
+        Unfortunately, different applications use different heuristics to determine the end of each URL. Two trailing
+        parentheses, for example, is just fine in Radar as well as Apple Mail if the URL is short enough. Using other
+        characters such as ] and } wouldn't work either because they would be %-escaped. At that point, we might as well
+        as %-escape everything.
+
+        Work around the bug by parsing the URL as if it had one extra ')' if the parsing had failed. Also shorten the charts
+        page's URL by avoid emitting "-null" for each pane when the pane doesn't have a currently selected point or selection.
+        This improves the odds of the entire URL being recognized by various applications.
+
+        We could, in theory, implement some sort of a URL shorter but that can wait until when we support real user accounts.
+
+        * public/v3/pages/chart-pane.js:
+        (ChartPane.prototype.serializeState): Don't serialize the selection or the current point if nothing is selected.
+        * public/v3/pages/page-router.js:
+        (PageRouter.prototype._deserializeHashQueryValue): Try parsing the value again with one extra ] at the end if
+        the JSON parsing had failed.
+
+2016-05-18  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Perf dashboard "Add pane" should list first by test, then by machine
+        https://bugs.webkit.org/show_bug.cgi?id=157880
+
+        Reviewed by Stephanie Lewis.
+
+        Reversed the order which tests and platforms are selected. Also split .pane-selector-container into #tests and
+        #platform for the ease of DOM node manipulations.
+
+        * public/v3/components/pane-selector.js:
+        (PaneSelector):
+        (PaneSelector.prototype._renderPlatformList): Renamed from _renderPlatformLists since there is a single list
+        for platforms. This list now disappears while a non-metric item is selected in the collection of test lists.
+        e.g. "Speedometer" instead of its "Score" metric. Remember the last metric we rendered to avoid churning.
+        (PaneSelector.prototype._renderTestLists): Render the top level tests once. The index of lists have been
+        decreased by one since test lists are now inside #tests instead of appearing after the platform list.
+        (PaneSelector.prototype._buildTestList): Don't filter tests since platform is chosen after tests now.
+        (PaneSelector.prototype._replaceList):
+        (PaneSelector.prototype._selectedItem): Don't reset the test path (specifies which subtest or metric is picked)
+        when a platform is selected since it happens after a test metric is chosen now.
+        (PaneSelector.prototype._clickedItem): Add a pane when a platform is clicked, not when a metric is clicked.
+        (PaneSelector.cssTemplate):
+
+2016-05-18  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Analysis task should look for a git commit based on abridged hashes
+        https://bugs.webkit.org/show_bug.cgi?id=157877
+        <rdar://problem/26254374>
+
+        Reviewed by Chris Dumez.
+
+        Made /privileged-api/associate-commit look for commits using LIKE instead of an exact match.
+        Associate the commit when there is exactly one match.
+
+        * public/include/commit-log-fetcher.php:
+        (CommitLogFetcher::fetch_between):
+        * public/include/db.php:
+        (Database::escape_for_like): Extracted from CommitLogFetcher::fetch_between.
+        * public/privileged-api/associate-commit.php:
+        (main): Look for the commits using LIKE. Reject whenever there are multiple commits. We limit the number of
+        matches to two for performance when the user specifies something that almost thousands of commits: e.g. "1".
+        * public/v3/pages/analysis-task-page.js:
+        (AnalysisTaskPage.prototype._associateCommit): Added human friendly error messages for mismatching commits.
+
+2016-05-18  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Unreviewed build fix. Use --date-order so that every child commit appears after its parent.
+        Otherwise we'll hit a FailedToFindParentCommit error while submitting a commit that appears before its parent.
+
+        * tools/sync-commits.py:
+        (GitRepository._fetch_all_hashes):
+
+2016-05-18  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Removed the erroneously committed debug code.
+
+        * tools/sync-commits.py:
+        (GitRepository.fetch_commit):
+
+2016-05-18  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Perf dashboard should have a script to sync git commits
+        https://bugs.webkit.org/show_bug.cgi?id=157867
+
+        Reviewed by Chris Dumez.
+
+        Added the support to pull from a Git repo to pull-svn.py and renamed it to sync-commits.py.
+
+        Added two classes SVNRepository and GitRepository which inherits from an abstract class, Repository.
+        The code that fetches commit and format revision number / git hash is specialized in each.
+
+        * Install.md:
+        * tools/pull-svn.py: Removed.
+        * tools/sync-commits.py: Renamed from Websites/perf.webkit.org/tools/pull-svn.py.
+        (main): Renamed --svn-config-json to --repository-config-json. Also made it robust against exceptions
+        inside fetch_commits_and_submit of each Repository class.
+        (load_repository): A factory function for SVNRepository and GitRepository.
+        (Repository): Added.
+        (Repository.__init__): Added.
+        (Repository.fetch_commits_and_submit): Extracted from standalone fetch_commits_and_submit.
+        (Repository.fetch_commit): Added. Implemented by a subclass.
+        (Repository.format_revision): Ditto.
+        (Repository.determine_last_reported_revision): Extracted from alonealone
+        determine_first_revision_to_fetch. The fallback to use "oldest" has been moved to SVNRepository's
+        fetch_commit since it doesn't work in Git.
+        (Repository.fetch_revision_from_dasbhoard): Extracted from fetch_revision_from_dasbhoard.
+        (SVNRepository): Added.
+        (SVNRepository.__init__): Added.
+        (SVNRepository.fetch_commit): Extracted from standalone fetch_commit_and_resolve_author and fetch_commit.
+        (SVNRepository._resolve_author_name): Renamed from resolve_author_name_from_account.
+        (SVNRepository.format_revision): Added.
+        (GitRepository): Added.
+        (GitRepository.__init__):
+        (GitRepository.fetch_commit): Added. Fetches the list of all git hashes if needed, and finds the next hash.
+        (GitRepository._find_next_hash): Added. Finds the first commit that appears after the specified hash.
+        (GitRepository._fetch_all_hashes): Added. Gets the list of all git hashs chronologically (old to new).
+        (GitRepository._run_git_command): Added.
+        (GitRepository.format_revision): Added. Use the first 8 characters of the hash.
+
+2016-05-17  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Add a subtitle under platform name in the summary page
+        https://bugs.webkit.org/show_bug.cgi?id=157809
+
+        Reviewed by Chris Dumez.
+
+        Add a description beneath the platform names.
+
+        * public/v3/pages/summary-page.js:
+        (SummaryPage.prototype._constructTable): Add a br and a span if subtitle is present.
+        (SummaryPage.cssTemplate): Added CSS rules for .subtitle.
+
+2016-05-13  Ryosuke Niwa  <rniwa@webkit.org>
+
+        v3 UI shows full git hash instead of the first 8 characters for a blame range
+        https://bugs.webkit.org/show_bug.cgi?id=157691
+
+        Reviewed by Stephanie Lewis.
+
+        Fixed the bug that v3 UI shows the full 40 character git hash instead of the first 8 character as done in v2 UI.
+
+        * public/v3/models/commit-log.js:
+        (CommitLog.prototype.diff): Fixed the bug.
+        * tools/run-tests.py:
+        (main): Add the support for running a subset of tests as mocha does.
+        * unit-tests/commit-log-tests.js: Added.
+
+2016-05-13  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Unreviewed. Added the missing executable bits.
+
+        * tools/bundle-v3-scripts.py: Added property svn:executable.
+        * tools/detect-changes.js: Added property svn:executable.
+        * tools/process-maintenance-backlog.py: Added property svn:executable.
+
+2016-05-13  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Summary page doesn't report some missing platforms
+        https://bugs.webkit.org/show_bug.cgi?id=157670
+
+        Reviewed by Darin Adler.
+
+        This patch improves the warning text for missing platforms and fixes the bug that platforms that don't have
+        any data reported for a given test would not be reported as missing.
+
+        * public/v3/pages/summary-page.js:
+        (SummaryPage.prototype.render): Added instrumentations.
+        (SummaryPage.prototype._constructRatioGraph): Always create both the ratio bar graph and the spinner icon.
+        (SummaryPage.prototype._renderCell): Extracted from _constructRatioGraph. Toggle the displayed-ness of the
+        spinner and the ratio bar graph in the cell by CSS for better performance.
+        (SummaryPage.prototype._warningTextForGroup): Extracted from _constructRatioGraph. Rephrased warning text
+        for clarity and adopted new API of SummaryPageConfigurationGroup.
+        (SummaryPage.prototype._warningTextForGroup.mapAndSortByName): Added.
+        (SummaryPage.prototype._warningTextForGroup.pluralizeIfNeeded): Added.
+        (SummaryPage.cssTemplate): Added rules to toggle the visibility of spinner icons and bar graphs.
+        (SummaryPageConfigurationGroup): Replaced this._warnings by more explicitly named this._missingPlatforms
+        and this._platformsWithoutBaseline. Also add a platform to this._missingPlatforms if it didn't appear in
+        any metrics. Note that adding a platform whenever it doesn't in any one metric would be incorrect since
+        some tests uses a different test name on different platforms: e.g. PLT-Mac and PLT-iPhone.
+        (SummaryPageConfigurationGroup.prototype.missingPlatforms): Added.
+        (SummaryPageConfigurationGroup.prototype.platformsWithoutBaseline): Added.
+        (SummaryPageConfigurationGroup.prototype._fetchAndComputeRatio):
+
+2016-05-13  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Always use v3 UI for dashboards and analysis task pages
+        https://bugs.webkit.org/show_bug.cgi?id=157647
+
+        Reviewed by Darin Adler.
+
+        Redirect dashboard pages from v1 and v2 to v3's summary page. Also redirect v1 UI's charts page and v2 UI's
+        analysis task pages to the corresponding v3 pages.
+
+        Keep v2's charts page accessible since some features such as segmentation is still only available on v2 UI.
+
+        * public/index.html:
+        (init.showCharts): Redirect to v3 UI once the chart list has been parsed.
+        (init.redirectChartsToV3): Added.
+        * public/v2/index.html:
+
+2016-05-13  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Show a spinner while fetching data on summary page
+        https://bugs.webkit.org/show_bug.cgi?id=157658
+
+        Reviewed by Darin Adler.
+
+        Show a spinner while fetching JSON files on the summary page.
+
+        * public/v3/components/base.js:
+        (ComponentBase.prototype.renderReplace): Added a new implementation that simply calls the static version.
+        (ComponentBase.renderReplace): Made this static.
+
+        * public/v3/pages/summary-page.js:
+        (SummaryPage.prototype._constructRatioGraph): Show a spinner icon when SummaryPageConfigurationGroup's
+        isFetching returns true.
+        (SummaryPage.cssTemplate): Force the height of each cell to be 2.5rem so that the height of cell doesn't
+        change when a spinner is replaced by a ratio bar graph.
+
+        (SummaryPageConfigurationGroup): Added this._isFetching as an instance variable.
+        (SummaryPageConfigurationGroup.prototype.isFetching): Added.
+        (SummaryPageConfigurationGroup.prototype.fetchAndComputeSummary): Set this._isFetching while waiting for
+        the promises to resolve after 50ms. We don't immediately set this._isFetching to avoid FOC when all JSON
+        files have been cached.
+
+2016-05-07  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Add horizontal between categories of tests
+        https://bugs.webkit.org/show_bug.cgi?id=157386
+
+        Reviewed by Darin Adler.
+
+        Wrap tests in each category by tbody and add a horizontal bar between each category.
+
+        * public/v3/pages/summary-page.js:
+        (SummaryPage.prototype._constructTable):
+        (SummaryPage.cssTemplate):
+
+2016-05-04  Dewei Zhu  <dewei_zhu@apple.com>
+
+        Summary page should show warnings when current or baseline data is missing.
+        https://bugs.webkit.org/show_bug.cgi?id=157339
+
+        Reviewed by Ryosuke Niwa.
+
+        Set summary page to be the default page of v3 UI.
+        Show warning icon when either baseline or current data is missing.
+        Make fetchBetween returns a promise.
+        Update unit tests for MeasurementSet.fetchBetween since it returns a promise now.
+        Add a workaround to skip some platform and metric configurations.
+
+        * public/v3/components/ratio-bar-graph.js:
+        (RatioBarGraph):
+        (RatioBarGraph.prototype.update): Add showWarningIcon flag to indicate whether we should show warning icon.
+        (RatioBarGraph.prototype.render): Show warning icon when showWarningIcon is true.
+        (RatioBarGraph.cssTemplate): Add style for warning icon.
+        * public/v3/components/warning-icon.js: Add warning icon.
+        (WarningIcon):
+        (WarningIcon.cssTemplate):
+        * public/v3/index.html:
+        * public/v3/main.js:
+        (main): Set summary page to be the default page of v3 UI.
+        * public/v3/models/measurement-set.js:
+        (MeasurementSet):
+        (MeasurementSet.prototype.fetchBetween): Returns a promise. Fix the bug in previous implementation that we miss
+        some callbacks sometimes. Basically, we will fetch primary cluster first, then secondary clusters. For each
+        secondary cluster fetch, we will always invoke callback even when it fails.
+        (MeasurementSet.prototype._fetchSecondaryClusters): Deleted.
+        (MeasurementSet.prototype._fetch.else.url.api.measurement.set platform): Deleted.
+        * public/v3/pages/summary-page.js:
+        (SummaryPage): Add a variable for excluded configurations.
+        (SummaryPage.prototype._createConfigurationGroup): Pass excluded configurations while building config groups.
+        (SummaryPage.prototype._constructTable): Remove the logic for unified header since it breaks consistency of the table appearance.
+        (SummaryPage.prototype.this._renderQueue.push): Show warning message when baseline/current data is missing.
+        (SummaryPageConfigurationGroup): Add a variable to keep track of the warnings while computing summary.
+        (SummaryPageConfigurationGroup.prototype.warnings): A getter for warnings.
+        (SummaryPageConfigurationGroup._computeSummary): Fix a bug in calculating ratios. We should always use
+        current/baseline for ratio and present the difference between ratio and 1 in the summary page.
+        (SummaryPageConfigurationGroup.set then): Deleted.
+        (SummaryPageConfigurationGroup.set var): Deleted.
+        * unit-tests/measurement-set-tests.js: Add a helper function to wait for fetchBetween. Update unit tests since fetchBetween returns a promise now.
+        (promise.set fetchBetween):
+        (set MeasurementSet):
+        (set fetchBetween): Deleted.
+
+2016-04-26  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Chart status should always be computed against prior values
+        https://bugs.webkit.org/show_bug.cgi?id=157014
+
+        Reviewed by Darin Adler.
+
+        Compare the current value against the last baseline or target value that appear before the current value in time
+        so that the comparison stay the same even when new baseline and target values are reported. Also include the compared
+        baseline or target value in the label for clarity.
+
+        * public/v3/components/chart-status-view.js:
+        (ChartStatusView.prototype._computeChartStatus):
+        (ChartStatusView.prototype._computeChartStatus.labelForDiff):
+        (ChartStatusView.prototype._findLastPointPriorToTime): Extracted from _relativeDifferenceToLaterPointInTimeSeries.
+        Now finds the last point before the current point's time if there is any, or the last point in baseline / target.
+        (ChartStatusView.prototype._relativeDifferenceToLaterPointInTimeSeries): Deleted.
+        * public/v3/models/metric.js:
+        (Metric.prototype.makeFormatter): Don't use SI units for unit-less metrics.
+
+2016-04-13  Ryosuke Niwa  <rniwa@webkit.org>
+
+        REGRESSION(r199444): Perf dashboard always fetches all measurement sets
+        https://bugs.webkit.org/show_bug.cgi?id=156534
+
+        Reviewed by Darin Adler.
+
+        The bug was cased by SummaryPage's constructor fetching all measurement sets. Since each page is always
+        constructed in main(), this resulted in all measurement sets being fetched on all pages.
+
+        * public/v3/pages/summary-page.js:
+        (SummaryPage):
+        (SummaryPage.prototype.open): Fetch measurement set JSONs here.
+        (SummaryPage.prototype._createConfigurationGroup): Renamed from _createConfigurationGroupAndStartFetchingData.
+
+2016-04-12  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Add a summary page to v3 UI
+        https://bugs.webkit.org/show_bug.cgi?id=156531
+
+        Reviewed by Stephanie Lewis.
+
+        Add new "Summary" page, which shows the average difference (better or worse) from the baseline across
+        multiple platforms and tests by a single number.
+
+        * public/include/manifest.php:
+        (ManifestGenerator::generate): Include "summary" in manifest.json.
+        * public/shared/statistics.js:
+        (Statistics.mean): Added.
+        (Statistics.median): Added.
+        * public/v3/components/ratio-bar-graph.js: Added.
+        (RatioBarGraph): Shows a horizontal bar graph that visualizes the relative difference (e.g. 3% better).
+        (RatioBarGraph.prototype.update):
+        (RatioBarGraph.prototype.render):
+        (RatioBarGraph.cssTemplate):
+        (RatioBarGraph.htmlTemplate):
+        * public/v3/index.html:
+        * public/v3/main.js:
+        (main): Instantiate SummaryPage and add it to the navigation bar and the router.
+        * public/v3/models/manifest.js:
+        (Manifest._didFetchManifest): Let "summary" pass through from manifest.json to main().
+        * public/v3/models/measurement-set.js:
+        (MeasurementSet.prototype._failedToFetchJSON): Invoke the callback with an error or true in order for
+        the callback can detect a failure.
+        (MeasurementSet.prototype._invokeCallbacks): Ditto.
+        * public/v3/pages/charts-page.js:
+        (ChartsPage.createStateForConfigurationList): Added to add a hyperlink from summary page to charts page.
+        * public/v3/pages/summary-page.js: Added.
+        (SummaryPage): Added.
+        (SummaryPage.prototype.routeName): Added.
+        (SummaryPage.prototype.open): Added.
+        (SummaryPage.prototype.render): Added.
+        (SummaryPage.prototype._createConfigurationGroupAndStartFetchingData): Added.
+        (SummaryPage.prototype._constructTable): Added.
+        (SummaryPage.prototype._constructRatioGraph): Added.
+        (SummaryPage.htmlTemplate): Added.
+        (SummaryPage.cssTemplate): Added.
+        (SummaryPageConfigurationGroup): Added. Represents a set of platforms and tests shown in a single cell.
+        (SummaryPageConfigurationGroup.prototype.ratio): Added.
+        (SummaryPageConfigurationGroup.prototype.label): Added.
+        (SummaryPageConfigurationGroup.prototype.changeType): Added.
+        (SummaryPageConfigurationGroup.prototype.configurationList): Added.
+        (SummaryPageConfigurationGroup.prototype.fetchAndComputeSummary): Added.
+        (SummaryPageConfigurationGroup.prototype._computeSummary): Added.
+        (SummaryPageConfigurationGroup.prototype._fetchAndComputeRatio): Added. Invoked for each time series in
+        the set, and stores the computed ratio of the current values to the baseline in this._setToRatio.
+        The results are aggregated by _computeSummary as a single number later.
+        (SummaryPageConfigurationGroup._medianForTimeRange): Added.
+        (SummaryPageConfigurationGroup._fetchData): A thin wrapper to make MeasurementSet.fetchBetween promise
+        friendly since MeasurementSet doesn't support Promise at the moment (but it should!).
+        * server-tests/api-manifest.js: Updated a test case.
+
+2016-04-12  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Make sync-buildbot.js fault safe
+        https://bugs.webkit.org/show_bug.cgi?id=156498
+
+        Reviewed by Chris Dumez.
+
+        Fixed a bug that sync-buildbot.js will continue to schedule build requests from multiple test groups
+        if multiple test groups are simultaneously in-progress on the same builder. Also fixed a bug that if
+        a build request had failed without leaving a trace (i.e. no entry on any of the builders we know of),
+        sync-buildbot.js throws an exception.
+
+        * server-tests/tools-buildbot-triggerable-tests.js: Added test cases.
+        * tools/js/buildbot-syncer.js:
+        (BuildbotSyncer.prototype.scheduleRequestInGroupIfAvailable): Renamed. Optionally takes the slave name.
+        When this parameter is specified, schedule the request only if the specified slave is available.
+        * tools/js/buildbot-triggerable.js:
+        (BuildbotTriggerable.prototype._scheduleNextRequestInGroupIfSlaveIsAvailable): Always use
+        scheduleRequestInGroupIfAvailable to schedule a new build request. Using scheduleRequest for non-first
+        build requests was problematic when there were multiple test groups with pending requests because then
+        we would schedule those pending requests without checking whether there is already a pending job or if
+        we have previously scheduled a job. Also fallback to use any syncer / builder when groupInfo.syncer is
+        not set even if the next request was not the first one in the test group since we can't determine on
+        which builder preceding requests are processed in such cases.
+        * unit-tests/buildbot-syncer-tests.js:
+
+2016-04-11  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Replace script runner to use mocha.js tests
+        https://bugs.webkit.org/show_bug.cgi?id=156490
+
+        Reviewed by Chris Dumez.
+
+        Replaced run-tests.js, which was a whole test harness for running legacy tests by tools/run-tests.py
+        which is a thin wrapper around mocha.js.
+
+        * run-tests.js: Removed.
+        * tests: Removed.
+        * tools/run-tests.py: Added.
+        (main):
+
+2016-04-11  Ryosuke Niwa  <rniwa@webkit.org>
+
+        New syncing script sometimes schedules a build request on a wrong builder
+        https://bugs.webkit.org/show_bug.cgi?id=156489
+
+        Reviewed by Stephanie Lewis.
+
+        The bug was caused by _scheduleNextRequestInGroupIfSlaveIsAvailable scheduling the next build request on
+        any available syncer regardless of whether the request is the first one in the test group or not because
+        BuildRequest.order was returning a string instead of a number.
+
+        Also fixed a bug that BuildbotTriggerable.syncOnce was re-ordering test groups by their id's instead of
+        respecting the order in which the perf dashboard returned.
+
+        * public/v3/models/build-request.js:
+        (BuildRequest.prototype.order): Force the order to be a number.
+        * server-tests/api-build-requests-tests.js: Assert the order as numbers.
+        * server-tests/resources/mock-data.js:
+        (MockData.addAnotherMockTestGroup): Changed the test group id to 601, which is after the first mock data.
+        The old number was masking a bug in BuildbotTriggerable that it was re-ordering test groups by their id's
+        instead of using the order set forth by the perf dashboard.
+        (MockData.mockTestSyncConfigWithSingleBuilder):
+        * server-tests/tools-buildbot-triggerable-tests.js: Added a test case for scheduling two build requests in
+        a single call to syncOnce. Each build request should be scheduled on the same builder as the previous build
+        requests in the same test group.
+        * tools/js/buildbot-triggerable.js:
+        (BuildbotTriggerable.prototype.syncOnce): Order test groups by groupOrder, which is the index at which first
+        build request in the group appeared.
+        (BuildbotTriggerable.prototype._scheduleNextRequestInGroupIfSlaveIsAvailable): Don't re-order build requests
+        as they're already sorted on the server side.
+        (BuildbotTriggerable._testGroupMapForBuildRequests): Added groupOrder to test group info 
+
+2016-04-09  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Build fix. Don't treat a build number 0 as a pending build.
+
+        * tools/js/buildbot-syncer.js:
+        (BuildbotBuildEntry.prototype.isPending):
+
+2016-04-08  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Escape builder names in url* and pathFor* methods of BuildbotSyncer
+        https://bugs.webkit.org/show_bug.cgi?id=156427
+
+        Reviewed by Darin Adler.
+
+        The build fix in r199251 breaks other usage of RemoteAPI. Fix it properly by escaping builder names in
+        various methods of BuildbotSyncer.
+
+        Also fixed a typo in the logging and a bug that the new syncing script never updated "scheduled" to "running".
+
+        * server-tests/resources/mock-data.js:
+        (MockData.mockTestSyncConfigWithTwoBuilders): Renamed "some-builder-2" to "some builder 2" to test the
+        new escaping behavior in tools-buildbot-triggerable-tests.js and buildbot-syncer-tests.js.
+
+        * server-tests/tools-buildbot-triggerable-tests.js: Added tests for status url, and added a new test case
+        for updating "scheduled" to "running".
+
+        * tools/js/buildbot-syncer.js:
+        (BuildbotBuildEntry.buildRequestStatusIfUpdateIsNeeded): Update the status to "running" when the request's
+        status is "scheduled" and the buildbot's build is currently in progress.
+        (BuildbotSyncer.prototype.pathForPendingBuildsJSON): Escape the builder name.
+        (BuildbotSyncer.prototype.pathForBuildJSON): Ditto.
+        (BuildbotSyncer.prototype.pathForForceBuild): Ditto.
+        (BuildbotSyncer.prototype.url): Ditto.
+        (BuildbotSyncer.prototype.urlForBuildNumber): Ditto.
+
+        * tools/js/buildbot-triggerable.js:
+        (BuildbotTriggerable.prototype._pullBuildbotOnAllSyncers):
+        (BuildbotTriggerable.prototype._scheduleNextRequestInGroupIfSlaveIsAvailable): Fixed a typo. We are
+        scheduling new build requests, not syncing them.
+        * tools/js/remote.js:
+        (RemoteAPI.sendHttpRequest): Reverted r199251.
+        * unit-tests/buildbot-syncer-tests.js:
+
+2016-04-08  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Build fix. We need to escape the path or http.request would fail.
+
+        * tools/js/remote.js:
+
+2016-04-08  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Fix various bugs in the new syncing script
+        https://bugs.webkit.org/show_bug.cgi?id=156393
+
+        Reviewed by Darin Adler.
+
+        * server-tests/resources/common-operations.js: Added. This file was supposed to be added in r199191.
+        (addBuilderForReport):
+        (addSlaveForReport):
+        (connectToDatabaseInEveryTest):
+        (submitReport):
+        * tools/js/buildbot-triggerable.js:
+        (BuildbotTriggerable.prototype._pullBuildbotOnAllSyncers): Don't log every time we pull from buildbot
+        builder as this dramatically increases the amount of log we generate.
+        * tools/js/parse-arguments.js:
+        (parseArguments): Fixed a typo. This should be parseArgument*s*, not parseArgument.
+        * tools/js/remote.js:
+        (RemoteAPI.prototype.url): Fixed a bug that portSuffix wasn't being expanded in the template literal.
+        (RemoteAPI.prototype.configure): Added more validations with nice error messages.
+        (RemoteAPI.prototype.sendHttpRequest): Falling back to port 80 isn't right when scheme is https. Compute
+        the right port in configure instead based on the scheme.
+        * tools/sync-buildbot.js:
+        (syncLoop): Fixed the bug that syncing multiple times fail because Manifest.fetch() create new Platform
+        and Test objects. This results in various references in BuildRequest objects to get outdated. Fixing this
+        properly in Manifest.fetch() because we do need to "forget" about some tests and platforms in some cases.
+        For now, delete all v3 model objects and start over in each syncing cycle.
+        * unit-tests/tools-js-remote-tests.js: Added. Unit tests for the aforementioned changes to RemoteAPI.
+
+2016-04-07  Ryosuke Niwa  <rniwa@webkit.org>
+
+        sync-buildbot.js doesn't mark disappeared builds as failed
+        https://bugs.webkit.org/show_bug.cgi?id=156386
+
+        Reviewed by Chris Dumez.
+
+        Fix a bug that new syncing script doesn't mark builds that it scheduled but doesn't appear when queried
+        by buildbot's JSON API. These are builds that got canceled by humans (e.g. buildbot was restarted, data
+        loss, pending build was canceled, etc...)
+
+        * server-tests/tools-buildbot-triggerable-tests.js: Added a test case.
+        * tools/js/buildbot-triggerable.js:
+        (BuildbotTriggerable.prototype._pullBuildbotOnAllSyncers): Added a set of build requests we've matched
+        against BuildbotBuildEntry's. Mark build requests that didn't have any entry but supposed to be in either
+        'scheduled' or 'running' status as failed.
+
+2016-04-07  Ryosuke Niwa  <rniwa@webkit.org>
+
+        A/B testing bots should prioritize user created test groups
+        https://bugs.webkit.org/show_bug.cgi?id=156375
+
+        Reviewed by Chris Dumez.
+
+        Order build requests preferring user created ones over ones automatically created by detect-changes.js.
+
+        Also fixed a bug in BuildbotSyncer.scheduleFirstRequestInGroupIfAvailable that it was scheduling a new
+        build request on a builder/slave even when we had previously scheduled another build request.
+
+        * public/include/build-requests-fetcher.php:
+        (BuildRequestsFetcher::fetch_incomplete_requests_for_triggerable): Order build requested based on
+        author_order which is 0 when it's created by an user and 1 when it's created by detect-changes.js.
+        Since we're using ascending order, this would put user created test groups first.
+        * server-tests/api-build-requests-tests.js: Updated an existing test case and added a new test case
+        for testing that build requests for an user created test group shows up first.
+        * server-tests/resources/mock-data.js:
+        (MockData.addAnotherMockTestGroup): Takes an extra argument to specify the author name.
+        * server-tests/tools-buildbot-triggerable-tests.js: Added a test case for testing that build requests
+        for an user created test group shows up first.
+        * tools/js/buildbot-syncer.js:
+        (BuildbotSyncer): Added _slavesWithNewRequests to keep track of build slaves on which we have already
+        scheduled new build requests. Don't schedule more requests on these slaves.
+        (BuildbotSyncer.prototype.scheduleRequest):
+        (BuildbotSyncer.prototype.scheduleFirstRequestInGroupIfAvailable): Add the specified slave name (or null
+        when slaveList is not specified) to _slavesWithNewRequests.
+        (BuildbotSyncer.prototype.pullBuildbot): Clear the set after pulling buildbot since any build request
+        we have previously scheduled should be included in one of the entires now.
+        * unit-tests/buildbot-syncer-tests.js: Added test cases for the aforementioned bug.
+        (sampleiOSConfig): Added a second slave for new test cases.
+
+2016-04-07  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Migrate legacy perf dashboard tests to mocha.js based tests
+        https://bugs.webkit.org/show_bug.cgi?id=156335
+
+        Reviewed by Chris Dumez.
+
+        Migrated all legacy run-tests.js tests to mocha.js based tests. Since the new harness uses Promise
+        for most of asynchronous operations, refactored the tests to use Promises as well, and added more
+        assertions where appropriate.
+
+        Also consolidated common helper functions into server-tests/resources/common-operations.js.
+        Unfortunately there were multiple inconsistent implementations of addBuilder/addSlave. Some were
+        taking an array of reports while others were taking a single report. New shared implementation in
+        common-operations.js now takes a single report.
+
+        Also decreased the timeout in most tests from 10s to 1s so that tests fail early when they timeout.
+        Most of tests are passing under 100ms on my computer so 1s should be plenty still.
+
+        * run-tests.js: Removed.
+        * server-tests/admin-platforms-tests.js: Moved from tests/admin-platforms.js.
+        (reportsForDifferentPlatforms):
+        * server-tests/admin-reprocess-report-tests.js: Moved from tests/admin-reprocess-report.js.
+        (.addBuilder): Moved to common-operations.js.
+        * server-tests/api-build-requests-tests.js:
+        * server-tests/api-manifest.js: Use MockData.resetV3Models() instead of manually clearing maps.
+        * server-tests/api-measurement-set-tests.js: Moved from tests/api-measurement-set.js.
+        (.queryPlatformAndMetric):
+        (.format):
+        * server-tests/api-report-commits-tests.js: Moved from tests/api-report-commits.js.
+        * server-tests/api-report-tests.js: Moved from tests/api-report.js.
+        (.emptyReport):
+        (.emptySlaveReport):
+        (.reportWithSameSubtestName):
+        * server-tests/resources/common-operations.js: Added.
+        (addBuilderForReport): Extracted from tests.
+        (addSlaveForReport): Ditto.
+        (connectToDatabaseInEveryTest): Added.
+        (submitReport): Extracted from admin-platforms-tests.js.
+        * server-tests/resources/test-server.js:
+        (TestServer): Make TestServer a singleton since it doesn't make any sense for each module to start
+        its own Apache instance (that would certainly will fail).
+        * server-tests/tools-buildbot-triggerable-tests.js:
+        * tests: Removed.
+        * tools/js/database.js:
+        (Database.prototype.selectAll): Added.
+        (Database.prototype.selectFirstRow): Added.
+        (Database.prototype.selectRows): Added. Dynamically construct a query string based on arguments.
+
+2016-04-05  Ryosuke Niwa  <rniwa@webkit.org>
+
+        New buildbot syncing scripts that supports multiple builders and slaves
+        https://bugs.webkit.org/show_bug.cgi?id=156269
+
+        Reviewed by Chris Dumez.
+
+        Add sync-buildbot.js that supports scheduling A/B testing jobs on multiple builders and slaves.
+        The old python script (sync-with-buildbot.py) could only support a single builder and slave
+        for each platform, test pair.
+
+        The main logic is implemented in BuildbotTriggerable.syncOnce. Various helper methods are added
+        throughout the codebase and tests have been refactored.
+
+        BuildbotSyncer has been updated to support multiple platform, test pairs. It's now responsible
+        for syncing everything on each builder (on a buildbot).
+
+        Added more unit tests for BuildbotSyncer and server tests for BuildbotTriggerable, and refactored
+        test helpers and mocks as needed.
+
+        * public/v3/models/build-request.js:
+        (BuildRequest.prototype.status): Added.
+        (BuildRequest.prototype.isScheduled): Added.
+        * public/v3/models/metric.js:
+        (Metric.prototype.fullName): Added.
+        * public/v3/models/platform.js:
+        (Platform): Added the map based on platform name.
+        (Platform.findByName): Added.
+        * public/v3/models/test.js:
+        (Test.topLevelTests):
+        (Test.findByPath): Added. Finds a test based on an array of test names; e.g. ['A', 'B'] would
+        find the test whose name is "B" which has a parent test named "A".
+        (Test.prototype.fullName): Added.
+        * server-tests/api-build-requests-tests.js:
+        (addMockData): Moved to resources/mock-data.js.
+        (addAnotherMockTestGroup): Ditto.
+        * server-tests/resources/mock-data.js: Added.
+        (MockData.resetV3Models): Added.
+        (MockData.addMockData): Moved from api-build-requests-tests.js.
+        (MockData.addAnotherMockTestGroup): Ditto.
+        (MockData.mockTestSyncConfigWithSingleBuilder): Added.
+        (MockData.mockTestSyncConfigWithTwoBuilders): Added.
+        (MockData.pendingBuild): Added.
+        (MockData.runningBuild): Added.
+        (MockData.finishedBuild): Added.
+        * server-tests/resources/test-server.js:
+        (TestServer):
+        (TestServer.prototype.remoteAPI):
+        (TestServer.prototype._ensureTestDatabase): Don't fail even if the test database doesn't exit.
+        (TestServer.prototype._startApache): Create a RemoteAPI instance to access the test sever.
+        (TestServer.prototype._waitForPid): Increase the timeout.
+        (TestServer.prototype.inject): Replace global.RemoteAPI during the test and restore it afterwards.
+        * server-tests/tools-buildbot-triggerable-tests.js: Added. Tests BuildbotTriggerable.syncOnce.
+        (MockLogger): Added.
+        (MockLogger.prototype.log): Added.
+        (MockLogger.prototype.error): Added.
+        * tools/detect-changes.js:
+        (parseArgument): Moved to js/parse-arguments.js.
+        * tools/js/buildbot-syncer.js:
+        (BuildbotBuildEntry):
+        (BuildbotBuildEntry.prototype.syncer): Added.
+        (BuildbotBuildEntry.prototype.buildRequestStatusIfUpdateIsNeeded): Added. Returns a new status
+        for a build request (of the matching build request ID) if it needs to be updated in the server.
+        (BuildbotSyncer): This class 
+        (BuildbotSyncer.prototype.addTestConfiguration): Added.
+        (BuildbotSyncer.prototype.testConfigurations): Returns the list of test configurations.
+        (BuildbotSyncer.prototype.matchesConfiguration): Returns true iff the request can be scheduled on
+        this builder.
+        (BuildbotSyncer.prototype.scheduleRequest): Added. Schedules a new job on buildbot for a request.
+        (BuildbotSyncer.prototype.scheduleFirstRequestInGroupIfAvailable): Added. Schedules a new job for
+        the specified build request on the first slave that's available.
+        (BuildbotSyncer.prototype.pullBuildbot): Return a list of BuildbotBuildEntry instead of an object.
+        Also store it on an instance variable so that scheduleFirstRequestInGroupIfAvailable could use it.
+        (BuildbotSyncer.prototype._pullRecentBuilds):
+        (BuildbotSyncer.prototype.pathForPendingBuildsJSON): Renamed from urlForPendingBuildsJSON and now
+        only returns the path instead of the full URL since RemoteAPI takes a path, not full URL.
+        (BuildbotSyncer.prototype.pathForBuildJSON): Ditto from pathForBuildJSON.
+        (BuildbotSyncer.prototype.pathForForceBuild): Added.
+        (BuildbotSyncer.prototype.url): Use RemoteAPI's url method instead of manually constructing URL.
+        (BuildbotSyncer.prototype.urlForBuildNumber): Ditto.
+        (BuildbotSyncer.prototype._propertiesForBuildRequest): Now that each syncer can have multiple test
+        configurations associated with it, find the one matching for this request.
+        (BuildbotSyncer._loadConfig): Create a syncer per builder and add all test configurations to it.
+        (BuildbotSyncer._validateAndMergeConfig): Added the support for 'SlaveList', which is a list of
+        slave names present on this builder.
+        * tools/js/buildbot-triggerable.js: Added.
+        (BuildbotTriggerable): Added.
+        (BuildbotTriggerable.prototype.name): Added.
+        (BuildbotTriggerable.prototype.syncOnce): Added. The main logic for the syncing script. It pulls
+        existing build requests from the perf dashboard, pulls buildbot for pending and running/completed
+        builds on each builder (represented by each syncer), schedules build requests on buildbot if there
+        is any builder/slave available, and updates the status of build requests in the database.
+        (BuildbotTriggerable.prototype._validateRequests): Added.
+        (BuildbotTriggerable.prototype._pullBuildbotOnAllSyncers): Added.
+        (BuildbotTriggerable.prototype._scheduleNextRequestInGroupIfSlaveIsAvailable): Added.
+        (BuildbotTriggerable._testGroupMapForBuildRequests): Added.
+        * tools/js/database.js:
+        * tools/js/parse-arguments.js: Added. Extracted out of tools/detect-changes.js.
+        (parseArguments):
+        * tools/js/remote.js:
+        (RemoteAPI): Now optionally takes the server configuration.
+        (RemoteAPI.prototype.url): Added.
+        (RemoteAPI.prototype.getJSON): Removed the code for specifying request content.
+        (RemoteAPI.prototype.getJSONWithStatus): Ditto.
+        (RemoteAPI.prototype.postJSON): Added.
+        (RemoteAPI.prototype.postFormUrlencodedData): Added.
+        (RemoteAPI.prototype.sendHttpRequest): Fixed the code to specify auth.
+        * tools/js/v3-models.js: Don't include RemoteAPI here as they require a configuration for each host.
+        * tools/sync-buildbot.js: Added.
+        (main): Added. Parse the arguments and start the loop.
+        (syncLoop): Added.
+        * unit-tests/buildbot-syncer-tests.js: Added tests for pullBuildbot, scheduleRequest, as well as
+        scheduleFirstRequestInGroupIfAvailable. Refactored helper functions as needed.
+        (sampleiOSConfig):
+        (smallConfiguration): Added.
+        (smallPendingBuild): Added.
+        (smallInProgressBuild): Added.
+        (smallFinishedBuild): Added.
+        (createSampleBuildRequest): Create a unique build request for each platform.
+        (samplePendingBuild): Optionally specify build time and slave name.
+        (sampleInProgressBuild): Optionally specify slave name.
+        (sampleFinishedBuild): Ditto.
+        * unit-tests/resources/mock-remote-api.js:
+        (assert.notReached.assert.notReached):
+        (MockRemoteAPI.url): Added.
+        (MockRemoteAPI.postFormUrlencodedData): Added.
+        (MockRemoteAPI._addRequest): Extracted from getJSONWithStatus.
+        (MockRemoteAPI.waitForRequest): Extracted from inject. For tools-buildbot-triggerable-tests.js, we
+        need to instantiate a RemoteAPI for buildbot without replacing global.RemoteAPI.
+        (MockRemoteAPI.inject):
+        (MockRemoteAPI.reset): Added.
+
+2016-03-30  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Simplify API of Test model by removing Test.setParentTest
+        https://bugs.webkit.org/show_bug.cgi?id=156055
+
+        Reviewed by Joseph Pecoraro.
+
+        Removed Test.setParentTest. Keep track of the child-parent relationship using the static map instead.
+
+        Now each test only stores parent's id and uses the ID static map in Test.parentTest().
+
+        * public/v3/models/manifest.js:
+        (Manifest._didFetchManifest.buildObjectsFromIdMap): Removed the code to create the map of child-parent
+        relationship and call setParentTest.
+        * public/v3/models/test.js:
+        (Test): Updated a static map by the name of "childTestMap" to store itself. We should probably sort
+        child tests using some fixed criteria in the future instead of relying on the creation order but
+        preserve the old code's ordering for now.
+        (Test.prototype.parentTest): Look up the static map by the parent test's id.
+        (Test.prototype.onlyContainsSingleMetric):
+        (Test.prototype.setParentTest): Deleted.
+        (Test.prototype.childTests): Look up the child test map.
+
+2016-03-30  Ryosuke Niwa  <rniwa@webkit.org>
+
+        BuildRequest should have associated platform and test
+        https://bugs.webkit.org/show_bug.cgi?id=156054
+
+        Reviewed by Joseph Pecoraro.
+
+        Added methods to retrieve the platform and the test associated with a build request with tests.
+
+        * public/v3/models/build-request.js:
+        (BuildRequest):
+        (BuildRequest.prototype.platform): Added.
+        (BuildRequest.prototype.test): Added.
+        * server-tests/api-build-requests-tests.js:
+        * server-tests/api-manifest.js: Fixed a typo. This tests /api/manifest, not /api/build-requests.
+        * unit-tests/buildbot-syncer-tests.js:
+        (.createSampleBuildRequest): Now takes Platform and Test objects to avoid hitting assertions in
+        BuildRequest's constructor.
+
+2016-03-30  Ryosuke Niwa  <rniwa@webkit.org>
+
+        BuildRequest should have a method to fetch all in-progress and pending requests for a triggerable
+        https://bugs.webkit.org/show_bug.cgi?id=156008
+
+        Reviewed by Darin Adler.
+
+        Add a method to BuildRequest that fetches all pending and in-progress requests for a triggerable.
+
+        Now, new syncing scripts must be able to figure out the build slave the first build requests in
+        a given test group had used in order to schedule subsequent build requests in the test group.
+
+        For this purpose, /api/build-requests has been modified to return all build requests whose test
+        group had not finished yet. A test group is finished if all build requests in the test group had
+        finished (completed, failed, or canceled).
+
+        * public/include/build-requests-fetcher.php:
+        (BuildRequestFetcher::fetch_incomplete_requests_for_triggerable): Return all build requests in test
+        groups that have not been finished.
+        * public/v3/models/build-request.js:
+        (BuildRequest):
+        (BuildRequest.prototype.testGroupId): Added.
+        (BuildRequest.prototype.isPending): Renamed from hasPending to fix a bad grammar.
+        (BuildRequest.fetchForTriggerable): Added.
+        (BuildRequest.constructBuildRequestsFromData): Extracted from _createModelsFromFetchedTestGroups in
+        TestGroup.
+        * public/v3/models/manifest.js:
+        (Manifest.fetch): Use the full path from root so that it works in server tests.
+        * public/v3/models/test-group.js:
+        (TestGroup.hasPending):
+        (TestGroup._createModelsFromFetchedTestGroups):
+        * server-tests/api-build-requests-tests.js: Added tests to ensure all build requests for a test group
+        is present in the response returned by /api/build-requests iff any build request in the group had not
+        finished yet.
+        (.addMockData):
+        (.addAnotherMockTestGroup): Added.
+        * unit-tests/test-groups-tests.js:
+
+2016-03-29  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Make dependency injection in unit tests more explicit
+        https://bugs.webkit.org/show_bug.cgi?id=156006
+
+        Reviewed by Joseph Pecoraro.
+
+        Make the dependency injection of model objects in unit tests explicit so that server tests that create
+        "real" model objects won't create these mock objects. Now each test that uses mock model objects would call
+        MockModels.inject() to inject before / beforeEach and access each object using a property on MockModels
+        instead of them being implicitly defined on the global object.
+
+        Similarly, MockRemoteAPI now only replaces global.RemoteAPI during each test so that server tests can use
+        real RemoteAPI to access the test Apache server.
+
+        * unit-tests/analysis-task-tests.js:
+        * unit-tests/buildbot-syncer-tests.js:
+        (createSampleBuildRequest):
+        * unit-tests/measurement-adaptor-tests.js:
+        * unit-tests/measurement-set-tests.js:
+        * unit-tests/resources/mock-remote-api.js:
+        (MockRemoteAPI.getJSONWithStatus):
+        (MockRemoteAPI.inject): Added. Override RemoteAPI on the global object during each test.
+        * unit-tests/resources/mock-v3-models.js:
+        (MockModels.inject): Added. Create mock model objects before each test, and clear all static maps of
+        various v3 model classes (to remove all singleton objects for those model classes).
+        * unit-tests/test-groups-tests.js:
+
+2016-03-29  Ryosuke Niwa  <rniwa@webkit.org>
+
+        BuildbotSyncer should be able to fetch JSON from buildbot
+        https://bugs.webkit.org/show_bug.cgi?id=155921
+
+        Reviewed by Joseph Pecoraro.
+
+        Added BuildbotSyncer.pullBuildbot which fetches pending, in-progress, and finished builds from buildbot
+        with lots of unit tests as this has historically been a source of subtle bugs in the old script.
+
+        New implementation fixes a subtle bug in the old pythons script which overlooked the possibility that
+        the state of some builds may change between each HTTP request. In the old script, we fetched the list
+        of the pending builds, and requested -1, -2, etc... builds for N times. But between each request,
+        a pending build may start running or an in-progress build finish and shift the offset by one. The new
+        script avoids this problem by first requesting all pending builds, then all in-progress and finished
+        builds in a single HTTP request. The results are then merged so that entries for in-progress and
+        finished builds would override the entries for pending builds if they overlap.
+
+        Also renamed RemoteAPI.fetchJSON to RemoteAPI.getJSON to match v3 UI's RemoteAPI. This change makes
+        the class interchangeable between frontend (public/v3/remote.js) and backend (tools/js/remote.js).
+
+        * server-tests/api-build-requests-tests.js:
+        * server-tests/api-manifest.js:
+        * tools/js/buildbot-syncer.js:
+        (BuildbotBuildEntry): Removed the unused argument "type". Store the syncer as an instance variable as
+        we'd need to query for the buildbot URL. Also fixed a bug that _isInProgress was true for finished
+        builds as 'currentStep' is always defined but null in those builds.
+        (BuildbotBuildEntry.prototype.buildNumber): Added.
+        (BuildbotBuildEntry.prototype.isPending): Added.
+        (BuildbotBuildEntry.prototype.hasFinished): Added.
+        (BuildbotSyncer.prototype.pullBuildbot): Added. Fetches pending builds first and then finished builds.
+        (BuildbotSyncer.prototype._pullRecentBuilds): Added. Fetches in-progress and finished builds.
+        (BuildbotSyncer.prototype.urlForPendingBuildsJSON): Added.
+        (BuildbotSyncer.prototype.urlForBuildJSON): Added.
+        (BuildbotSyncer.prototype.url): Added.
+        (BuildbotSyncer.prototype.urlForBuildNumber): Added.
+        * tools/js/remote.js:
+        (RemoteAPI.prototype.getJSON): Renamed from fetchJSON.
+        (RemoteAPI.prototype.getJSONWithStatus): Renamed from fetchJSONWithStatus.
+        * tools/js/v3-models.js: Load tools/js/remote.js instead of public/v3/remote.js inside node.
+        * unit-tests/buildbot-syncer-tests.js: Added a lot of unit tests for BuildbotSyncer.pullBuildbot
+        (samplePendingBuild):
+        (sampleInProgressBuild): Added.
+        (sampleFinishedBuild): Added.
+        * unit-tests/resources/mock-remote-api.js:
+        (global.RemoteAPI.getJSON): Use the same mock as getJSONWithStatus.
+
+2016-03-24  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Migrate admin-regenerate-manifest.js to mocha.js and test v3 UI code
+        https://bugs.webkit.org/show_bug.cgi?id=155863
+
+        Reviewed by Joseph Pecoraro.
+
+        Replaced admin-regenerate-manifest.js by a new mocha.js tests using the new server testing capability
+        added in r198642 and tested v3 UI code (parsing manifest.json and creating models). Also removed
+        /admin/regenerate-manifest since it has been superseded by /api/manifest.
+
+        This patch also extracts manifest.js out of main.js so that it could be used and tested without the
+        DOM support in node.
+
+        * public/admin/regenerate-manifest.php: Deleted.
+        * public/include/db.php: Fixed a regression from r198642 since CONFIG_DIR now doesn't end with
+        a trailing backslash.
+        * public/include/manifest.php:
+        (ManifestGenerator::bug_trackers): Avoid a warning message when there are no repositories.
+        * public/v3/index.html:
+        * public/v3/main.js:
+        (main):
+        * public/v3/models/bug-tracker.js:
+        (BugTracker.prototype.newBugUrl): Added.
+        (BugTracker.prototype.repositories): Added.
+        * public/v3/models/manifest.js: Added. Extracted from main.js.
+        (Manifest.fetch): Moved from main.js' fetchManifest.
+        (Manifest._didFetchManifest): Moved from main.js' didFetchManifest.
+        * public/v3/models/platform.js:
+        (Platform.prototype.hasTest): Fixed the bug that "test" here was shadowing the function parameter of
+        the same name. This is tested by the newly added test cases.
+        * server-tests/api-build-requests-tests.js:
+        * server-tests/api-manifest.js: Added. Migrated test cases from tests/admin-regenerate-manifest.js
+        with additional assertions for v3 UI model objects.
+        * server-tests/resources/test-server.js:
+        (TestServer.prototype.start):
+        (TestServer.prototype.testConfig): Renamed from _constructTestConfig now that this is a public API.
+        Also no longer takes dataDirectory as an argument since it's always the same.
+        (TestServer.prototype._ensureDataDirectory): Fixed a bug that we weren't making public/data.
+        (TestServer.prototype.cleanDataDirectory): Added. Remove all files inside public/data between tests.
+        (TestServer.prototype.inject): Added. Calls before, etc... because always calling before had an
+        unintended side effect of slowing down unit tests even through they don't need Postgres or Apache.
+        * tests/admin-regenerate-manifest.js: Removed.
+        * tools/js/database.js:
+        * tools/js/v3-models.js:
+
+2016-03-23  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Add mocha server tests for /api/build-requests
+        https://bugs.webkit.org/show_bug.cgi?id=155831
+
+        Reviewed by Chris Dumez.
+
+        Added the new mocha.js based server-tests for /api/build-requests. The new harness automatically:
+         - starts a new Apache instance
+         - switches the database during testing via setting an environmental variable 
+         - backups and restores public/data directory during testing
+
+        As a result, developer no longer has to manually setup Apache, edit config.json manually to use
+        a testing database, or run /api/manifest.php to re-generate the manifest file after testing.
+
+        This patch also makes ID resolution optional on /api/build-requests so that v3 model based syncing
+        scripts can re-use the same code as the v3 UI to process the JSON. tools/sync-with-buildbot.py has
+        been modified to use this option (useLegacyIdResolution).
+
+        * config.json: Added configurations for the test httpd server.
+        * init-database.sql: Don't error when tables and types don't exist (when database is empty).
+        * public/api/build-requests.php:
+        (main): Made the ID resolution optional with useLegacyIdResolution. Also removed "updates" from the
+        results JSON since it's never used.
+        * public/include/build-requests-fetcher.php:
+        (BuildRequestsFetcher::__construct):
+        (BuildRequestsFetcher::fetch_roots_for_set_if_needed): Fixed the bug that we would include the same
+        commit multiple times for each root set.
+        * public/include/db.php:
+        (config): If present, use ORG_WEBKIT_PERF_CONFIG_PATH instead of Websites/perf.webkit.org/config.json.
+        * server-tests: Added.
+        * server-tests/api-build-requests-tests.js: Added. Tests for /api/build-requests.
+        (.addMockData):
+        * server-tests/resources: Added.
+        * server-tests/resources/test-server.conf: Added. Apache configuration file for testing.
+        * server-tests/resources/test-server.js: Added.
+        (TestSever): Added.
+        (TestSever.prototype.start): Added.
+        (TestSever.prototype.stop): Added.
+        (TestSever.prototype.remoteAPI): Added. Configures RemoteAPI to be used with the test sever.
+        (TestSever.prototype.database): Added. Returns Database configured to use the test database.
+        (TestSever.prototype._constructTestConfig): Creates config.json for testing. The file is generated by
+        _start and db.php's config() reads it from the environmental variable: ORG_WEBKIT_PERF_CONFIG_PATH.
+        (TestSever.prototype._ensureDataDirectory): Renames public/data to public/original-data if exists,
+        and creates a new empty public/data.
+        (TestSever.prototype._restoreDataDirectory): Deletes public/data and renames public/original-data
+        back to public/data.
+        (TestSever.prototype._ensureTestDatabase): Drops the test database if exists and creates a new one.
+        (TestSever.prototype.initDatabase): Run init-database.sql to start each test with a consistent state.
+        (TestSever.prototype._executePgsqlCommand): Executes a postgres command line tool such as psql.
+        (TestSever.prototype._determinePgsqlDirectory): Finds the directory that contains psql.
+        (TestSever.prototype._startApache): Starts an Apache instance for testing.
+        (TestSever.prototype._stopApache): Stops the Apache instance for testing.
+        (TestSever.prototype._waitForPid): Waits for the Apache pid file to appear or disappear.
+        (before): Start the test server at the beginning.
+        (beforeEach): Re-initialize all tables before each test.
+        (after): Stop the test server at the end.
+        * tools/js/config.js:
+        (Config.prototype.path):
+        (Config.prototype.serverRoot): Added. The path to Websites/perf.webkit.org/public/.
+        (Config.prototype.pathFromRoot): Added. Resolves a path from Websites/perf.webkit.org.
+        * tools/js/database.js:
+        (Database): Now optionally takes the database name to use a different database during testing.
+        (Database.prototype.connect):
+        (Database.prototype.query): Added.
+        (Database.prototype.insert): Added.
+        (tableToPrefixMap): Maps table name to its prefix. Used by Database.insert.
+        * tools/js/remote.js: Added.
+        (RemoteAPI): Added. This is node.js equivalent of RemoteAPI in public/v3/remote.js.
+        (RemoteAPI.prototype.configure): Added.
+        (RemoteAPI.prototype.fetchJSON): Added.
+        (RemoteAPI.prototype.fetchJSONWithStatus): Added.
+        (RemoteAPI.prototype.sendHttpRequest): Added.
+        * tools/sync-with-buildbot.py:
+        (main): Use useLegacyIdResolution as this script relies on the legacy behavior.
+        * unit-tests/checkconfig.js: pg was never directly used in this test.
+
+2016-03-23  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Delete a file that was supposed to be removed in r198614 for real.
+
+        * unit-tests/resources/v3-models.js: Removed.
+
+2016-03-23  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Add a model for parsing buildbot JSON with unit tests
+        https://bugs.webkit.org/show_bug.cgi?id=155814
+
+        Reviewed by Joseph Pecoraro.
+
+        Added BuildbotSyncer and BuildbotBuildEntry classes to parse buildbot JSON files with unit tests.
+        They will be used in the new syncing scripts to improve A/B testing.
+
+        * public/v3/models/build-request.js:
+        (BuildRequest):
+        * tools/js/buildbot-syncer.js: Added.
+        (BuildbotBuildEntry): Added.
+        (BuildbotBuildEntry.prototype.slaveName): Added.
+        (BuildbotBuildEntry.prototype.buildRequestId): Added.
+        (BuildbotBuildEntry.prototype.isInProgress): Added.
+        (BuildbotSyncer): Added.
+        (BuildbotSyncer.prototype.testPath): Added.
+        (BuildbotSyncer.prototype.builderName): Added.
+        (BuildbotSyncer.prototype.platformName): Added.
+        (BuildbotSyncer.prototype.fetchPendingRequests): Added.
+        (BuildbotSyncer.prototype._propertiesForBuildRequest): Added.
+        (BuildbotSyncer.prototype._revisionSetFromRootSetWithExclusionList): Added.
+        (BuildbotSyncer._loadConfig): Added.
+        (BuildbotSyncer._validateAndMergeConfig): Added.
+        (BuildbotSyncer._validateAndMergeProperties): Added.
+        * tools/js/v3-models.js: Copied from unit-tests/resources/v3-models.js.
+        (beforeEach): Deleted since this only defined inside mocha.
+        * unit-tests/analysis-task-tests.js:
+        * unit-tests/buildbot-syncer-tests.js: Added.
+        (sampleiOSConfig):
+        (createSampleBuildRequest):
+        (.smallConfiguration):
+        * unit-tests/measurement-adaptor-tests.js:
+        * unit-tests/measurement-set-tests.js:
+        * unit-tests/resources/mock-v3-models.js: Renamed from unit-tests/resources/v3-models.js.
+        (beforeEach):
+        * unit-tests/test-groups-tests.js:
+        (sampleTestGroup):
+
+2016-03-22  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Add unit tests for test-group.js
+        https://bugs.webkit.org/show_bug.cgi?id=155781
+
+        Reviewed by Joseph Pecoraro.
+
+        Added unit tests for test-group.js that would have caught regressions fixed in r198503.
+
+        * public/v3/components/chart-pane-base.js:
+        (ChartPaneBase.prototype._renderAnnotations): Added a forgotten break statement.
+        * public/v3/models/build-request.js:
+        (BuildRequest.prototype.setResult):
+        (BuildRequest):
+        * public/v3/models/test-group.js:
+        * unit-tests/measurement-set-tests.js: Use ./resources/v3-models.js to reduce the code duplication.
+        * unit-tests/resources/v3-models.js: Import more stuff from v3 models.
+        (beforeEach):
+        * unit-tests/test-groups-tests.js: Added. Added some unit tests for TestGroup.
+        (sampleTestGroup):
+        (.testGroupWithStatusList):
+
+2016-03-22  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Fix a typo.
+
+        * config.json:
+
+2016-03-21  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Commit log viewer repaints too frequently after r198499
+        https://bugs.webkit.org/show_bug.cgi?id=155732
+
+        Reviewed by Joseph Pecoraro.
+
+        The bug was caused by InteractiveTimeSeriesChart invoking onchange callback whenever mouse moved even
+        if the current point didn't change. Fixed the bug by avoiding the work if the indicator hadn't changed
+        and avoiding work in the commit log viewer when the requested repository and the revision range were
+        the same as those of the last request.
+
+        * public/v3/components/commit-log-viewer.js:
+        (CommitLogViewer):
+        (CommitLogViewer.prototype.currentRepository): Exit early when repository and the revision range are
+        identical to the one we already have to avoid repaints and issuing multiple network requests.
+        * public/v3/components/interactive-time-series-chart.js:
+        (InteractiveTimeSeriesChart.prototype._mouseMove): Don't invoke _notifyIndicatorChanged if the current
+        indicator hadn't changed.
+        * public/v3/pages/chart-pane.js:
+        (ChartPane.prototype._indicatorDidChange): Fixed the bug that unlocking the indicator wouldn't update
+        the URL. We need to check whether the lock state had changed. The old condition was also redundant
+        since _mainChartIndicatorWasLocked is always identically equal to isLocked per the prior assignment.
+
+2016-03-21  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Fix A/B testing after r198503.
+
+        * public/include/build-requests-fetcher.php:
+
+2016-03-21  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Analysis task page is broken after r198479
+        https://bugs.webkit.org/show_bug.cgi?id=155735
+
+        Rubber-stamped by Chris Dumez.
+
+        * public/api/measurement-set.php:
+        (AnalysisResultsFetcher::fetch_commits): We need to emit the commit ID as done for regular data.
+        * public/include/build-requests-fetcher.php:
+        (BuildRequestsFetcher::fetch_roots_for_set_if_needed): Ditto. Don't use a fake ID after r198479.
+        * public/v3/models/commit-log.js:
+        (CommitLog): Assert that all commit log IDs are integers to catch regressions like this in future.
+        * public/v3/models/root-set.js:
+        (RootSet): Don't resolve Repository here as doing so would modify the shared "root" entry in the JSON
+        we fetched, and subsequent construction of RootSet would fail since this line would blow up trying to
+        find the repository with "[object]" as the ID.
+        * public/v3/models/test-group.js:
+        (TestGroup._createModelsFromFetchedTestGroups): Resolve Repository here.
+
+2016-03-21  Ryosuke Niwa  <rniwa@webkit.org>
+
+        v3 UI sometimes don't update the list of revisions on the commit log viewer
+        https://bugs.webkit.org/show_bug.cgi?id=155729
+
+        Rubber-stamped by Chris Dumez.
+
+        Fixed multiple bugs that were affecting the list of blame range and commit logs for the range weren't
+        updated in some cases on v3 UI. Also, the commit log viewer state is now a part of the URL state so
+        opening and closing the commit log viewer will persist across page loads.
+
+        Also fixed a regression from r198479 that Test object can't be created for a top level test.
+
+        * public/v3/components/chart-pane-base.js:
+        (ChartPaneBase.prototype.configure):
+        (ChartPaneBase.prototype._mainSelectionDidChange): Fixed the bug that the list of blame range nor the
+        commit log viewer don't get updated when the selected range changes.
+        (ChartPaneBase.prototype._indicatorDidChange):
+        (ChartPaneBase.prototype._didFetchData):
+        (ChartPaneBase.prototype._updateStatus): Extracted from _indicatorDidChange and _didFetchData.
+        (ChartPaneBase.prototype._requestOpeningCommitViewer): Renamed from _openCommitViewer.
+
+        * public/v3/components/chart-status-view.js:
+        (ChartStatusView.prototype.updateStatusIfNeeded): Fixed the bug that the blame range doesn't get set
+        on the initial page load when the selection range is set but the chart data hadn't been fetched yet.
+
+        * public/v3/components/commit-log-viewer.js:
+        (CommitLogViewer.prototype.view): Fixed the bug that we don't clear out the old list of commits while
+        loading the next set of commits to show as it looked as if the list was never updated.
+        (CommitLogViewer.prototype.render): Fixed the bug that the view always show the last repository name
+        even if there were nothing being fetched or commits to show.
+
+        * public/v3/components/pane-selector.js:
+        (PaneSelector.prototype.focus): Removed superfluous call to console.log.
+
+        * public/v3/models/data-model.js:
+        (DataModelObject.listForStaticMap): Generalized the code for all to fix the bug in Test.
+        (DataModelObject.all):
+
+        * public/v3/models/test.js:
+        (Test): Fixed the bug that this code was relying on the static map to be an array.
+        (Test.topLevelTests): Use newly added listForStaticMap to convert the dictionary to an array.
+
+        * public/v3/pages/chart-pane-status-view.js:
+        (ChartPaneStatusView): Always initialize _usedRevisionRange as a triple to simplify code elsewhere.
+        (ChartPaneStatusView.prototype.render): Invoke _revisionCallback when user clicks on a repository
+        expansion mark (>>). Also fixed click handler from the row since this made selecting revision range
+        on the view cumbersome. Now user has to explicitly click on the expansion mark (>>).
+        (ChartPaneStatusView.prototype._setRevisionRange): Now takes shouldNotify, from, and to as arguments
+        as this function must not invoke_revisionCallback inside _updateRevisionListForNewCurrentRepository.
+        (ChartPaneStatusView.prototype.moveRepositoryWithNotification): Use newly added setCurrentRepository
+        instead of manually invoking setCurrentRepository and updateRevisionListWithNotification.
+        (ChartPaneStatusView.prototype.setCurrentRepository): Fixed the bug that we weren't updating the
+        blame list here.
+        (ChartPaneStatusView.prototype.updateRevisionList): Renamed from updateRevisionListWithNotification
+        since we no longer call _revisionCallback. In general, callbacks are only meant to communicate user
+        initiated actions, and not program induced updates like this API so this was a bad pattern anyway.
+        ChartPane now explicitly updates the commit log viewer instead of relying on this function calling
+        _requestOpeningCommitViewer implicitly.
+        (ChartPaneStatusView.prototype._updateRevisionListForNewCurrentRepository): Extracted from
+        updateRevisionListWithNotification so that setCurrentRepository can also call this function.
+
+        * public/v3/pages/chart-pane.js:
+        (ChartPane.prototype._requestOpeningCommitViewer): Overrides ChartPaneBase's method. Open the same
+        repository in other panes via ChartsPage.setOpenRepository.
+        (ChartPane.prototype.setOpenRepository): This method is called when the user selected a repository in
+        another pane. Open the same repository in this pane if it wasn't already open.
+
+        * public/v3/pages/charts-page.js:
+        (ChartsPage): Added this._currentRepositoryId.
+        (ChartsPage.prototype.serializeState): Serialize _currentRepositoryId.
+        (ChartsPage.prototype.updateFromSerializedState): Set the commit log viewer's 
+        (ChartsPage.prototype.setOpenRepository): Added.
+
+        * tests/api-measurement-set.js: Fixed a test after r198479.
+
+2016-03-21  Ryosuke Niwa  <rniwa@webkit.org>
+
+        V3 Perf Dashboard should automatically select initial range when creating a new task
+        https://bugs.webkit.org/show_bug.cgi?id=155677
+
+        Reviewed by Joseph Pecoraro.
+
+        Select the entire range of points for which the analysis task is created by default so that creating
+        a test group to confirm the regression / progression is easy.
+
+        * public/v3/pages/analysis-task-page.js:
+        (AnalysisTaskPage): Added a boolean flag which indicates the user had modified main chart's selection.
+        * public/v3/pages/analysis-task-page.js:
+        (AnalysisTaskPage.prototype.render): Set the main chart's selection to the entire range of points in
+        the analysis task if the user had never modified selection.
+        (AnalysisTaskPage.prototype._chartSelectionDidChange): This callback is invoked only when the user had
+        modified the selection so set _selectionWasModifiedByUser true here unconditionally.
+
+2016-03-19  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Associated commits don't immediately show up on an analysis task page
+        https://bugs.webkit.org/show_bug.cgi?id=155692
+
+        Reviewed by Darin Adler.
+
+        The bug was caused by resolveCommits in AnalysisTask._constructAnalysisTasksFromRawData not being
+        able to find the matching commit log if the commit log had been created by the charts which don't
+        set the remote identifiers on each CommitLog objects.
+
+        Fixed the bug by modifying /api/measurement-set to include the commit ID, and making CommitLog
+        use the real database ID as its ID instead of a fake ID we create from repository and revision.
+
+        Also added a bunch of Mocha unit tests for AnalysisTask.fetchAll.
+
+        * public/api/measurement-set.php:
+        (MeasurementSetFetcher::execute_query): Fetch commit_id.
+        (MeasurementSetFetcher::format_run): Use pass-by-reference to avoid making a copy of the row.
+        (MeasurementSetFetcher::parse_revisions_array): Include commit_id as the first item in the result.
+        * public/v3/instrumentation.js:
+        * public/v3/models/analysis-task.js:
+        (AnalysisTask): Fixed a bug that _buildRequestCount and _finishedBuildRequestCount could be kept
+        as strings and hasPendingRequests() could return a wrong result because it would perform string
+        inequality instead of numerical inequality.
+        (AnalysisTask.prototype.updateSingleton): Ditto.
+        (AnalysisTask.prototype.dissociateCommit):
+        (AnalysisTask._constructAnalysisTasksFromRawData):
+        (AnalysisTask._constructAnalysisTasksFromRawData.resolveCommits): Use findById now that CommitLog
+        objects all use the same id as the database id.
+        * public/v3/models/commit-log.js:
+        (CommitLog):
+        (CommitLog.prototype.remoteId): Deleted since we no longer create a fake id for commit logs for
+        measurement sets.
+        (CommitLog.findByRemoteId): Deleted.
+        (CommitLog.ensureSingleton): Deleted.
+        (CommitLog.fetchBetweenRevisions):
+
+        * public/v3/models/data-model.js:
+        (DataModelObject.clearStaticMap): Added to aid unit testing.
+        (DataModelObject.ensureNamedStaticMap): Fixed a typo. Each map is a dictionary, not an array.
+        * public/v3/models/metric.js:
+        * public/v3/models/platform.js:
+        * public/v3/models/root-set.js:
+        (RootSet): Updated per the interface change in CommitLog.ensureSingleton.
+        (MeasurementRootSet): Updated per /api/measurement-set change. Use the first value as the id.
+        * public/v3/models/test.js:
+        * unit-tests/analysis-task-tests.js: Added.
+        (sampleAnalysisTask):
+        (measurementCluster):
+        * unit-tests/checkconfig.js: Added some assertion message to help aid diagnosing the failure.
+        * unit-tests/measurement-adaptor-tests.js: Updated the sample data per the API change in
+        /api/measurement-set and also added assertions for commit log ids.
+        * unit-tests/measurement-set-tests.js:
+        (beforeEach):
+        * unit-tests/resources: Added.
+        * unit-tests/resources/mock-remote-api.js: Added. Extracted from measurement-set-tests.js to be
+        used in analysis-task-tests.js.
+        (assert.notReached.assert.notReached):
+        (global.RemoteAPI.getJSON):
+        (global.RemoteAPI.getJSONWithStatus):
+        (beforeEach):
+        * unit-tests/resources/v3-models.js: Added. Extracted from measurement-set-tests.js to be used in
+        analysis-task-tests.js and added more imports as needed.
+        (importFromV3):
+        (beforeEach):
+
+2016-03-18  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Build fix after r198464.
+
+        * public/v3/components/analysis-results-viewer.js:
+        (AnalysisResultsViewer.prototype._buildRowsForPointsAndTestGroups):
+
+2016-03-18  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Build fix after r198234.
+
+        * public/api/commits.php:
+        (main): Typo: fetch_latest_reported -> fetch_last_reported.
+        * public/include/commit-log-fetcher.php:
+        (CommitLogFetcher::format_single_commit): commits should be an array.
+
+2016-03-18  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Perf Dashboard v3 confuses better and worse on A/B task page
+        https://bugs.webkit.org/show_bug.cgi?id=155675
+        <rdar://problem/25208723>
+
+        Reviewed by Joseph Pecoraro.
+
+        The analysis results viewer on v3 UI sometimes treats regressions as progressions and vice versa when
+        the first set (i.e. set A) of the revisions used in an A/B testing never appears in the original graph,
+        and its latest commit time matches that of the second set, which appears in the original graph.
+
+        Because the analysis results viewer compares results in the increasing row number, this results in
+        B to be compared to A instead of A to be compared to B. Fixed the bug by preventing the wrong ordering
+        to occur in _buildRowsForPointsAndTestGroups by always inserting a root set A before B when B appears
+        and A doesn't appear in the original graph.
+
+        * public/v3/components/analysis-results-viewer.js:
+        (AnalysisResultsViewer.prototype._collectRootSetsInTestGroups): Remember the succeeding root set B
+        when creating an entry for root set A.
+        (AnalysisResultsViewer.prototype._buildRowsForPointsAndTestGroups): Fixed the bug. Also un-duplicated
+        the code to create a new row.
+        (AnalysisResultsViewer.RootSetInTestGroup): Now takes a succeeding root set. e.g. it's B for A and
+        undefined for B in A/B testing.
+        (AnalysisResultsViewer.RootSetInTestGroup.prototype.succeedingRootSet): Added.
+        * public/v3/components/time-series-chart.js:
+        (TimeSeriesChart.computeTimeGrid): Fixed the bug that we would end up showing 0 AM instead of dates
+        when both dates and months change.
+
+2016-03-18  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Add unit tests for measurement-set.js and measurement-adapter.js
+        https://bugs.webkit.org/show_bug.cgi?id=155673
+
+        Reviewed by Daniel Bates.
+
+        Add tests which were supposed to be added in r198462.
+
+        * unit-tests/measurement-adaptor-tests.js: Added.
+        * unit-tests/measurement-set-tests.js: Added.
+        (assert.notReached): Added.
+        (global.RemoteAPI.getJSON): Added.
+        (global.RemoteAPI.getJSONWithStatus): Added. A mock.
+
+2016-03-18  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Add unit tests for measurement-set.js and measurement-adapter.js
+        https://bugs.webkit.org/show_bug.cgi?id=155673
+
+        Reviewed by Darin Adler.
+
+        Added mocha unit tests for MeasurementSet and MeasurementAdapter classes along with the necessary
+        refactoring to run these tests in node.
+
+        getJSON and getJSONStatus are now under RemoteAPI so that unit tests can mock them.
+
+        Removed the dependency on v2 UI's TimeSeries and Measurement class by adding a new implementation
+        of TimeSeries in v3 and removing the dependency on Measurement in chart-pane-status-view.js with
+        new helper methods on Build and CommitLog.
+
+        Many js files now use 'use strict' (node doesn't support class syntax in non-strict mode) and
+        module.exports to export symbols in node's require function.
+
+        * public/v3/index.html:
+        * public/v3/main.js:
+        * public/v3/models/analysis-results.js:
+        (AnalysisResults.fetch):
+        * public/v3/models/analysis-task.js:
+        (AnalysisTask.fetchAll):
+        * public/v3/models/builder.js:
+        (Build):
+        (Build.prototype.builder): Added. Used by ChartPaneStatusView.
+        (Build.prototype.buildNumber): Ditto.
+        (Build.prototype.buildTime): Ditto.
+        * public/v3/models/commit-log.js:
+        (CommitLog.prototype.diff): Ditto.
+        (CommitLog.fetchBetweenRevisions):
+        * public/v3/models/data-model.js:
+        (DataModelObject.cachedFetch):
+        * public/v3/models/measurement-adaptor.js:
+        (MeasurementAdaptor.prototype.applyToAnalysisResults): Renamed from adoptToAnalysisResults.
+        (MeasurementAdaptor.prototype.applyTo): Renamed from adoptToSeries. Now shares a lot more
+        code with applyToAnalysisResults. The code to set 'series' and 'seriesIndex' has been moved
+        to TimeSeries.append. 'measurement' is no longer needed as this patch removes its only use
+        in ChartPaneStatusView.
+        * public/v3/models/measurement-cluster.js:
+        (MeasurementCluster.prototype.addToSeries): Use TimeSeries.append instead of directly mutating
+        series._series.
+        * public/v3/models/measurement-set.js:
+        (Array.prototype.includes): Added a polyfill for node.
+        (MeasurementSet.prototype._fetchSecondaryClusters): Removed a bogus assertion. When fetchBetween
+        is called with a mixture of clusters that have been fetched and not fetched, this assertion fails.
+        (MeasurementSet.prototype._fetch):
+        (TimeSeries.prototype.findById): Moved to time-series.js.
+        (TimeSeries.prototype.dataBetweenPoints): Ditto.
+        (TimeSeries.prototype.firstPoint): Ditto.
+        (TimeSeries.prototype.fetchedTimeSeries): Moved the code to extend the last point to TimeSeries'
+        extendToFuture.
+        * public/v3/models/repository.js:
+        * public/v3/models/root-set.js:
+        (MeasurementRootSet): Ignore repositories that had not been defined (e.g. it could be added after
+        manifest.json had been downloaded but before a given root set is created for an A/B testing).
+        * public/v3/models/time-series.js:
+        (TimeSeries): Added.
+        (TimeSeries.prototype.append): Added.
+        (TimeSeries.prototype.extendToFuture): Added.
+        (TimeSeries.prototype.firstPoint): Moved from measurement-set.js.
+        (TimeSeries.prototype.lastPoint): Added.
+        (TimeSeries.prototype.previousPoint): Added.
+        (TimeSeries.prototype.nextPoint): Added.
+        (TimeSeries.prototype.findPointByIndex): Added.
+        (TimeSeries.prototype.findById): Moved from measurement-set.js.
+        (TimeSeries.prototype.findPointAfterTime): Added.
+        (TimeSeries.prototype.dataBetweenPoints): Moved from measurement-set.js.
+        * public/v3/pages/chart-pane-status-view.js:
+        (ChartPaneStatusView.prototype.render): Use newly added helper functions on Build.
+        (ChartPaneStatusView.prototype._formatTime): Added.
+        (ChartPaneStatusView.prototype.setCurrentRepository):
+        (ChartPaneStatusView.prototype.computeChartStatusLabels): Rewrote the code using RootSet object on
+        currentPoint and previousPoint instead of Measurement class from v2 UI. Also sort the results using
+        sortByNamePreferringOnesWithURL.
+        * public/v3/remote.js:
+        (RemoteAPI.getJSON): Moved under RemoteAPI.
+        (RemoteAPI.getJSONWithStatus): Ditto.
+        (PrivilegedAPI):
+        (PrivilegedAPI.requestCSRFToken):
+
+2016-03-17  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Add unit tests for config.json and statistics.js
+        https://bugs.webkit.org/show_bug.cgi?id=155626
+
+        Reviewed by Darin Adler.
+
+        Added mocha unit tests for statistics.js and validating config.json. For segmentations, I've extracted
+        real data from our internal perf dashboard.
+
+        Also fixed some bugs covered by these new tests.
+
+        * public/shared/statistics.js:
+        (Statistics.movingAverage): Fixed a bug that forwardWindowSize was never used.
+        (Statistics.exponentialMovingAverage): Fixed the bug that the moving average starts at 0. It should
+        start at the first value instead.
+        (.splitIntoSegmentsUntilGoodEnough): Fixed the bug that we may try to segment a time series into
+        more parts than there are data points. Clearly, that doesn't make any sense.
+        (.findOptimalSegmentation): Renamed local variables so that they're more descriptive, and rewrote
+        the debugging code was the old code was emitting some useless data. Also fixed the bug that the length
+        of "segmentation" was off by one (we need segmentCount + 1 elements in the array sine we always
+        include the start of the first segment = 0 and the end of the last segment = values.length).
+        (.SampleVarianceUpperTriangularMatrix):
+        (Statistics): Modernized the export code.
+        * tools/js: Added.
+        * tools/js/config.js: Added.
+        (Config): Added.
+        (Config.prototype.configFilePath): Added.
+        (Config.prototype.value): Added.
+        (Config.prototype.path): Added.
+        * tools/js/database.js: Added.
+        (Database): Added.
+        (Database.prototype.connect): Added.
+        (Database.prototype.disconnect): Added.
+        * unit-tests: Added.
+        * unit-tests/checkconfig.js: Added. Validates config.json. This is useful while setting up
+        a local instance of the perf dashboard.
+        * unit-tests/statistics-tests.js: Added.
+        (assert.almostEqual): Added. Asserts that two floating values are within a given significant digits.
+        (.stdev):
+        (.delta):
+        (.computeWelchsT):
+
+2016-03-17  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Fix a typo which was supposed to be fixed in r198351.
+
+        * public/v3/pages/analysis-task-page.js:
+        (AnalysisTaskPage.prototype.render):
+
+2016-03-17  Ryosuke Niwa  <rniwa@webkit.org>
+
+        An analysis task should be closed if a progression cause is identified
+        https://bugs.webkit.org/show_bug.cgi?id=155549
+
+        Reviewed by Chris Dumez.
+
+        Since a progression is desirable, we should close an analysis task once its cause is identified.
+
+        Also fix some typos.
+
+        * init-database.sql: Fixed a typo.
+        * public/api/analysis-tasks.php:
+        * public/v3/models/analysis-task.js:
+        (AnalysisTask.prototype.dissociateBug): Renamed from dissociateBug.
+        * public/v3/pages/analysis-task-page.js:
+        (AnalysisTaskPage.prototype.render):
+        (AnalysisTaskPage.prototype._dissociateBug): Renamed from _dissociateBug.
+        (AnalysisTaskPage.prototype._dissociateCommit): Fixed the typo in the alert.
+
+2016-03-16  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Analysis task page should allow specifying commits that caused or fixed a regression or a progression
+        https://bugs.webkit.org/show_bug.cgi?id=155529
+
+        Reviewed by Chris Dumez.
+
+        Added the capability to associate revisions that caused or fixed a progression or a regression for which
+        an analysis task was created. Added task_commits that stores this relationship and added the backend
+        support to retrieve this table in /api/analysis-tasks and an privileged API to update this table at
+        /privileged-api/associate-commit.
+
+        Also extracted a new component, MutableListView, out of AnalysisTaskPage to render and manipulate a list
+        of mutable items, and used it to render the list of associated bugs and commits. The view takes a list of
+        kinds (e.g. repositories or bug trackers), and accepts a pair of a kind and arbitrary text as a new item
+        value.
+
+        * init-database.sql: Added task_commits table.
+
+        * public/api/analysis-tasks.php:
+        (main):
+        (fetch_associated_data_for_tasks): Renamed from fetch_and_push_bugs_to_tasks now that it also fetches
+        the list of commits associated with each analysis task by calling CommitLogFetcher::fetch_for_tasks.
+        Also fixe the bug that we were not taking 
+        (format_task): No longer sets 'category' since the computation of category now depends on the list of
+        commits associated with this analysis task which aren't available until fetch_associated_data_for_tasks.
+        (determine_category): Added. Categorize any analysis tasks with "fixes" commits as "closed" and "causes"
+        commits as "identified".
+
+        * public/include/commit-log-fetcher.php:
+        (CommitLogFetcher::__construct): Remove the unused instance variable.
+        (CommitLogFetcher::fetch_for_tasks): Added. Fetches all commits associated with a list of analysis tasks.
+        Assumes the caller (fetch_associated_data_for_tasks) had setup "fixes" and "causes" fields on each task.
+
+        * public/privileged-api/associate-commit.php: Added. Updates task_commits table to associate or disassociate
+        a commit with an analysis task. When the specified analysis task and the specified commit are already
+        associated, we simply update the table instead of adding a duplicating entry or error. For dissociation,
+        the front-end specifies the commit ID.
+        (main): Added.
+
+        * public/v3/index.html:
+        * public/v3/components/mutable-list-view.js: Added. Used by the list associated bugs and commits.
+        (MutableListView): Added.
+        (MutableListView.prototype.setList): Added.
+        (MutableListView.prototype.setKindList): Added.
+        (MutableListView.prototype.setAddCallback): Added. This callback is invoked when the user tries to add
+        a new item to the list.
+        (MutableListView.prototype.render): Added.
+        (MutableListView.prototype._submitted): Added.
+        (MutableListView.cssTemplate):
+        (MutableListView.htmlTemplate):
+        (MutableListItem): Added. RemovalLink could be a hyperlink or a callback and gets involved when the user
+        tries to delete this item.
+        (MutableListItem.prototype.content):
+
+        * public/v3/models/analysis-task.js:
+        (AnalysisTask): Added the support of the list of commits that fixed and caused changes.
+        (AnalysisTask.prototype.updateSingleton): Ditto.
+        (AnalysisTask.prototype.causes): Added.
+        (AnalysisTask.prototype.fixes): Added.
+        (AnalysisTask.prototype.associateCommit): Added. Use the API added at /privileged-api/associate-commit
+        to associate a new commit with this analysis task. Each commit has either caused or fixed the change.
+        (AnalysisTask.prototype.dissociateCommit): Added. Use the same API to disassociate each commit.
+        (AnalysisTask._constructAnalysisTasksFromRawData): Find all commits associated with each analysis task.
+        Because commit log objects use a fake ID fdue to /api/measurement-set not providing commit IDs, we must
+        use CommitLog.findByRemoteId to find each commit instead of usual CommitLog.findById.
+        (AnalysisTask._constructAnalysisTasksFromRawData.resolveCommits): Added.
+
+        * public/v3/models/build-request.js:
+        (BuildRequest.prototype.hasFinished): Renamed from hasCompleted since it was confusing for this._status
+        being "completed" wasn't a necessary condition for this function to return true.
+
+        * public/v3/models/commit-log.js:
+        (CommitLog): Added the static map for actual commit ID instead of a fake ID created in ensureSingleton.
+        (CommitLog.prototype.remoteId): Added. Returns the real commit ID.
+        (CommitLog.findByRemoteId): Added. Finds an CommitLog object using the real ID.
+
+        * public/v3/models/test-group.js:
+        (TestGroup.prototype.hasFinished): Renamed from hasCompleted to match the rename in BuildRequest.
+
+        * public/v3/pages/analysis-task-page.js:
+        (AnalysisTaskPage): Added lists for the commits that fixed and caused the change using MutableListView.
+        Also adopted MutableListView for the list of associated bugs.
+        (AnalysisTaskPage.prototype.render): Added the code to populate the newly added lists.
+        (AnalysisTaskPage.prototype._makeCommitListItem): Added.
+        (AnalysisTaskPage.prototype._associateBug): Now this is a callback from MutableListView.
+        (AnalysisTaskPage.prototype._associateCommit): Added.
+        (AnalysisTaskPage.prototype._dissociateCommit): Added.
+        (AnalysisTaskPage.htmlTemplate):
+        (AnalysisTaskPage.cssTemplate):
+
+        * public/v3/remote.js:
+        (getJSON): Spit out the entire responseText when JSON failed to parse to make debugging easier.
+
+2016-03-15  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Extract the code to format commit logs into its own PHP file
+        https://bugs.webkit.org/show_bug.cgi?id=155514
+
+        Rubber-stamped by Chris Dumez.
+
+        Extracted CommitLogFetcher out of /api/commits so that it could be used in analysis-tasks.php
+        in the future to support associating cause/fix for each analysis task.
+
+        * public/api/commits.php:
+        * public/include/commit-log-fetcher.php: Added.
+        (CommitLogFetcher)
+        (CommitLogFetcher::__construct): Added.
+        (CommitLogFetcher::repository_id_from_name): Added.
+        (CommitLogFetcher::fetch_between): Added.
+        (CommitLogFetcher::fetch_oldest): Added.
+        (CommitLogFetcher::fetch_latest): Added.
+        (CommitLogFetcher::fetch_last_reported): Added.
+        (CommitLogFetcher::fetch_revision): Added.
+        (CommitLogFetcher::commit_for_revision): Added.
+        (CommitLogFetcher::format_single_commit): Added.
+        (CommitLogFetcher::format_commit): Added.
+
+2016-03-09  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Build fix after r196870.
+
+        * public/include/report-processor.php:
+
+2016-03-09  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Add Size metric to perf dashboard
+        https://bugs.webkit.org/show_bug.cgi?id=155266
+
+        Reviewed by Chris Dumez.
+
+        Added the "Size" metric and use bytes as its unit.
+
+        * public/js/helper-classes.js:
+        (PerfTestRuns):
+        * public/v2/data.js:
+        (RunsData.unitFromMetricName):
+
+2016-02-20  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Add the support for universal slave password
+        https://bugs.webkit.org/show_bug.cgi?id=154476
+
+        Reviewed by David Kilzer.
+
+        Added the support for universalSlavePassword.
+
+        * config.json:
+        * public/include/report-processor.php:
+        (ReportProcessor::process):
+        (ReportProcessor::authenticate_and_construct_build_data): Extracted from process().
+
+2016-02-19  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Analysis tasks page complains about missing repository but with a wrong name
+        https://bugs.webkit.org/show_bug.cgi?id=154468
+
+        Reviewed by Chris Dumez.
+
+        Fixed the bug by using the right variable in the template literal.
+
+        * public/v3/components/customizable-test-group-form.js:
+        (CustomizableTestGroupForm.prototype._computeRootSetMap): Use querySelector here since Chrome doesn't have
+        getElementsByClassName on ShadowRoot.
+        * public/v3/pages/analysis-task-page.js:
+        (AnalysisTaskPage.prototype._createTestGroupAfterVerifyingRootSetList): Use name which is the name of
+        repository here.
+
+2016-02-18  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Revert an unintended change made in the previous commit.
+
+        * init-database.sql:
+
+2016-02-18  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Perf dashboard should let user cancel pending A/B testing and hide failed ones
+        https://bugs.webkit.org/show_bug.cgi?id=154433
+
+        Reviewed by Chris Dumez.
+
+        Added a button to hide a test group in the details view (the bottom table) in the analysis task page, and
+        "Show hidden tests" link to show the hidden test groups on demand. When a test group is hidden, all pending
+        requests in the group will also be canceled since a common scenario of using this feature is that the user
+        had triggered an useless A/B testing; e.g. all builds will fail, wrong, etc... We can revisit and add the
+        capability to just cancel the pending requests and leaving the group visible later if necessary.
+
+        Run `ALTER TYPE build_request_status_type ADD VALUE 'canceled';` to add the new type.
+
+        * init-database.sql: Added testgroup_hidden column to analysis_test_groups table and added 'canceled'
+        as a value to build_request_status_type table.
+        * public/api/test-groups.php:
+        (format_test_group): Added 'hidden' field in the JSON result.
+        * public/privileged-api/update-test-group.php:
+        (main): Added the support for updating testgroup_hidden column. When this column is set to true, also
+        cancel all pending build requests (by setting its request_status to 'canceled' which will be ignore by
+        the syncing script).
+        * public/v3/components/test-group-results-table.js:
+        (TestGroupResultsTable.prototype.setTestGroup): Reset _renderedTestGroup here so that the next call to
+        render() will update the table; e.g. when build requests' status change from 'Pending' to 'Canceled'.
+        * public/v3/models/build-request.js:
+        (BuildRequest.prototype.hasCompleted): A build request is considered complete/finished if it's canceled.
+        (BuildRequest.prototype.hasPending): Added.
+        (BuildRequest.prototype.statusLabel): Handle 'canceled' status.
+        * public/v3/models/test-group.js:
+        (TestGroup):
+        (TestGroup.prototype.updateSingleton): Added to update 'hidden' field.
+        (TestGroup.prototype.isHidden): Added.
+        (TestGroup.prototype.hasPending): Added.
+        (TestGroup.prototype.hasPending): Added.
+        (TestGroup.prototype.updateHiddenFlag): Added. Uses the privileged API to update testgroup_hidden column.
+        The JSON API also updates the status of the 'pending' build requests in the group to 'canceled'.
+        * public/v3/pages/analysis-task-page.js:
+        (AnalysisTaskPage): Added _showHiddenTestGroups and _filteredTestGroups as instance variables.
+        (AnalysisTaskPage.prototype._didFetchTestGroups):
+        (AnalysisTaskPage.prototype._showAllTestGroups): Added.
+        (AnalysisTaskPage.prototype._didUpdateTestGroupHiddenState): Extracted from _didFetchTestGroups.
+        (AnalysisTaskPage.prototype._renderTestGroupList): Use the filtered list of test groups to show the list
+        of test groups. When all test groups are shown, we would first show the hidden ones after the regular ones.
+        (AnalysisTaskPage.prototype._createTestGroupListItem): Extracted from _renderTestGroupList.
+        (AnalysisTaskPage.prototype._renderTestGroupDetails): Update the text inside the button to hide the test
+        group. Also show a warning text that the pending requests will be canceled if there are any.
+        (AnalysisTaskPage.prototype._hideCurrentTestGroup): Added.
+        (AnalysisTaskPage.cssTemplate): Updated the style.
+
+2016-02-18  Ryosuke Niwa  <rniwa@webkit.org>
+
+        The rows in the analysis results table should be expandable
+        https://bugs.webkit.org/show_bug.cgi?id=154427
+
+        Reviewed by Chris Dumez.
+
+        Added "(Expand)" link between rows that have hidden points. Upon click it inserts the hidden rows.
+
+        We insert around five rows at a time when there are hundreds of hidden points but we also avoid leaving
+        behind expandable rows of less than two rows.
+
+        Also fixed a bug in CustomizableTestGroupForm that getElementsById would throw in the shipping Safari
+        because getElementsById doesn't exist on Element.prototype by using class name instead.
+
+        * public/v3/components/analysis-results-viewer.js:
+        (AnalysisResultsViewer):
+        (AnalysisResultsViewer.prototype.setCurrentTestGroup): Removed superfluous call to render().
+        (AnalysisResultsViewer.prototype.setPoints): Always show the start and the end points.
+        (AnalysisResultsViewer.prototype.buildRowGroups):
+        (AnalysisResultsViewer.prototype._buildRowsForPointsAndTestGroups): Add an instance of ExpandableRow which
+        shows a "(Expand)" link to show hidden rows here.
+        (AnalysisResultsViewer.prototype._expandBetween): Added. Expands rows between two points.
+        (AnalysisResultsViewer.cssTemplate): Added rules for "(Expand)" links.
+        (AnalysisResultsViewer.ExpandableRow): Added.
+        (AnalysisResultsViewer.ExpandableRow.prototype.resultContent): Added. Overrides what's in the results column.
+        (AnalysisResultsViewer.ExpandableRow.prototype.heading): Added. Generates "(Expand)" link.
+
+        * public/v3/components/customizable-test-group-form.js:
+        (CustomizableTestGroupForm.prototype._computeRootSetMap): Use getElementsByClassName instead of
+        getElementById.
+        (CustomizableTestGroupForm.prototype._classForLabelAndRepository): Renamed from _idForLabelAndRepository.
+        (CustomizableTestGroupForm._constructRevisionRadioButtons): Set class name instead of id.
+
+        * public/v3/components/results-table.js:
+        (ResultsTable.prototype.render): Don't generate radio buttons to select a row when root set is missing;
+        e.g. for rows that show "(Expand)" links.
+
+2016-02-18  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Statistically significant A/B testing results should be color coded in details view
+        https://bugs.webkit.org/show_bug.cgi?id=154414
+
+        Reviewed by Chris Dumez.
+
+        Color code the statistically significant comparisions in TestGroupResultsTable as done in the analysis
+        results viewer.
+
+        * public/v3/components/customizable-test-group-form.js:
+        (CustomizableTestGroupForm.cssTemplate): Build fix after r196768.
+        * public/v3/components/test-group-results-table.js:
+        (TestGroupResultsTable.prototype.buildRowGroups): Add the status as a class name.
+        (TestGroupResultsTable.cssTemplate): Added styles to color-code statistically significant results.
+
+2016-02-17  Ryosuke Niwa  <rniwa@webkit.org>
+
+        v3 UI should allow custom revisions for A/B testing
+        https://bugs.webkit.org/show_bug.cgi?id=154379
+
+        Reviewed by Chris Dumez.
+
+        Added the capability to customize revisions selected in the overview chart and the results viewer.
+
+        Newly added CustomizableTestGroupForm is responsible for allowing users to modify the set of revisions in
+        a new A/B testing group. Unlike TestGroupForm which doesn't know anything about which revisions are selected
+        for each project/repository, CustomizableTestGroupForm is aware of the list of revisions used in each set.
+
+        The list of revisions used in each set is represented by RootSet if users had not customized them, and
+        CustomRootSet otherwise; the latter was added since regular RootSet object requires CommitLog and other
+        DataModelObjects which are hard to create without corresponding database entries.
+
+        * public/v3/components/customizable-test-group-form.js: Added.
+        (CustomizableTestGroupForm): Added.
+        (CustomizableTestGroupForm.prototype.setRootSetMap): Added.
+        (CustomizableTestGroupForm.prototype._submitted): Overrides the superclass' method.
+        (CustomizableTestGroupForm.prototype._customize): Ditto. Unlike TestGroupForm's callback, this class'
+        callback passes in a root set map as the third argument.
+        (CustomizableTestGroupForm.prototype._computeRootSetMap): Added. Returns this._rootSetMap, which is set by
+        AnalysisTaskPage if user had not customized the root sets. Otherwise return a new map with CustomRootSet's.
+        (CustomizableTestGroupForm.prototype.render): Added. Creates a table to allow customization of root sets.
+        (CustomizableTestGroupForm._constructRevisionRadioButtons): Added.
+        (CustomizableTestGroupForm._createRadioButton): Added.
+        (CustomizableTestGroupForm.cssTemplate): Added.
+        (CustomizableTestGroupForm.formContent): Added. This method is called by TestGroupForm.htmlTemplate.
+        * public/v3/components/test-group-form.js:
+        (TestGroupForm): Updated the various methods to not directly mutate DOM. Store the state in instance
+        variables and update DOM in render() as done elsewhere.
+        (TestGroupForm.prototype.setNeedsName): Deleted. We no longer need this flag since TestGroupForm which is
+        used for retries never needs a name and CustomizableTestGroupForm which is used to create a new test group
+        always requires a name.
+        (TestGroupForm.prototype.setDisabled):
+        (TestGroupForm.prototype.setLabel):
+        (TestGroupForm.prototype.setRepetitionCount):
+        (TestGroupForm.prototype.render): Added.
+        (TestGroupForm.prototype._submitted): Moved the code to prevent the default action has been moved to the
+        constructor since this method is overridden by CustomizableTestGroupForm.
+        (TestGroupForm.cssTemplate): Added.
+        (TestGroupForm.htmlTemplate):
+        (TestGroupForm.formContent): Extracted from htmlTemplate.
+        * public/v3/index.html:
+        * public/v3/models/repository.js:
+        (Repository.sortByNamePreferringOnesWithURL): Added.
+        * public/v3/models/root-set.js:
+        (RootSet.prototype.revisionForRepository): Added so that _createTestGroupAfterVerifyingRootSetList can retrieve
+        the revision information from CustomRootSet without going through CommitLog objects since CustomRootSet doesn't
+        have associated CommitLog objects.
+        (CustomRootSet): Added. Used by CustomizableTestGroupForm to create a custom root map since regular RootSet
+        requires CommitLog and other related objects which are hard to create without database entries.
+        (CustomRootSet.prototype.setRevisionForRepository): Added.
+        (CustomRootSet.prototype.repositories): Added.
+        (CustomRootSet.prototype.revisionForRepository): Added.
+        * public/v3/pages/analysis-task-page.js:
+        (AnalysisTaskPage):
+        (AnalysisTaskPage.prototype.render): Removed the reference to v2 UI since v3 UI is now strictly more powerful
+        than v2 UI. Also update the root set maps in each form here.
+        (AnalysisTaskPage.prototype._retryCurrentTestGroup): No longer takes unused name argument as it got removed
+        from TestGroupForm.
+        (AnalysisTaskPage.prototype._chartSelectionDidChange): No longer updates the disabled-ness here since it's now
+        done in render() via setRootSetMap().
+        (AnalysisTaskPage.prototype._createNewTestGroupFromChart): Now takes rootSetMap as an argument.
+        (AnalysisTaskPage.prototype._selectedRowInAnalysisResultsViewer): No longer updates the disabled-ness here
+        since it's now done in render() via setRootSetMap().
+        (AnalysisTaskPage.prototype._createNewTestGroupFromViewer): Now takes rootSetMap as an argument.
+        (AnalysisTaskPage.prototype._createTestGroupAfterVerifyingRootSetList): Take a dictionary of root set labels
+        such as A and B, which maps to a RootSet or a newly-added CustomRootSet.
+        (AnalysisTaskPage.htmlTemplate): Use customizable-test-group-form for creating a new A/B testing group. Retry
+        form will continue to use TestGroupForm since customizing revisions is non-sensical in retries.
+        (AnalysisTaskPage.cssTemplate): Updated the style.
+
+2016-02-16  Ryosuke Niwa  <rniwa@webkit.org>
+
+        v3 UI has the capability to schedule an A/B testing in a specific range
+        https://bugs.webkit.org/show_bug.cgi?id=154329
+
+        Reviewed by Chris Dumez.
+
+        Extended AnalysisTaskChartPane and ResultsTable so that users can select a range of points in either
+        the overview chart pane and the results viewer table. Extracted TestGroupForm out of the analysis task
+        page and used right below those two components in the analysis task page.
+
+        * public/v3/components/results-table.js:
+        (ResultsTable):
+        (ResultsTable.prototype.setRangeSelectorLabels): Added.
+        (ResultsTable.prototype.setRangeSelectorCallback): Added.
+        (ResultsTable.prototype.selectedRange): Added.
+        (ResultsTable.prototype._rangeSelectorClicked): Added.
+        (ResultsTable.prototype.render): Generate radio boxes to select a range.
+
+        * public/v3/components/test-group-form.js:
+        (TestGroupForm):
+        (TestGroupForm.prototype.setStartCallback): Added.
+        (TestGroupForm.prototype.setNeedsName): Added.
+        (TestGroupForm.prototype.setDisabled): Added.
+        (TestGroupForm.prototype.setLabel): Added.
+        (TestGroupForm.prototype.setRepetitionCount): Added.
+        (TestGroupForm.prototype._submitted): Added.
+        (TestGroupForm.htmlTemplate): Extracted from AnalysisTaskPage.htmlTemplate.
+
+        * public/v3/index.html:
+
+        * public/v3/pages/analysis-task-page.js:
+        (AnalysisTaskChartPane.prototype._mainSelectionDidChange): Added. Delegates the work to AnalysisTaskPage.
+        (AnalysisTaskChartPane.prototype.selectedPoints): Added.
+        (AnalysisTaskPage):
+        (AnalysisTaskPage.prototype.title):
+        (AnalysisTaskPage.prototype.render):
+        (AnalysisTaskPage.prototype._renderTestGroupDetails): Use TestGroupForm's methods instead of mutating DOM. 
+        (AnalysisTaskPage.prototype._retryCurrentTestGroup):
+        (AnalysisTaskPage.prototype._chartSelectionDidChange): Added.
+        (AnalysisTaskPage.prototype._createNewTestGroupFromChart): Added.
+        (AnalysisTaskPage.prototype._selectedRowInAnalysisResultsViewer): Added.
+        (AnalysisTaskPage.prototype._createNewTestGroupFromViewer): Added.
+        (AnalysisTaskPage.prototype._createRetryNameForTestGroup):
+        (AnalysisTaskPage.prototype._createTestGroupAfterVerifyingRootSetList): Extracted from _retryCurrentTestGroup
+        so that we can call it in _createNewTestGroupFromChart and _createNewTestGroupFromViewer.
+        (AnalysisTaskPage.htmlTemplate):
+
+2016-02-15  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Extract the code specific to v2 UI out of shared statistics.js
+        https://bugs.webkit.org/show_bug.cgi?id=154277
+
+        Reviewed by Chris Dumez.
+
+        Extracted statistics-strategies.js out of statistics.js for v2 UI and detect-changes.js. The intent is to
+        deprecate this file once we implement refined statistics tools in v3 UI and adopt it in detect-changes.js.
+
+        * public/shared/statistics.js:
+        (Statistics.movingAverage): Extracted from the "Simple Moving Average" strategy.
+        (Statistics.cumultaiveMovingAverage): Extracted from the "Cumulative Moving Average" strategy.
+        (Statistics.exponentialMovingAverage): Extracted from the "Exponential Moving Average" strategy.
+        Use a temporary "movingAverage" to keep the last moving average instead of relying on the previous
+        entry in "averages" array to avoid special casing an array of length 1 and starting the loop at i = 1.
+        (Statistics.segmentTimeSeriesGreedyWithStudentsTTest): Extracted from "Segmentation: Recursive t-test"
+        strategy. Don't create the list of averages to match segmentTimeSeriesByMaximizingSchwarzCriterion here.
+        It's done in newly added averagesFromSegments.
+        (Statistics.segmentTimeSeriesByMaximizingSchwarzCriterion): Extracted from
+        "Segmentation: Schwarz criterion" strategy.
+        (.recursivelySplitIntoTwoSegmentsAtMaxTIfSignificantlyDifferent): Just store the start index to match
+        * public/v2/app.js:
+        (App.Pane.updateStatisticsTools):
+        (App.Pane._computeMovingAverageAndOutliers):
+        * public/v2/data.js:
+        * public/v2/index.html:
+        * public/v2/statistics-strategies.js: Added.
+        (StatisticsStrategies.MovingAverageStrategies): Added.
+        (averagesFromSegments): Extracted from "Segmentation: Schwarz criterion" strategy. Now used by both
+        "Segmentation: Recursive t-test" and "Segmentation: Schwarz criterion" strategies.
+        (StatisticsStrategies.EnvelopingStrategies): Moved from Statistics.EnvelopingStrategies.
+        (StatisticsStrategies.TestRangeSelectionStrategies): Moved from Statistics.TestRangeSelectionStrategies.
+        (createWesternElectricRule): Moved from statistics.js.
+        (countValuesOnSameSide): Ditto.
+        (StatisticsStrategies.executeStrategy): Moved from Statistics.executeStrategy.
+        * tools/detect-changes.js:
+        (computeRangesForTesting):
+
+2016-02-15  Ryosuke Niwa  <rniwa@webkit.org>
+
+        v1 UI and v2 UI should share statistics.js
+        https://bugs.webkit.org/show_bug.cgi?id=154262
+
+        Reviewed by Chris Dumez.
+
+        Share statistics.js between v1 and v2 UI.
+
+        * public/index.html:
+        * public/js/shared.js: Deleted.
+        * public/js/statistics.js: Removed.
+        * public/shared: Added.
+        * public/shared/statistics.js: Moved from Websites/perf.webkit.org/public/v2/js/statistics.js.
+        * public/v2/index.html:
+        * public/v2/js/statistics.js: Removed.
+        * public/v3/index.html:
+        * tools/detect-changes.js:
+
 2016-02-13  Ryosuke Niwa  <rniwa@webkit.org>
 
         v3 UI sometimes shows same dates twice on the x-axis of time series charts

@@ -34,6 +34,13 @@
 #if USE(PTHREADS) && !OS(WINDOWS) && !OS(DARWIN)
 #include <semaphore.h>
 #include <signal.h>
+// Using signal.h didn't make mcontext_t and ucontext_t available on FreeBSD.
+// This bug has been fixed in FreeBSD 11.0-CURRENT, so this workaround can be
+// removed after FreeBSD 10.x goes EOL.
+// https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=207079
+#if OS(FREEBSD)
+#include <ucontext.h>
+#endif
 #endif
 
 #if OS(DARWIN)
@@ -144,7 +151,7 @@ private:
     void tryCopyOtherThreadStack(Thread*, void*, size_t capacity, size_t*);
     bool tryCopyOtherThreadStacks(LockHolder&, void*, size_t capacity, size_t*);
 
-    static void removeThread(void*);
+    static void THREAD_SPECIFIC_CALL removeThread(void*);
 
     template<typename PlatformThread>
     void removeThreadIfFound(PlatformThread);
@@ -152,7 +159,6 @@ private:
     Lock m_registeredThreadsMutex;
     Thread* m_registeredThreads;
     WTF::ThreadSpecificKey m_threadSpecificForMachineThreads;
-    WTF::ThreadSpecificKey m_threadSpecificForThread;
 #if !ASSERT_DISABLED
     Heap* m_heap;
 #endif

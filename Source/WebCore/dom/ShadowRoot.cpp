@@ -44,31 +44,27 @@ struct SameSizeAsShadowRoot : public DocumentFragment, public TreeScope {
     void* styleResolver;
     void* authorStyleSheets;
     void* host;
-#if ENABLE(SHADOW_DOM) || ENABLE(DETAILS_ELEMENT)
     void* slotAssignment;
-#endif
 };
 
 COMPILE_ASSERT(sizeof(ShadowRoot) == sizeof(SameSizeAsShadowRoot), shadowroot_should_stay_small);
 
-ShadowRoot::ShadowRoot(Document& document, Type type)
+ShadowRoot::ShadowRoot(Document& document, Mode type)
     : DocumentFragment(document, CreateShadowRoot)
     , TreeScope(*this, document)
     , m_type(type)
 {
 }
 
-#if ENABLE(SHADOW_DOM) || ENABLE(DETAILS_ELEMENT)
 
 ShadowRoot::ShadowRoot(Document& document, std::unique_ptr<SlotAssignment>&& slotAssignment)
     : DocumentFragment(document, CreateShadowRoot)
     , TreeScope(*this, document)
-    , m_type(Type::UserAgent)
+    , m_type(Mode::UserAgent)
     , m_slotAssignment(WTFMove(slotAssignment))
 {
 }
 
-#endif
 
 ShadowRoot::~ShadowRoot()
 {
@@ -86,7 +82,7 @@ ShadowRoot::~ShadowRoot()
 
 StyleResolver& ShadowRoot::styleResolver()
 {
-    if (m_type == Type::UserAgent)
+    if (m_type == Mode::UserAgent)
         return document().userAgentShadowTreeStyleResolver();
 
     if (!m_styleResolver) {
@@ -112,15 +108,10 @@ AuthorStyleSheets& ShadowRoot::authorStyleSheets()
 
 void ShadowRoot::updateStyle()
 {
-    bool shouldRecalcStyle = false;
-
-    if (m_authorStyleSheets) {
-        // FIXME: Make optimized updated work.
-        shouldRecalcStyle = m_authorStyleSheets->updateActiveStyleSheets(AuthorStyleSheets::FullUpdate);
-    }
-
-    if (shouldRecalcStyle)
-        setNeedsStyleRecalc();
+    if (!m_authorStyleSheets)
+        return;
+    // FIXME: Make optimized updated work.
+    m_authorStyleSheets->didChange(DeferRecalcStyle);
 }
 
 String ShadowRoot::innerHTML() const
@@ -135,7 +126,7 @@ void ShadowRoot::setInnerHTML(const String& markup, ExceptionCode& ec)
         return;
     }
 
-    if (RefPtr<DocumentFragment> fragment = createFragmentForInnerOuterHTML(markup, host(), AllowScriptingContent, ec))
+    if (RefPtr<DocumentFragment> fragment = createFragmentForInnerOuterHTML(*host(), markup, AllowScriptingContent, ec))
         replaceChildrenWithFragment(*this, fragment.releaseNonNull(), ec);
 }
 
@@ -178,10 +169,10 @@ void ShadowRoot::removeAllEventListeners()
         node->removeAllEventListeners();
 }
 
-#if ENABLE(SHADOW_DOM) || ENABLE(DETAILS_ELEMENT)
 
 HTMLSlotElement* ShadowRoot::findAssignedSlot(const Node& node)
 {
+    ASSERT(node.parentNode() == host());
     if (!m_slotAssignment)
         return nullptr;
     return m_slotAssignment->findAssignedSlot(node, *this);
@@ -200,18 +191,6 @@ void ShadowRoot::removeSlotElementByName(const AtomicString& name, HTMLSlotEleme
     return m_slotAssignment->removeSlotElementByName(name, slot, *this);
 }
 
-void ShadowRoot::invalidateSlotAssignments()
-{
-    if (m_slotAssignment)
-        m_slotAssignment->invalidate(*this);
-}
-
-void ShadowRoot::invalidateDefaultSlotAssignments()
-{
-    if (m_slotAssignment)
-        m_slotAssignment->invalidateDefaultSlot(*this);
-}
-
 const Vector<Node*>* ShadowRoot::assignedNodesForSlot(const HTMLSlotElement& slot)
 {
     if (!m_slotAssignment)
@@ -219,6 +198,5 @@ const Vector<Node*>* ShadowRoot::assignedNodesForSlot(const HTMLSlotElement& slo
     return m_slotAssignment->assignedNodesForSlot(slot, *this);
 }
 
-#endif
 
 }

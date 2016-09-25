@@ -40,24 +40,32 @@
 
 namespace WebCore {
 
-RefPtr<MockRealtimeAudioSource> MockRealtimeAudioSource::create()
+Ref<MockRealtimeAudioSource> MockRealtimeAudioSource::create()
 {
-    return adoptRef(new MockRealtimeAudioSource());
+    return adoptRef(*new MockRealtimeAudioSource(MockRealtimeMediaSource::mockAudioSourceName()));
 }
 
-MockRealtimeAudioSource::MockRealtimeAudioSource()
-    : MockRealtimeMediaSource(createCanonicalUUIDString(), RealtimeMediaSource::Audio, mockAudioSourceName())
+Ref<MockRealtimeAudioSource> MockRealtimeAudioSource::createMuted(const String& name)
+{
+    auto source = adoptRef(*new MockRealtimeAudioSource(name));
+    source->m_muted = true;
+    return source;
+}
+
+MockRealtimeAudioSource::MockRealtimeAudioSource(const String& name)
+    : MockRealtimeMediaSource(createCanonicalUUIDString(), RealtimeMediaSource::Audio, name)
 {
 }
 
 void MockRealtimeAudioSource::updateSettings(RealtimeMediaSourceSettings& settings)
 {
-    settings.setVolume(50);
+    settings.setVolume(volume());
+    settings.setEchoCancellation(echoCancellation());
 }
 
 void MockRealtimeAudioSource::initializeCapabilities(RealtimeMediaSourceCapabilities& capabilities)
 {
-    capabilities.setVolume(CapabilityValueOrRange(0, 1.0));
+    capabilities.setVolume(CapabilityValueOrRange(0.0, 1.0));
     capabilities.setEchoCancellation(RealtimeMediaSourceCapabilities::EchoCancellation::ReadWrite);
 }
 

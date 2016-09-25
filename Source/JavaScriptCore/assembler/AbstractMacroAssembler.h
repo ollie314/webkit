@@ -28,6 +28,8 @@
 
 #include "AbortReason.h"
 #include "AssemblerBuffer.h"
+#include "AssemblerCommon.h"
+#include "CPU.h"
 #include "CodeLocation.h"
 #include "MacroAssemblerCodeRef.h"
 #include "Options.h"
@@ -36,65 +38,9 @@
 #include <wtf/SharedTask.h>
 #include <wtf/WeakRandom.h>
 
-#if ENABLE(ASSEMBLER)
-
 namespace JSC {
 
-inline bool isARMv7IDIVSupported()
-{
-#if HAVE(ARM_IDIV_INSTRUCTIONS)
-    return true;
-#else
-    return false;
-#endif
-}
-
-inline bool isARM64()
-{
-#if CPU(ARM64)
-    return true;
-#else
-    return false;
-#endif
-}
-
-inline bool isX86()
-{
-#if CPU(X86_64) || CPU(X86)
-    return true;
-#else
-    return false;
-#endif
-}
-
-inline bool isX86_64()
-{
-#if CPU(X86_64)
-    return true;
-#else
-    return false;
-#endif
-}
-
-inline bool optimizeForARMv7IDIVSupported()
-{
-    return isARMv7IDIVSupported() && Options::useArchitectureSpecificOptimizations();
-}
-
-inline bool optimizeForARM64()
-{
-    return isARM64() && Options::useArchitectureSpecificOptimizations();
-}
-
-inline bool optimizeForX86()
-{
-    return isX86() && Options::useArchitectureSpecificOptimizations();
-}
-
-inline bool optimizeForX86_64()
-{
-    return isX86_64() && Options::useArchitectureSpecificOptimizations();
-}
+#if ENABLE(ASSEMBLER)
 
 class AllowMacroScratchRegisterUsage;
 class DisallowMacroScratchRegisterUsage;
@@ -143,7 +89,9 @@ public:
             return TimesFour;
         return TimesEight;
     }
-
+    
+    struct BaseIndex;
+    
     // Address:
     //
     // Describes a simple base-offset address.
@@ -158,6 +106,8 @@ public:
         {
             return Address(base, offset + additionalOffset);
         }
+        
+        BaseIndex indexedBy(RegisterID index, Scale) const;
         
         RegisterID base;
         int32_t offset;
@@ -216,7 +166,7 @@ public:
             , offset(offset)
         {
         }
-
+        
         RegisterID base;
         RegisterID index;
         Scale scale;
@@ -711,8 +661,6 @@ public:
     // A JumpList is a set of Jump objects.
     // All jumps in the set will be linked to the same destination.
     class JumpList {
-        friend class LinkBuffer;
-
     public:
         typedef Vector<Jump, 2> JumpVector;
         
@@ -724,20 +672,18 @@ public:
                 append(jump);
         }
 
-        void link(AbstractMacroAssemblerType* masm)
+        void link(AbstractMacroAssemblerType* masm) const
         {
             size_t size = m_jumps.size();
             for (size_t i = 0; i < size; ++i)
                 m_jumps[i].link(masm);
-            m_jumps.clear();
         }
         
-        void linkTo(Label label, AbstractMacroAssemblerType* masm)
+        void linkTo(Label label, AbstractMacroAssemblerType* masm) const
         {
             size_t size = m_jumps.size();
             for (size_t i = 0; i < size; ++i)
                 m_jumps[i].linkTo(label, masm);
-            m_jumps.clear();
         }
         
         void append(Jump jump)
@@ -993,7 +939,7 @@ public:
     {
         switch (nearCall.callMode()) {
         case NearCallMode::Tail:
-            AssemblerType::relinkJump(nearCall.dataLocation(), destination.executableAddress());
+            AssemblerType::relinkJump(nearCall.dataLocation(), destination.dataLocation());
             return;
         case NearCallMode::Regular:
             AssemblerType::relinkCall(nearCall.dataLocation(), destination.executableAddress());
@@ -1038,18 +984,34 @@ public:
         m_linkTasks.append(createSharedTask<void(LinkBuffer&)>(functor));
     }
 
+    void emitNops(size_t memoryToFillWithNopsInBytes)
+    {
+        AssemblerBuffer& buffer = m_assembler.buffer();
+        size_t startCodeSize = buffer.codeSize();
+        size_t targetCodeSize = startCodeSize + memoryToFillWithNopsInBytes;
+        buffer.ensureSpace(memoryToFillWithNopsInBytes);
+        bool isCopyingToExecutableMemory = false;
+        AssemblerType::fillNops(static_cast<char*>(buffer.data()) + startCodeSize, memoryToFillWithNopsInBytes, isCopyingToExecutableMemory);
+        buffer.setCodeSize(targetCodeSize);
+    }
+
 protected:
     AbstractMacroAssembler()
-        : m_randomSource(cryptographicallyRandomNumber())
+        : m_randomSource(0)
     {
         invalidateAllTempRegisters();
     }
 
     uint32_t random()
     {
+        if (!m_randomSourceIsInitialized) {
+            m_randomSourceIsInitialized = true;
+            m_randomSource.setSeed(cryptographicallyRandomNumber());
+        }
         return m_randomSource.getUint32();
     }
 
+    bool m_randomSourceIsInitialized { false };
     WeakRandom m_randomSource;
 
 #if ENABLE(DFG_REGISTER_ALLOCATION_VALIDATION)
@@ -1141,8 +1103,17 @@ protected:
     friend class LinkBuffer;
 }; // class AbstractMacroAssembler
 
-} // namespace JSC
+template <class AssemblerType, class MacroAssemblerType>
+inline typename AbstractMacroAssembler<AssemblerType, MacroAssemblerType>::BaseIndex
+AbstractMacroAssembler<AssemblerType, MacroAssemblerType>::Address::indexedBy(
+    typename AbstractMacroAssembler<AssemblerType, MacroAssemblerType>::RegisterID index,
+    typename AbstractMacroAssembler<AssemblerType, MacroAssemblerType>::Scale scale) const
+{
+    return BaseIndex(base, index, scale, offset);
+}
 
 #endif // ENABLE(ASSEMBLER)
+
+} // namespace JSC
 
 #endif // AbstractMacroAssembler_h

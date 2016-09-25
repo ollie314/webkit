@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,126 +23,292 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WASMFunctionParser_h
-#define WASMFunctionParser_h
+#pragma once
 
 #if ENABLE(WEBASSEMBLY)
 
-#include "SourceCode.h"
-#include "WASMReader.h"
+#include "WASMParser.h"
+#include <wtf/DataLog.h>
 
-#define ContextExpression typename Context::Expression
-#define ContextStatement typename Context::Statement
-#define ContextExpressionList typename Context::ExpressionList
-#define ContextMemoryAddress typename Context::MemoryAddress
-#define ContextJumpTarget typename Context::JumpTarget
+namespace JSC { namespace WASM {
 
-namespace JSC {
-
-class CodeBlock;
-class JSWASMModule;
-class VM;
-
-class WASMFunctionParser {
-public:
-    static bool checkSyntax(JSWASMModule*, const SourceCode&, size_t functionIndex, unsigned startOffsetInSource, unsigned& endOffsetInSource, unsigned& stackHeight, String& errorMessage);
-    static void compile(VM&, CodeBlock*, JSWASMModule*, const SourceCode&, size_t functionIndex);
-
-private:
-    WASMFunctionParser(JSWASMModule* module, const SourceCode& source, size_t functionIndex)
-        : m_module(module)
-        , m_reader(static_cast<WebAssemblySourceProvider*>(source.provider())->data())
-        , m_functionIndex(functionIndex)
-        , m_breakScopeDepth(0)
-        , m_continueScopeDepth(0)
-        , m_labelDepth(0)
-    {
-    }
-
-    template <class Context> bool parseFunction(Context&);
-    bool parseLocalVariables();
-
-    template <class Context> ContextStatement parseStatement(Context&);
-    template <class Context> ContextStatement parseReturnStatement(Context&);
-    template <class Context> ContextStatement parseBlockStatement(Context&);
-    template <class Context> ContextStatement parseIfStatement(Context&);
-    template <class Context> ContextStatement parseIfElseStatement(Context&);
-    template <class Context> ContextStatement parseWhileStatement(Context&);
-    template <class Context> ContextStatement parseDoStatement(Context&);
-    template <class Context> ContextStatement parseLabelStatement(Context&);
-    template <class Context> ContextStatement parseBreakStatement(Context&);
-    template <class Context> ContextStatement parseBreakLabelStatement(Context&);
-    template <class Context> ContextStatement parseContinueStatement(Context&);
-    template <class Context> ContextStatement parseContinueLabelStatement(Context&);
-    template <class Context> ContextStatement parseSwitchStatement(Context&);
-
-    template <class Context> ContextExpression parseExpression(Context&, WASMExpressionType);
-
-    template <class Context> ContextExpression parseExpressionI32(Context&);
-    template <class Context> ContextExpression parseConstantPoolIndexExpressionI32(Context&, uint32_t constantPoolIndex);
-    template <class Context> ContextExpression parseConstantPoolIndexExpressionI32(Context&);
-    template <class Context> ContextExpression parseImmediateExpressionI32(Context&, uint32_t immediate);
-    template <class Context> ContextExpression parseImmediateExpressionI32(Context&);
-    template <class Context> ContextExpression parseUnaryExpressionI32(Context&, WASMOpExpressionI32);
-    template <class Context> ContextExpression parseBinaryExpressionI32(Context&, WASMOpExpressionI32);
-    template <class Context> ContextExpression parseRelationalI32ExpressionI32(Context&, WASMOpExpressionI32);
-    template <class Context> ContextExpression parseRelationalF32ExpressionI32(Context&, WASMOpExpressionI32);
-    template <class Context> ContextExpression parseRelationalF64ExpressionI32(Context&, WASMOpExpressionI32);
-    template <class Context> ContextExpression parseMinOrMaxExpressionI32(Context&, WASMOpExpressionI32);
-
-    template <class Context> ContextExpression parseExpressionF32(Context&);
-    template <class Context> ContextExpression parseConstantPoolIndexExpressionF32(Context&, uint32_t constantIndex);
-    template <class Context> ContextExpression parseConstantPoolIndexExpressionF32(Context&);
-    template <class Context> ContextExpression parseImmediateExpressionF32(Context&);
-    template <class Context> ContextExpression parseUnaryExpressionF32(Context&, WASMOpExpressionF32);
-    template <class Context> ContextExpression parseBinaryExpressionF32(Context&, WASMOpExpressionF32);
-
-    template <class Context> ContextExpression parseExpressionF64(Context&);
-    template <class Context> ContextExpression parseConstantPoolIndexExpressionF64(Context&, uint32_t constantIndex);
-    template <class Context> ContextExpression parseConstantPoolIndexExpressionF64(Context&);
-    template <class Context> ContextExpression parseImmediateExpressionF64(Context&);
-    template <class Context> ContextExpression parseUnaryExpressionF64(Context&, WASMOpExpressionF64);
-    template <class Context> ContextExpression parseBinaryExpressionF64(Context&, WASMOpExpressionF64);
-    template <class Context> ContextExpression parseMinOrMaxExpressionF64(Context&, WASMOpExpressionF64);
-
-    template <class Context> ContextExpression parseExpressionVoid(Context&);
-
-    template <class Context> ContextExpression parseGetLocalExpression(Context&, WASMType, uint32_t localIndex);
-    template <class Context> ContextExpression parseGetLocalExpression(Context&, WASMType);
-    template <class Context> ContextExpression parseGetGlobalExpression(Context&, WASMType);
-    template <class Context> ContextExpression parseSetLocal(Context&, WASMOpKind, WASMExpressionType, uint32_t localIndex);
-    template <class Context> ContextExpression parseSetLocal(Context&, WASMOpKind, WASMExpressionType);
-    template <class Context> ContextExpression parseSetGlobal(Context&, WASMOpKind, WASMExpressionType, uint32_t globalIndex);
-    template <class Context> ContextExpression parseSetGlobal(Context&, WASMOpKind, WASMExpressionType);
-    template <class Context> ContextMemoryAddress parseMemoryAddress(Context&, MemoryAccessOffsetMode);
-    template <class Context> ContextExpression parseLoad(Context&, WASMExpressionType, WASMMemoryType, MemoryAccessOffsetMode, MemoryAccessConversion = MemoryAccessConversion::NoConversion);
-    template <class Context> ContextExpression parseStore(Context&, WASMOpKind, WASMExpressionType, WASMMemoryType, MemoryAccessOffsetMode);
-    template <class Context> ContextExpressionList parseCallArguments(Context&, const Vector<WASMType>& arguments);
-    template <class Context> ContextExpression parseCallInternal(Context&, WASMOpKind, WASMExpressionType returnType);
-    template <class Context> ContextExpression parseCallIndirect(Context&, WASMOpKind, WASMExpressionType returnType);
-    template <class Context> ContextExpression parseCallImport(Context&, WASMOpKind, WASMExpressionType returnType);
-    template <class Context> ContextExpression parseConditional(Context&, WASMExpressionType);
-    template <class Context> ContextExpression parseComma(Context&, WASMExpressionType);
-    template <class Context> ContextExpression parseConvertType(Context&, WASMExpressionType fromType, WASMExpressionType toType, WASMTypeConversion);
-
-    JSWASMModule* m_module;
-    WASMReader m_reader;
-    size_t m_functionIndex;
-    String m_errorMessage;
-
-    WASMExpressionType m_returnType;
-    Vector<WASMType> m_localTypes;
-    uint32_t m_numberOfI32LocalVariables;
-    uint32_t m_numberOfF32LocalVariables;
-    uint32_t m_numberOfF64LocalVariables;
-
-    unsigned m_breakScopeDepth;
-    unsigned m_continueScopeDepth;
-    unsigned m_labelDepth;
+enum class BlockType {
+    If,
+    Block,
+    Loop
 };
 
-} // namespace JSC
+template<typename Context>
+class FunctionParser : public Parser {
+public:
+    typedef typename Context::ExpressionType ExpressionType;
+    typedef typename Context::ControlType ControlType;
+
+    FunctionParser(Context&, const Vector<uint8_t>& sourceBuffer, const FunctionInformation&);
+
+    bool WARN_UNUSED_RETURN parse();
+
+private:
+    static const bool verbose = false;
+
+    bool WARN_UNUSED_RETURN parseBlock();
+    bool WARN_UNUSED_RETURN parseExpression(OpType);
+    bool WARN_UNUSED_RETURN parseUnreachableExpression(OpType);
+    bool WARN_UNUSED_RETURN unifyControl(Vector<ExpressionType>&, unsigned level);
+
+    Context& m_context;
+    Vector<ExpressionType, 1> m_expressionStack;
+    Vector<ControlType> m_controlStack;
+    const Signature& m_signature;
+    unsigned m_unreachableBlocks { 0 };
+};
+
+template<typename Context>
+FunctionParser<Context>::FunctionParser(Context& context, const Vector<uint8_t>& sourceBuffer, const FunctionInformation& info)
+    : Parser(sourceBuffer, info.start, info.end)
+    , m_context(context)
+    , m_signature(*info.signature)
+{
+    if (verbose)
+        dataLogLn("Parsing function starting at: ", info.start, " ending at: ", info.end);
+    m_context.addArguments(m_signature.arguments);
+}
+
+template<typename Context>
+bool FunctionParser<Context>::parse()
+{
+    uint32_t localCount;
+    if (!parseVarUInt32(localCount))
+        return false;
+
+    for (uint32_t i = 0; i < localCount; ++i) {
+        uint32_t numberOfLocals;
+        if (!parseVarUInt32(numberOfLocals))
+            return false;
+
+        Type typeOfLocal;
+        if (!parseValueType(typeOfLocal))
+            return false;
+
+        m_context.addLocal(typeOfLocal, numberOfLocals);
+    }
+
+    return parseBlock();
+}
+
+template<typename Context>
+bool FunctionParser<Context>::parseBlock()
+{
+    while (true) {
+        uint8_t op;
+        if (!parseUInt7(op))
+            return false;
+
+        if (verbose) {
+            dataLogLn("processing op (", m_unreachableBlocks, "): ",  RawPointer(reinterpret_cast<void*>(op)), " at offset: ", RawPointer(reinterpret_cast<void*>(m_offset)));
+            m_context.dump(m_controlStack, m_expressionStack);
+        }
+
+        if (op == OpType::End && !m_controlStack.size())
+            break;
+
+        if (m_unreachableBlocks) {
+            if (!parseUnreachableExpression(static_cast<OpType>(op))) {
+                if (verbose)
+                    dataLogLn("failed to process unreachable op:", op);
+                return false;
+            }
+        } else if (!parseExpression(static_cast<OpType>(op))) {
+            if (verbose)
+                dataLogLn("failed to process op:", op);
+            return false;
+        }
+
+    }
+
+    // I'm not sure if we should check the expression stack here...
+    return true;
+}
+#define CREATE_CASE(name, id, b3op) case name:
+
+template<typename Context>
+bool FunctionParser<Context>::parseExpression(OpType op)
+{
+    switch (op) {
+    FOR_EACH_WASM_BINARY_OP(CREATE_CASE) {
+        ExpressionType right = m_expressionStack.takeLast();
+        ExpressionType left = m_expressionStack.takeLast();
+        ExpressionType result;
+        if (!m_context.binaryOp(static_cast<BinaryOpType>(op), left, right, result))
+            return false;
+        m_expressionStack.append(result);
+        return true;
+    }
+
+    FOR_EACH_WASM_UNARY_OP(CREATE_CASE) {
+        ExpressionType arg = m_expressionStack.takeLast();
+        ExpressionType result;
+        if (!m_context.unaryOp(static_cast<UnaryOpType>(op), arg, result))
+            return false;
+        m_expressionStack.append(result);
+        return true;
+    }
+
+    case OpType::I32Const: {
+        uint32_t constant;
+        if (!parseVarUInt32(constant))
+            return false;
+        m_expressionStack.append(m_context.addConstant(I32, constant));
+        return true;
+    }
+
+    case OpType::GetLocal: {
+        uint32_t index;
+        if (!parseVarUInt32(index))
+            return false;
+        ExpressionType result;
+        if (!m_context.getLocal(index, result))
+            return false;
+
+        m_expressionStack.append(result);
+        return true;
+    }
+
+    case OpType::SetLocal: {
+        uint32_t index;
+        if (!parseVarUInt32(index))
+            return false;
+        ExpressionType value = m_expressionStack.takeLast();
+        return m_context.setLocal(index, value);
+    }
+
+    case OpType::Block: {
+        Type inlineSignature;
+        if (!parseValueType(inlineSignature))
+            return false;
+
+        m_controlStack.append(m_context.addBlock(inlineSignature));
+        return true;
+    }
+
+    case OpType::Loop: {
+        Type inlineSignature;
+        if (!parseValueType(inlineSignature))
+            return false;
+
+        m_controlStack.append(m_context.addLoop(inlineSignature));
+        return true;
+    }
+
+    case OpType::If: {
+        Type inlineSignature;
+        if (!parseValueType(inlineSignature))
+            return false;
+
+        ExpressionType condition = m_expressionStack.takeLast();
+        m_controlStack.append(m_context.addIf(condition, inlineSignature));
+        return true;
+    }
+
+    case OpType::Else: {
+        return m_context.addElse(m_controlStack.last());
+    }
+
+    case OpType::Branch:
+    case OpType::BranchIf: {
+        uint32_t target;
+        if (!parseVarUInt32(target) || target >= m_controlStack.size())
+            return false;
+
+        ExpressionType condition = Context::emptyExpression;
+        if (op == OpType::BranchIf)
+            condition = m_expressionStack.takeLast();
+        else
+            m_unreachableBlocks = 1;
+
+        ControlType& data = m_controlStack[m_controlStack.size() - 1 - target];
+
+        return m_context.addBranch(data, condition, m_expressionStack);
+    }
+
+    case OpType::Return: {
+        Vector<ExpressionType, 1> returnValues;
+        if (m_signature.returnType != Void)
+            returnValues.append(m_expressionStack.takeLast());
+
+        m_unreachableBlocks = 1;
+        return m_context.addReturn(returnValues);
+    }
+
+    case OpType::End: {
+        ControlType data = m_controlStack.takeLast();
+        return m_context.endBlock(data, m_expressionStack);
+    }
+
+    }
+
+    // Unknown opcode.
+    return false;
+}
+
+template<typename Context>
+bool FunctionParser<Context>::parseUnreachableExpression(OpType op)
+{
+    ASSERT(m_unreachableBlocks);
+    switch (op) {
+    case OpType::Else: {
+        if (m_unreachableBlocks > 1)
+            return true;
+
+        ControlType& data = m_controlStack.last();
+        ASSERT(data.type() == BlockType::If);
+        m_unreachableBlocks = 0;
+        return m_context.addElse(data);
+    }
+
+    case OpType::End: {
+        if (m_unreachableBlocks == 1) {
+            ControlType data = m_controlStack.takeLast();
+            if (!m_context.isContinuationReachable(data))
+                return true;
+        }
+        m_unreachableBlocks--;
+        return true;
+    }
+
+    case OpType::Loop:
+    case OpType::If:
+    case OpType::Block: {
+        m_unreachableBlocks++;
+        return true;
+    }
+
+    // two immediate cases
+    case OpType::Branch:
+    case OpType::BranchIf: {
+        uint32_t unused;
+        if (!parseVarUInt32(unused))
+            return false;
+        return parseVarUInt32(unused);
+    }
+
+    // one immediate cases
+    case OpType::Return:
+    case OpType::I32Const:
+    case OpType::SetLocal:
+    case OpType::GetLocal: {
+        uint32_t unused;
+        return parseVarUInt32(unused);
+    }
+
+    default:
+        break;
+    }
+    return true;
+}
+
+#undef CREATE_CASE
+
+} } // namespace JSC::WASM
 
 #endif // ENABLE(WEBASSEMBLY)
-
-#endif // WASMFunctionParser_h

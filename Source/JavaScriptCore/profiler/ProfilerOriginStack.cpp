@@ -100,7 +100,11 @@ void OriginStack::dump(PrintStream& out) const
 
 JSValue OriginStack::toJS(ExecState* exec) const
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
     JSArray* result = constructEmptyArray(exec, 0);
+    if (UNLIKELY(scope.exception()))
+        return jsUndefined();
     
     for (unsigned i = 0; i < m_stack.size(); ++i)
         result->putDirectIndex(exec, i, m_stack[i].toJS(exec));

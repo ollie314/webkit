@@ -27,17 +27,21 @@ function array_set_default(&$array, $key, $default) {
 
 $_config = NULL;
 
-define('CONFIG_DIR', dirname(__FILE__) . '/../../');
+define('CONFIG_DIR', realpath(dirname(__FILE__) . '/../../'));
 
 function config($key, $default = NULL) {
     global $_config;
-    if (!$_config)
-        $_config = json_decode(file_get_contents(CONFIG_DIR . 'config.json'), true);
+    if (!$_config) {
+        $file_path = getenv('ORG_WEBKIT_PERF_CONFIG_PATH');
+        if (!$file_path)
+            $file_path = CONFIG_DIR . '/config.json';
+        $_config = json_decode(file_get_contents($file_path), true);
+    }
     return array_get($_config, $key, $default);
 }
 
 function config_path($key, $path) {
-    return CONFIG_DIR . config($key) . '/' . $path;
+    return CONFIG_DIR . '/' . config($key) . '/' . $path;
 }
 
 function generate_data_file($filename, $content) {
@@ -78,6 +82,10 @@ class Database
         if ($dot_index !== FALSE)
             $timestamp_in_s += floatval(substr($time_str, $dot_index));
         return intval($timestamp_in_s * 1000);
+    }
+
+    static function escape_for_like($string) {
+        return str_replace(array('\\', '_', '%'), array('\\\\', '\\_', '\\%'), $string);
     }
 
     function connect() {

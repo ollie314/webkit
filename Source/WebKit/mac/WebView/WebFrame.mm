@@ -61,7 +61,6 @@
 #import <WebCore/CachedResourceLoader.h>
 #import <WebCore/Chrome.h>
 #import <WebCore/ColorMac.h>
-#import <WebCore/DOMImplementation.h>
 #import <WebCore/DatabaseManager.h>
 #import <WebCore/DocumentFragment.h>
 #import <WebCore/DocumentLoader.h>
@@ -80,6 +79,7 @@
 #import <WebCore/HitTestResult.h>
 #import <WebCore/JSNode.h>
 #import <WebCore/LegacyWebArchive.h>
+#import <WebCore/MIMETypeRegistry.h>
 #import <WebCore/MainFrame.h>
 #import <WebCore/Page.h>
 #import <WebCore/PlatformEventFactoryMac.h>
@@ -101,9 +101,9 @@
 #import <WebCore/markup.h>
 #import <WebKitSystemInterface.h>
 #import <bindings/ScriptValue.h>
+#import <runtime/JSCJSValue.h>
 #import <runtime/JSLock.h>
 #import <runtime/JSObject.h>
-#import <runtime/JSCJSValue.h>
 #import <wtf/CurrentTime.h>
 
 #if PLATFORM(IOS)
@@ -111,7 +111,6 @@
 #import "WebResource.h"
 #import "WebUIKitDelegate.h"
 #import <WebCore/Document.h>
-#import <WebCore/Editor.h>
 #import <WebCore/EditorClient.h>
 #import <WebCore/FocusController.h>
 #import <WebCore/Font.h>
@@ -681,7 +680,7 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
     JSC::JSLockHolder jscLock(exec);
 #endif
 
-    JSC::JSValue result = _private->coreFrame->script().executeScript(string, forceUserGesture).jsValue();
+    JSC::JSValue result = _private->coreFrame->script().executeScript(string, forceUserGesture);
 
     if (!_private->coreFrame) // In case the script removed our frame from the page.
         return @"";
@@ -717,12 +716,12 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
         
     if (startNode && startNode->renderer()) {
 #if !PLATFORM(IOS)
-        startNode->renderer()->scrollRectToVisible(enclosingIntRect(rangeRect), ScrollAlignment::alignToEdgeIfNeeded, ScrollAlignment::alignToEdgeIfNeeded);
+        startNode->renderer()->scrollRectToVisible(SelectionRevealMode::Reveal, enclosingIntRect(rangeRect), ScrollAlignment::alignToEdgeIfNeeded, ScrollAlignment::alignToEdgeIfNeeded);
 #else
         RenderLayer* layer = startNode->renderer()->enclosingLayer();
         if (layer) {
             layer->setAdjustForIOSCaretWhenScrolling(true);
-            startNode->renderer()->scrollRectToVisible(enclosingIntRect(rangeRect), ScrollAlignment::alignToEdgeIfNeeded, ScrollAlignment::alignToEdgeIfNeeded);
+            startNode->renderer()->scrollRectToVisible(SelectionRevealMode::Reveal, enclosingIntRect(rangeRect), ScrollAlignment::alignToEdgeIfNeeded, ScrollAlignment::alignToEdgeIfNeeded);
             layer->setAdjustForIOSCaretWhenScrolling(false);
             _private->coreFrame->selection().setCaretRectNeedsUpdate();
             _private->coreFrame->selection().updateAppearance();
@@ -741,7 +740,7 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
         RenderLayer* layer = startNode->renderer()->enclosingLayer();
         if (layer) {
             layer->setAdjustForIOSCaretWhenScrolling(true);
-            startNode->renderer()->scrollRectToVisible(enclosingIntRect(rangeRect), ScrollAlignment::alignToEdgeIfNeeded, ScrollAlignment::alignToEdgeIfNeeded);
+            startNode->renderer()->scrollRectToVisible(SelectionRevealMode::Reveal, enclosingIntRect(rangeRect), ScrollAlignment::alignToEdgeIfNeeded, ScrollAlignment::alignToEdgeIfNeeded);
             layer->setAdjustForIOSCaretWhenScrolling(false);
 
             Frame *coreFrame = core(self);
@@ -873,11 +872,13 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
     newStart = newStart.parentAnchoredEquivalent();
     newEnd = newEnd.parentAnchoredEquivalent();
 
-    RefPtr<Range> range = _private->coreFrame->document()->createRange();
-    int exception = 0;
-    range->setStart(newStart.containerNode(), newStart.offsetInContainerNode(), exception);
-    range->setEnd(newStart.containerNode(), newStart.offsetInContainerNode(), exception);
-    return kit(range.get());
+    Ref<Range> range = _private->coreFrame->document()->createRange();
+    if (newStart.containerNode()) {
+        int exception = 0;
+        range->setStart(*newStart.containerNode(), newStart.offsetInContainerNode(), exception);
+        range->setEnd(*newStart.containerNode(), newStart.offsetInContainerNode(), exception);
+    }
+    return kit(range.ptr());
 }
 
 - (DOMDocumentFragment *)_documentFragmentWithMarkupString:(NSString *)markupString baseURLString:(NSString *)baseURLString 
@@ -909,15 +910,15 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
     while ((node = [nodeEnum nextObject]))
         nodesVector.append(core(node));
 
-    RefPtr<DocumentFragment> fragment = document->createDocumentFragment();
+    auto fragment = document->createDocumentFragment();
 
     for (auto* node : nodesVector) {
-        Ref<Element> element = createDefaultParagraphElement(*document);
+        auto element = createDefaultParagraphElement(*document);
         element->appendChild(*node);
-        fragment->appendChild(WTFMove(element));
+        fragment->appendChild(element);
     }
 
-    return kit(fragment.release().get());
+    return kit(fragment.ptr());
 }
 
 - (void)_replaceSelectionWithNode:(DOMNode *)node selectReplacement:(BOOL)selectReplacement smartReplace:(BOOL)smartReplace matchStyle:(BOOL)matchStyle
@@ -974,8 +975,8 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
     if (!view)
         return;
     // FIXME: These are fake modifier keys here, but they should be real ones instead.
-    PlatformMouseEvent event(IntPoint(windowLoc), globalPoint(windowLoc, [view->platformWidget() window]),
-        LeftButton, PlatformEvent::MouseMoved, 0, false, false, false, false, currentTime(), WebCore::ForceAtClick);
+    PlatformMouseEvent event(IntPoint(windowLoc), IntPoint(globalPoint(windowLoc, [view->platformWidget() window])),
+                             LeftButton, PlatformEvent::MouseMoved, 0, false, false, false, false, currentTime(), WebCore::ForceAtClick, WebCore::NoTap);
     _private->coreFrame->eventHandler().dragSourceEndedAt(event, (DragOperation)operation);
 }
 #endif
@@ -986,7 +987,7 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
     String mimeType = frame->document()->loader()->writer().mimeType();
     PluginData* pluginData = frame->page() ? &frame->page()->pluginData() : 0;
 
-    if (WebCore::DOMImplementation::isTextMIMEType(mimeType)
+    if (WebCore::MIMETypeRegistry::isTextMIMEType(mimeType)
         || Image::supportsType(mimeType)
         || (pluginData && pluginData->supportsWebVisibleMimeType(mimeType, PluginData::AllPlugins) && frame->loader().subframeLoader().allowPlugins())
         || (pluginData && pluginData->supportsWebVisibleMimeType(mimeType, PluginData::OnlyApplicationPlugins)))
@@ -1200,10 +1201,10 @@ static WebFrameLoadType toWebFrameLoadType(FrameLoadType frameLoadType)
 #endif
 
 #if PLATFORM(IOS)
+
 - (unsigned)formElementsCharacterCount
 {
-    WebCore::Frame *frame = core(self);
-    return frame->formElementsCharacterCount();
+    return core(self)->formElementsCharacterCount();
 }
 
 - (void)setTimeoutsPaused:(BOOL)flag
@@ -1298,7 +1299,9 @@ static WebFrameLoadType toWebFrameLoadType(FrameLoadType frameLoadType)
 {
     ASSERT(!WebThreadIsEnabled() || WebThreadIsLocked());
     FrameLoader& frameLoader = _private->coreFrame->loader();
-    frameLoader.client().saveViewStateToItem(frameLoader.history().currentItem());
+    auto* item = frameLoader.history().currentItem();
+    if (item)
+        frameLoader.client().saveViewStateToItem(*item);
 }
 
 - (void)deviceOrientationChanged
@@ -1371,7 +1374,7 @@ static WebFrameLoadType toWebFrameLoadType(FrameLoadType frameLoadType)
 {
     WebCore::Frame *frame = core(self);
     RevealExtentOption revealExtentOption = revealExtent ? RevealExtent : DoNotRevealExtent;
-    frame->selection().revealSelection(ScrollAlignment::alignToEdgeIfNeeded, revealExtentOption);
+    frame->selection().revealSelection(SelectionRevealMode::Reveal, ScrollAlignment::alignToEdgeIfNeeded, revealExtentOption);
 }
 
 - (void)resetSelection
@@ -1382,20 +1385,28 @@ static WebFrameLoadType toWebFrameLoadType(FrameLoadType frameLoadType)
 
 - (BOOL)hasEditableSelection
 {
-    WebCore::Frame *frame = core(self);
-    return frame->selection().selection().isContentEditable();
+    return core(self)->selection().selection().isContentEditable();
 }
 
 - (int)preferredHeight
 {
-    WebCore::Frame *frame = core(self);
-    return frame->preferredHeight();
+    return core(self)->preferredHeight();
 }
 
 - (int)innerLineHeight:(DOMNode *)node
 {
-    WebCore::Frame *frame = core(self);
-    return frame->innerLineHeight(node);
+    if (!node)
+        return 0;
+
+    auto& coreNode = *core(node);
+
+    coreNode.document().updateLayout();
+
+    auto* renderer = coreNode.renderer();
+    if (!renderer)
+        return 0;
+
+    return renderer->innerLineHeight();
 }
 
 - (void)updateLayout
@@ -1418,14 +1429,12 @@ static WebFrameLoadType toWebFrameLoadType(FrameLoadType frameLoadType)
 
 - (NSRect)caretRect
 {
-    WebCore::Frame *frame = core(self);
-    return frame->caretRect();
+    return core(self)->caretRect();
 }
 
 - (NSRect)rectForScrollToVisible
 {
-    WebCore::Frame *frame = core(self);
-    return frame->rectForScrollToVisible();
+    return core(self)->rectForScrollToVisible();
 }
 
 - (void)setCaretColor:(CGColorRef)color
@@ -1522,20 +1531,17 @@ static WebFrameLoadType toWebFrameLoadType(FrameLoadType frameLoadType)
 
 - (unichar)characterInRelationToCaretSelection:(int)amount
 {
-    WebCore::Frame *frame = core(self);
-    return frame->selection().characterInRelationToCaretSelection(amount);
+    return core(self)->selection().characterInRelationToCaretSelection(amount);
 }
 
 - (unichar)characterBeforeCaretSelection
 {
-    WebCore::Frame *frame = core(self);
-    return frame->selection().characterBeforeCaretSelection();
+    return core(self)->selection().characterBeforeCaretSelection();
 }
 
 - (unichar)characterAfterCaretSelection
 {
-    WebCore::Frame *frame = core(self);
-    return frame->selection().characterAfterCaretSelection();
+    return core(self)->selection().characterAfterCaretSelection();
 }
 
 - (DOMRange *)wordRangeContainingCaretSelection
@@ -1554,20 +1560,17 @@ static WebFrameLoadType toWebFrameLoadType(FrameLoadType frameLoadType)
 
 - (int)wordOffsetInRange:(DOMRange *)range
 {
-    WebCore::Frame *frame = core(self);
-    return frame->selection().wordOffsetInRange(core(range));
+    return core(self)->selection().wordOffsetInRange(core(range));
 }
 
 - (BOOL)spaceFollowsWordInRange:(DOMRange *)range
 {
-    WebCore::Frame *frame = core(self);
-    return frame->selection().spaceFollowsWordInRange(core(range));
+    return core(self)->selection().spaceFollowsWordInRange(core(range));
 }
 
 - (NSArray *)wordsInCurrentParagraph
 {
-    WebCore::Frame *frame = core(self);
-    return frame->wordsInCurrentParagraph();
+    return core(self)->wordsInCurrentParagraph();
 }
 
 - (BOOL)selectionAtDocumentStart
@@ -1628,11 +1631,11 @@ static WebFrameLoadType toWebFrameLoadType(FrameLoadType frameLoadType)
     if (!doc)
         return;
 
-    Node *node = core(element);
+    Node* node = core(element);
     if (!node->inDocument())
         return;
         
-    frame->selection().selectRangeOnElement(range.location, range.length, node);
+    frame->selection().selectRangeOnElement(range.location, range.length, *node);
 }
 
 - (DOMRange *)markedTextDOMRange
@@ -1689,7 +1692,7 @@ static WebFrameLoadType toWebFrameLoadType(FrameLoadType frameLoadType)
     if (!frame || !frame->document())
         return;
         
-    frame->editor().setTextAsChildOfElement(text, core(element));
+    frame->editor().setTextAsChildOfElement(text, *core(element));
 }
 
 - (void)setDictationPhrases:(NSArray *)dictationPhrases metadata:(id)metadata asChildOfElement:(DOMElement *)element
@@ -2107,7 +2110,7 @@ static WebFrameLoadType toWebFrameLoadType(FrameLoadType frameLoadType)
     ASSERT(frame->document());
     RetainPtr<WebFrame> webFrame(kit(frame)); // Running arbitrary JavaScript can destroy the frame.
 
-    JSC::JSValue result = frame->script().executeScriptInWorld(*core(world), string, true).jsValue();
+    JSC::JSValue result = frame->script().executeScriptInWorld(*core(world), string, true);
 
     if (!webFrame->_private->coreFrame) // In case the script removed our frame from the page.
         return @"";
@@ -2358,7 +2361,7 @@ static WebFrameLoadType toWebFrameLoadType(FrameLoadType frameLoadType)
     Frame* coreFrame = _private->coreFrame;
     if (!coreFrame)
         return nil;
-    return [[[WebElementDictionary alloc] initWithHitTestResult:coreFrame->eventHandler().hitTestResultAtPoint(IntPoint(point), HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping | HitTestRequest::DisallowShadowContent)] autorelease];
+    return [[[WebElementDictionary alloc] initWithHitTestResult:coreFrame->eventHandler().hitTestResultAtPoint(IntPoint(point), HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping | HitTestRequest::DisallowUserAgentShadowContent)] autorelease];
 }
 
 - (NSURL *)_unreachableURL
@@ -2411,8 +2414,12 @@ static WebFrameLoadType toWebFrameLoadType(FrameLoadType frameLoadType)
 
 static bool needsMicrosoftMessengerDOMDocumentWorkaround()
 {
-    static bool needsWorkaround = applicationIsMicrosoftMessenger() && [[[NSBundle mainBundle] objectForInfoDictionaryKey:(NSString *)kCFBundleVersionKey] compare:@"7.1" options:NSNumericSearch] == NSOrderedAscending;
+#if PLATFORM(IOS)
+    return false;
+#else
+    static bool needsWorkaround = MacApplication::isMicrosoftMessenger() && [[[NSBundle mainBundle] objectForInfoDictionaryKey:(NSString *)kCFBundleVersionKey] compare:@"7.1" options:NSNumericSearch] == NSOrderedAscending;
     return needsWorkaround;
+#endif
 }
 
 - (DOMDocument *)DOMDocument
@@ -2516,11 +2523,6 @@ static NSURL *createUniqueWebDataURL()
 #endif
 
     ResourceRequest request(baseURL);
-
-#if PLATFORM(MAC)
-    // hack because Mail checks for this property to detect data / archive loads
-    [NSURLProtocol setProperty:@"" forKey:@"WebDataRequest" inRequest:(NSMutableURLRequest *)request.nsURLRequest(UpdateHTTPBody)];
-#endif
 
     ResourceResponse response(responseURL, MIMEType, [data length], encodingName);
     SubstituteData substituteData(WebCore::SharedBuffer::wrapNSData(data), [unreachableURL absoluteURL], response, SubstituteData::SessionHistoryVisibility::Hidden);

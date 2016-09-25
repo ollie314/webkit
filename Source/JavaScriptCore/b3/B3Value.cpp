@@ -29,8 +29,10 @@
 #if ENABLE(B3_JIT)
 
 #include "B3ArgumentRegValue.h"
+#include "B3BasicBlockInlines.h"
+#include "B3BottomProvider.h"
 #include "B3CCallValue.h"
-#include "B3ControlValue.h"
+#include "B3FenceValue.h"
 #include "B3MemoryValue.h"
 #include "B3OriginDump.h"
 #include "B3ProcedureInlines.h"
@@ -41,6 +43,7 @@
 #include "B3ValueKeyInlines.h"
 #include "B3VariableValue.h"
 #include <wtf/CommaPrinter.h>
+#include <wtf/ListDump.h>
 #include <wtf/StringPrintStream.h>
 
 namespace JSC { namespace B3 {
@@ -60,7 +63,7 @@ void Value::replaceWithIdentity(Value* value)
     ASSERT(m_type == value->m_type);
 
     if (m_type == Void) {
-        replaceWithNop();
+        replaceWithNopIgnoringType();
         return;
     }
 
@@ -71,7 +74,7 @@ void Value::replaceWithIdentity(Value* value)
 
     RELEASE_ASSERT(type == value->type());
 
-    this->Value::~Value();
+    this->~Value();
 
     new (this) Value(Identity, type, origin, value);
 
@@ -79,13 +82,24 @@ void Value::replaceWithIdentity(Value* value)
     this->m_index = index;
 }
 
+void Value::replaceWithBottom(InsertionSet& insertionSet, size_t index)
+{
+    replaceWithBottom(BottomProvider(insertionSet, index));
+}
+
 void Value::replaceWithNop()
+{
+    RELEASE_ASSERT(m_type == Void);
+    replaceWithNopIgnoringType();
+}
+
+void Value::replaceWithNopIgnoringType()
 {
     unsigned index = m_index;
     Origin origin = m_origin;
     BasicBlock* owner = this->owner;
 
-    this->Value::~Value();
+    this->~Value();
 
     new (this) Value(Nop, Void, origin);
 
@@ -105,12 +119,56 @@ void Value::replaceWithPhi()
     BasicBlock* owner = this->owner;
     Type type = m_type;
 
-    this->Value::~Value();
+    this->~Value();
 
     new (this) Value(Phi, type, origin);
 
     this->owner = owner;
     this->m_index = index;
+}
+
+void Value::replaceWithJump(BasicBlock* owner, FrequentedBlock target)
+{
+    RELEASE_ASSERT(owner->last() == this);
+    
+    unsigned index = m_index;
+    Origin origin = m_origin;
+    
+    this->~Value();
+    
+    new (this) Value(Jump, Void, origin);
+    
+    this->owner = owner;
+    this->m_index = index;
+    
+    owner->setSuccessors(target);
+}
+
+void Value::replaceWithOops(BasicBlock* owner)
+{
+    RELEASE_ASSERT(owner->last() == this);
+    
+    unsigned index = m_index;
+    Origin origin = m_origin;
+    
+    this->~Value();
+    
+    new (this) Value(Oops, Void, origin);
+    
+    this->owner = owner;
+    this->m_index = index;
+    
+    owner->clearSuccessors();
+}
+
+void Value::replaceWithJump(FrequentedBlock target)
+{
+    replaceWithJump(owner, target);
+}
+
+void Value::replaceWithOops()
+{
+    replaceWithOops(owner);
 }
 
 void Value::dump(PrintStream& out) const
@@ -175,6 +233,19 @@ void Value::deepDump(const Procedure* proc, PrintStream& out) const
     }
 
     out.print(")");
+}
+
+void Value::dumpSuccessors(const BasicBlock* block, PrintStream& out) const
+{
+    // Note that this must not crash if we have the wrong number of successors, since someone
+    // debugging a number-of-successors bug will probably want to dump IR!
+    
+    if (opcode() == Branch && block->numSuccessors() == 2) {
+        out.print("Then:", block->taken(), ", Else:", block->notTaken());
+        return;
+    }
+    
+    out.print(listDump(block->successors()));
 }
 
 Value* Value::negConstant(Procedure&) const
@@ -267,6 +338,16 @@ Value* Value::bitwiseCastConstant(Procedure&) const
     return nullptr;
 }
 
+Value* Value::iToDConstant(Procedure&) const
+{
+    return nullptr;
+}
+
+Value* Value::iToFConstant(Procedure&) const
+{
+    return nullptr;
+}
+
 Value* Value::doubleToFloatConstant(Procedure&) const
 {
     return nullptr;
@@ -283,6 +364,11 @@ Value* Value::absConstant(Procedure&) const
 }
 
 Value* Value::ceilConstant(Procedure&) const
+{
+    return nullptr;
+}
+
+Value* Value::floorConstant(Procedure&) const
 {
     return nullptr;
 }
@@ -354,6 +440,31 @@ Value* Value::invertedCompare(Procedure& proc) const
     if (Optional<Opcode> invertedOpcode = B3::invertedCompare(opcode(), child(0)->type()))
         return proc.add<Value>(*invertedOpcode, type(), origin(), children());
     return nullptr;
+}
+
+bool Value::isRounded() const
+{
+    ASSERT(isFloat(type()));
+    switch (opcode()) {
+    case Floor:
+    case Ceil:
+    case IToD:
+    case IToF:
+        return true;
+
+    case ConstDouble: {
+        double value = asDouble();
+        return std::isfinite(value) && value == ceil(value);
+    }
+
+    case ConstFloat: {
+        float value = asFloat();
+        return std::isfinite(value) && value == ceilf(value);
+    }
+
+    default:
+        return false;
+    }
 }
 
 bool Value::returnsBool() const
@@ -432,6 +543,7 @@ Effects Value::effects() const
     case Clz:
     case Abs:
     case Ceil:
+    case Floor:
     case Sqrt:
     case BitwiseCast:
     case SExt8:
@@ -440,6 +552,7 @@ Effects Value::effects() const
     case ZExt32:
     case Trunc:
     case IToD:
+    case IToF:
     case FloatToDouble:
     case DoubleToFloat:
     case Equal:
@@ -473,6 +586,24 @@ Effects Value::effects() const
         result.writes = as<MemoryValue>()->range();
         result.controlDependent = true;
         break;
+    case Fence: {
+        const FenceValue* fence = as<FenceValue>();
+        result.reads = fence->read;
+        result.writes = fence->write;
+        
+        // Prevent killing of fences that claim not to write anything. It's a bit weird that we use
+        // local state as the way to do this, but it happens to work: we must assume that we cannot
+        // kill writesLocalState unless we understands exactly what the instruction is doing (like
+        // the way that fixSSA understands Set/Get and the way that reduceStrength and others
+        // understand Upsilon). This would only become a problem if we had some analysis that was
+        // looking to use the writesLocalState bit to invalidate a CSE over local state operations.
+        // Then a Fence would look block, say, the elimination of a redundant Get. But it like
+        // that's not at all how our optimizations for Set/Get/Upsilon/Phi work - they grok their
+        // operations deeply enough that they have no need to check this bit - so this cheat is
+        // fine.
+        result.writesLocalState = true;
+        break;
+    }
     case CCall:
         result = as<CCallValue>()->effects;
         break;
@@ -500,6 +631,7 @@ Effects Value::effects() const
     case Switch:
     case Return:
     case Oops:
+    case EntrySwitch:
         result.terminal = true;
         break;
     }
@@ -514,6 +646,7 @@ ValueKey Value::key() const
     case Identity:
     case Abs:
     case Ceil:
+    case Floor:
     case Sqrt:
     case SExt8:
     case SExt16:
@@ -522,6 +655,7 @@ ValueKey Value::key() const
     case Clz:
     case Trunc:
     case IToD:
+    case IToF:
     case FloatToDouble:
     case DoubleToFloat:
     case Check:
@@ -585,28 +719,24 @@ void Value::performSubstitution()
     }
 }
 
+bool Value::isFree() const
+{
+    switch (opcode()) {
+    case Const32:
+    case Const64:
+    case ConstDouble:
+    case ConstFloat:
+    case Identity:
+    case Nop:
+        return true;
+    default:
+        return false;
+    }
+}
+
 void Value::dumpMeta(CommaPrinter&, PrintStream&) const
 {
 }
-
-#if !ASSERT_DISABLED
-void Value::checkOpcode(Opcode opcode)
-{
-    ASSERT(!ArgumentRegValue::accepts(opcode));
-    ASSERT(!CCallValue::accepts(opcode));
-    ASSERT(!CheckValue::accepts(opcode));
-    ASSERT(!Const32Value::accepts(opcode));
-    ASSERT(!Const64Value::accepts(opcode));
-    ASSERT(!ConstDoubleValue::accepts(opcode));
-    ASSERT(!ConstFloatValue::accepts(opcode));
-    ASSERT(!ControlValue::accepts(opcode));
-    ASSERT(!MemoryValue::accepts(opcode));
-    ASSERT(!PatchpointValue::accepts(opcode));
-    ASSERT(!SlotBaseValue::accepts(opcode));
-    ASSERT(!UpsilonValue::accepts(opcode));
-    ASSERT(!VariableValue::accepts(opcode));
-}
-#endif // !ASSERT_DISABLED
 
 Type Value::typeFor(Opcode opcode, Value* firstChild, Value* secondChild)
 {
@@ -629,6 +759,7 @@ Type Value::typeFor(Opcode opcode, Value* firstChild, Value* secondChild)
     case Clz:
     case Abs:
     case Ceil:
+    case Floor:
     case Sqrt:
     case CheckAdd:
     case CheckSub:
@@ -658,6 +789,7 @@ Type Value::typeFor(Opcode opcode, Value* firstChild, Value* secondChild)
     case IToD:
         return Double;
     case DoubleToFloat:
+    case IToF:
         return Float;
     case BitwiseCast:
         switch (firstChild->type()) {
@@ -674,6 +806,11 @@ Type Value::typeFor(Opcode opcode, Value* firstChild, Value* secondChild)
         }
         return Void;
     case Nop:
+    case Jump:
+    case Branch:
+    case Return:
+    case Oops:
+    case EntrySwitch:
         return Void;
     case Select:
         ASSERT(secondChild);
@@ -681,6 +818,12 @@ Type Value::typeFor(Opcode opcode, Value* firstChild, Value* secondChild)
     default:
         RELEASE_ASSERT_NOT_REACHED();
     }
+}
+
+void Value::badOpcode(Opcode opcode, unsigned numArgs)
+{
+    dataLog("Bad opcode ", opcode, " with ", numArgs, " args.\n");
+    RELEASE_ASSERT_NOT_REACHED();
 }
 
 } } // namespace JSC::B3

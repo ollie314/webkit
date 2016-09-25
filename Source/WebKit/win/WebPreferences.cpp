@@ -291,6 +291,12 @@ void WebPreferences::initializeDefaultSettings()
 
     CFDictionaryAddValue(defaults, CFSTR(WebKitAllowDisplayAndRunningOfInsecureContentPreferenceKey), kCFBooleanTrue);
 
+    CFDictionaryAddValue(defaults, CFSTR(WebKitFetchAPIEnabledPreferenceKey), kCFBooleanFalse);
+
+    CFDictionaryAddValue(defaults, CFSTR(WebKitShadowDOMEnabledPreferenceKey), kCFBooleanFalse);
+
+    CFDictionaryAddValue(defaults, CFSTR(WebKitCustomElementsEnabledPreferenceKey), kCFBooleanFalse);
+
     defaultSettings = defaults;
 }
 
@@ -1915,5 +1921,75 @@ HRESULT WebPreferences::showTiledScrollingIndicator(_Out_ BOOL* enabled)
 HRESULT WebPreferences::setShowTiledScrollingIndicator(BOOL enabled)
 {
     setBoolValue(WebKitShowTiledScrollingIndicatorPreferenceKey, enabled);
+    return S_OK;
+}
+
+HRESULT WebPreferences::fetchAPIEnabled(_Out_ BOOL* enabled)
+{
+    if (!enabled)
+        return E_POINTER;
+    *enabled = boolValueForKey(WebKitFetchAPIEnabledPreferenceKey);
+    return S_OK;
+}
+
+HRESULT WebPreferences::setFetchAPIEnabled(BOOL enabled)
+{
+    setBoolValue(WebKitFetchAPIEnabledPreferenceKey, enabled);
+    return S_OK;
+}
+
+HRESULT WebPreferences::setDOMIteratorEnabled(BOOL enabled)
+{
+    setBoolValue(WebKitDOMIteratorEnabledPreferenceKey, enabled);
+    return S_OK;
+}
+
+HRESULT WebPreferences::domIteratorEnabled(_Out_ BOOL* enabled)
+{
+    if (!enabled)
+        return E_POINTER;
+    *enabled = boolValueForKey(WebKitDOMIteratorEnabledPreferenceKey);
+    return S_OK;
+}
+
+HRESULT WebPreferences::shadowDOMEnabled(_Out_ BOOL* enabled)
+{
+    if (!enabled)
+        return E_POINTER;
+    *enabled = boolValueForKey(WebKitShadowDOMEnabledPreferenceKey);
+    return S_OK;
+}
+
+HRESULT WebPreferences::setShadowDOMEnabled(BOOL enabled)
+{
+    setBoolValue(WebKitShadowDOMEnabledPreferenceKey, enabled);
+    return S_OK;
+}
+
+HRESULT WebPreferences::customElementsEnabled(_Out_ BOOL* enabled)
+{
+    if (!enabled)
+        return E_POINTER;
+    *enabled = boolValueForKey(WebKitCustomElementsEnabledPreferenceKey);
+    return S_OK;
+}
+
+HRESULT WebPreferences::setCustomElementsEnabled(BOOL enabled)
+{
+    setBoolValue(WebKitCustomElementsEnabledPreferenceKey, enabled);
+    return S_OK;
+}
+
+HRESULT WebPreferences::setModernMediaControlsEnabled(BOOL enabled)
+{
+    setBoolValue(WebKitModernMediaControlsEnabledPreferenceKey, enabled);
+    return S_OK;
+}
+
+HRESULT WebPreferences::modernMediaControlsEnabled(_Out_ BOOL* enabled)
+{
+    if (!enabled)
+        return E_POINTER;
+    *enabled = boolValueForKey(WebKitModernMediaControlsEnabledPreferenceKey);
     return S_OK;
 }

@@ -33,7 +33,6 @@
 namespace JSC {
 
 class CallLinkInfo;
-class CCallHelpers;
 
 MacroAssemblerCodeRef throwExceptionFromCallSlowPathGenerator(VM*);
 
@@ -46,6 +45,7 @@ MacroAssemblerCodeRef virtualThunkFor(VM*, CallLinkInfo&);
 MacroAssemblerCodeRef nativeCallGenerator(VM*);
 MacroAssemblerCodeRef nativeConstructGenerator(VM*);
 MacroAssemblerCodeRef nativeTailCallGenerator(VM*);
+MacroAssemblerCodeRef nativeTailCallWithoutSavedTagsGenerator(VM*);
 MacroAssemblerCodeRef arityFixupGenerator(VM*);
 MacroAssemblerCodeRef unreachableGenerator(VM*);
 
@@ -60,9 +60,11 @@ MacroAssemblerCodeRef floorThunkGenerator(VM*);
 MacroAssemblerCodeRef logThunkGenerator(VM*);
 MacroAssemblerCodeRef roundThunkGenerator(VM*);
 MacroAssemblerCodeRef sqrtThunkGenerator(VM*);
-MacroAssemblerCodeRef powThunkGenerator(VM*);
 MacroAssemblerCodeRef imulThunkGenerator(VM*);
 MacroAssemblerCodeRef randomThunkGenerator(VM*);
+MacroAssemblerCodeRef truncThunkGenerator(VM*);
+
+MacroAssemblerCodeRef boundThisNoArgsFunctionCallGenerator(VM* vm);
 
 }
 #endif // ENABLE(JIT)

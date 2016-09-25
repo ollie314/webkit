@@ -27,6 +27,7 @@
 #ifndef UnlinkedInstructionStream_h
 #define UnlinkedInstructionStream_h
 
+#include "Opcode.h"
 #include "UnlinkedCodeBlock.h"
 #include <wtf/RefCountedArray.h>
 
@@ -38,6 +39,7 @@ public:
     explicit UnlinkedInstructionStream(const Vector<UnlinkedInstruction, 0, UnsafeVectorOverflow>&);
 
     unsigned count() const { return m_instructionCount; }
+    size_t sizeInBytes() const;
 
     class Reader {
     public:

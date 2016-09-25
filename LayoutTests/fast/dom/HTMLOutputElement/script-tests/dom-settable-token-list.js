@@ -16,7 +16,7 @@ debug('- Tests from http://simon.html5.org/test/html/dom/reflecting/DOMTokenList
 
 // HTMLOutputElement::htmlFor should be settable.
 createElement('x');
-shouldBe('element.htmlFor.__proto__', 'DOMSettableTokenList.prototype');
+shouldBe('element.htmlFor.__proto__', 'DOMTokenList.prototype');
 element.htmlFor = 'y  z';
 shouldBeEqualToString('String(element.htmlFor)', 'y z');
 shouldBeEqualToString('element.getAttribute("for")', 'y z');
@@ -139,14 +139,10 @@ function shouldThrowDOMException(f, ec)
 }
 
 createElement('x');
-shouldThrowDOMException(function() {
-    element.htmlFor.contains('');
-}, DOMException.SYNTAX_ERR);
+shouldBeFalse("element.htmlFor.contains('')");
 
 createElement('x y');
-shouldThrowDOMException(function() {
-    element.htmlFor.contains('x y');
-}, DOMException.INVALID_CHARACTER_ERR);
+shouldBeFalse("element.htmlFor.contains('x y')");
 
 createElement('');
 shouldThrowDOMException(function() {
@@ -236,21 +232,21 @@ createElement('x\u000Dy');
 shouldEvaluateTo('element.htmlFor.length', 2);
 
 
-debug('- DOMSettableTokenList presence and type');
+debug('- DOMTokenList presence and type');
 
 
 // Safari returns object
 // Firefox returns object
 // IE8 returns object
 // Chrome returns function
-// assertEquals('object', typeof DOMSettableTokenList);
-shouldBeTrue('\'undefined\' != typeof DOMSettableTokenList');
+// assertEquals('object', typeof DOMTokenList);
+shouldBeTrue('\'undefined\' != typeof DOMTokenList');
 
-shouldBeEqualToString('typeof DOMSettableTokenList.prototype', 'object');
+shouldBeEqualToString('typeof DOMTokenList.prototype', 'object');
 
 createElement('x');
 shouldBeEqualToString('typeof element.htmlFor', 'object');
 
-shouldEvaluateTo('element.htmlFor.constructor', 'DOMSettableTokenList');
+shouldEvaluateTo('element.htmlFor.constructor', 'DOMTokenList');
 
 shouldBeTrue('element.htmlFor === element.htmlFor');

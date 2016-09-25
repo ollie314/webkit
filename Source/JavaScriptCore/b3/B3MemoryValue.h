@@ -33,6 +33,9 @@
 
 namespace JSC { namespace B3 {
 
+// FIXME: We want to allow fenced memory accesses on ARM.
+// https://bugs.webkit.org/show_bug.cgi?id=162349
+
 class JS_EXPORT_PRIVATE MemoryValue : public Value {
 public:
     static bool accepts(Opcode opcode)
@@ -50,6 +53,23 @@ public:
         default:
             return false;
         }
+    }
+
+    static bool isStore(Opcode opcode)
+    {
+        switch (opcode) {
+        case Store8:
+        case Store16:
+        case Store:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    static bool isLoad(Opcode opcode)
+    {
+        return accepts(opcode) && !isStore(opcode);
     }
 
     ~MemoryValue();

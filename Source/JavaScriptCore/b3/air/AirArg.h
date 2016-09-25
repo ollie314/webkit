@@ -60,11 +60,14 @@ public:
         Tmp,
 
         // This is an immediate that the instruction will materialize. Imm is the immediate that can be
-        // inlined into most instructions, while Imm64 indicates a constant materialization and is
+        // inlined into most instructions, while BigImm indicates a constant materialization and is
         // usually only usable with Move. Specials may also admit it, for example for stackmaps used for
         // OSR exit and tail calls.
+        // BitImm is an immediate for Bitwise operation (And, Xor, etc).
         Imm,
-        Imm64,
+        BigImm,
+        BitImm,
+        BitImm64,
 
         // These are the addresses. Instructions may load from (Use), store to (Def), or evaluate
         // (UseAddr) addresses.
@@ -475,17 +478,33 @@ public:
         return result;
     }
 
-    static Arg imm64(int64_t value)
+    static Arg bigImm(int64_t value)
     {
         Arg result;
-        result.m_kind = Imm64;
+        result.m_kind = BigImm;
+        result.m_offset = value;
+        return result;
+    }
+
+    static Arg bitImm(int64_t value)
+    {
+        Arg result;
+        result.m_kind = BitImm;
+        result.m_offset = value;
+        return result;
+    }
+
+    static Arg bitImm64(int64_t value)
+    {
+        Arg result;
+        result.m_kind = BitImm64;
         result.m_offset = value;
         return result;
     }
 
     static Arg immPtr(const void* address)
     {
-        return imm64(bitwise_cast<intptr_t>(address));
+        return bigImm(bitwise_cast<intptr_t>(address));
     }
 
     static Arg addr(Air::Tmp base, int32_t offset = 0)
@@ -652,14 +671,32 @@ public:
         return kind() == Imm;
     }
 
-    bool isImm64() const
+    bool isBigImm() const
     {
-        return kind() == Imm64;
+        return kind() == BigImm;
+    }
+
+    bool isBitImm() const
+    {
+        return kind() == BitImm;
+    }
+
+    bool isBitImm64() const
+    {
+        return kind() == BitImm64;
     }
 
     bool isSomeImm() const
     {
-        return isImm() || isImm64();
+        switch (kind()) {
+        case Imm:
+        case BigImm:
+        case BitImm:
+        case BitImm64:
+            return true;
+        default:
+            return false;
+        }
     }
 
     bool isAddr() const
@@ -747,7 +784,7 @@ public:
 
     int64_t value() const
     {
-        ASSERT(kind() == Imm || kind() == Imm64);
+        ASSERT(isSomeImm());
         return m_offset;
     }
 
@@ -756,8 +793,66 @@ public:
     {
         return B3::isRepresentableAs<T>(value());
     }
+    
+    static bool isRepresentableAs(Width width, Signedness signedness, int64_t value)
+    {
+        switch (signedness) {
+        case Signed:
+            switch (width) {
+            case Width8:
+                return B3::isRepresentableAs<int8_t>(value);
+            case Width16:
+                return B3::isRepresentableAs<int16_t>(value);
+            case Width32:
+                return B3::isRepresentableAs<int32_t>(value);
+            case Width64:
+                return B3::isRepresentableAs<int64_t>(value);
+            }
+        case Unsigned:
+            switch (width) {
+            case Width8:
+                return B3::isRepresentableAs<uint8_t>(value);
+            case Width16:
+                return B3::isRepresentableAs<uint16_t>(value);
+            case Width32:
+                return B3::isRepresentableAs<uint32_t>(value);
+            case Width64:
+                return B3::isRepresentableAs<uint64_t>(value);
+            }
+        }
+        ASSERT_NOT_REACHED();
+    }
 
     bool isRepresentableAs(Width, Signedness) const;
+    
+    static int64_t castToType(Width width, Signedness signedness, int64_t value)
+    {
+        switch (signedness) {
+        case Signed:
+            switch (width) {
+            case Width8:
+                return static_cast<int8_t>(value);
+            case Width16:
+                return static_cast<int16_t>(value);
+            case Width32:
+                return static_cast<int32_t>(value);
+            case Width64:
+                return static_cast<int64_t>(value);
+            }
+        case Unsigned:
+            switch (width) {
+            case Width8:
+                return static_cast<uint8_t>(value);
+            case Width16:
+                return static_cast<uint16_t>(value);
+            case Width32:
+                return static_cast<uint32_t>(value);
+            case Width64:
+                return static_cast<uint64_t>(value);
+            }
+        }
+        ASSERT_NOT_REACHED();
+    }
 
     template<typename T>
     T asNumber() const
@@ -767,7 +862,7 @@ public:
 
     void* pointerValue() const
     {
-        ASSERT(kind() == Imm64);
+        ASSERT(kind() == BigImm);
         return bitwise_cast<void*>(static_cast<intptr_t>(m_offset));
     }
 
@@ -837,7 +932,9 @@ public:
     {
         switch (kind()) {
         case Imm:
-        case Imm64:
+        case BigImm:
+        case BitImm:
+        case BitImm64:
         case Addr:
         case Index:
         case Stack:
@@ -861,6 +958,8 @@ public:
     {
         switch (kind()) {
         case Imm:
+        case BitImm:
+        case BitImm64:
         case RelCond:
         case ResCond:
         case DoubleCond:
@@ -872,7 +971,7 @@ public:
         case Index:
         case Stack:
         case CallArg:
-        case Imm64: // Yes, we allow Imm64 as a double immediate. We use this for implementing stackmaps.
+        case BigImm: // Yes, we allow BigImm as a double immediate. We use this for implementing stackmaps.
             return true;
         case Tmp:
             return isFPTmp();
@@ -884,6 +983,8 @@ public:
     {
         switch (kind()) {
         case Imm:
+        case BitImm:
+        case BitImm64:
         case Special:
         case Tmp:
             return true;
@@ -958,39 +1059,30 @@ public:
         return tmp().tmpIndex();
     }
 
-    // If 'this' is an address Arg, then it returns a new address Arg with the additional offset applied.
-    // Note that this does not consider whether doing so produces a valid Arg or not. Unless you really
-    // know what you're doing, you should call Arg::isValidForm() on the result. Some code won't do that,
-    // like if you're applying a very small offset to a Arg::stack() that you know has no offset to begin
-    // with. It's safe to assume that all targets allow small offsets (like, 0..7) for Addr, Stack, and
-    // CallArg.
-    Arg withOffset(int64_t additionalOffset) const
-    {
-        if (!hasOffset())
-            return Arg();
-        if (sumOverflows<int64_t>(offset(), additionalOffset))
-            return Arg();
-        switch (kind()) {
-        case Addr:
-            return addr(base(), offset() + additionalOffset);
-        case Stack:
-            return stack(stackSlot(), offset() + additionalOffset);
-        case CallArg:
-            return callArg(offset() + additionalOffset);
-        case Index:
-            return index(base(), index(), scale(), offset() + additionalOffset);
-        default:
-            RELEASE_ASSERT_NOT_REACHED();
-            return Arg();
-        }
-    }
-
     static bool isValidImmForm(int64_t value)
     {
         if (isX86())
             return B3::isRepresentableAs<int32_t>(value);
         if (isARM64())
             return isUInt12(value);
+        return false;
+    }
+
+    static bool isValidBitImmForm(int64_t value)
+    {
+        if (isX86())
+            return B3::isRepresentableAs<int32_t>(value);
+        if (isARM64())
+            return ARM64LogicalImmediate::create32(value).isValid();
+        return false;
+    }
+
+    static bool isValidBitImm64Form(int64_t value)
+    {
+        if (isX86())
+            return B3::isRepresentableAs<int32_t>(value);
+        if (isARM64())
+            return ARM64LogicalImmediate::create64(value).isValid();
         return false;
     }
 
@@ -1042,8 +1134,12 @@ public:
             return true;
         case Imm:
             return isValidImmForm(value());
-        case Imm64:
+        case BigImm:
             return true;
+        case BitImm:
+            return isValidBitImmForm(value());
+        case BitImm64:
+            return isValidBitImm64Form(value());
         case Addr:
         case Stack:
         case CallArg:
@@ -1119,14 +1215,14 @@ public:
 
     MacroAssembler::TrustedImm32 asTrustedImm32() const
     {
-        ASSERT(isImm());
+        ASSERT(isImm() || isBitImm());
         return MacroAssembler::TrustedImm32(static_cast<int32_t>(m_offset));
     }
 
 #if USE(JSVALUE64)
     MacroAssembler::TrustedImm64 asTrustedImm64() const
     {
-        ASSERT(isImm64());
+        ASSERT(isBigImm() || isBitImm64());
         return MacroAssembler::TrustedImm64(value());
     }
 #endif
@@ -1134,7 +1230,7 @@ public:
     MacroAssembler::TrustedImmPtr asTrustedImmPtr() const
     {
         if (is64Bit())
-            ASSERT(isImm64());
+            ASSERT(isBigImm());
         else
             ASSERT(isImm());
         return MacroAssembler::TrustedImmPtr(pointerValue());
@@ -1171,7 +1267,7 @@ public:
         ASSERT(isDoubleCond());
         return static_cast<MacroAssembler::DoubleCondition>(m_offset);
     }
-
+    
     // Tells you if the Arg is invertible. Only condition arguments are invertible, and even for those, there
     // are a few exceptions - notably Overflow and Signed.
     bool isInvertible() const
@@ -1222,6 +1318,9 @@ public:
         return isRelCond() && MacroAssembler::isUnsigned(asRelationalCondition());
     }
 
+    // This computes a hash for comparing this to JSAir's Arg.
+    unsigned jsHash() const;
+    
     void dump(PrintStream&) const;
 
     Arg(WTF::HashTableDeletedValueType)
@@ -1259,11 +1358,11 @@ struct ArgHash {
 
 namespace WTF {
 
-void printInternal(PrintStream&, JSC::B3::Air::Arg::Kind);
-void printInternal(PrintStream&, JSC::B3::Air::Arg::Role);
-void printInternal(PrintStream&, JSC::B3::Air::Arg::Type);
-void printInternal(PrintStream&, JSC::B3::Air::Arg::Width);
-void printInternal(PrintStream&, JSC::B3::Air::Arg::Signedness);
+JS_EXPORT_PRIVATE void printInternal(PrintStream&, JSC::B3::Air::Arg::Kind);
+JS_EXPORT_PRIVATE void printInternal(PrintStream&, JSC::B3::Air::Arg::Role);
+JS_EXPORT_PRIVATE void printInternal(PrintStream&, JSC::B3::Air::Arg::Type);
+JS_EXPORT_PRIVATE void printInternal(PrintStream&, JSC::B3::Air::Arg::Width);
+JS_EXPORT_PRIVATE void printInternal(PrintStream&, JSC::B3::Air::Arg::Signedness);
 
 template<typename T> struct DefaultHash;
 template<> struct DefaultHash<JSC::B3::Air::Arg> {

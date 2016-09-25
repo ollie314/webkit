@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015, 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,11 +23,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef IDBError_h
-#define IDBError_h
+#pragma once
 
 #if ENABLE(INDEXED_DATABASE)
 
+#include "DOMError.h"
 #include "IDBDatabaseException.h"
 #include <wtf/text/WTFString.h>
 
@@ -37,9 +37,16 @@ class IDBError {
 public:
     IDBError() { }
     IDBError(ExceptionCode);
-    IDBError(ExceptionCode, const String& message);
+    WEBCORE_EXPORT IDBError(ExceptionCode, const String& message);
+
+    static IDBError userDeleteError()
+    {
+        return { IDBDatabaseException::UnknownError, ASCIILiteral("Database deleted by request of the user") };
+    }
 
     IDBError& operator=(const IDBError&);
+
+    RefPtr<DOMError> toDOMError() const;
 
     ExceptionCode code() const { return m_code; }
     String name() const;
@@ -49,12 +56,32 @@ public:
 
     IDBError isolatedCopy() const;
 
+    template<class Encoder> void encode(Encoder&) const;
+    template<class Decoder> static bool decode(Decoder&, IDBError&);
+
 private:
     ExceptionCode m_code { IDBDatabaseException::NoError };
     String m_message;
 };
 
+template<class Encoder>
+void IDBError::encode(Encoder& encoder) const
+{
+    encoder << m_code << m_message;
+}
+    
+template<class Decoder>
+bool IDBError::decode(Decoder& decoder, IDBError& error)
+{
+    if (!decoder.decode(error.m_code))
+        return false;
+
+    if (!decoder.decode(error.m_message))
+        return false;
+
+    return true;
+}
+
 } // namespace WebCore
 
 #endif // ENABLE(INDEXED_DATABASE)
-#endif // IDBError_h

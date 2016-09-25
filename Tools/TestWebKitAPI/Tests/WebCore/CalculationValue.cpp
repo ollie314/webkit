@@ -38,14 +38,14 @@ public:
         ++deletionCount;
     }
 
-    virtual float evaluate(float) const override { return 0; }
+    float evaluate(float) const override { return 0; }
     bool operator==(const CalcExpressionNode&) const override { ASSERT_NOT_REACHED(); return false; }
 };
 
 static Ref<WebCore::CalculationValue> createTestValue()
 {
     auto node = std::make_unique<CalculationDeletionTestNode>();
-    return WebCore::CalculationValue::create(WTFMove(node), WebCore::CalculationRangeAll);
+    return WebCore::CalculationValue::create(WTFMove(node), WebCore::ValueRangeAll);
 }
 
 TEST(CalculationValue, LengthConstruction)

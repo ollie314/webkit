@@ -57,12 +57,14 @@ using namespace HTMLNames;
 
 AuthorStyleSheets::AuthorStyleSheets(Document& document)
     : m_document(document)
+    , m_optimizedUpdateTimer(*this, &AuthorStyleSheets::optimizedUpdateTimerFired)
 {
 }
 
 AuthorStyleSheets::AuthorStyleSheets(ShadowRoot& shadowRoot)
     : m_document(shadowRoot.documentScope())
     , m_shadowRoot(&shadowRoot)
+    , m_optimizedUpdateTimer(*this, &AuthorStyleSheets::optimizedUpdateTimerFired)
 {
 }
 
@@ -117,7 +119,7 @@ void AuthorStyleSheets::addStyleSheetCandidateNode(Node& node, bool createdByPar
     do {
         --it;
         Node* n = *it;
-        unsigned short position = n->compareDocumentPosition(&node);
+        unsigned short position = n->compareDocumentPosition(node);
         if (position == Node::DOCUMENT_POSITION_FOLLOWING) {
             m_styleSheetCandidateNodes.insertBefore(followingNode, &node);
             return;
@@ -156,7 +158,7 @@ void AuthorStyleSheets::collectActiveStyleSheets(Vector<RefPtr<StyleSheet>>& she
 #endif
         } else if (is<HTMLLinkElement>(*node) || is<HTMLStyleElement>(*node) || is<SVGStyleElement>(*node)) {
             Element& element = downcast<Element>(*node);
-            AtomicString title = element.fastGetAttribute(titleAttr);
+            AtomicString title = element.attributeWithoutSynchronization(titleAttr);
             bool enabledViaScript = false;
             if (is<HTMLLinkElement>(element)) {
                 // <LINK> element
@@ -167,7 +169,7 @@ void AuthorStyleSheets::collectActiveStyleSheets(Vector<RefPtr<StyleSheet>>& she
                 if (linkElement.styleSheetIsLoading()) {
                     // it is loading but we should still decide which style sheet set to use
                     if (!enabledViaScript && !title.isEmpty() && m_preferredStylesheetSetName.isEmpty()) {
-                        if (!linkElement.fastGetAttribute(relAttr).contains("alternate")) {
+                        if (!linkElement.attributeWithoutSynchronization(relAttr).contains("alternate")) {
                             m_preferredStylesheetSetName = title;
                             m_selectedStylesheetSetName = title;
                         }
@@ -188,7 +190,7 @@ void AuthorStyleSheets::collectActiveStyleSheets(Vector<RefPtr<StyleSheet>>& she
             // Check to see if this sheet belongs to a styleset
             // (thus making it PREFERRED or ALTERNATE rather than
             // PERSISTENT).
-            auto& rel = element.fastGetAttribute(relAttr);
+            auto& rel = element.attributeWithoutSynchronization(relAttr);
             if (!enabledViaScript && !title.isEmpty()) {
                 // Yes, we have a title.
                 if (m_preferredStylesheetSetName.isEmpty()) {
@@ -215,18 +217,7 @@ AuthorStyleSheets::StyleResolverUpdateType AuthorStyleSheets::analyzeStyleSheetC
 {
     requiresFullStyleRecalc = true;
     
-    // Stylesheets of <style> elements that @import stylesheets are active but loading. We need to trigger a full recalc when such loads are done.
-    bool hasActiveLoadingStylesheet = false;
     unsigned newStylesheetCount = newStylesheets.size();
-    for (auto& sheet : newStylesheets) {
-        if (sheet->isLoading())
-            hasActiveLoadingStylesheet = true;
-    }
-    if (m_hadActiveLoadingStylesheet && !hasActiveLoadingStylesheet) {
-        m_hadActiveLoadingStylesheet = false;
-        return Reconstruct;
-    }
-    m_hadActiveLoadingStylesheet = hasActiveLoadingStylesheet;
 
     if (updateFlag != OptimizedUpdate)
         return Reconstruct;
@@ -281,6 +272,8 @@ static void filterEnabledNonemptyCSSStyleSheets(Vector<RefPtr<CSSStyleSheet>>& r
         if (!is<CSSStyleSheet>(*sheet))
             continue;
         CSSStyleSheet& styleSheet = downcast<CSSStyleSheet>(*sheet);
+        if (styleSheet.isLoading())
+            continue;
         if (styleSheet.disabled())
             continue;
         if (!styleSheet.length())
@@ -291,10 +284,10 @@ static void filterEnabledNonemptyCSSStyleSheets(Vector<RefPtr<CSSStyleSheet>>& r
 
 bool AuthorStyleSheets::updateActiveStyleSheets(UpdateFlag updateFlag)
 {
-    if (m_document.inStyleRecalc()) {
-        // SVG <use> element may manage to invalidate style selector in the middle of a style recalc.
-        // https://bugs.webkit.org/show_bug.cgi?id=54344
-        // FIXME: This should be fixed in SVG and the call site replaced by ASSERT(!m_inStyleRecalc).
+    if (m_document.inStyleRecalc() || m_document.inRenderTreeUpdate()) {
+        // Protect against deleting style resolver in the middle of a style resolution.
+        // Crash stacks indicate we can get here when z resource load fails synchronously (for example due to content blocking).
+        // FIXME: These kind of cases should be eliminated and this path replaced by an assert.
         m_pendingUpdateType = FullUpdate;
         m_document.scheduleForcedStyleRecalc();
         return false;
@@ -357,9 +350,9 @@ void AuthorStyleSheets::updateStyleResolver(Vector<RefPtr<CSSStyleSheet>>& activ
     }
 
     userAgentShadowTreeStyleResolver.ruleSets().resetAuthorStyle();
-    auto& authorRuleSet = *styleResolver.ruleSets().authorStyle();
+    auto& authorRuleSet = styleResolver.ruleSets().authorStyle();
     if (authorRuleSet.hasShadowPseudoElementRules())
-        userAgentShadowTreeStyleResolver.ruleSets().authorStyle()->copyShadowPseudoElementRulesFrom(authorRuleSet);
+        userAgentShadowTreeStyleResolver.ruleSets().authorStyle().copyShadowPseudoElementRulesFrom(authorRuleSet);
 }
 
 const Vector<RefPtr<CSSStyleSheet>> AuthorStyleSheets::activeStyleSheetsForInspector() const
@@ -391,6 +384,66 @@ bool AuthorStyleSheets::activeStyleSheetsContains(const CSSStyleSheet* sheet) co
             m_weakCopyOfActiveStyleSheetListForFastLookup->add(activeStyleSheet.get());
     }
     return m_weakCopyOfActiveStyleSheetListForFastLookup->contains(sheet);
+}
+
+void AuthorStyleSheets::flushPendingUpdates()
+{
+    if (m_pendingUpdateType == NoUpdate)
+        return;
+    updateActiveStyleSheets(m_pendingUpdateType);
+}
+
+void AuthorStyleSheets::scheduleOptimizedUpdate()
+{
+    if (m_optimizedUpdateTimer.isActive())
+        return;
+    if (m_pendingUpdateType == NoUpdate)
+        m_pendingUpdateType = OptimizedUpdate;
+    m_optimizedUpdateTimer.startOneShot(0);
+}
+
+void AuthorStyleSheets::didChange(StyleResolverUpdateFlag updateFlag)
+{
+    m_optimizedUpdateTimer.stop();
+
+    // Don't bother updating, since we haven't loaded all our style info yet
+    // and haven't calculated the style resolver for the first time.
+    if (!m_document.hasLivingRenderTree() || (!m_shadowRoot && !m_didCalculateStyleResolver && m_pendingStyleSheetCount)) {
+        m_document.clearStyleResolver();
+        return;
+    }
+    m_didCalculateStyleResolver = true;
+
+    auto styleSheetUpdate = (updateFlag == RecalcStyleIfNeeded || updateFlag == DeferRecalcStyleIfNeeded)
+        ? AuthorStyleSheets::OptimizedUpdate
+        : AuthorStyleSheets::FullUpdate;
+    bool stylesheetChangeRequiresStyleRecalc = updateActiveStyleSheets(styleSheetUpdate);
+
+    auto scheduleStyleRecalc = [&] {
+        if (m_shadowRoot)
+            m_shadowRoot->setNeedsStyleRecalc();
+        else
+            m_document.scheduleForcedStyleRecalc();
+    };
+
+    if (updateFlag == DeferRecalcStyle) {
+        scheduleStyleRecalc();
+        return;
+    }
+
+    if (updateFlag == DeferRecalcStyleIfNeeded) {
+        if (stylesheetChangeRequiresStyleRecalc)
+            scheduleStyleRecalc();
+        return;
+    }
+
+    if (stylesheetChangeRequiresStyleRecalc)
+        m_document.recalcStyle(Style::Force);
+}
+
+void AuthorStyleSheets::optimizedUpdateTimerFired()
+{
+    didChange(RecalcStyleIfNeeded);
 }
 
 }

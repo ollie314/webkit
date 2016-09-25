@@ -11,6 +11,7 @@ class AnalysisResultsViewer extends ResultsTable {
         this._shouldRenderTable = true;
         this._additionalHeading = null;
         this._testGroupCallback = null;
+        this._expandedPoints = new Set;
     }
 
     setTestGroupCallback(callback) { this._testGroupCallback = callback; }
@@ -18,7 +19,6 @@ class AnalysisResultsViewer extends ResultsTable {
     setCurrentTestGroup(testGroup)
     {
         this._currentTestGroup = testGroup;
-        this.render();
     }
 
     setPoints(startPoint, endPoint)
@@ -26,6 +26,9 @@ class AnalysisResultsViewer extends ResultsTable {
         this._startPoint = startPoint;
         this._endPoint = endPoint;
         this._shouldRenderTable = true;
+        this._expandedPoints.clear();
+        this._expandedPoints.add(startPoint);
+        this._expandedPoints.add(endPoint);
     }
 
     setTestGroups(testGroups)
@@ -91,6 +94,11 @@ class AnalysisResultsViewer extends ResultsTable {
         var self = this;
         rowList.forEach(function (row, rowIndex) {
             var matchingRootSets = rowToMatchingRootSets.get(row);
+            if (!matchingRootSets) {
+                console.assert(row instanceof AnalysisResultsViewer.ExpandableRow);
+                return;
+            }
+
             for (var entry of matchingRootSets) {
                 var testGroup = entry.testGroup();
 
@@ -131,7 +139,7 @@ class AnalysisResultsViewer extends ResultsTable {
         for (var group of this._testGroups) {
             var sortedSets = group.requestedRootSets();
             for (var i = 0; i < sortedSets.length; i++)
-                rootSetsInTestGroups.push(new AnalysisResultsViewer.RootSetInTestGroup(group, sortedSets[i]));
+                rootSetsInTestGroups.push(new AnalysisResultsViewer.RootSetInTestGroup(group, sortedSets[i], sortedSets[i + 1]));
         }
 
         return rootSetsInTestGroups;
@@ -144,6 +152,7 @@ class AnalysisResultsViewer extends ResultsTable {
         var pointAfterEnd = this._endPoint.series.nextPoint(this._endPoint);
         var rootSetsWithPoints = new Set;
         var pointIndex = 0;
+        var previousPoint;
         for (var point = this._startPoint; point && point != pointAfterEnd; point = point.series.nextPoint(point), pointIndex++) {
             var rootSetInPoint = point.rootSet();
             var matchingRootSets = [];
@@ -154,11 +163,16 @@ class AnalysisResultsViewer extends ResultsTable {
                 }
             }
 
-            if (!matchingRootSets.length && point != this._startPoint && point != this._endPoint)
+            var hasMatchingTestGroup = !!matchingRootSets.length;
+            if (!hasMatchingTestGroup && !this._expandedPoints.has(point))
                 continue;
 
             var row = new ResultsTableRow(pointIndex.toString(), rootSetInPoint);
             row.setResult(point);
+
+            if (previousPoint && previousPoint.series.nextPoint(previousPoint) != point)
+                rowList.push(new AnalysisResultsViewer.ExpandableRow(this._expandBetween.bind(this, previousPoint, point)));
+            previousPoint = point;
 
             rowToMatchingRootSets.set(row, matchingRootSets);
             rowList.push(row);
@@ -170,18 +184,27 @@ class AnalysisResultsViewer extends ResultsTable {
 
             for (var i = 0; i < rowList.length; i++) {
                 var row = rowList[i];
-                if (row.rootSet().equals(entry.rootSet())) {
+                if (!(row instanceof AnalysisResultsViewer.ExpandableRow) && row.rootSet().equals(entry.rootSet())) {
                     rowToMatchingRootSets.get(row).push(entry);
                     return;
                 }
             }
 
             var groupTime = entry.rootSet().latestCommitTime();
+            var newRow = new ResultsTableRow(null, entry.rootSet());
+            rowToMatchingRootSets.set(newRow, [entry]);
+
             for (var i = 0; i < rowList.length; i++) {
+                if (rowList[i] instanceof AnalysisResultsViewer.ExpandableRow)
+                    continue;
+
+                if (entry.succeedingRootSet() && rowList[i].rootSet().equals(entry.succeedingRootSet())) {
+                    rowList.splice(i, 0, newRow);
+                    return;
+                }
+
                 var rowTime = rowList[i].rootSet().latestCommitTime();
                 if (rowTime > groupTime) {
-                    var newRow = new ResultsTableRow(null, entry.rootSet());
-                    rowToMatchingRootSets.set(newRow, [entry]);
                     rowList.splice(i, 0, newRow);
                     return;
                 }
@@ -190,13 +213,13 @@ class AnalysisResultsViewer extends ResultsTable {
                     // Missing some commits. Do as best as we can to avoid going backwards in time.
                     var repositoriesInNewRow = entry.rootSet().repositories();
                     for (var j = i; j < rowList.length; j++) {
+                        if (rowList[j] instanceof AnalysisResultsViewer.ExpandableRow)
+                            continue;
                         for (var repository of repositoriesInNewRow) {
                             var newCommit = entry.rootSet().commitForRepository(repository);
                             var rowCommit = rowList[j].rootSet().commitForRepository(repository);
                             if (!rowCommit || newCommit.time() < rowCommit.time()) {
-                                var row = new ResultsTableRow(null, entry.rootSet());
-                                rowToMatchingRootSets.set(row, [entry]);
-                                rowList.splice(j, 0, row);
+                                rowList.splice(j, 0, newRow);
                                 return;
                             }
                         }
@@ -221,6 +244,23 @@ class AnalysisResultsViewer extends ResultsTable {
     {
         if (this._testGroupCallback)
             this._testGroupCallback(testGroup);
+    }
+    
+    _expandBetween(pointBeforeExpansion, pointAfterExpansion)
+    {
+        console.assert(pointBeforeExpansion.series == pointAfterExpansion.series);
+        var indexBeforeStart = pointBeforeExpansion.seriesIndex;
+        var indexAfterEnd = pointAfterExpansion.seriesIndex;
+        console.assert(indexBeforeStart + 1 < indexAfterEnd);
+
+        var series = pointAfterExpansion.series;
+        var increment = Math.ceil((indexAfterEnd - indexBeforeStart) / 5);
+        if (increment < 3)
+            increment = 1;
+        for (var i = indexBeforeStart + 1; i < indexAfterEnd; i += increment)
+            this._expandedPoints.add(series.findPointByIndex(i));
+        this._shouldRenderTable = true;
+        this.render();
     }
 
     static htmlTemplate()
@@ -284,23 +324,50 @@ class AnalysisResultsViewer extends ResultsTable {
             .analysis-view .stacking-block.better {
                 background: rgba(102, 102, 255, 0.5);
             }
+
+            .analysis-view .point-label-with-expansion-link {
+                font-size: 0.7rem;
+            }
+            .analysis-view .point-label-with-expansion-link a {
+                color: #999;
+                text-decoration: none;
+            }
         `;
     }
 }
 
 ComponentBase.defineElement('analysis-results-viewer', AnalysisResultsViewer);
 
+AnalysisResultsViewer.ExpandableRow = class extends ResultsTableRow {
+    constructor(callback)
+    {
+        super(null, null);
+        this._callback = callback;
+    }
+
+    resultContent() { return ''; }
+
+    heading()
+    {
+        return ComponentBase.createElement('span', {class: 'point-label-with-expansion-link'}, [
+            ComponentBase.createLink('(Expand)', 'Expand', this._callback),
+        ]);
+    }
+}
+
 AnalysisResultsViewer.RootSetInTestGroup = class {
-    constructor(testGroup, rootSet)
+    constructor(testGroup, rootSet, succeedingRootSet)
     {
         console.assert(testGroup instanceof TestGroup);
         console.assert(rootSet instanceof RootSet);
         this._testGroup = testGroup;
         this._rootSet = rootSet;
+        this._succeedingRootSet = succeedingRootSet;
     }
 
     testGroup() { return this._testGroup; }
     rootSet() { return this._rootSet; }
+    succeedingRootSet() { return this._succeedingRootSet; }
 }
 
 AnalysisResultsViewer.TestGroupStackingBlock = class {

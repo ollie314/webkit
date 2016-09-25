@@ -43,6 +43,25 @@ PASS Intl.DateTimeFormat.supportedLocalesOf('en-x') threw exception RangeError: 
 PASS Intl.DateTimeFormat.supportedLocalesOf('en-*') threw exception RangeError: invalid language tag: en-*.
 PASS Intl.DateTimeFormat.supportedLocalesOf('en-') threw exception RangeError: invalid language tag: en-.
 PASS Intl.DateTimeFormat.supportedLocalesOf('en--US') threw exception RangeError: invalid language tag: en--US.
+PASS Intl.DateTimeFormat.supportedLocalesOf('de') did not throw exception.
+PASS Intl.DateTimeFormat.supportedLocalesOf('de-DE') did not throw exception.
+PASS Intl.DateTimeFormat.supportedLocalesOf('DE-de') did not throw exception.
+PASS Intl.DateTimeFormat.supportedLocalesOf('cmn') did not throw exception.
+PASS Intl.DateTimeFormat.supportedLocalesOf('cmn-Hans') did not throw exception.
+PASS Intl.DateTimeFormat.supportedLocalesOf('CMN-hANS') did not throw exception.
+PASS Intl.DateTimeFormat.supportedLocalesOf('cmn-hans-cn') did not throw exception.
+PASS Intl.DateTimeFormat.supportedLocalesOf('es-419') did not throw exception.
+PASS Intl.DateTimeFormat.supportedLocalesOf('es-419-u-nu-latn-cu-bob') did not throw exception.
+PASS Intl.DateTimeFormat.supportedLocalesOf('i-klingon') did not throw exception.
+PASS Intl.DateTimeFormat.supportedLocalesOf('cmn-hans-cn-t-ca-u-ca-x-t-u') did not throw exception.
+PASS Intl.DateTimeFormat.supportedLocalesOf('enochian-enochian') did not throw exception.
+PASS Intl.DateTimeFormat.supportedLocalesOf('de-gregory-u-ca-gregory') did not throw exception.
+PASS Intl.DateTimeFormat.supportedLocalesOf('aa-a-foo-x-a-foo-bar') did not throw exception.
+PASS Intl.DateTimeFormat.supportedLocalesOf('x-en-US-12345') did not throw exception.
+PASS Intl.DateTimeFormat.supportedLocalesOf('x-12345-12345-en-US') did not throw exception.
+PASS Intl.DateTimeFormat.supportedLocalesOf('x-en-US-12345-12345') did not throw exception.
+PASS Intl.DateTimeFormat.supportedLocalesOf('x-en-u-foo') did not throw exception.
+PASS Intl.DateTimeFormat.supportedLocalesOf('x-en-u-foo-u-bar') did not throw exception.
 PASS Intl.DateTimeFormat.prototype.constructor is Intl.DateTimeFormat
 PASS Intl.DateTimeFormat.prototype.format is an instance of Function
 PASS Object.getOwnPropertyDescriptor(Intl.DateTimeFormat.prototype, 'format').get is an instance of Function
@@ -83,6 +102,7 @@ PASS Intl.DateTimeFormat.prototype.resolvedOptions() === Intl.DateTimeFormat.pro
 PASS Intl.DateTimeFormat.prototype.resolvedOptions.call(5) threw exception TypeError: Intl.DateTimeFormat.prototype.resolvedOptions called on value that's not an object initialized as a DateTimeFormat.
 PASS Intl.DateTimeFormat('$') threw exception RangeError: invalid language tag: $.
 PASS Intl.DateTimeFormat('en', null) threw exception TypeError: null is not an object (evaluating 'Intl.DateTimeFormat('en', null)').
+PASS Intl.DateTimeFormat().resolvedOptions().locale is 'en-US'
 PASS Intl.DateTimeFormat('en').resolvedOptions().weekday is undefined
 PASS Intl.DateTimeFormat('en').resolvedOptions().era is undefined
 PASS Intl.DateTimeFormat('en').resolvedOptions().month is 'numeric'
@@ -2146,6 +2166,9 @@ PASS
     var resolved = Intl.DateTimeFormat("zh-TW", options).resolvedOptions();
     Object.keys(options).every(option => resolved[option] != null) is true
 PASS typeof Intl.DateTimeFormat("zh-TW", { hour: "numeric", minute: "numeric" }).format() === "string" is true
+PASS var legacy = Object.create(Intl.DateTimeFormat.prototype);Intl.DateTimeFormat.apply(legacy) is legacy
+PASS var legacy = Object.create(Intl.DateTimeFormat.prototype);Intl.DateTimeFormat.call(legacy, 'en-u-nu-arab', { timeZone: 'America/Los_Angeles' }).format(1451099872641) is '١٢/٢٥/٢٠١٥'
+PASS var incompat = {};Intl.DateTimeFormat.apply(incompat) is not incompat
 PASS successfullyParsed is true
 
 TEST COMPLETE

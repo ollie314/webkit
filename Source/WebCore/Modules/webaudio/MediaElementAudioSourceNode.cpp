@@ -40,13 +40,13 @@ const unsigned maxSampleRate = 192000;
 
 namespace WebCore {
 
-Ref<MediaElementAudioSourceNode> MediaElementAudioSourceNode::create(AudioContext* context, HTMLMediaElement* mediaElement)
+Ref<MediaElementAudioSourceNode> MediaElementAudioSourceNode::create(AudioContext& context, HTMLMediaElement& mediaElement)
 {
     return adoptRef(*new MediaElementAudioSourceNode(context, mediaElement));
 }
 
-MediaElementAudioSourceNode::MediaElementAudioSourceNode(AudioContext* context, HTMLMediaElement* mediaElement)
-    : AudioNode(context, context->sampleRate())
+MediaElementAudioSourceNode::MediaElementAudioSourceNode(AudioContext& context, HTMLMediaElement& mediaElement)
+    : AudioNode(context, context.sampleRate())
     , m_mediaElement(mediaElement)
     , m_sourceNumberOfChannels(0)
     , m_sourceSampleRate(0)
@@ -92,7 +92,7 @@ void MediaElementAudioSourceNode::setFormat(size_t numberOfChannels, float sourc
 
         {
             // The context must be locked when changing the number of output channels.
-            AudioContext::AutoLocker contextLocker(*context());
+            AudioContext::AutoLocker contextLocker(context());
 
             // Do any necesssary re-configuration to the output's number of channels.
             output(0)->setNumberOfChannels(numberOfChannels);
@@ -104,7 +104,7 @@ void MediaElementAudioSourceNode::process(size_t numberOfFrames)
 {
     AudioBus* outputBus = output(0)->bus();
 
-    if (!mediaElement() || !m_sourceNumberOfChannels || !m_sourceSampleRate) {
+    if (!m_sourceNumberOfChannels || !m_sourceSampleRate) {
         outputBus->zero();
         return;
     }
@@ -119,7 +119,7 @@ void MediaElementAudioSourceNode::process(size_t numberOfFrames)
         return;
     }
 
-    if (AudioSourceProvider* provider = mediaElement()->audioSourceProvider()) {
+    if (AudioSourceProvider* provider = mediaElement().audioSourceProvider()) {
         if (m_multiChannelResampler.get()) {
             ASSERT(m_sourceSampleRate != sampleRate());
             m_multiChannelResampler->process(provider, outputBus, numberOfFrames);

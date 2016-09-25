@@ -42,9 +42,7 @@
 #include "TextResourceDecoder.h"
 #include "XMLDocument.h"
 #include "markup.h"
-
 #include <wtf/Assertions.h>
-#include <wtf/Vector.h>
 
 namespace WebCore {
 
@@ -138,7 +136,7 @@ RefPtr<DocumentFragment> XSLTProcessor::transformToFragment(Node* sourceNode, Do
 
     if (!transformToString(*sourceNode, resultMIMEType, resultString, resultEncoding))
         return nullptr;
-    return createFragmentForTransformToFragment(resultString, resultMIMEType, outputDoc);
+    return createFragmentForTransformToFragment(*outputDoc, resultString, resultMIMEType);
 }
 
 void XSLTProcessor::setParameter(const String& /*namespaceURI*/, const String& localName, const String& value)

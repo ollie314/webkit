@@ -616,6 +616,11 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ControlPart e)
         m_value.valueID = CSSValueImageControlsButton;
         break;
 #endif
+#if ENABLE(APPLE_PAY)
+    case ApplePayButtonPart:
+        m_value.valueID = CSSValueApplePayButton;
+        break;
+#endif
     }
 }
 
@@ -902,45 +907,45 @@ template<> inline CSSPrimitiveValue::operator EBoxDecorationBreak() const
 }
 #endif
 
-template<> inline CSSPrimitiveValue::CSSPrimitiveValue(BackgroundEdgeOrigin e)
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(Edge e)
     : CSSValue(PrimitiveClass)
 {
     m_primitiveUnitType = CSS_VALUE_ID;
     switch (e) {
-    case TopEdge:
+    case Edge::Top:
         m_value.valueID = CSSValueTop;
         break;
-    case RightEdge:
+    case Edge::Right:
         m_value.valueID = CSSValueRight;
         break;
-    case BottomEdge:
+    case Edge::Bottom:
         m_value.valueID = CSSValueBottom;
         break;
-    case LeftEdge:
+    case Edge::Left:
         m_value.valueID = CSSValueLeft;
         break;
     }
 }
 
-template<> inline CSSPrimitiveValue::operator BackgroundEdgeOrigin() const
+template<> inline CSSPrimitiveValue::operator Edge() const
 {
     ASSERT(isValueID());
 
     switch (m_value.valueID) {
     case CSSValueTop:
-        return TopEdge;
+        return Edge::Top;
     case CSSValueRight:
-        return RightEdge;
+        return Edge::Right;
     case CSSValueBottom:
-        return BottomEdge;
+        return Edge::Bottom;
     case CSSValueLeft:
-        return LeftEdge;
+        return Edge::Left;
     default:
         break;
     }
 
     ASSERT_NOT_REACHED();
-    return TopEdge;
+    return Edge::Top;
 }
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBoxSizing e)
@@ -1379,14 +1384,17 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EDisplay e)
         break;
 #if ENABLE(CSS_GRID_LAYOUT)
     case GRID:
-        m_value.valueID = CSSValueWebkitGrid;
+        m_value.valueID = CSSValueGrid;
         break;
     case INLINE_GRID:
-        m_value.valueID = CSSValueWebkitInlineGrid;
+        m_value.valueID = CSSValueInlineGrid;
         break;
 #endif
     case NONE:
         m_value.valueID = CSSValueNone;
+        break;
+    case CONTENTS:
+        m_value.valueID = CSSValueContents;
         break;
     }
 }
@@ -2180,9 +2188,6 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EOverflow e)
     case OAUTO:
         m_value.valueID = CSSValueAuto;
         break;
-    case OMARQUEE:
-        m_value.valueID = CSSValueWebkitMarquee;
-        break;
     case OOVERLAY:
         m_value.valueID = CSSValueOverlay;
         break;
@@ -2208,8 +2213,6 @@ template<> inline CSSPrimitiveValue::operator EOverflow() const
         return OSCROLL;
     case CSSValueAuto:
         return OAUTO;
-    case CSSValueWebkitMarquee:
-        return OMARQUEE;
     case CSSValueOverlay:
         return OOVERLAY;
     case CSSValueWebkitPagedX:
@@ -5120,6 +5123,9 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ItemPosition itemPosition
     case ItemPositionAuto:
         m_value.valueID = CSSValueAuto;
         break;
+    case ItemPositionNormal:
+        m_value.valueID = CSSValueNormal;
+        break;
     case ItemPositionStretch:
         m_value.valueID = CSSValueStretch;
         break;
@@ -5164,6 +5170,8 @@ template<> inline CSSPrimitiveValue::operator ItemPosition() const
     switch (m_value.valueID) {
     case CSSValueAuto:
         return ItemPositionAuto;
+    case CSSValueNormal:
+        return ItemPositionNormal;
     case CSSValueStretch:
         return ItemPositionStretch;
     case CSSValueBaseline:
@@ -5231,8 +5239,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ContentPosition contentPo
 {
     m_primitiveUnitType = CSS_VALUE_ID;
     switch (contentPosition) {
-    case ContentPositionAuto:
-        m_value.valueID = CSSValueAuto;
+    case ContentPositionNormal:
+        m_value.valueID = CSSValueNormal;
         break;
     case ContentPositionBaseline:
         m_value.valueID = CSSValueBaseline;
@@ -5267,8 +5275,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ContentPosition contentPo
 template<> inline CSSPrimitiveValue::operator ContentPosition() const
 {
     switch (m_value.valueID) {
-    case CSSValueAuto:
-        return ContentPositionAuto;
+    case CSSValueNormal:
+        return ContentPositionNormal;
     case CSSValueBaseline:
         return ContentPositionBaseline;
     case CSSValueLastBaseline:
@@ -5291,7 +5299,7 @@ template<> inline CSSPrimitiveValue::operator ContentPosition() const
         break;
     }
     ASSERT_NOT_REACHED();
-    return ContentPositionAuto;
+    return ContentPositionNormal;
 }
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ContentDistributionType contentDistribution)
@@ -5467,6 +5475,82 @@ template<> inline CSSPrimitiveValue::operator TrailingWord() const
     }
     ASSERT_NOT_REACHED();
     return TrailingWord::Auto;
+}
+#endif
+
+#if ENABLE(APPLE_PAY)
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ApplePayButtonStyle e)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_VALUE_ID;
+    switch (e) {
+    case ApplePayButtonStyle::White:
+        m_value.valueID = CSSValueWhite;
+        break;
+    case ApplePayButtonStyle::WhiteOutline:
+        m_value.valueID = CSSValueWhiteOutline;
+        break;
+    case ApplePayButtonStyle::Black:
+        m_value.valueID = CSSValueBlack;
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator ApplePayButtonStyle() const
+{
+    ASSERT(isValueID());
+    switch (m_value.valueID) {
+    case CSSValueWhite:
+        return ApplePayButtonStyle::White;
+    case CSSValueWhiteOutline:
+        return ApplePayButtonStyle::WhiteOutline;
+    case CSSValueBlack:
+        return ApplePayButtonStyle::Black;
+    default:
+        break;
+    }
+    ASSERT_NOT_REACHED();
+    return ApplePayButtonStyle::Black;
+}
+
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ApplePayButtonType e)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_VALUE_ID;
+    switch (e) {
+    case ApplePayButtonType::Plain:
+        m_value.valueID = CSSValuePlain;
+        break;
+    case ApplePayButtonType::Buy:
+        m_value.valueID = CSSValueBuy;
+        break;
+    case ApplePayButtonType::SetUp:
+        m_value.valueID = CSSValueSetUp;
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator ApplePayButtonType() const
+{
+    ASSERT(isValueID());
+    switch (m_value.valueID) {
+    case CSSValuePlain:
+        return ApplePayButtonType::Plain;
+    case CSSValueBuy:
+        return ApplePayButtonType::Buy;
+    case CSSValueSetUp:
+        return ApplePayButtonType::SetUp;
+    default:
+        break;
+    }
+    ASSERT_NOT_REACHED();
+    return ApplePayButtonType::Plain;
 }
 #endif
 

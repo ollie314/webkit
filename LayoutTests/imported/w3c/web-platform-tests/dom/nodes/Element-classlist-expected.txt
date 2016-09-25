@@ -14,14 +14,17 @@ PASS classList[index] must be undefined for out-of-range index
 PASS classList[index] must be undefined for negative index 
 PASS className should contain initial markup whitespace 
 FAIL classList should contain initial markup whitespace assert_equals: implicit expected " " but got ""
-PASS .contains(empty_string) must throw a SYNTAX_ERR 
+PASS .contains(empty_string) must return false 
 PASS .add(empty_string) must throw a SYNTAX_ERR 
 PASS .remove(empty_string) must throw a SYNTAX_ERR 
 PASS .toggle(empty_string) must throw a SYNTAX_ERR 
-PASS .contains(string_with_spaces) must throw an INVALID_CHARACTER_ERR 
+PASS .replace with empty_string must throw a SYNTAX_ERR 
+PASS .contains(string_with_spaces) must return false 
 PASS .add(string_with_spaces) must throw an INVALID_CHARACTER_ERR 
 PASS .remove(string_with_spaces) must throw an INVALID_CHARACTER_ERR 
 PASS .toggle(string_with_spaces) must throw an INVALID_CHARACTER_ERR 
+PASS .replace with string_with_spaces must throw a INVALID_CHARACTER_ERR 
+PASS .replace with an already existing token 
 PASS computed style must update when setting .className 
 PASS classList.contains must update when .className is changed 
 PASS classList.contains must be case sensitive 
@@ -51,11 +54,20 @@ PASS classList.toggle must toggle tokens case-sensitively when adding
 PASS classList.toggle must not break case-sensitive CSS selector matching 
 PASS classList.toggle must be able to remove tokens 
 PASS classList.toggle must be case-sensitive when removing tokens 
+PASS classList.replace replaces arguments passed, if they are present. 
+PASS classList.replace must replace existing tokens 
+PASS classList.replace must not break case-sensitive CSS selector matching 
+PASS classList.replace must replace duplicated tokens 
+PASS classList.replace must collapse whitespace around replaced tokens 
+PASS classList.replace must collapse whitespaces around each token 
+PASS classList.replace must collapse whitespaces around each token and remove duplicates 
+PASS classList.replace must collapse whitespace when replacing duplicate tokens 
 PASS CSS class selectors must stop matching when all classes have been removed 
 PASS className must be empty when all classes have been removed 
 PASS classList must stringify to an empty string when all classes have been removed 
 PASS classList.item(0) must return null when all classes have been removed 
 PASS classList[0] must be undefined when all classes have been removed 
+PASS Invoking add or remove should set the class attribute 
 PASS classList.add should treat " " as a space 
 PASS classList.add should treat \t as a space 
 PASS classList.add should treat \r as a space 
@@ -63,4 +75,6 @@ PASS classList.add should treat \n as a space
 PASS classList.add should treat \f as a space 
 PASS classList.length must be read-only 
 PASS classList must have [PutForwards=value] 
+PASS classList.replace should work 
+PASS classList.supports should throw 
 

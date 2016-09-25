@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,9 +28,14 @@
 
 #if ENABLE(FTL_JIT)
 
+#include "B3Value.h"
 #include "DFGArrayMode.h"
 #include "FTLAbstractHeap.h"
+#include "HasOwnPropertyCache.h"
 #include "IndexingType.h"
+#include "JSMap.h"
+#include "JSSet.h"
+#include "Symbol.h"
 
 namespace JSC { namespace FTL {
 
@@ -53,6 +58,7 @@ namespace JSC { namespace FTL {
     macro(JSArrayBufferView_mode, JSArrayBufferView::offsetOfMode()) \
     macro(JSArrayBufferView_vector, JSArrayBufferView::offsetOfVector()) \
     macro(JSCell_cellState, JSCell::cellStateOffset()) \
+    macro(JSCell_header, 0) \
     macro(JSCell_indexingType, JSCell::indexingTypeOffset()) \
     macro(JSCell_structureID, JSCell::structureIDOffset()) \
     macro(JSCell_typeInfoFlags, JSCell::typeInfoFlagsOffset()) \
@@ -74,7 +80,20 @@ namespace JSC { namespace FTL {
     macro(JSString_value, JSString::offsetOfValue()) \
     macro(JSSymbolTableObject_symbolTable, JSSymbolTableObject::offsetOfSymbolTable()) \
     macro(JSWrapperObject_internalValue, JSWrapperObject::internalValueOffset()) \
-    macro(MarkedAllocator_freeListHead, MarkedAllocator::offsetOfFreeListHead()) \
+    macro(RegExpConstructor_cachedResult_lastRegExp, RegExpConstructor::offsetOfCachedResult() + RegExpCachedResult::offsetOfLastRegExp()) \
+    macro(RegExpConstructor_cachedResult_lastInput, RegExpConstructor::offsetOfCachedResult() + RegExpCachedResult::offsetOfLastInput()) \
+    macro(RegExpConstructor_cachedResult_result_start, RegExpConstructor::offsetOfCachedResult() + RegExpCachedResult::offsetOfResult() + OBJECT_OFFSETOF(MatchResult, start)) \
+    macro(RegExpConstructor_cachedResult_result_end, RegExpConstructor::offsetOfCachedResult() + RegExpCachedResult::offsetOfResult() + OBJECT_OFFSETOF(MatchResult, end)) \
+    macro(RegExpConstructor_cachedResult_reified, RegExpConstructor::offsetOfCachedResult() + RegExpCachedResult::offsetOfReified()) \
+    macro(RegExpObject_lastIndex, RegExpObject::offsetOfLastIndex()) \
+    macro(RegExpObject_lastIndexIsWritable, RegExpObject::offsetOfLastIndexIsWritable()) \
+    macro(ShadowChicken_Packet_callee, OBJECT_OFFSETOF(ShadowChicken::Packet, callee)) \
+    macro(ShadowChicken_Packet_frame, OBJECT_OFFSETOF(ShadowChicken::Packet, frame)) \
+    macro(ShadowChicken_Packet_callerFrame, OBJECT_OFFSETOF(ShadowChicken::Packet, callerFrame)) \
+    macro(ShadowChicken_Packet_thisValue, OBJECT_OFFSETOF(ShadowChicken::Packet, thisValue)) \
+    macro(ShadowChicken_Packet_scope, OBJECT_OFFSETOF(ShadowChicken::Packet, scope)) \
+    macro(ShadowChicken_Packet_codeBlock, OBJECT_OFFSETOF(ShadowChicken::Packet, codeBlock)) \
+    macro(ShadowChicken_Packet_callSiteIndex, OBJECT_OFFSETOF(ShadowChicken::Packet, callSiteIndex)) \
     macro(ScopedArguments_overrodeThings, ScopedArguments::offsetOfOverrodeThings()) \
     macro(ScopedArguments_scope, ScopedArguments::offsetOfScope()) \
     macro(ScopedArguments_table, ScopedArguments::offsetOfTable()) \
@@ -87,15 +106,20 @@ namespace JSC { namespace FTL {
     macro(Structure_globalObject, Structure::globalObjectOffset()) \
     macro(Structure_prototype, Structure::prototypeOffset()) \
     macro(Structure_structureID, Structure::structureIDOffset()) \
-    macro(Symbol_privateName, Symbol::offsetOfPrivateName())
+    macro(JSMap_hashMapImpl, JSMap::offsetOfHashMapImpl()) \
+    macro(JSSet_hashMapImpl, JSSet::offsetOfHashMapImpl()) \
+    macro(HashMapImpl_capacity, HashMapImpl<HashMapBucket<HashMapBucketDataKey>>::offsetOfCapacity()) \
+    macro(HashMapImpl_buffer,  HashMapImpl<HashMapBucket<HashMapBucketDataKey>>::offsetOfBuffer()) \
+    macro(HashMapBucket_value, HashMapBucket<HashMapBucketDataKeyValue>::offsetOfValue()) \
+    macro(HashMapBucket_key, HashMapBucket<HashMapBucketDataKeyValue>::offsetOfKey()) \
+    macro(Symbol_symbolImpl, Symbol::offsetOfSymbolImpl()) \
 
 #define FOR_EACH_INDEXED_ABSTRACT_HEAP(macro) \
     macro(DirectArguments_storage, DirectArguments::storageOffset(), sizeof(EncodedJSValue)) \
     macro(JSEnvironmentRecord_variables, JSEnvironmentRecord::offsetOfVariables(), sizeof(EncodedJSValue)) \
     macro(JSPropertyNameEnumerator_cachedPropertyNamesVectorContents, 0, sizeof(WriteBarrier<JSString>)) \
     macro(JSRopeString_fibers, JSRopeString::offsetOfFibers(), sizeof(WriteBarrier<JSString>)) \
-    macro(MarkedSpace_Subspace_impreciseAllocators, OBJECT_OFFSETOF(MarkedSpace::Subspace, impreciseAllocators), sizeof(MarkedAllocator)) \
-    macro(MarkedSpace_Subspace_preciseAllocators, OBJECT_OFFSETOF(MarkedSpace::Subspace, preciseAllocators), sizeof(MarkedAllocator)) \
+    macro(MarkedSpace_Subspace_allocatorForSizeStep, OBJECT_OFFSETOF(MarkedSpace::Subspace, allocatorForSizeStep), sizeof(MarkedAllocator*)) \
     macro(ScopedArguments_overflowStorage, ScopedArguments::overflowStorageOffset(), sizeof(EncodedJSValue)) \
     macro(WriteBarrierBuffer_bufferContents, 0, sizeof(JSCell*)) \
     macro(characters8, 0, sizeof(LChar)) \
@@ -107,7 +131,8 @@ namespace JSC { namespace FTL {
     macro(scopedArgumentsTableArguments, 0, sizeof(int32_t)) \
     macro(singleCharacterStrings, 0, sizeof(JSString*)) \
     macro(structureTable, 0, sizeof(Structure*)) \
-    macro(variables, 0, sizeof(Register))
+    macro(variables, 0, sizeof(Register)) \
+    macro(HasOwnPropertyCache, 0, sizeof(HasOwnPropertyCache::Entry)) \
     
 #define FOR_EACH_NUMBERED_ABSTRACT_HEAP(macro) \
     macro(properties)
@@ -118,7 +143,7 @@ namespace JSC { namespace FTL {
 class AbstractHeapRepository {
     WTF_MAKE_NONCOPYABLE(AbstractHeapRepository);
 public:
-    AbstractHeapRepository(LContext);
+    AbstractHeapRepository();
     ~AbstractHeapRepository();
     
     AbstractHeap root;
@@ -127,11 +152,11 @@ public:
     FOR_EACH_ABSTRACT_HEAP(ABSTRACT_HEAP_DECLARATION)
 #undef ABSTRACT_HEAP_DECLARATION
 
-#define ABSTRACT_FIELD_DECLARATION(name, offset) AbstractField name;
+#define ABSTRACT_FIELD_DECLARATION(name, offset) AbstractHeap name;
     FOR_EACH_ABSTRACT_FIELD(ABSTRACT_FIELD_DECLARATION)
 #undef ABSTRACT_FIELD_DECLARATION
     
-    AbstractField& JSCell_freeListNext;
+    AbstractHeap& JSCell_freeListNext;
     
 #define INDEXED_ABSTRACT_HEAP_DECLARATION(name, offset, size) IndexedAbstractHeap name;
     FOR_EACH_INDEXED_ABSTRACT_HEAP(INDEXED_ABSTRACT_HEAP_DECLARATION)
@@ -186,13 +211,36 @@ public:
         }
     }
 
+    void decorateMemory(const AbstractHeap*, B3::Value*);
+    void decorateCCallRead(const AbstractHeap*, B3::Value*);
+    void decorateCCallWrite(const AbstractHeap*, B3::Value*);
+    void decoratePatchpointRead(const AbstractHeap*, B3::Value*);
+    void decoratePatchpointWrite(const AbstractHeap*, B3::Value*);
+
+    void computeRangesAndDecorateInstructions();
+
 private:
-    friend class AbstractHeap;
-    
-    LContext m_context;
-#if !FTL_USES_B3
-    unsigned m_tbaaKind;
-#endif
+
+    struct HeapForValue {
+        HeapForValue()
+        {
+        }
+
+        HeapForValue(const AbstractHeap* heap, B3::Value* value)
+            : heap(heap)
+            , value(value)
+        {
+        }
+        
+        const AbstractHeap* heap { nullptr };
+        B3::Value* value { nullptr };
+    };
+
+    Vector<HeapForValue> m_heapForMemory;
+    Vector<HeapForValue> m_heapForCCallRead;
+    Vector<HeapForValue> m_heapForCCallWrite;
+    Vector<HeapForValue> m_heapForPatchpointRead;
+    Vector<HeapForValue> m_heapForPatchpointWrite;
 };
 
 } } // namespace JSC::FTL

@@ -28,10 +28,8 @@
 #include "WebToDatabaseProcessConnection.h"
 
 #include "DatabaseToWebProcessConnectionMessages.h"
-#include "WebIDBServerConnection.h"
-#include "WebIDBServerConnectionMessages.h"
+#include "WebIDBConnectionToServerMessages.h"
 #include "WebProcess.h"
-#include <wtf/RunLoop.h>
 
 #if ENABLE(DATABASE_PROCESS)
 
@@ -40,8 +38,8 @@ using namespace WebCore;
 namespace WebKit {
 
 WebToDatabaseProcessConnection::WebToDatabaseProcessConnection(IPC::Connection::Identifier connectionIdentifier)
+    : m_connection(IPC::Connection::createClientConnection(connectionIdentifier, *this))
 {
-    m_connection = IPC::Connection::createClientConnection(connectionIdentifier, *this);
     m_connection->open();
 }
 
@@ -49,13 +47,13 @@ WebToDatabaseProcessConnection::~WebToDatabaseProcessConnection()
 {
 }
 
-void WebToDatabaseProcessConnection::didReceiveMessage(IPC::Connection& connection, IPC::MessageDecoder& decoder)
+void WebToDatabaseProcessConnection::didReceiveMessage(IPC::Connection& connection, IPC::Decoder& decoder)
 {
 #if ENABLE(INDEXED_DATABASE)
-    if (decoder.messageReceiverName() == Messages::WebIDBServerConnection::messageReceiverName()) {
-        HashMap<uint64_t, WebIDBServerConnection*>::iterator connectionIterator = m_webIDBServerConnections.find(decoder.destinationID());
-        if (connectionIterator != m_webIDBServerConnections.end())
-            connectionIterator->value->didReceiveWebIDBServerConnectionMessage(connection, decoder);
+    if (decoder.messageReceiverName() == Messages::WebIDBConnectionToServer::messageReceiverName()) {
+        auto idbConnection = m_webIDBConnectionsByIdentifier.get(decoder.destinationID());
+        if (idbConnection)
+            idbConnection->didReceiveMessage(connection, decoder);
         return;
     }
 #endif
@@ -65,6 +63,14 @@ void WebToDatabaseProcessConnection::didReceiveMessage(IPC::Connection& connecti
 
 void WebToDatabaseProcessConnection::didClose(IPC::Connection& connection)
 {
+#if ENABLE(INDEXED_DATABASE)
+    for (auto& connection : m_webIDBConnectionsByIdentifier.values())
+        connection->connectionToServerLost();
+
+    m_webIDBConnectionsByIdentifier.clear();
+    m_webIDBConnectionsBySession.clear();
+#endif
+
     WebProcess::singleton().webToDatabaseProcessConnectionClosed(this);
 }
 
@@ -73,20 +79,16 @@ void WebToDatabaseProcessConnection::didReceiveInvalidMessage(IPC::Connection&, 
 }
 
 #if ENABLE(INDEXED_DATABASE)
-void WebToDatabaseProcessConnection::registerWebIDBServerConnection(WebIDBServerConnection& connection)
+WebIDBConnectionToServer& WebToDatabaseProcessConnection::idbConnectionToServerForSession(const SessionID& sessionID)
 {
-    ASSERT(!m_webIDBServerConnections.contains(connection.messageSenderDestinationID()));
-    m_webIDBServerConnections.set(connection.messageSenderDestinationID(), &connection);
+    auto result = m_webIDBConnectionsBySession.add(sessionID, nullptr);
+    if (result.isNewEntry) {
+        result.iterator->value = WebIDBConnectionToServer::create();
+        ASSERT(!m_webIDBConnectionsByIdentifier.contains(result.iterator->value->identifier()));
+        m_webIDBConnectionsByIdentifier.set(result.iterator->value->identifier(), result.iterator->value);
+    }
 
-}
-
-void WebToDatabaseProcessConnection::removeWebIDBServerConnection(WebIDBServerConnection& connection)
-{
-    ASSERT(m_webIDBServerConnections.contains(connection.messageSenderDestinationID()));
-
-    send(Messages::DatabaseToWebProcessConnection::RemoveDatabaseProcessIDBConnection(connection.messageSenderDestinationID()));
-
-    m_webIDBServerConnections.remove(connection.messageSenderDestinationID());
+    return *result.iterator->value;
 }
 #endif
 

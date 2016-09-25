@@ -31,13 +31,11 @@
 
 #include "JSObject.h"
 #include "JSSymbolTableObject.h"
-#include "Register.h"
 #include "SymbolTable.h"
 
 namespace JSC {
 
 class LLIntOffsetsExtractor;
-class Register;
 
 class JSEnvironmentRecord : public JSSymbolTableObject {
     friend class JIT;
@@ -111,6 +109,7 @@ protected:
     }
 
     static void visitChildren(JSCell*, SlotVisitor&);
+    static void heapSnapshot(JSCell*, HeapSnapshotBuilder&);
 };
 
 } // namespace JSC

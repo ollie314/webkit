@@ -26,11 +26,8 @@
 #include "config.h"
 #include "WeakMapData.h"
 
-#include "CopiedAllocator.h"
-#include "CopyVisitorInlines.h"
 #include "ExceptionHelpers.h"
-#include "JSCJSValueInlines.h"
-#include "SlotVisitorInlines.h"
+#include "JSCInlines.h"
 
 #include <wtf/MathExtras.h>
 
@@ -54,6 +51,12 @@ void WeakMapData::destroy(JSCell* cell)
     static_cast<WeakMapData*>(cell)->~WeakMapData();
 }
 
+size_t WeakMapData::estimatedSize(JSCell* cell)
+{
+    WeakMapData* thisObj = jsCast<WeakMapData*>(cell);
+    return Base::estimatedSize(cell) + (thisObj->m_map.capacity() * (sizeof(JSObject*) + sizeof(WriteBarrier<Unknown>)));
+}
+
 void WeakMapData::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     Base::visitChildren(cell, visitor);
@@ -63,7 +66,7 @@ void WeakMapData::visitChildren(JSCell* cell, SlotVisitor& visitor)
 
     // Rough approximation of the external storage needed for the hashtable.
     // This isn't exact, but it is close enough, and proportional to the actual
-    // external mermory usage.
+    // external memory usage.
     visitor.reportExtraMemoryVisited(thisObj->m_map.capacity() * (sizeof(JSObject*) + sizeof(WriteBarrier<Unknown>)));
 }
 

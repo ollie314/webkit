@@ -26,6 +26,7 @@
 #include "config.h"
 #include "ContainerNodeAlgorithms.h"
 
+#include "NoEventDispatchAssertion.h"
 
 namespace WebCore {
 
@@ -187,7 +188,7 @@ void addChildNodesToDeletionQueue(Node*& head, Node*& tail, ContainerNode& conta
             Ref<Node> protect(*node); // removedFromDocument may remove remove all references to this node.
             if (Document* containerDocument = container.ownerDocument())
                 containerDocument->adoptIfNeeded(node);
-            if (node->inDocument())
+            if (node->isInTreeScope())
                 notifyChildNodeRemoved(container, *node);
         }
     }

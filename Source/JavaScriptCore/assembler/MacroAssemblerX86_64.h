@@ -38,6 +38,9 @@ namespace JSC {
 
 class MacroAssemblerX86_64 : public MacroAssemblerX86Common {
 public:
+    static const unsigned numGPRs = 16;
+    static const unsigned numFPRs = 16;
+    
     static const Scale ScalePtr = TimesEight;
 
     using MacroAssemblerX86Common::add32;
@@ -137,8 +140,9 @@ public:
     
     void store8(TrustedImm32 imm, void* address)
     {
+        TrustedImm32 imm8(static_cast<int8_t>(imm.m_value));
         move(TrustedImmPtr(address), scratchRegister());
-        store8(imm, Address(scratchRegister()));
+        store8(imm8, Address(scratchRegister()));
     }
 
     void store8(RegisterID reg, void* address)
@@ -345,6 +349,12 @@ public:
 
     void and64(TrustedImmPtr imm, RegisterID srcDest)
     {
+        intptr_t intValue = imm.asIntptr();
+        if (intValue <= std::numeric_limits<int32_t>::max()
+            && intValue >= std::numeric_limits<int32_t>::min()) {
+            and64(TrustedImm32(static_cast<int32_t>(intValue)), srcDest);
+            return;
+        }
         move(imm, scratchRegister());
         and64(scratchRegister(), srcDest);
     }
@@ -487,10 +497,15 @@ public:
         m_assembler.orq_rr(src, dest);
     }
 
-    void or64(TrustedImm64 imm, RegisterID dest)
+    void or64(TrustedImm64 imm, RegisterID srcDest)
     {
+        if (imm.m_value <= std::numeric_limits<int32_t>::max()
+            && imm.m_value >= std::numeric_limits<int32_t>::min()) {
+            or64(TrustedImm32(static_cast<int32_t>(imm.m_value)), srcDest);
+            return;
+        }
         move(imm, scratchRegister());
-        or64(scratchRegister(), dest);
+        or64(scratchRegister(), srcDest);
     }
 
     void or64(TrustedImm32 imm, RegisterID dest)
@@ -701,19 +716,21 @@ public:
 
     void compare64(RelationalCondition cond, RegisterID left, TrustedImm32 right, RegisterID dest)
     {
-        if (((cond == Equal) || (cond == NotEqual)) && !right.m_value)
-            m_assembler.testq_rr(left, left);
-        else
-            m_assembler.cmpq_ir(right.m_value, left);
-        m_assembler.setCC_r(x86Condition(cond), dest);
-        m_assembler.movzbl_rr(dest, dest);
+        if (!right.m_value) {
+            if (auto resultCondition = commuteCompareToZeroIntoTest(cond)) {
+                test64(*resultCondition, left, left, dest);
+                return;
+            }
+        }
+
+        m_assembler.cmpq_ir(right.m_value, left);
+        set32(x86Condition(cond), dest);
     }
     
     void compare64(RelationalCondition cond, RegisterID left, RegisterID right, RegisterID dest)
     {
         m_assembler.cmpq_rr(right, left);
-        m_assembler.setCC_r(x86Condition(cond), dest);
-        m_assembler.movzbl_rr(dest, dest);
+        set32(x86Condition(cond), dest);
     }
 
     void compareDouble(DoubleCondition cond, FPRegisterID left, FPRegisterID right, RegisterID dest)
@@ -758,9 +775,9 @@ public:
 
     Jump branch64(RelationalCondition cond, RegisterID left, TrustedImm32 right)
     {
-        if (((cond == Equal) || (cond == NotEqual)) && !right.m_value) {
-            m_assembler.testq_rr(left, left);
-            return Jump(m_assembler.jCC(x86Condition(cond)));
+        if (!right.m_value) {
+            if (auto resultCondition = commuteCompareToZeroIntoTest(cond))
+                return branchTest64(*resultCondition, left, left);
         }
         m_assembler.cmpq_ir(right.m_value, left);
         return Jump(m_assembler.jCC(x86Condition(cond)));
@@ -909,16 +926,21 @@ public:
         return branchAdd64(cond, src1, dest);
     }
 
-    Jump branchAdd64(ResultCondition cond, Address src1, RegisterID src2, RegisterID dest)
+    Jump branchAdd64(ResultCondition cond, Address op1, RegisterID op2, RegisterID dest)
     {
-        move(src2, dest);
-        return branchAdd64(cond, src1, dest);
+        if (op2 == dest)
+            return branchAdd64(cond, op1, dest);
+        if (op1.base == dest) {
+            load32(op1, dest);
+            return branchAdd64(cond, op2, dest);
+        }
+        move(op2, dest);
+        return branchAdd64(cond, op1, dest);
     }
 
     Jump branchAdd64(ResultCondition cond, RegisterID src1, Address src2, RegisterID dest)
     {
-        move(src1, dest);
-        return branchAdd64(cond, src2, dest);
+        return branchAdd64(cond, src2, src1, dest);
     }
 
     Jump branchAdd64(ResultCondition cond, RegisterID src, RegisterID dest)
@@ -979,10 +1001,65 @@ public:
         cmov(x86Condition(cond), src, dest);
     }
 
+    void moveConditionally64(RelationalCondition cond, RegisterID left, RegisterID right, RegisterID thenCase, RegisterID elseCase, RegisterID dest)
+    {
+        m_assembler.cmpq_rr(right, left);
+
+        if (thenCase != dest && elseCase != dest) {
+            move(elseCase, dest);
+            elseCase = dest;
+        }
+
+        if (elseCase == dest)
+            cmov(x86Condition(cond), thenCase, dest);
+        else
+            cmov(x86Condition(invert(cond)), elseCase, dest);
+    }
+
+    void moveConditionally64(RelationalCondition cond, RegisterID left, TrustedImm32 right, RegisterID thenCase, RegisterID elseCase, RegisterID dest)
+    {
+        if (!right.m_value) {
+            if (auto resultCondition = commuteCompareToZeroIntoTest(cond)) {
+                moveConditionallyTest64(*resultCondition, left, left, thenCase, elseCase, dest);
+                return;
+            }
+        }
+
+        m_assembler.cmpq_ir(right.m_value, left);
+
+        if (thenCase != dest && elseCase != dest) {
+            move(elseCase, dest);
+            elseCase = dest;
+        }
+
+        if (elseCase == dest)
+            cmov(x86Condition(cond), thenCase, dest);
+        else
+            cmov(x86Condition(invert(cond)), elseCase, dest);
+    }
+
     void moveConditionallyTest64(ResultCondition cond, RegisterID testReg, RegisterID mask, RegisterID src, RegisterID dest)
     {
         m_assembler.testq_rr(testReg, mask);
         cmov(x86Condition(cond), src, dest);
+    }
+
+    void moveConditionallyTest64(ResultCondition cond, RegisterID left, RegisterID right, RegisterID thenCase, RegisterID elseCase, RegisterID dest)
+    {
+        ASSERT(isInvertible(cond));
+        ASSERT_WITH_MESSAGE(cond != Overflow, "TEST does not set the Overflow Flag.");
+
+        m_assembler.testq_rr(right, left);
+
+        if (thenCase != dest && elseCase != dest) {
+            move(elseCase, dest);
+            elseCase = dest;
+        }
+
+        if (elseCase == dest)
+            cmov(x86Condition(cond), thenCase, dest);
+        else
+            cmov(x86Condition(invert(cond)), elseCase, dest);
     }
     
     void moveConditionallyTest64(ResultCondition cond, RegisterID testReg, TrustedImm32 mask, RegisterID src, RegisterID dest)
@@ -995,6 +1072,73 @@ public:
         else
             m_assembler.testq_i32r(mask.m_value, testReg);
         cmov(x86Condition(cond), src, dest);
+    }
+
+    void moveConditionallyTest64(ResultCondition cond, RegisterID testReg, TrustedImm32 mask, RegisterID thenCase, RegisterID elseCase, RegisterID dest)
+    {
+        ASSERT(isInvertible(cond));
+        ASSERT_WITH_MESSAGE(cond != Overflow, "TEST does not set the Overflow Flag.");
+
+        if (mask.m_value == -1)
+            m_assembler.testq_rr(testReg, testReg);
+        else if (!(mask.m_value & ~0x7f))
+            m_assembler.testb_i8r(mask.m_value, testReg);
+        else
+            m_assembler.testq_i32r(mask.m_value, testReg);
+
+        if (thenCase != dest && elseCase != dest) {
+            move(elseCase, dest);
+            elseCase = dest;
+        }
+
+        if (elseCase == dest)
+            cmov(x86Condition(cond), thenCase, dest);
+        else
+            cmov(x86Condition(invert(cond)), elseCase, dest);
+    }
+
+    template<typename LeftType, typename RightType>
+    void moveDoubleConditionally64(RelationalCondition cond, LeftType left, RightType right, FPRegisterID thenCase, FPRegisterID elseCase, FPRegisterID dest)
+    {
+        static_assert(!std::is_same<LeftType, FPRegisterID>::value && !std::is_same<RightType, FPRegisterID>::value, "One of the tested argument could be aliased on dest. Use moveDoubleConditionallyDouble().");
+
+        if (thenCase != dest && elseCase != dest) {
+            moveDouble(elseCase, dest);
+            elseCase = dest;
+        }
+
+        if (elseCase == dest) {
+            Jump falseCase = branch64(invert(cond), left, right);
+            moveDouble(thenCase, dest);
+            falseCase.link(this);
+        } else {
+            Jump trueCase = branch64(cond, left, right);
+            moveDouble(elseCase, dest);
+            trueCase.link(this);
+        }
+    }
+
+    template<typename TestType, typename MaskType>
+    void moveDoubleConditionallyTest64(ResultCondition cond, TestType test, MaskType mask, FPRegisterID thenCase, FPRegisterID elseCase, FPRegisterID dest)
+    {
+        static_assert(!std::is_same<TestType, FPRegisterID>::value && !std::is_same<MaskType, FPRegisterID>::value, "One of the tested argument could be aliased on dest. Use moveDoubleConditionallyDouble().");
+
+        if (elseCase == dest && isInvertible(cond)) {
+            Jump falseCase = branchTest64(invert(cond), test, mask);
+            moveDouble(thenCase, dest);
+            falseCase.link(this);
+        } else if (thenCase == dest) {
+            Jump trueCase = branchTest64(cond, test, mask);
+            moveDouble(elseCase, dest);
+            trueCase.link(this);
+        }
+
+        Jump trueCase = branchTest64(cond, test, mask);
+        moveDouble(elseCase, dest);
+        Jump falseCase = jump();
+        trueCase.link(this);
+        moveDouble(thenCase, dest);
+        falseCase.link(this);
     }
     
     void abortWithReason(AbortReason reason)
@@ -1070,27 +1214,45 @@ public:
     using MacroAssemblerX86Common::branch8;
     Jump branch8(RelationalCondition cond, AbsoluteAddress left, TrustedImm32 right)
     {
+        TrustedImm32 right8(static_cast<int8_t>(right.m_value));
         MacroAssemblerX86Common::move(TrustedImmPtr(left.m_ptr), scratchRegister());
-        return MacroAssemblerX86Common::branch8(cond, Address(scratchRegister()), right);
+        return MacroAssemblerX86Common::branch8(cond, Address(scratchRegister()), right8);
     }
     
     using MacroAssemblerX86Common::branchTest8;
     Jump branchTest8(ResultCondition cond, ExtendedAddress address, TrustedImm32 mask = TrustedImm32(-1))
     {
+        TrustedImm32 mask8(static_cast<int8_t>(mask.m_value));
         TrustedImmPtr addr(reinterpret_cast<void*>(address.offset));
         MacroAssemblerX86Common::move(addr, scratchRegister());
-        return MacroAssemblerX86Common::branchTest8(cond, BaseIndex(scratchRegister(), address.base, TimesOne), mask);
+        return MacroAssemblerX86Common::branchTest8(cond, BaseIndex(scratchRegister(), address.base, TimesOne), mask8);
     }
     
     Jump branchTest8(ResultCondition cond, AbsoluteAddress address, TrustedImm32 mask = TrustedImm32(-1))
     {
+        TrustedImm32 mask8(static_cast<int8_t>(mask.m_value));
         MacroAssemblerX86Common::move(TrustedImmPtr(address.m_ptr), scratchRegister());
-        return MacroAssemblerX86Common::branchTest8(cond, Address(scratchRegister()), mask);
+        return MacroAssemblerX86Common::branchTest8(cond, Address(scratchRegister()), mask8);
     }
 
     void convertInt64ToDouble(RegisterID src, FPRegisterID dest)
     {
         m_assembler.cvtsi2sdq_rr(src, dest);
+    }
+
+    void convertInt64ToDouble(Address src, FPRegisterID dest)
+    {
+        m_assembler.cvtsi2sdq_mr(src.offset, src.base, dest);
+    }
+
+    void convertInt64ToFloat(RegisterID src, FPRegisterID dest)
+    {
+        m_assembler.cvtsi2ssq_rr(src, dest);
+    }
+
+    void convertInt64ToFloat(Address src, FPRegisterID dest)
+    {
+        m_assembler.cvtsi2ssq_mr(src.offset, src.base, dest);
     }
 
     static bool supportsFloatingPoint() { return true; }

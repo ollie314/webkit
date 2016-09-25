@@ -24,20 +24,17 @@ a.href = "https://www.my\"d(){}|~om?ain#com/path/testurl.html#middle";
 a.hash = "#hash#value";
 shouldBe("a.href", "'https://www.my\"d(){}|~om?ain#com/path/testurl.html#middle'");
 
-// IE8 converts null to "null", which is not the right thing to do.
-// Firefox 3.5.2 removes the '#' at the end, and it should per
-// http://dev.w3.org/html5/spec/infrastructure.html#url-decomposition-idl-attributes .
 debug("Set hash to null");
 a.href = "https://www.mydomain.com/path/testurl.html#middle";
 a.hash = null;
-shouldBe("a.href", "'https://www.mydomain.com/path/testurl.html#'");
+shouldBe("a.href", "'https://www.mydomain.com/path/testurl.html#null'");
 
 // Firefox 3.5.2 removes the '#' at the end, and it should per
 // http://dev.w3.org/html5/spec/infrastructure.html#url-decomposition-idl-attributes .
 debug("Set hash to empty string");
 a.href = "https://www.mydomain.com/path/testurl.html#middle";
 a.hash = "";
-shouldBe("a.href", "'https://www.mydomain.com/path/testurl.html#'");
+shouldBe("a.href", "'https://www.mydomain.com/path/testurl.html'");
 
 // Firefox 3.5.2 does not allow setting hash to mailto: scheme, and it should.
 debug("Add hash to mailto: protocol");
@@ -55,7 +52,7 @@ shouldBe("a.href", "'file:///some%20path#hash value'");
 debug("Set hash to '#'");
 a.href = "http://mydomain.com#middle";
 a.hash = "#";
-shouldBe("a.href", "'http://mydomain.com/#'");
+shouldBe("a.href", "'http://mydomain.com/'");
 
 // Firefox 3.5.2 does not allow setting hash to foo: scheme, and it should.
 debug("Add hash to non-standard protocol");

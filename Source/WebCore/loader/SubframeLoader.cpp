@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2006-2016 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Nokia Corporation and/or its subsidiary(-ies)
  * Copyright (C) 2008, 2009 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
  * Copyright (C) 2008 Alp Toker <alp@atoker.com>
@@ -43,7 +43,8 @@
 #include "FrameLoaderClient.h"
 #include "HTMLAppletElement.h"
 #include "HTMLAudioElement.h"
-#include "HTMLFrameElementBase.h"
+#include "HTMLFrameElement.h"
+#include "HTMLIFrameElement.h"
 #include "HTMLNames.h"
 #include "HTMLObjectElement.h"
 #include "MIMETypeRegistry.h"
@@ -84,6 +85,9 @@ bool SubframeLoader::requestFrame(HTMLFrameOwnerElement& ownerElement, const Str
     } else
         url = completeURL(urlString);
 
+    if (shouldConvertInvalidURLsToBlank() && !url.isValid())
+        url = blankURL();
+
     Frame* frame = loadOrRedirectSubframe(ownerElement, url, frameName, lockHistory, lockBackForwardList);
     if (!frame)
         return false;
@@ -104,7 +108,7 @@ bool SubframeLoader::resourceWillUsePlugin(const String& url, const String& mime
     return shouldUsePlugin(completedURL, mimeType, false, useFallback);
 }
 
-bool SubframeLoader::pluginIsLoadable(HTMLPlugInImageElement& pluginElement, const URL& url, const String& mimeType)
+bool SubframeLoader::pluginIsLoadable(const URL& url, const String& mimeType)
 {
     if (MIMETypeRegistry::isJavaAppletMIMEType(mimeType)) {
         if (!m_frame.settings().isJavaEnabled())
@@ -119,17 +123,6 @@ bool SubframeLoader::pluginIsLoadable(HTMLPlugInImageElement& pluginElement, con
 
         if (!document()->securityOrigin()->canDisplay(url)) {
             FrameLoader::reportLocalLoadFailed(&m_frame, url.string());
-            return false;
-        }
-
-        String declaredMimeType = document()->isPluginDocument() && document()->ownerElement() ?
-            document()->ownerElement()->fastGetAttribute(HTMLNames::typeAttr) :
-            pluginElement.fastGetAttribute(HTMLNames::typeAttr);
-        bool isInUserAgentShadowTree = pluginElement.isInUserAgentShadowTree();
-        if (!document()->contentSecurityPolicy()->allowObjectFromSource(url, isInUserAgentShadowTree)
-            || !document()->contentSecurityPolicy()->allowPluginType(mimeType, declaredMimeType, url, isInUserAgentShadowTree)) {
-            RenderEmbeddedObject* renderer = pluginElement.renderEmbeddedObject();
-            renderer->setPluginUnavailabilityReason(RenderEmbeddedObject::PluginBlockedByContentSecurityPolicy);
             return false;
         }
 
@@ -148,7 +141,7 @@ bool SubframeLoader::requestPlugin(HTMLPlugInImageElement& ownerElement, const U
     if ((!allowPlugins() && !MIMETypeRegistry::isApplicationPluginMIMEType(mimeType)))
         return false;
 
-    if (!pluginIsLoadable(ownerElement, url, mimeType))
+    if (!pluginIsLoadable(url, mimeType))
         return false;
 
     ASSERT(ownerElement.hasTagName(objectTag) || ownerElement.hasTagName(embedTag));
@@ -197,7 +190,7 @@ static void logPluginRequest(Page* page, const String& mimeType, const String& u
     String pluginFile = page->pluginData().pluginFileForWebVisibleMimeType(newMIMEType);
     String description = !pluginFile ? newMIMEType : pluginFile;
 
-    DiagnosticLoggingClient& diagnosticLoggingClient = page->mainFrame().diagnosticLoggingClient();
+    DiagnosticLoggingClient& diagnosticLoggingClient = page->diagnosticLoggingClient();
     diagnosticLoggingClient.logDiagnosticMessage(success ? DiagnosticLoggingKeys::pluginLoadedKey() : DiagnosticLoggingKeys::pluginLoadingFailedKey(), description, ShouldSample::No);
 
     if (!page->hasSeenAnyPlugin())
@@ -217,6 +210,8 @@ bool SubframeLoader::requestObject(HTMLPlugInImageElement& ownerElement, const S
     URL completedURL;
     if (!url.isEmpty())
         completedURL = completeURL(url);
+
+    document()->contentSecurityPolicy()->upgradeInsecureRequestIfNeeded(completedURL, ContentSecurityPolicy::InsecureRequestType::Load);
 
     bool hasFallbackContent = is<HTMLObjectElement>(ownerElement) && downcast<HTMLObjectElement>(ownerElement).hasFallbackContent();
 
@@ -253,9 +248,11 @@ PassRefPtr<Widget> SubframeLoader::createJavaAppletWidget(const IntSize& size, H
         }
 
         const char javaAppletMimeType[] = "application/x-java-applet";
-        bool isInUserAgentShadowTree = element.isInUserAgentShadowTree();
-        if (!element.document().contentSecurityPolicy()->allowObjectFromSource(codeBaseURL, isInUserAgentShadowTree)
-            || !element.document().contentSecurityPolicy()->allowPluginType(javaAppletMimeType, javaAppletMimeType, codeBaseURL, isInUserAgentShadowTree))
+        ASSERT(element.document().contentSecurityPolicy());
+        auto& contentSecurityPolicy = *element.document().contentSecurityPolicy();
+        // Elements in user agent show tree should load whatever the embedding document policy is.
+        if (!element.isInUserAgentShadowTree()
+            && (!contentSecurityPolicy.allowObjectFromSource(codeBaseURL) || !contentSecurityPolicy.allowPluginType(javaAppletMimeType, javaAppletMimeType, codeBaseURL)))
             return nullptr;
     }
 
@@ -281,8 +278,11 @@ PassRefPtr<Widget> SubframeLoader::createJavaAppletWidget(const IntSize& size, H
     return widget;
 }
 
-Frame* SubframeLoader::loadOrRedirectSubframe(HTMLFrameOwnerElement& ownerElement, const URL& url, const AtomicString& frameName, LockHistory lockHistory, LockBackForwardList lockBackForwardList)
+Frame* SubframeLoader::loadOrRedirectSubframe(HTMLFrameOwnerElement& ownerElement, const URL& requestUrl, const AtomicString& frameName, LockHistory lockHistory, LockBackForwardList lockBackForwardList)
 {
+    URL url = requestUrl;
+    ownerElement.document().contentSecurityPolicy()->upgradeInsecureRequestIfNeeded(url, ContentSecurityPolicy::InsecureRequestType::Load);
+
     Frame* frame = ownerElement.contentFrame();
     if (frame)
         frame->navigationScheduler().scheduleLocationChange(m_frame.document(), m_frame.document()->securityOrigin(), url, m_frame.loader().outgoingReferrer(), lockHistory, lockBackForwardList);
@@ -377,9 +377,9 @@ bool SubframeLoader::shouldUsePlugin(const URL& url, const String& mimeType, boo
     ObjectContentType objectType = m_frame.loader().client().objectContentType(url, mimeType);
     // If an object's content can't be handled and it has no fallback, let
     // it be handled as a plugin to show the broken plugin icon.
-    useFallback = objectType == ObjectContentNone && hasFallback;
+    useFallback = objectType == ObjectContentType::None && hasFallback;
 
-    return objectType == ObjectContentNone || objectType == ObjectContentNetscapePlugin || objectType == ObjectContentOtherPlugin;
+    return objectType == ObjectContentType::None || objectType == ObjectContentType::PlugIn;
 }
 
 Document* SubframeLoader::document() const
@@ -430,6 +430,13 @@ URL SubframeLoader::completeURL(const String& url) const
 {
     ASSERT(m_frame.document());
     return m_frame.document()->completeURL(url);
+}
+
+bool SubframeLoader::shouldConvertInvalidURLsToBlank() const
+{
+    if (Settings* settings = document() ? document()->settings() : nullptr)
+        return settings->shouldConvertInvalidURLsToBlank();
+    return true;
 }
 
 } // namespace WebCore

@@ -42,9 +42,9 @@ class SecurityOrigin;
 class StyleRuleBase;
 class StyleRuleImport;
 
-class StyleSheetContents : public RefCounted<StyleSheetContents> {
+class StyleSheetContents final : public RefCounted<StyleSheetContents> {
 public:
-    static Ref<StyleSheetContents> create(const CSSParserContext& context = CSSParserContext(CSSStrictMode))
+    static Ref<StyleSheetContents> create(const CSSParserContext& context = CSSParserContext(HTMLStandardMode))
     {
         return adoptRef(*new StyleSheetContents(0, String(), context));
     }
@@ -60,8 +60,9 @@ public:
     WEBCORE_EXPORT ~StyleSheetContents();
     
     const CSSParserContext& parserContext() const { return m_parserContext; }
-
-    const AtomicString& determineNamespace(const AtomicString& prefix);
+    
+    const AtomicString& defaultNamespace() { return m_defaultNamespace; }
+    const AtomicString& namespaceURIFromPrefix(const AtomicString& prefix);
 
     void parseAuthorStyleSheet(const CachedCSSStyleSheet*, const SecurityOrigin*);
     WEBCORE_EXPORT bool parseString(const String&);
@@ -94,7 +95,7 @@ public:
     bool hasSyntacticallyValidCSSHeader() const { return m_hasSyntacticallyValidCSSHeader; }
 
     void parserAddNamespace(const AtomicString& prefix, const AtomicString& uri);
-    void parserAppendRule(PassRefPtr<StyleRuleBase>);
+    void parserAppendRule(Ref<StyleRuleBase>&&);
     void parserSetEncodingFromCharsetRule(const String& encoding); 
     void parserSetUsesRemUnits() { m_usesRemUnits = true; }
     void parserSetUsesStyleBasedEditability() { m_usesStyleBasedEditability = true; }
@@ -127,7 +128,7 @@ public:
 
     unsigned estimatedSizeInBytes() const;
     
-    bool wrapperInsertRule(PassRefPtr<StyleRuleBase>, unsigned index);
+    bool wrapperInsertRule(Ref<StyleRuleBase>&&, unsigned index);
     void wrapperDeleteRule(unsigned index);
 
     Ref<StyleSheetContents> copy() const { return adoptRef(*new StyleSheetContents(*this)); }
@@ -160,6 +161,7 @@ private:
     Vector<RefPtr<StyleRuleBase>> m_childRules;
     typedef HashMap<AtomicString, AtomicString> PrefixNamespaceURIMap;
     PrefixNamespaceURIMap m_namespaces;
+    AtomicString m_defaultNamespace;
 
     bool m_loadCompleted : 1;
     bool m_isUserStyleSheet : 1;

@@ -32,7 +32,6 @@
 #include "AudioContext.h"
 #include <runtime/Float32Array.h>
 #include <wtf/Lock.h>
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
 
@@ -53,7 +52,7 @@ public:
 
     // hasValue is set to true if a valid timeline value is returned.
     // otherwise defaultValue is returned.
-    float valueForContextTime(AudioContext*, float defaultValue, bool& hasValue);
+    float valueForContextTime(AudioContext&, float defaultValue, bool& hasValue);
 
     // Given the time range, calculates parameter values into the values buffer
     // and returns the last parameter value calculated for "values" or the defaultValue if none were calculated.
@@ -76,13 +75,13 @@ private:
             LastType
         };
 
-        ParamEvent(Type type, float value, float time, float timeConstant, float duration, PassRefPtr<Float32Array> curve)
+        ParamEvent(Type type, float value, float time, float timeConstant, float duration, RefPtr<Float32Array>&& curve)
             : m_type(type)
             , m_value(value)
             , m_time(time)
             , m_timeConstant(timeConstant)
             , m_duration(duration)
-            , m_curve(curve)
+            , m_curve(WTFMove(curve))
         {
         }
 

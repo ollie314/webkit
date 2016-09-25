@@ -12,7 +12,9 @@ class ComponentBase {
     content() { return this._shadow; }
     render() { }
 
-    renderReplace(element, content)
+    renderReplace(element, content) { ComponentBase.renderReplace(element, content); }
+
+    static renderReplace(element, content)
     {
         element.innerHTML = '';
         if (content)
@@ -71,16 +73,6 @@ class ComponentBase {
             }
             this._recursivelyReplaceUnknownElementsByComponents(child);
         }
-    }
-
-    static isElementInViewport(element)
-    {
-        var viewportHeight = window.innerHeight;
-        var boundingRect = element.getBoundingClientRect();
-        if (viewportHeight < boundingRect.top || boundingRect.bottom < 0
-            || !boundingRect.width || !boundingRect.height)
-            return false;
-        return true;
     }
 
     static defineElement(name, elementInterface)

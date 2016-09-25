@@ -69,10 +69,10 @@ Ref<IOChannel> IOChannel::open(const String& filePath, IOChannel::Type type)
     return adoptRef(*new IOChannel(filePath, type));
 }
 
-static inline void runTaskInQueue(std::function<void ()> task, WorkQueue* queue)
+static inline void runTaskInQueue(Function<void ()>&& task, WorkQueue* queue)
 {
     if (queue) {
-        queue->dispatch(task);
+        queue->dispatch(WTFMove(task));
         return;
     }
 
@@ -114,9 +114,7 @@ static void inputStreamReadReadyCallback(GInputStream* stream, GAsyncResult* res
     gssize bytesRead = g_input_stream_read_finish(stream, result, nullptr);
     if (bytesRead == -1) {
         WorkQueue* queue = asyncData->queue.get();
-        auto* asyncDataPtr = asyncData.release();
-        runTaskInQueue([asyncDataPtr] {
-            std::unique_ptr<ReadAsyncData> asyncData(asyncDataPtr);
+        runTaskInQueue([asyncData = WTFMove(asyncData)] {
             asyncData->completionHandler(asyncData->data, -1);
         }, queue);
         return;
@@ -124,9 +122,7 @@ static void inputStreamReadReadyCallback(GInputStream* stream, GAsyncResult* res
 
     if (!bytesRead) {
         WorkQueue* queue = asyncData->queue.get();
-        auto* asyncDataPtr = asyncData.release();
-        runTaskInQueue([asyncDataPtr] {
-            std::unique_ptr<ReadAsyncData> asyncData(asyncDataPtr);
+        runTaskInQueue([asyncData = WTFMove(asyncData)] {
             asyncData->completionHandler(asyncData->data, 0);
         }, queue);
         return;
@@ -138,9 +134,7 @@ static void inputStreamReadReadyCallback(GInputStream* stream, GAsyncResult* res
     size_t pendingBytesToRead = asyncData->bytesToRead - asyncData->data.size();
     if (!pendingBytesToRead) {
         WorkQueue* queue = asyncData->queue.get();
-        auto* asyncDataPtr = asyncData.release();
-        runTaskInQueue([asyncDataPtr] {
-            std::unique_ptr<ReadAsyncData> asyncData(asyncDataPtr);
+        runTaskInQueue([asyncData = WTFMove(asyncData)] {
             asyncData->completionHandler(asyncData->data, 0);
         }, queue);
         return;
@@ -184,7 +178,7 @@ void IOChannel::readSyncInThread(size_t offset, size_t size, WorkQueue* queue, s
     ASSERT(!isMainThread());
 
     RefPtr<IOChannel> channel(this);
-    createThread("IOChannel::readSync", [channel, size, queue, completionHandler] {
+    detachThread(createThread("IOChannel::readSync", [channel, size, queue, completionHandler] {
         size_t bufferSize = std::min(size, gDefaultReadBufferSize);
         uint8_t* bufferData = static_cast<uint8_t*>(fastMalloc(bufferSize));
         GRefPtr<SoupBuffer> readBuffer = adoptGRef(soup_buffer_new_with_owner(bufferData, bufferSize, bufferData, fastFree));
@@ -218,7 +212,7 @@ void IOChannel::readSyncInThread(size_t offset, size_t size, WorkQueue* queue, s
             Data data = { WTFMove(buffer) };
             completionHandler(data, 0);
         }, queue);
-    });
+    }));
 }
 
 struct WriteAsyncData {
@@ -234,9 +228,7 @@ static void outputStreamWriteReadyCallback(GOutputStream* stream, GAsyncResult* 
     gssize bytesWritten = g_output_stream_write_finish(stream, result, nullptr);
     if (bytesWritten == -1) {
         WorkQueue* queue = asyncData->queue.get();
-        auto* asyncDataPtr = asyncData.release();
-        runTaskInQueue([asyncDataPtr] {
-            std::unique_ptr<WriteAsyncData> asyncData(asyncDataPtr);
+        runTaskInQueue([asyncData = WTFMove(asyncData)] {
             asyncData->completionHandler(-1);
         }, queue);
         return;
@@ -245,9 +237,7 @@ static void outputStreamWriteReadyCallback(GOutputStream* stream, GAsyncResult* 
     gssize pendingBytesToWrite = asyncData->buffer->length - bytesWritten;
     if (!pendingBytesToWrite) {
         WorkQueue* queue = asyncData->queue.get();
-        auto* asyncDataPtr = asyncData.release();
-        runTaskInQueue([asyncDataPtr] {
-            std::unique_ptr<WriteAsyncData> asyncData(asyncDataPtr);
+        runTaskInQueue([asyncData = WTFMove(asyncData)] {
             asyncData->completionHandler(0);
         }, queue);
         return;

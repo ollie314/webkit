@@ -1,3 +1,5 @@
+include(CMakeParseArguments)
+
 macro(WEBKIT_INCLUDE_CONFIG_FILES_IF_EXISTS)
     set(_file ${CMAKE_CURRENT_SOURCE_DIR}/Platform${PORT}.cmake)
     if (EXISTS ${_file})
@@ -25,8 +27,9 @@ endmacro()
 
 macro(ADD_PRECOMPILED_HEADER _header _cpp _source)
     if (MSVC)
-        get_filename_component(PrecompiledBasename ${_header} NAME_WE)
-        set(PrecompiledBinary "${CMAKE_CURRENT_BINARY_DIR}/${PrecompiledBasename}.pch")
+        get_filename_component(PrecompiledBasename ${_cpp} NAME_WE)
+        file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${_source}")
+        set(PrecompiledBinary "${CMAKE_CURRENT_BINARY_DIR}/${_source}/${PrecompiledBasename}.pch")
         set(_sources ${${_source}})
 
         set_source_files_properties(${_cpp}
@@ -40,78 +43,87 @@ macro(ADD_PRECOMPILED_HEADER _header _cpp _source)
     #FIXME: Add support for Xcode.
 endmacro()
 
-# Helper macro which wraps generate-bindings.pl script.
-#   _output_source is a list name which will contain generated sources.(eg. WebCore_SOURCES)
-#   _input_files are IDL files to generate.
-#   _base_dir is base directory where script is called.
-#   _idl_includes is value of --include argument. (eg. --include=${WEBCORE_DIR}/bindings/js)
-#   _features is a value of --defines argument.
-#   _destination is a value of --outputDir argument.
-#   _prefix is a prefix of output files. (eg. JS - it makes JSXXX.cpp JSXXX.h from XXX.idl)
-#   _generator is a value of --generator argument.
-#   _supplemental_dependency_file is a value of --supplementalDependencyFile. (optional)
-macro(GENERATE_BINDINGS _output_source _input_files _base_dir _idl_includes _features _destination _prefix _generator _extension _idl_attributes_file)
-    set(BINDING_GENERATOR ${WEBCORE_DIR}/bindings/scripts/generate-bindings.pl)
-    set(_args ${ARGN})
-    list(LENGTH _args _argCount)
-    if (_argCount GREATER 0)
-        list(GET _args 0 _supplemental_dependency_file)
-        if (_supplemental_dependency_file)
-            set(_supplemental_dependency --supplementalDependencyFile ${_supplemental_dependency_file})
+# Helper macro which wraps preprocess-idls.pl and generate-bindings.pl scripts.
+#   OUTPUT_SOURCE is a list name which will contain generated sources.(eg. WebCore_SOURCES)
+#   INPUT_FILES are IDL files to generate.
+#   BASE_DIR is base directory where script is called.
+#   IDL_INCLUDES is value of --include argument. (eg. ${WEBCORE_DIR}/bindings/js)
+#   FEATURES is a value of --defines argument.
+#   DESTINATION is a value of --outputDir argument.
+#   GENERATOR is a value of --generator argument.
+#   SUPPLEMENTAL_DEPFILE is a value of --supplementalDependencyFile. (optional)
+#   PP_EXTRA_OUTPUT is extra outputs of preprocess-idls.pl. (optional)
+#   PP_EXTRA_ARGS is extra arguments for preprocess-idls.pl. (optional)
+function(GENERATE_BINDINGS)
+    set(options)
+    set(oneValueArgs OUTPUT_SOURCE BASE_DIR FEATURES DESTINATION GENERATOR SUPPLEMENTAL_DEPFILE)
+    set(multiValueArgs INPUT_FILES IDL_INCLUDES PP_EXTRA_OUTPUT PP_EXTRA_ARGS)
+    cmake_parse_arguments(arg "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+    set(binding_generator ${WEBCORE_DIR}/bindings/scripts/generate-bindings.pl)
+    set(idl_attributes_file ${WEBCORE_DIR}/bindings/scripts/IDLAttributes.txt)
+    set(id ${arg_OUTPUT_SOURCE})
+    set(idl_files_list ${CMAKE_CURRENT_BINARY_DIR}/idl_files_${id}.tmp)
+    set(_supplemental_dependency)
+
+    set(content)
+    foreach (f ${arg_INPUT_FILES})
+        if (NOT IS_ABSOLUTE ${f})
+            set(f ${CMAKE_CURRENT_SOURCE_DIR}/${f})
         endif ()
-        list(GET _args 1 _additional_dependencies)
+        set(content "${content}${f}\n")
+    endforeach ()
+    file(WRITE ${idl_files_list} ${content})
+
+    if (arg_SUPPLEMENTAL_DEPFILE)
+        set(_supplemental_dependency --supplementalDependencyFile ${arg_SUPPLEMENTAL_DEPFILE})
+
+        add_custom_command(
+            OUTPUT ${arg_SUPPLEMENTAL_DEPFILE} ${arg_PP_EXTRA_OUTPUT}
+            DEPENDS ${WEBCORE_DIR}/bindings/scripts/preprocess-idls.pl ${arg_INPUT_FILES}
+            COMMAND ${PERL_EXECUTABLE} -I${WEBCORE_DIR}/bindings/scripts ${WEBCORE_DIR}/bindings/scripts/preprocess-idls.pl --defines ${arg_FEATURES} --idlFilesList ${idl_files_list} --supplementalDependencyFile ${arg_SUPPLEMENTAL_DEPFILE} ${arg_PP_EXTRA_ARGS}
+            VERBATIM)
     endif ()
 
-    set(COMMON_GENERATOR_DEPENDENCIES
-        ${BINDING_GENERATOR}
-        ${WEBCORE_DIR}/bindings/scripts/CodeGenerator.pm
-        ${SCRIPTS_BINDINGS}
-        ${_supplemental_dependency_file}
-        ${_idl_attributes_file}
-    )
-    list(APPEND COMMON_GENERATOR_DEPENDENCIES ${_additional_dependencies})
-
-    if (EXISTS ${WEBCORE_DIR}/bindings/scripts/CodeGenerator${_generator}.pm)
-        list(APPEND COMMON_GENERATOR_DEPENDENCIES ${WEBCORE_DIR}/bindings/scripts/CodeGenerator${_generator}.pm)
-    endif ()
-
-    foreach (_file ${_input_files})
-        get_filename_component(_name ${_file} NAME_WE)
-
-        # Not all ObjC bindings generate a .mm file, and not all .mm files generated should be compiled.
-        if (${_generator} STREQUAL "ObjC")
-            list(FIND ObjC_BINDINGS_NO_MM ${_name} _no_mm_index)
-            if (${_no_mm_index} EQUAL -1)
-                set(_no_mm 0)
-            else ()
-                set(_no_mm 1)
-            endif ()
+    set(idl_includes)
+    foreach (dir ${arg_IDL_INCLUDES})
+        if (IS_ABSOLUTE ${dir})
+            list(APPEND idl_includes --include=${dir})
         else ()
-            set(_no_mm 0)
-        endif ()
-
-        if (${_no_mm})
-            add_custom_command(
-                OUTPUT ${_destination}/${_prefix}${_name}.h
-                MAIN_DEPENDENCY ${_file}
-                DEPENDS ${COMMON_GENERATOR_DEPENDENCIES}
-                COMMAND ${PERL_EXECUTABLE} -I${WEBCORE_DIR}/bindings/scripts ${BINDING_GENERATOR} --defines "${_features}" --generator ${_generator} ${_idl_includes} --outputDir "${_destination}" --preprocessor "${CODE_GENERATOR_PREPROCESSOR}" --idlAttributesFile ${_idl_attributes_file} ${_supplemental_dependency} ${_file}
-                WORKING_DIRECTORY ${_base_dir}
-                VERBATIM)
-
-            list(APPEND ${_output_source} ${_destination}/${_prefix}${_name}.h)
-        else ()
-            add_custom_command(
-                OUTPUT ${_destination}/${_prefix}${_name}.${_extension} ${_destination}/${_prefix}${_name}.h
-                MAIN_DEPENDENCY ${_file}
-                DEPENDS ${COMMON_GENERATOR_DEPENDENCIES}
-                COMMAND ${PERL_EXECUTABLE} -I${WEBCORE_DIR}/bindings/scripts ${BINDING_GENERATOR} --defines "${_features}" --generator ${_generator} ${_idl_includes} --outputDir "${_destination}" --preprocessor "${CODE_GENERATOR_PREPROCESSOR}" --idlAttributesFile ${_idl_attributes_file} ${_supplemental_dependency} ${_file}
-                WORKING_DIRECTORY ${_base_dir}
-                VERBATIM)
-            list(APPEND ${_output_source} ${_destination}/${_prefix}${_name}.${_extension})
+            list(APPEND idl_includes --include=${CMAKE_CURRENT_SOURCE_DIR}/${dir})
         endif ()
     endforeach ()
-endmacro()
+
+    set(common_generator_dependencies
+        ${binding_generator}
+        ${WEBCORE_DIR}/bindings/scripts/CodeGenerator.pm
+        ${SCRIPTS_BINDINGS}
+        ${arg_SUPPLEMENTAL_DEPFILE}
+        ${idl_attributes_file}
+    )
+    list(APPEND common_generator_dependencies ${arg_PP_EXTRA_OUTPUT})
+
+    if (EXISTS ${WEBCORE_DIR}/bindings/scripts/CodeGenerator${arg_GENERATOR}.pm)
+        list(APPEND common_generator_dependencies ${WEBCORE_DIR}/bindings/scripts/CodeGenerator${arg_GENERATOR}.pm)
+    endif ()
+    if (EXISTS ${arg_BASE_DIR}/CodeGenerator${arg_GENERATOR}.pm)
+        list(APPEND common_generator_dependencies ${arg_BASE_DIR}/CodeGenerator${arg_GENERATOR}.pm)
+    endif ()
+
+    set(gen_sources)
+    foreach (_file ${arg_INPUT_FILES})
+        get_filename_component(_name ${_file} NAME_WE)
+
+        add_custom_command(
+            OUTPUT ${arg_DESTINATION}/JS${_name}.cpp ${arg_DESTINATION}/JS${_name}.h
+            MAIN_DEPENDENCY ${_file}
+            DEPENDS ${common_generator_dependencies}
+            COMMAND ${PERL_EXECUTABLE} -I${WEBCORE_DIR}/bindings/scripts -I${arg_BASE_DIR} ${binding_generator} --defines ${arg_FEATURES} --generator ${arg_GENERATOR} ${idl_includes} --outputDir ${arg_DESTINATION} --preprocessor ${CODE_GENERATOR_PREPROCESSOR} --idlAttributesFile ${idl_attributes_file} ${_supplemental_dependency} ${_file}
+            WORKING_DIRECTORY ${arg_BASE_DIR}
+            VERBATIM)
+        list(APPEND gen_sources ${arg_DESTINATION}/JS${_name}.cpp)
+    endforeach ()
+    set(${arg_OUTPUT_SOURCE} ${${arg_OUTPUT_SOURCE}} ${gen_sources} PARENT_SCOPE)
+endfunction()
 
 macro(GENERATE_FONT_NAMES _infile)
     set(NAMES_GENERATOR ${WEBCORE_DIR}/dom/make_names.pl)
@@ -243,7 +255,29 @@ macro(WEBKIT_WRAP_SOURCELIST)
 endmacro()
 
 macro(WEBKIT_FRAMEWORK _target)
-    if (APPLE AND NOT PORT STREQUAL "GTK")
+    include_directories(${${_target}_INCLUDE_DIRECTORIES})
+    include_directories(SYSTEM ${${_target}_SYSTEM_INCLUDE_DIRECTORIES})
+    add_library(${_target} ${${_target}_LIBRARY_TYPE}
+        ${${_target}_HEADERS}
+        ${${_target}_SOURCES}
+    )
+    target_link_libraries(${_target} ${${_target}_LIBRARIES})
+    set_target_properties(${_target} PROPERTIES COMPILE_DEFINITIONS "BUILDING_${_target}")
+
+    if (${_target}_OUTPUT_NAME)
+        set_target_properties(${_target} PROPERTIES OUTPUT_NAME ${${_target}_OUTPUT_NAME})
+    endif ()
+
+    if (${_target}_PRE_BUILD_COMMAND)
+        add_custom_target(_${_target}_PreBuild COMMAND ${${_target}_PRE_BUILD_COMMAND} VERBATIM)
+        add_dependencies(${_target} _${_target}_PreBuild)
+    endif ()
+
+    if (${_target}_POST_BUILD_COMMAND)
+        add_custom_command(TARGET ${_target} POST_BUILD COMMAND ${${_target}_POST_BUILD_COMMAND} VERBATIM)
+    endif ()
+
+    if (APPLE AND NOT PORT STREQUAL "GTK" AND NOT ${_target} STREQUAL "WTF")
         set_target_properties(${_target} PROPERTIES FRAMEWORK TRUE)
         install(TARGETS ${_target} FRAMEWORK DESTINATION ${LIB_INSTALL_DIR})
     endif ()
@@ -328,14 +362,32 @@ macro(GENERATE_WEBKIT2_MESSAGE_SOURCES _output_source _input_files)
     endforeach ()
 endmacro()
 
+macro(MAKE_JS_FILE_ARRAYS _output_cpp _output_h _scripts _scripts_dependencies)
+    if (WIN32)
+        set(_python_path set "PYTHONPATH=${JavaScriptCore_SCRIPTS_DIR}" COMMAND)
+    else ()
+        set(_python_path "PYTHONPATH=${JavaScriptCore_SCRIPTS_DIR}")
+    endif ()
+
+    add_custom_command(
+        OUTPUT ${_output_h} ${_output_cpp}
+        MAIN_DEPENDENCY ${WEBCORE_DIR}/Scripts/make-js-file-arrays.py
+        DEPENDS ${${_scripts}}
+        COMMAND ${_python_path} ${PYTHON_EXECUTABLE} ${WEBCORE_DIR}/Scripts/make-js-file-arrays.py ${_output_h} ${_output_cpp} ${${_scripts}}
+        VERBATIM)
+    list(APPEND WebCore_DERIVED_SOURCES ${_output_cpp})
+    ADD_SOURCE_DEPENDENCIES(${${_scripts_dependencies}} ${_output_h} ${_output_cpp})
+endmacro()
+
 # Helper macro for using all-in-one builds
 # This macro removes the sources included in the _all_in_one_file from the input _file_list.
 # _file_list is a list of source files
 # _all_in_one_file is an all-in-one cpp file includes other cpp files
 # _result_file_list is the output file list
-macro(PROCESS_ALLINONE_FILE _file_list _all_in_one_file _result_file_list)
+macro(PROCESS_ALLINONE_FILE _file_list _all_in_one_file _result_file_list _no_compile)
     file(STRINGS ${_all_in_one_file} _all_in_one_file_content)
     set(${_result_file_list} ${_file_list})
+    set(_allins "")
     foreach (_line ${_all_in_one_file_content})
         string(REGEX MATCH "^#include [\"<](.*)[\">]" _found ${_line})
         if (_found)
@@ -344,7 +396,14 @@ macro(PROCESS_ALLINONE_FILE _file_list _all_in_one_file _result_file_list)
     endforeach ()
 
     foreach (_allin ${_allins})
-        string(REGEX REPLACE ";[^;]*/${_allin};" ";" _new_result "${${_result_file_list}}")
+        if (${_no_compile})
+            # For DerivedSources.cpp, we still need the derived sources to be generated, but we do not want them to be compiled
+            # individually. We add the header to the result file list so that CMake knows to keep generating the files.
+            string(REGEX REPLACE "(.*)\\.cpp" "\\1" _allin_no_ext ${_allin})
+            string(REGEX REPLACE ";([^;]*/)${_allin_no_ext}\\.cpp;" ";\\1${_allin_no_ext}.h;" _new_result "${${_result_file_list}};")
+        else ()
+            string(REGEX REPLACE ";[^;]*/${_allin};" ";" _new_result "${${_result_file_list}};")
+        endif ()
         set(${_result_file_list} ${_new_result})
     endforeach ()
 

@@ -84,7 +84,7 @@ CheckSpecial::CheckSpecial(Air::Opcode opcode, unsigned numArgs, RoleMode stackm
     , m_stackmapRole(stackmapRole)
     , m_numCheckArgs(numArgs)
 {
-    ASSERT(isTerminal(opcode));
+    ASSERT(isDefinitelyTerminal(opcode));
 }
 
 CheckSpecial::CheckSpecial(const CheckSpecial::Key& key)
@@ -102,6 +102,7 @@ Inst CheckSpecial::hiddenBranch(const Inst& inst) const
     hiddenBranch.args.reserveInitialCapacity(m_numCheckArgs);
     for (unsigned i = 0; i < m_numCheckArgs; ++i)
         hiddenBranch.args.append(inst.args[i + 1]);
+    ASSERT(hiddenBranch.isTerminal());
     return hiddenBranch;
 }
 
@@ -113,7 +114,11 @@ void CheckSpecial::forEachArg(Inst& inst, const ScopedLambda<Inst::EachArgCallba
             unsigned index = &arg - &hidden.args[0];
             callback(inst.args[1 + index], role, type, width);
         });
-    forEachArgImpl(numB3Args(inst), m_numCheckArgs + 1, inst, m_stackmapRole, callback);
+
+    Optional<unsigned> firstRecoverableIndex;
+    if (m_checkOpcode == BranchAdd32 || m_checkOpcode == BranchAdd64)
+        firstRecoverableIndex = 1;
+    forEachArgImpl(numB3Args(inst), m_numCheckArgs + 1, inst, m_stackmapRole, firstRecoverableIndex, callback);
 }
 
 bool CheckSpecial::isValid(Inst& inst)
@@ -130,13 +135,11 @@ bool CheckSpecial::admitsStack(Inst& inst, unsigned argIndex)
     return admitsStackImpl(numB3Args(inst), m_numCheckArgs + 1, inst, argIndex);
 }
 
-bool CheckSpecial::shouldTryAliasingDef(Inst& inst, unsigned& defIndex)
+Optional<unsigned> CheckSpecial::shouldTryAliasingDef(Inst& inst)
 {
-    if (hiddenBranch(inst).shouldTryAliasingDef(defIndex)) {
-        defIndex += 1;
-        return true;
-    }
-    return false;
+    if (Optional<unsigned> branchDef = hiddenBranch(inst).shouldTryAliasingDef())
+        return *branchDef + 1;
+    return Nullopt;
 }
 
 CCallHelpers::Jump CheckSpecial::generate(Inst& inst, CCallHelpers& jit, GenerationContext& context)

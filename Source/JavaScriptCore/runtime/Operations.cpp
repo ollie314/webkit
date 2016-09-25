@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 1999-2000 Harri Porten (porten@kde.org)
- * Copyright (C) 2008 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2008, 2016 Apple Inc. All Rights Reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -43,8 +43,14 @@ bool JSValue::strictEqualSlowCase(ExecState* exec, JSValue v1, JSValue v2)
 NEVER_INLINE JSValue jsAddSlowCase(CallFrame* callFrame, JSValue v1, JSValue v2)
 {
     // exception for the Date exception in defaultValue()
+    VM& vm = callFrame->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
     JSValue p1 = v1.toPrimitive(callFrame);
+    if (UNLIKELY(scope.exception()))
+        return JSValue();
     JSValue p2 = v2.toPrimitive(callFrame);
+    if (UNLIKELY(scope.exception()))
+        return JSValue();
 
     if (p1.isString())
         return jsString(callFrame, asString(p1), p2.toString(callFrame));
@@ -78,7 +84,7 @@ JSValue jsTypeStringForValue(VM& vm, JSGlobalObject* globalObject, JSValue v)
         if (object->inlineTypeFlags() & TypeOfShouldCallGetCallData) {
             CallData callData;
             JSObject* object = asObject(v);
-            if (object->methodTable(vm)->getCallData(object, callData) != CallTypeNone)
+            if (object->methodTable(vm)->getCallData(object, callData) != CallType::None)
                 return vm.smallStrings.functionString();
         }
     }
@@ -103,7 +109,7 @@ bool jsIsObjectTypeOrNull(CallFrame* callFrame, JSValue v)
             return false;
         CallData callData;
         JSObject* object = asObject(v);
-        if (object->methodTable(callFrame->vm())->getCallData(object, callData) != CallTypeNone)
+        if (object->methodTable(callFrame->vm())->getCallData(object, callData) != CallType::None)
             return false;
     }
     return true;
@@ -114,10 +120,33 @@ bool jsIsFunctionType(JSValue v)
     if (v.isObject()) {
         CallData callData;
         JSObject* object = asObject(v);
-        if (object->methodTable()->getCallData(object, callData) != CallTypeNone)
+        if (object->methodTable()->getCallData(object, callData) != CallType::None)
             return true;
     }
     return false;
+}
+
+size_t normalizePrototypeChain(CallFrame* callFrame, Structure* structure)
+{
+    VM& vm = callFrame->vm();
+    size_t count = 0;
+    while (1) {
+        if (structure->isProxy())
+            return InvalidPrototypeChain;
+        JSValue v = structure->prototypeForLookup(callFrame);
+        if (v.isNull())
+            return count;
+
+        JSCell* base = v.asCell();
+        structure = base->structure(vm);
+        if (structure->isDictionary()) {
+            if (structure->hasBeenFlattenedBefore())
+                return InvalidPrototypeChain;
+            structure->flattenDictionaryStructure(vm, asObject(base));
+        }
+
+        ++count;
+    }
 }
 
 } // namespace JSC

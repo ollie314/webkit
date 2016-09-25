@@ -28,23 +28,24 @@
 #include "CachedResourceRequest.h"
 #include "CachedResourceRequestInitiators.h"
 #include "Document.h"
+#include "MediaList.h"
 #include "SecurityOrigin.h"
 #include "StyleSheetContents.h"
 #include <wtf/StdLibExtras.h>
 
 namespace WebCore {
 
-Ref<StyleRuleImport> StyleRuleImport::create(const String& href, PassRefPtr<MediaQuerySet> media)
+Ref<StyleRuleImport> StyleRuleImport::create(const String& href, Ref<MediaQuerySet>&& media)
 {
-    return adoptRef(*new StyleRuleImport(href, media));
+    return adoptRef(*new StyleRuleImport(href, WTFMove(media)));
 }
 
-StyleRuleImport::StyleRuleImport(const String& href, PassRefPtr<MediaQuerySet> media)
+StyleRuleImport::StyleRuleImport(const String& href, Ref<MediaQuerySet>&& media)
     : StyleRuleBase(Import, 0)
     , m_parentStyleSheet(0)
     , m_styleSheetClient(this)
     , m_strHref(href)
-    , m_mediaQueries(media)
+    , m_mediaQueries(WTFMove(media))
     , m_cachedSheet(0)
     , m_loading(false)
 {
@@ -65,7 +66,7 @@ void StyleRuleImport::setCSSStyleSheet(const String& href, const URL& baseURL, c
     if (m_styleSheet)
         m_styleSheet->clearOwnerRule();
 
-    CSSParserContext context = m_parentStyleSheet ? m_parentStyleSheet->parserContext() : CSSStrictMode;
+    CSSParserContext context = m_parentStyleSheet ? m_parentStyleSheet->parserContext() : HTMLStandardMode;
     context.charset = charset;
     if (!baseURL.isNull())
         context.baseURL = baseURL;
@@ -118,10 +119,11 @@ void StyleRuleImport::requestStyleSheet()
     request.setInitiator(cachedResourceRequestInitiators().css);
     if (m_cachedSheet)
         m_cachedSheet->removeClient(&m_styleSheetClient);
-    if (m_parentStyleSheet->isUserStyleSheet())
-        m_cachedSheet = document->cachedResourceLoader().requestUserCSSStyleSheet(request);
-    else
-        m_cachedSheet = document->cachedResourceLoader().requestCSSStyleSheet(request);
+    if (m_parentStyleSheet->isUserStyleSheet()) {
+        request.setOptions(ResourceLoaderOptions(DoNotSendCallbacks, SniffContent, BufferData, AllowStoredCredentials, ClientCredentialPolicy::MayAskClientForCredentials, FetchOptions::Credentials::Include, SkipSecurityCheck, FetchOptions::Mode::NoCors, DoNotIncludeCertificateInfo, ContentSecurityPolicyImposition::SkipPolicyCheck, DefersLoadingPolicy::AllowDefersLoading, CachingPolicy::AllowCaching));
+        m_cachedSheet = document->cachedResourceLoader().requestUserCSSStyleSheet(WTFMove(request));
+    } else
+        m_cachedSheet = document->cachedResourceLoader().requestCSSStyleSheet(WTFMove(request));
     if (m_cachedSheet) {
         // if the import rule is issued dynamically, the sheet may be
         // removed from the pending sheet count, so let the doc know

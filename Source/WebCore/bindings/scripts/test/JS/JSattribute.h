@@ -18,8 +18,7 @@
     Boston, MA 02110-1301, USA.
 */
 
-#ifndef JSattribute_h
-#define JSattribute_h
+#pragma once
 
 #include "JSDOMWrapper.h"
 #include "attribute.h"
@@ -38,10 +37,8 @@ public:
         return ptr;
     }
 
-    static const bool hasStaticPropertyTable = false;
-
     static JSC::JSObject* createPrototype(JSC::VM&, JSC::JSGlobalObject*);
-    static JSC::JSObject* getPrototype(JSC::VM&, JSC::JSGlobalObject*);
+    static JSC::JSObject* prototype(JSC::VM&, JSC::JSGlobalObject*);
     static attribute* toWrapped(JSC::JSValue);
     static void destroy(JSC::JSCell*);
 
@@ -53,6 +50,8 @@ public:
     }
 
     static JSC::JSValue getConstructor(JSC::VM&, const JSC::JSGlobalObject*);
+public:
+    static const unsigned StructureFlags = JSC::HasStaticPropertyTable | Base::StructureFlags;
 protected:
     JSattribute(JSC::Structure*, JSDOMGlobalObject&, Ref<attribute>&&);
 
@@ -81,11 +80,13 @@ inline void* wrapperKey(attribute* wrappableObject)
     return wrappableObject;
 }
 
-JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject*, attribute*);
-inline JSC::JSValue toJS(JSC::ExecState* state, JSDOMGlobalObject* globalObject, attribute& impl) { return toJS(state, globalObject, &impl); }
-JSC::JSValue toJSNewlyCreated(JSC::ExecState*, JSDOMGlobalObject*, attribute*);
+JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject*, attribute&);
+inline JSC::JSValue toJS(JSC::ExecState* state, JSDOMGlobalObject* globalObject, attribute* impl) { return impl ? toJS(state, globalObject, *impl) : JSC::jsNull(); }
+JSC::JSValue toJSNewlyCreated(JSC::ExecState*, JSDOMGlobalObject*, Ref<attribute>&&);
+inline JSC::JSValue toJSNewlyCreated(JSC::ExecState* state, JSDOMGlobalObject* globalObject, RefPtr<attribute>&& impl) { return impl ? toJSNewlyCreated(state, globalObject, impl.releaseNonNull()) : JSC::jsNull(); }
 
+template<> struct JSDOMWrapperConverterTraits<attribute> {
+    using WrapperClass = JSattribute;
+};
 
 } // namespace WebCore
-
-#endif

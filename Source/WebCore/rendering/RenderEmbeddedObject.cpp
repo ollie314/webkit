@@ -29,6 +29,7 @@
 #include "ChromeClient.h"
 #include "Cursor.h"
 #include "EventHandler.h"
+#include "EventNames.h"
 #include "FontCascade.h"
 #include "FontSelector.h"
 #include "Frame.h"
@@ -96,10 +97,9 @@ static const Color& unavailablePluginBorderColor()
     return standard;
 }
 
-RenderEmbeddedObject::RenderEmbeddedObject(HTMLFrameOwnerElement& element, Ref<RenderStyle>&& style)
+RenderEmbeddedObject::RenderEmbeddedObject(HTMLFrameOwnerElement& element, RenderStyle&& style)
     : RenderWidget(element, WTFMove(style))
     , m_isPluginUnavailable(false)
-    , m_isUnavailablePluginIndicatorHidden(false)
     , m_unavailablePluginIndicatorIsPressed(false)
     , m_mouseDownWasInUnavailablePluginIndicator(false)
 {
@@ -112,7 +112,7 @@ RenderEmbeddedObject::~RenderEmbeddedObject()
     view().frameView().removeEmbeddedObjectToUpdate(*this);
 }
 
-RenderPtr<RenderEmbeddedObject> RenderEmbeddedObject::createForApplet(HTMLAppletElement& applet, Ref<RenderStyle>&& style)
+RenderPtr<RenderEmbeddedObject> RenderEmbeddedObject::createForApplet(HTMLAppletElement& applet, RenderStyle&& style)
 {
     auto renderer = createRenderer<RenderEmbeddedObject>(applet, WTFMove(style));
     renderer->setInline(true);
@@ -192,7 +192,6 @@ void RenderEmbeddedObject::setUnavailablePluginIndicatorIsPressed(bool pressed)
 {
     if (m_unavailablePluginIndicatorIsPressed == pressed)
         return;
-
     m_unavailablePluginIndicatorIsPressed = pressed;
     repaint();
 }
@@ -342,10 +341,10 @@ void RenderEmbeddedObject::paintReplaced(PaintInfo& paintInfo, const LayoutPoint
 
 void RenderEmbeddedObject::setUnavailablePluginIndicatorIsHidden(bool hidden)
 {
-    if (m_isUnavailablePluginIndicatorHidden == hidden)
+    auto newState = hidden ? UnavailablePluginIndicatorState::Hidden : UnavailablePluginIndicatorState::Visible;
+    if (m_isUnavailablePluginIndicatorState == newState)
         return;
-
-    m_isUnavailablePluginIndicatorHidden = hidden;
+    m_isUnavailablePluginIndicatorState = newState;
     repaint();
 }
 
@@ -426,7 +425,7 @@ bool RenderEmbeddedObject::isReplacementObscured() const
 
     IntRect rootViewRect = view().frameView().convertToRootView(snappedIntRect(rect));
     
-    HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping | HitTestRequest::DisallowShadowContent | HitTestRequest::AllowChildFrameContent);
+    HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping | HitTestRequest::DisallowUserAgentShadowContent | HitTestRequest::AllowChildFrameContent);
     HitTestResult result;
     HitTestLocation location;
     
@@ -524,8 +523,8 @@ void RenderEmbeddedObject::layout()
     LayoutStateMaintainer statePusher(view(), *this, locationOffset(), hasTransform() || hasReflection() || style().isFlippedBlocksWritingMode());
     
     childBox.setLocation(LayoutPoint(borderLeft(), borderTop()) + LayoutSize(paddingLeft(), paddingTop()));
-    childBox.style().setHeight(Length(newSize.height(), Fixed));
-    childBox.style().setWidth(Length(newSize.width(), Fixed));
+    childBox.mutableStyle().setHeight(Length(newSize.height(), Fixed));
+    childBox.mutableStyle().setWidth(Length(newSize.width(), Fixed));
     childBox.setNeedsLayout(MarkOnlyThis);
     childBox.layout();
     clearChildNeedsLayout();

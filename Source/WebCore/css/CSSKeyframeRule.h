@@ -36,17 +36,29 @@ class CSSStyleDeclaration;
 class StyleRuleCSSStyleDeclaration;
 class CSSKeyframesRule;
 
-class StyleKeyframe : public RefCounted<StyleKeyframe> {
-    WTF_MAKE_FAST_ALLOCATED;
+// FIXME-NEWPARSER: Rename this to StyleRuleKeyframe
+class StyleKeyframe final : public StyleRuleBase {
 public:
+    // FIXME-NEWPARSER: Remove this create function once we get rid of the old parser.
     static Ref<StyleKeyframe> create(Ref<StyleProperties>&& properties)
     {
         return adoptRef(*new StyleKeyframe(WTFMove(properties)));
+    }
+
+    static Ref<StyleKeyframe> create(std::unique_ptr<Vector<double>> keys, Ref<StyleProperties>&& properties)
+    {
+        return adoptRef(*new StyleKeyframe(WTFMove(keys), WTFMove(properties)));
     }
     ~StyleKeyframe();
 
     String keyText() const;
     void setKeyText(const String& text) { m_keys = CSSParser::parseKeyframeSelector(text); }
+    void setKey(double key)
+    {
+        ASSERT(m_keys.isEmpty());
+        m_keys.clear();
+        m_keys.append(key);
+    }
 
     const Vector<double>& keys() const { return m_keys; };
 
@@ -57,6 +69,7 @@ public:
 
 private:
     explicit StyleKeyframe(Ref<StyleProperties>&&);
+    StyleKeyframe(std::unique_ptr<Vector<double>>, Ref<StyleProperties>&&);
 
     Ref<StyleProperties> m_properties;
     Vector<double> m_keys;
@@ -66,8 +79,8 @@ class CSSKeyframeRule final : public CSSRule {
 public:
     virtual ~CSSKeyframeRule();
 
-    virtual String cssText() const override { return m_keyframe->cssText(); }
-    virtual void reattach(StyleRuleBase&) override;
+    String cssText() const final { return m_keyframe->cssText(); }
+    void reattach(StyleRuleBase&) final;
 
     String keyText() const { return m_keyframe->keyText(); }
     void setKeyText(const String& text) { m_keyframe->setKeyText(text); }
@@ -77,7 +90,7 @@ public:
 private:
     CSSKeyframeRule(StyleKeyframe&, CSSKeyframesRule* parent);
 
-    virtual CSSRule::Type type() const override { return KEYFRAME_RULE; }
+    CSSRule::Type type() const final { return KEYFRAME_RULE; }
 
     Ref<StyleKeyframe> m_keyframe;
     mutable RefPtr<StyleRuleCSSStyleDeclaration> m_propertiesCSSOMWrapper;

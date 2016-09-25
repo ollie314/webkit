@@ -41,17 +41,25 @@
 #include "FrameView.h"
 #include "HTMLBDIElement.h"
 #include "HTMLBRElement.h"
+#include "HTMLButtonElement.h"
 #include "HTMLCollection.h"
 #include "HTMLDocument.h"
 #include "HTMLElementFactory.h"
+#include "HTMLFieldSetElement.h"
 #include "HTMLFormElement.h"
+#include "HTMLInputElement.h"
 #include "HTMLNames.h"
+#include "HTMLOptGroupElement.h"
+#include "HTMLOptionElement.h"
 #include "HTMLParserIdioms.h"
+#include "HTMLSelectElement.h"
+#include "HTMLTextAreaElement.h"
 #include "HTMLTextFormControlElement.h"
 #include "NodeTraversal.h"
 #include "RenderElement.h"
 #include "ScriptController.h"
 #include "Settings.h"
+#include "SimulatedClick.h"
 #include "StyleProperties.h"
 #include "SubframeLoader.h"
 #include "Text.h"
@@ -83,45 +91,6 @@ String HTMLElement::nodeName() const
     return Element::nodeName();
 }
 
-bool HTMLElement::ieForbidsInsertHTML() const
-{
-    // FIXME: Supposedly IE disallows settting innerHTML, outerHTML
-    // and createContextualFragment on these tags.  We have no tests to
-    // verify this however, so this list could be totally wrong.
-    // This list was moved from the previous endTagRequirement() implementation.
-    // This is also called from editing and assumed to be the list of tags
-    // for which no end tag should be serialized. It's unclear if the list for
-    // IE compat and the list for serialization sanity are the same.
-    if (hasTagName(areaTag)
-        || hasTagName(baseTag)
-        || hasTagName(basefontTag)
-        || hasTagName(brTag)
-        || hasTagName(colTag)
-        || hasTagName(embedTag)
-        || hasTagName(frameTag)
-        || hasTagName(hrTag)
-        || hasTagName(imageTag)
-        || hasTagName(imgTag)
-        || hasTagName(inputTag)
-        || hasTagName(isindexTag)
-        || hasTagName(linkTag)
-        || hasTagName(metaTag)
-        || hasTagName(paramTag)
-        || hasTagName(sourceTag)
-        || hasTagName(wbrTag))
-        return true;
-    // FIXME: I'm not sure why dashboard mode would want to change the
-    // serialization of <canvas>, that seems like a bad idea.
-#if ENABLE(DASHBOARD_SUPPORT)
-    if (hasTagName(canvasTag)) {
-        Settings* settings = document().settings();
-        if (settings && settings->usesDashboardBackwardCompatibilityMode())
-            return true;
-    }
-#endif
-    return false;
-}
-
 static inline CSSValueID unicodeBidiAttributeForDirAuto(HTMLElement& element)
 {
     if (element.hasTagName(preTag) || element.hasTagName(textareaTag))
@@ -133,10 +102,10 @@ static inline CSSValueID unicodeBidiAttributeForDirAuto(HTMLElement& element)
 
 unsigned HTMLElement::parseBorderWidthAttribute(const AtomicString& value) const
 {
-    unsigned borderWidth = 0;
-    if (value.isEmpty() || !parseHTMLNonNegativeInteger(value, borderWidth))
-        return hasTagName(tableTag) ? 1 : borderWidth;
-    return borderWidth;
+    if (Optional<unsigned> borderWidth = parseHTMLNonNegativeInteger(value))
+        return borderWidth.value();
+
+    return hasTagName(tableTag) ? 1 : 0;
 }
 
 void HTMLElement::applyBorderAttributeToStyle(const AtomicString& value, MutableStyleProperties& style)
@@ -191,7 +160,7 @@ static inline ContentEditableType contentEditableType(const AtomicString& value)
 
 static ContentEditableType contentEditableType(const HTMLElement& element)
 {
-    return contentEditableType(element.fastGetAttribute(contenteditableAttr));
+    return contentEditableType(element.attributeWithoutSynchronization(contenteditableAttr));
 }
 
 void HTMLElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStyleProperties& style)
@@ -243,7 +212,7 @@ void HTMLElement::collectStyleForPresentationAttribute(const QualifiedName& name
         mapLanguageAttributeToLocale(value, style);
     else if (name == langAttr) {
         // xml:lang has a higher priority than lang.
-        if (!fastHasAttribute(XMLNames::langAttr))
+        if (!hasAttributeWithoutSynchronization(XMLNames::langAttr))
             mapLanguageAttributeToLocale(value, style);
     } else
         StyledElement::collectStyleForPresentationAttribute(name, value, style);
@@ -327,6 +296,7 @@ HTMLElement::EventHandlerNameMap HTMLElement::createEventHandlerNameMap()
         &ontimeupdateAttr,
         &ontouchcancelAttr,
         &ontouchendAttr,
+        &ontouchforcechangeAttr,
         &ontouchmoveAttr,
         &ontouchstartAttr,
         &ontransitionendAttr,
@@ -451,13 +421,10 @@ void HTMLElement::parseAttribute(const QualifiedName& name, const AtomicString& 
     }
 
     if (name == tabindexAttr) {
-        int tabIndex = 0;
         if (value.isEmpty())
             clearTabIndexExplicitlyIfNeeded();
-        else if (parseHTMLInteger(value, tabIndex)) {
-            // Clamp tab index to a 16-bit value to match Firefox's behavior.
-            setTabIndexExplicitly(std::max(-0x8000, std::min(tabIndex, 0x7FFF)));
-        }
+        else if (Optional<int> tabIndex = parseHTMLInteger(value))
+            setTabIndexExplicitly(tabIndex.value());
         return;
     }
 
@@ -475,7 +442,7 @@ Ref<DocumentFragment> HTMLElement::textToFragment(const String& text, ExceptionC
     for (unsigned start = 0, length = text.length(); start < length; ) {
 
         // Find next line break.
-        UChar c;
+        UChar c = 0;
         unsigned i;
         for (i = start; i < length; i++) {
             c = text[i];
@@ -538,12 +505,12 @@ static inline const AtomicString& toValidDirValue(const AtomicString& value)
 
 const AtomicString& HTMLElement::dir() const
 {
-    return toValidDirValue(fastGetAttribute(dirAttr));
+    return toValidDirValue(attributeWithoutSynchronization(dirAttr));
 }
 
 void HTMLElement::setDir(const AtomicString& value)
 {
-    setAttribute(dirAttr, value);
+    setAttributeWithoutSynchronization(dirAttr, value);
 }
 
 void HTMLElement::setInnerText(const String& text, ExceptionCode& ec)
@@ -623,90 +590,13 @@ void HTMLElement::setOuterText(const String& text, ExceptionCode& ec)
         ec = HIERARCHY_REQUEST_ERR;
     if (ec)
         return;
-    parent->replaceChild(newChild.releaseNonNull(), *this, ec);
+    parent->replaceChild(*newChild, *this, ec);
 
     RefPtr<Node> node = next ? next->previousSibling() : nullptr;
     if (!ec && is<Text>(node.get()))
         mergeWithNextTextNode(downcast<Text>(*node), ec);
     if (!ec && is<Text>(prev.get()))
         mergeWithNextTextNode(downcast<Text>(*prev), ec);
-}
-
-Node* HTMLElement::insertAdjacent(const String& where, Ref<Node>&& newChild, ExceptionCode& ec)
-{
-    // In Internet Explorer if the element has no parent and where is "beforeBegin" or "afterEnd",
-    // a document fragment is created and the elements appended in the correct order. This document
-    // fragment isn't returned anywhere.
-    //
-    // This is impossible for us to implement as the DOM tree does not allow for such structures,
-    // Opera also appears to disallow such usage.
-
-    if (equalLettersIgnoringASCIICase(where, "beforebegin")) {
-        ContainerNode* parent = this->parentNode();
-        return (parent && parent->insertBefore(newChild.copyRef(), this, ec)) ? newChild.ptr() : nullptr;
-    }
-
-    if (equalLettersIgnoringASCIICase(where, "afterbegin"))
-        return insertBefore(newChild.copyRef(), firstChild(), ec) ? newChild.ptr() : nullptr;
-
-    if (equalLettersIgnoringASCIICase(where, "beforeend"))
-        return appendChild(newChild.copyRef(), ec) ? newChild.ptr() : nullptr;
-
-    if (equalLettersIgnoringASCIICase(where, "afterend")) {
-        ContainerNode* parent = this->parentNode();
-        return (parent && parent->insertBefore(newChild.copyRef(), nextSibling(), ec)) ? newChild.ptr() : nullptr;
-    }
-    
-    // IE throws COM Exception E_INVALIDARG; this is the best DOM exception alternative.
-    ec = NOT_SUPPORTED_ERR;
-    return nullptr;
-}
-
-Element* HTMLElement::insertAdjacentElement(const String& where, Element* newChild, ExceptionCode& ec)
-{
-    if (!newChild) {
-        // IE throws COM Exception E_INVALIDARG; this is the best DOM exception alternative.
-        ec = TYPE_MISMATCH_ERR;
-        return nullptr;
-    }
-
-    Node* returnValue = insertAdjacent(where, *newChild, ec);
-    ASSERT_WITH_SECURITY_IMPLICATION(!returnValue || is<Element>(*returnValue));
-    return downcast<Element>(returnValue); 
-}
-
-// Step 3 of http://www.whatwg.org/specs/web-apps/current-work/multipage/apis-in-html-documents.html#insertadjacenthtml()
-static Element* contextElementForInsertion(const String& where, Element* element, ExceptionCode& ec)
-{
-    if (equalLettersIgnoringASCIICase(where, "beforebegin") || equalLettersIgnoringASCIICase(where, "afterend")) {
-        ContainerNode* parent = element->parentNode();
-        if (parent && !is<Element>(*parent)) {
-            ec = NO_MODIFICATION_ALLOWED_ERR;
-            return nullptr;
-        }
-        ASSERT_WITH_SECURITY_IMPLICATION(!parent || is<Element>(*parent));
-        return downcast<Element>(parent);
-    }
-    if (equalLettersIgnoringASCIICase(where, "afterbegin") || equalLettersIgnoringASCIICase(where, "beforeend"))
-        return element;
-    ec =  SYNTAX_ERR;
-    return nullptr;
-}
-
-void HTMLElement::insertAdjacentHTML(const String& where, const String& markup, ExceptionCode& ec)
-{
-    Element* contextElement = contextElementForInsertion(where, this, ec);
-    if (!contextElement)
-        return;
-    RefPtr<DocumentFragment> fragment = createFragmentForInnerOuterHTML(markup, contextElement, AllowScriptingContent, ec);
-    if (!fragment)
-        return;
-    insertAdjacent(where, fragment.releaseNonNull(), ec);
-}
-
-void HTMLElement::insertAdjacentText(const String& where, const String& text, ExceptionCode& ec)
-{
-    insertAdjacent(where, document().createTextNode(text), ec);
 }
 
 void HTMLElement::applyAlignmentAttributeToStyle(const AtomicString& alignment, MutableStyleProperties& style)
@@ -772,11 +662,11 @@ String HTMLElement::contentEditable() const
 void HTMLElement::setContentEditable(const String& enabled, ExceptionCode& ec)
 {
     if (equalLettersIgnoringASCIICase(enabled, "true"))
-        setAttribute(contenteditableAttr, AtomicString("true", AtomicString::ConstructFromLiteral));
+        setAttributeWithoutSynchronization(contenteditableAttr, AtomicString("true", AtomicString::ConstructFromLiteral));
     else if (equalLettersIgnoringASCIICase(enabled, "false"))
-        setAttribute(contenteditableAttr, AtomicString("false", AtomicString::ConstructFromLiteral));
+        setAttributeWithoutSynchronization(contenteditableAttr, AtomicString("false", AtomicString::ConstructFromLiteral));
     else if (equalLettersIgnoringASCIICase(enabled, "plaintext-only"))
-        setAttribute(contenteditableAttr, AtomicString("plaintext-only", AtomicString::ConstructFromLiteral));
+        setAttributeWithoutSynchronization(contenteditableAttr, AtomicString("plaintext-only", AtomicString::ConstructFromLiteral));
     else if (equalLettersIgnoringASCIICase(enabled, "inherit"))
         removeAttribute(contenteditableAttr);
     else
@@ -785,12 +675,12 @@ void HTMLElement::setContentEditable(const String& enabled, ExceptionCode& ec)
 
 bool HTMLElement::draggable() const
 {
-    return equalLettersIgnoringASCIICase(fastGetAttribute(draggableAttr), "true");
+    return equalLettersIgnoringASCIICase(attributeWithoutSynchronization(draggableAttr), "true");
 }
 
 void HTMLElement::setDraggable(bool value)
 {
-    setAttribute(draggableAttr, value
+    setAttributeWithoutSynchronization(draggableAttr, value
         ? AtomicString("true", AtomicString::ConstructFromLiteral)
         : AtomicString("false", AtomicString::ConstructFromLiteral));
 }
@@ -802,14 +692,14 @@ bool HTMLElement::spellcheck() const
 
 void HTMLElement::setSpellcheck(bool enable)
 {
-    setAttribute(spellcheckAttr, enable
+    setAttributeWithoutSynchronization(spellcheckAttr, enable
         ? AtomicString("true", AtomicString::ConstructFromLiteral)
         : AtomicString("false", AtomicString::ConstructFromLiteral));
 }
 
 void HTMLElement::click()
 {
-    dispatchSimulatedClick(nullptr, SendNoEvents, DoNotShowPressedLook);
+    simulateClick(*this, nullptr, SendNoEvents, DoNotShowPressedLook, SimulatedClickCreationOptions::FromBindings);
 }
 
 void HTMLElement::accessKeyAction(bool sendMouseEvents)
@@ -819,10 +709,10 @@ void HTMLElement::accessKeyAction(bool sendMouseEvents)
 
 String HTMLElement::title() const
 {
-    return fastGetAttribute(titleAttr);
+    return attributeWithoutSynchronization(titleAttr);
 }
 
-short HTMLElement::tabIndex() const
+int HTMLElement::tabIndex() const
 {
     if (supportsFocus())
         return Element::tabIndex();
@@ -831,7 +721,7 @@ short HTMLElement::tabIndex() const
 
 TranslateAttributeMode HTMLElement::translateAttributeMode() const
 {
-    const AtomicString& value = fastGetAttribute(translateAttr);
+    const AtomicString& value = attributeWithoutSynchronization(translateAttr);
 
     if (value.isNull())
         return TranslateAttributeInherit;
@@ -859,7 +749,7 @@ bool HTMLElement::translate() const
 
 void HTMLElement::setTranslate(bool enable)
 {
-    setAttribute(translateAttr, enable ? "yes" : "no");
+    setAttributeWithoutSynchronization(translateAttr, enable ? "yes" : "no");
 }
 
 bool HTMLElement::rendererIsNeeded(const RenderStyle& style)
@@ -876,7 +766,7 @@ bool HTMLElement::rendererIsNeeded(const RenderStyle& style)
     return StyledElement::rendererIsNeeded(style);
 }
 
-RenderPtr<RenderElement> HTMLElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
+RenderPtr<RenderElement> HTMLElement::createElementRenderer(RenderStyle&& style, const RenderTreePosition&)
 {
     return RenderElement::createFor(*this, WTFMove(style));
 }
@@ -891,7 +781,7 @@ static inline bool elementAffectsDirectionality(const Node& node)
     if (!is<HTMLElement>(node))
         return false;
     const HTMLElement& element = downcast<HTMLElement>(node);
-    return is<HTMLBDIElement>(element) || element.fastHasAttribute(dirAttr);
+    return is<HTMLBDIElement>(element) || element.hasAttributeWithoutSynchronization(dirAttr);
 }
 
 static void setHasDirAutoFlagRecursively(Node* firstNode, bool flag, Node* lastNode = nullptr)
@@ -925,7 +815,7 @@ void HTMLElement::childrenChanged(const ChildChange& change)
 
 bool HTMLElement::hasDirectionAuto() const
 {
-    const AtomicString& direction = fastGetAttribute(dirAttr);
+    const AtomicString& direction = attributeWithoutSynchronization(dirAttr);
     return (hasTagName(bdiTag) && direction.isNull()) || equalLettersIgnoringASCIICase(direction, "auto");
 }
 
@@ -962,7 +852,7 @@ TextDirection HTMLElement::directionality(Node** strongDirectionalityTextNode) c
 
         // Skip elements with valid dir attribute
         if (is<Element>(*node)) {
-            AtomicString dirAttributeValue = downcast<Element>(*node).fastGetAttribute(dirAttr);
+            AtomicString dirAttributeValue = downcast<Element>(*node).attributeWithoutSynchronization(dirAttr);
             if (isLTROrRTLIgnoringCase(dirAttributeValue) || equalLettersIgnoringASCIICase(dirAttributeValue, "auto")) {
                 node = NodeTraversal::nextSkippingChildren(*node, this);
                 continue;
@@ -1147,11 +1037,19 @@ void HTMLElement::addHTMLColorToStyle(MutableStyleProperties& style, CSSProperty
         return;
 
     // If the string is a named CSS color or a 3/6-digit hex color, use that.
-    Color parsedColor(colorString);
-    if (!parsedColor.isValid())
-        parsedColor.setRGB(parseColorStringWithCrazyLegacyRules(colorString));
+    // We can't use the default Color constructor because it accepts
+    // 4/8-digit hex, which conflict with some legacy HTML content using attributes.
 
-    style.setProperty(propertyID, CSSValuePool::singleton().createColorValue(parsedColor.rgb()));
+    Color color;
+
+    if ((colorString.length() == 4 || colorString.length() == 7) && colorString[0] == '#')
+        color = Color(colorString);
+    if (!color.isValid())
+        color.setNamedColor(colorString);
+    if (!color.isValid())
+        color.setRGB(parseColorStringWithCrazyLegacyRules(colorString));
+
+    style.setProperty(propertyID, CSSValuePool::singleton().createColorValue(color.rgb()));
 }
 
 bool HTMLElement::willRespondToMouseMoveEvents()
@@ -1167,6 +1065,22 @@ bool HTMLElement::willRespondToMouseWheelEvents()
 bool HTMLElement::willRespondToMouseClickEvents()
 {
     return !isDisabledFormControl() && Element::willRespondToMouseClickEvents();
+}
+
+bool HTMLElement::canBeActuallyDisabled() const
+{
+    return is<HTMLButtonElement>(*this)
+        || is<HTMLInputElement>(*this)
+        || is<HTMLSelectElement>(*this)
+        || is<HTMLTextAreaElement>(*this)
+        || is<HTMLOptGroupElement>(*this)
+        || is<HTMLOptionElement>(*this)
+        || is<HTMLFieldSetElement>(*this);
+}
+
+bool HTMLElement::isActuallyDisabled() const
+{
+    return canBeActuallyDisabled() && isDisabledFormControl();
 }
 
 } // namespace WebCore

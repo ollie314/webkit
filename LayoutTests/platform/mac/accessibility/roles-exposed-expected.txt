@@ -579,9 +579,19 @@ samp
       AXSubrole: AXSampleStyleGroup
       AXRoleDescription: group
       
-section
+section:not([aria-label]:not([aria-labelledby])
       AXRole: AXGroup
-      AXSubrole: AXDocumentRegion
+      AXSubrole: 
+      AXRoleDescription: group
+      
+section[aria-label]
+      AXRole: AXGroup
+      AXSubrole: AXLandmarkRegion
+      AXRoleDescription: region
+      
+section[aria-labelledby]
+      AXRole: AXGroup
+      AXSubrole: AXLandmarkRegion
       AXRoleDescription: region
       
 select:not([multiple])
@@ -635,14 +645,14 @@ strong
       AXRoleDescription: 
       
 sub
-      AXRole: 
-      AXSubrole: 
-      AXRoleDescription: 
+      AXRole: AXGroup
+      AXSubrole: AXSubscriptStyleGroup
+      AXRoleDescription: group
       
 sup
-      AXRole: 
-      AXSubrole: 
-      AXRoleDescription: 
+      AXRole: AXGroup
+      AXSubrole: AXSuperscriptStyleGroup
+      AXRoleDescription: group
       
 svg
       AXRole: 
@@ -807,12 +817,12 @@ div[role=alert]
 div[role=alertdialog]
       AXRole: AXGroup
       AXSubrole: AXApplicationAlertDialog
-      AXRoleDescription: alert dialog
+      AXRoleDescription: web alert dialog
       
 div[role=application]
       AXRole: AXGroup
-      AXSubrole: AXLandmarkApplication
-      AXRoleDescription: application
+      AXSubrole: AXWebApplication
+      AXRoleDescription: web application
       
 div[role=article]
       AXRole: AXGroup
@@ -857,7 +867,7 @@ div[role=definition]
 div[role=dialog]
       AXRole: AXGroup
       AXSubrole: AXApplicationDialog
-      AXRoleDescription: dialog
+      AXRoleDescription: web dialog
       
 div[role=directory]
       AXRole: AXList
@@ -1036,7 +1046,7 @@ div[role=radio]
       
 div[role=region]
       AXRole: AXGroup
-      AXSubrole: AXDocumentRegion
+      AXSubrole: AXLandmarkRegion
       AXRoleDescription: region
       
 div[role=scrollbar]

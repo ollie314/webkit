@@ -23,17 +23,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#if ENABLE(REMOTE_INSPECTOR)
+#pragma once
 
-#ifndef RemoteInspector_h
-#define RemoteInspector_h
+#if ENABLE(REMOTE_INSPECTOR)
 
 #import "RemoteInspectorXPCConnection.h"
 #import <wtf/Forward.h>
 #import <wtf/HashMap.h>
 #import <wtf/Lock.h>
 #import <wtf/RetainPtr.h>
-#import <wtf/Vector.h>
 
 OBJC_CLASS NSDictionary;
 OBJC_CLASS NSString;
@@ -52,7 +50,7 @@ public:
     public:
         virtual ~Client() { }
         virtual bool remoteAutomationAllowed() const = 0;
-        virtual void requestAutomationSession() = 0;
+        virtual void requestAutomationSession(const String& sessionIdentifier) = 0;
     };
 
     static void startDisabled();
@@ -104,9 +102,9 @@ private:
 
     void sendAutomaticInspectionCandidateMessage();
 
-    virtual void xpcConnectionReceivedMessage(RemoteInspectorXPCConnection*, NSString *messageName, NSDictionary *userInfo) override;
-    virtual void xpcConnectionFailed(RemoteInspectorXPCConnection*) override;
-    virtual void xpcConnectionUnhandledMessage(RemoteInspectorXPCConnection*, xpc_object_t) override;
+    void xpcConnectionReceivedMessage(RemoteInspectorXPCConnection*, NSString *messageName, NSDictionary *userInfo) override;
+    void xpcConnectionFailed(RemoteInspectorXPCConnection*) override;
+    void xpcConnectionUnhandledMessage(RemoteInspectorXPCConnection*, xpc_object_t) override;
 
     void receivedSetupMessage(NSDictionary *userInfo);
     void receivedDataMessage(NSDictionary *userInfo);
@@ -117,6 +115,7 @@ private:
     void receivedConnectionDiedMessage(NSDictionary *userInfo);
     void receivedAutomaticInspectionConfigurationMessage(NSDictionary *userInfo);
     void receivedAutomaticInspectionRejectMessage(NSDictionary *userInfo);
+    void receivedAutomationSessionRequestMessage(NSDictionary *userInfo);
 
     static bool startEnabled;
 
@@ -150,7 +149,5 @@ private:
 };
 
 } // namespace Inspector
-
-#endif // RemoteInspector_h
 
 #endif // ENABLE(REMOTE_INSPECTOR)

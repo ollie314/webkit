@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2010, 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2009-2010, 2012-2013, 2016 Apple Inc. All rights reserved.
  * Copyright (C) 2012 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -50,6 +50,11 @@ public:
 
     ALWAYS_INLINE void append(const char* characters, unsigned length) { append(reinterpret_cast<const LChar*>(characters), length); }
 
+    void append(const AtomicString& atomicString)
+    {
+        append(atomicString.string());
+    }
+
     void append(const String& string)
     {
         if (!string.length())
@@ -96,6 +101,13 @@ public:
         else
             append(stringView.characters16(), stringView.length());
     }
+
+#if USE(CF)
+    WTF_EXPORT_PRIVATE void append(CFStringRef);
+#endif
+#if USE(CF) && defined(__OBJC__)
+    void append(NSString *string) { append((__bridge CFStringRef)string); }
+#endif
     
     void append(const String& string, unsigned offset, unsigned length)
     {
@@ -276,6 +288,7 @@ public:
         m_buffer.swap(stringBuilder.m_buffer);
         std::swap(m_is8Bit, stringBuilder.m_is8Bit);
         std::swap(m_bufferCharacters8, stringBuilder.m_bufferCharacters8);
+        ASSERT(!m_buffer || m_buffer->length() >= m_length);
     }
 
 private:

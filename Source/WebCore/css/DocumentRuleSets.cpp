@@ -39,6 +39,8 @@ namespace WebCore {
 
 DocumentRuleSets::DocumentRuleSets()
 {
+    m_authorStyle = std::make_unique<RuleSet>();
+    m_authorStyle->disableAutoShrinkToFit();
 }
 
 DocumentRuleSets::~DocumentRuleSets()
@@ -78,6 +80,7 @@ static std::unique_ptr<RuleSet> makeRuleSet(const Vector<RuleFeature>& rules)
 
 void DocumentRuleSets::resetAuthorStyle()
 {
+    m_isAuthorStyleDefined = true;
     m_authorStyle = std::make_unique<RuleSet>();
     m_authorStyle->disableAutoShrinkToFit();
 }
@@ -88,7 +91,7 @@ void DocumentRuleSets::appendAuthorStyleSheets(const Vector<RefPtr<CSSStyleSheet
     // needs to be reconstructed. To handle insertions too the rule order numbers would need to be updated.
     for (auto& cssSheet : styleSheets) {
         ASSERT(!cssSheet->disabled());
-        if (cssSheet->mediaQueries() && !medium->eval(cssSheet->mediaQueries(), resolver))
+        if (cssSheet->mediaQueries() && !medium->evaluate(*cssSheet->mediaQueries(), resolver))
             continue;
         m_authorStyle->addRulesFromSheet(cssSheet->contents(), *medium, resolver);
         inspectorCSSOMWrappers.collectFromStyleSheetIfNeeded(cssSheet.get());
@@ -114,16 +117,37 @@ void DocumentRuleSets::collectFeatures() const
 
     m_siblingRuleSet = makeRuleSet(m_features.siblingRules);
     m_uncommonAttributeRuleSet = makeRuleSet(m_features.uncommonAttributeRules);
+
+    m_ancestorClassRuleSets.clear();
+    m_ancestorAttributeRuleSetsForHTML.clear();
+
+    m_features.shrinkToFit();
 }
 
 RuleSet* DocumentRuleSets::ancestorClassRules(AtomicStringImpl* className) const
 {
-    auto addResult = m_ancestorClassRuleSet.add(className, nullptr);
+    auto addResult = m_ancestorClassRuleSets.add(className, nullptr);
     if (addResult.isNewEntry) {
         if (auto* rules = m_features.ancestorClassRules.get(className))
             addResult.iterator->value = makeRuleSet(*rules);
     }
     return addResult.iterator->value.get();
+}
+
+const DocumentRuleSets::AttributeRules* DocumentRuleSets::ancestorAttributeRulesForHTML(AtomicStringImpl* attributeName) const
+{
+    auto addResult = m_ancestorAttributeRuleSetsForHTML.add(attributeName, nullptr);
+    auto& value = addResult.iterator->value;
+    if (addResult.isNewEntry) {
+        if (auto* rules = m_features.ancestorAttributeRulesForHTML.get(attributeName)) {
+            value = std::make_unique<AttributeRules>();
+            value->attributeSelectors.reserveCapacity(rules->selectors.size());
+            for (auto* selector : rules->selectors.values())
+                value->attributeSelectors.uncheckedAppend(selector);
+            value->ruleSet = makeRuleSet(rules->features);
+        }
+    }
+    return value.get();
 }
 
 } // namespace WebCore

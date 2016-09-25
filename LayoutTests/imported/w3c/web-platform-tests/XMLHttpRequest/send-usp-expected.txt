@@ -1,130 +1,131 @@
 
-FAIL XMLHttpRequest.send(URLSearchParams) (0) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (1) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (2) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (3) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (4) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (5) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (6) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (7) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (8) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (9) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (10) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (11) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (12) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (13) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (14) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (15) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (16) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (17) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (18) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (19) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (20) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (21) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (22) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (23) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (24) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (25) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (26) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (27) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (28) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (29) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (30) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (31) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (32) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (33) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (34) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (35) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (36) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (37) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (38) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (39) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (40) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (41) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (42) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (43) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (44) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (45) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (46) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (47) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (48) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (49) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (50) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (51) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (52) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (53) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (54) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (55) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (56) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (57) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (58) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (59) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (60) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (61) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (62) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (63) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (64) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (65) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (66) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (67) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (68) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (69) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (70) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (71) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (72) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (73) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (74) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (75) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (76) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (77) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (78) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (79) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (80) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (81) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (82) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (83) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (84) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (85) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (86) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (87) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (88) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (89) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (90) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (91) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (92) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (93) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (94) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (95) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (96) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (97) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (98) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (99) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (100) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (101) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (102) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (103) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (104) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (105) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (106) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (107) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (108) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (109) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (110) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (111) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (112) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (113) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (114) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (115) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (116) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (117) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (118) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (119) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (120) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (121) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (122) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (123) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (124) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (125) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (126) Can't find variable: URLSearchParams
-FAIL XMLHttpRequest.send(URLSearchParams) (127) Can't find variable: URLSearchParams
+PASS Overall fetch with URLSearchParams 
+PASS XMLHttpRequest.send(URLSearchParams) (0) 
+PASS XMLHttpRequest.send(URLSearchParams) (1) 
+PASS XMLHttpRequest.send(URLSearchParams) (2) 
+PASS XMLHttpRequest.send(URLSearchParams) (3) 
+PASS XMLHttpRequest.send(URLSearchParams) (4) 
+PASS XMLHttpRequest.send(URLSearchParams) (5) 
+PASS XMLHttpRequest.send(URLSearchParams) (6) 
+PASS XMLHttpRequest.send(URLSearchParams) (7) 
+PASS XMLHttpRequest.send(URLSearchParams) (8) 
+PASS XMLHttpRequest.send(URLSearchParams) (9) 
+PASS XMLHttpRequest.send(URLSearchParams) (10) 
+PASS XMLHttpRequest.send(URLSearchParams) (11) 
+PASS XMLHttpRequest.send(URLSearchParams) (12) 
+PASS XMLHttpRequest.send(URLSearchParams) (13) 
+PASS XMLHttpRequest.send(URLSearchParams) (14) 
+PASS XMLHttpRequest.send(URLSearchParams) (15) 
+PASS XMLHttpRequest.send(URLSearchParams) (16) 
+PASS XMLHttpRequest.send(URLSearchParams) (17) 
+PASS XMLHttpRequest.send(URLSearchParams) (18) 
+PASS XMLHttpRequest.send(URLSearchParams) (19) 
+PASS XMLHttpRequest.send(URLSearchParams) (20) 
+PASS XMLHttpRequest.send(URLSearchParams) (21) 
+PASS XMLHttpRequest.send(URLSearchParams) (22) 
+PASS XMLHttpRequest.send(URLSearchParams) (23) 
+PASS XMLHttpRequest.send(URLSearchParams) (24) 
+PASS XMLHttpRequest.send(URLSearchParams) (25) 
+PASS XMLHttpRequest.send(URLSearchParams) (26) 
+PASS XMLHttpRequest.send(URLSearchParams) (27) 
+PASS XMLHttpRequest.send(URLSearchParams) (28) 
+PASS XMLHttpRequest.send(URLSearchParams) (29) 
+PASS XMLHttpRequest.send(URLSearchParams) (30) 
+PASS XMLHttpRequest.send(URLSearchParams) (31) 
+PASS XMLHttpRequest.send(URLSearchParams) (32) 
+PASS XMLHttpRequest.send(URLSearchParams) (33) 
+PASS XMLHttpRequest.send(URLSearchParams) (34) 
+PASS XMLHttpRequest.send(URLSearchParams) (35) 
+PASS XMLHttpRequest.send(URLSearchParams) (36) 
+PASS XMLHttpRequest.send(URLSearchParams) (37) 
+PASS XMLHttpRequest.send(URLSearchParams) (38) 
+PASS XMLHttpRequest.send(URLSearchParams) (39) 
+PASS XMLHttpRequest.send(URLSearchParams) (40) 
+PASS XMLHttpRequest.send(URLSearchParams) (41) 
+PASS XMLHttpRequest.send(URLSearchParams) (42) 
+PASS XMLHttpRequest.send(URLSearchParams) (43) 
+PASS XMLHttpRequest.send(URLSearchParams) (44) 
+PASS XMLHttpRequest.send(URLSearchParams) (45) 
+PASS XMLHttpRequest.send(URLSearchParams) (46) 
+PASS XMLHttpRequest.send(URLSearchParams) (47) 
+PASS XMLHttpRequest.send(URLSearchParams) (48) 
+PASS XMLHttpRequest.send(URLSearchParams) (49) 
+PASS XMLHttpRequest.send(URLSearchParams) (50) 
+PASS XMLHttpRequest.send(URLSearchParams) (51) 
+PASS XMLHttpRequest.send(URLSearchParams) (52) 
+PASS XMLHttpRequest.send(URLSearchParams) (53) 
+PASS XMLHttpRequest.send(URLSearchParams) (54) 
+PASS XMLHttpRequest.send(URLSearchParams) (55) 
+PASS XMLHttpRequest.send(URLSearchParams) (56) 
+PASS XMLHttpRequest.send(URLSearchParams) (57) 
+PASS XMLHttpRequest.send(URLSearchParams) (58) 
+PASS XMLHttpRequest.send(URLSearchParams) (59) 
+PASS XMLHttpRequest.send(URLSearchParams) (60) 
+PASS XMLHttpRequest.send(URLSearchParams) (61) 
+PASS XMLHttpRequest.send(URLSearchParams) (62) 
+PASS XMLHttpRequest.send(URLSearchParams) (63) 
+PASS XMLHttpRequest.send(URLSearchParams) (64) 
+PASS XMLHttpRequest.send(URLSearchParams) (65) 
+PASS XMLHttpRequest.send(URLSearchParams) (66) 
+PASS XMLHttpRequest.send(URLSearchParams) (67) 
+PASS XMLHttpRequest.send(URLSearchParams) (68) 
+PASS XMLHttpRequest.send(URLSearchParams) (69) 
+PASS XMLHttpRequest.send(URLSearchParams) (70) 
+PASS XMLHttpRequest.send(URLSearchParams) (71) 
+PASS XMLHttpRequest.send(URLSearchParams) (72) 
+PASS XMLHttpRequest.send(URLSearchParams) (73) 
+PASS XMLHttpRequest.send(URLSearchParams) (74) 
+PASS XMLHttpRequest.send(URLSearchParams) (75) 
+PASS XMLHttpRequest.send(URLSearchParams) (76) 
+PASS XMLHttpRequest.send(URLSearchParams) (77) 
+PASS XMLHttpRequest.send(URLSearchParams) (78) 
+PASS XMLHttpRequest.send(URLSearchParams) (79) 
+PASS XMLHttpRequest.send(URLSearchParams) (80) 
+PASS XMLHttpRequest.send(URLSearchParams) (81) 
+PASS XMLHttpRequest.send(URLSearchParams) (82) 
+PASS XMLHttpRequest.send(URLSearchParams) (83) 
+PASS XMLHttpRequest.send(URLSearchParams) (84) 
+PASS XMLHttpRequest.send(URLSearchParams) (85) 
+PASS XMLHttpRequest.send(URLSearchParams) (86) 
+PASS XMLHttpRequest.send(URLSearchParams) (87) 
+PASS XMLHttpRequest.send(URLSearchParams) (88) 
+PASS XMLHttpRequest.send(URLSearchParams) (89) 
+PASS XMLHttpRequest.send(URLSearchParams) (90) 
+PASS XMLHttpRequest.send(URLSearchParams) (91) 
+PASS XMLHttpRequest.send(URLSearchParams) (92) 
+PASS XMLHttpRequest.send(URLSearchParams) (93) 
+PASS XMLHttpRequest.send(URLSearchParams) (94) 
+PASS XMLHttpRequest.send(URLSearchParams) (95) 
+PASS XMLHttpRequest.send(URLSearchParams) (96) 
+PASS XMLHttpRequest.send(URLSearchParams) (97) 
+PASS XMLHttpRequest.send(URLSearchParams) (98) 
+PASS XMLHttpRequest.send(URLSearchParams) (99) 
+PASS XMLHttpRequest.send(URLSearchParams) (100) 
+PASS XMLHttpRequest.send(URLSearchParams) (101) 
+PASS XMLHttpRequest.send(URLSearchParams) (102) 
+PASS XMLHttpRequest.send(URLSearchParams) (103) 
+PASS XMLHttpRequest.send(URLSearchParams) (104) 
+PASS XMLHttpRequest.send(URLSearchParams) (105) 
+PASS XMLHttpRequest.send(URLSearchParams) (106) 
+PASS XMLHttpRequest.send(URLSearchParams) (107) 
+PASS XMLHttpRequest.send(URLSearchParams) (108) 
+PASS XMLHttpRequest.send(URLSearchParams) (109) 
+PASS XMLHttpRequest.send(URLSearchParams) (110) 
+PASS XMLHttpRequest.send(URLSearchParams) (111) 
+PASS XMLHttpRequest.send(URLSearchParams) (112) 
+PASS XMLHttpRequest.send(URLSearchParams) (113) 
+PASS XMLHttpRequest.send(URLSearchParams) (114) 
+PASS XMLHttpRequest.send(URLSearchParams) (115) 
+PASS XMLHttpRequest.send(URLSearchParams) (116) 
+PASS XMLHttpRequest.send(URLSearchParams) (117) 
+PASS XMLHttpRequest.send(URLSearchParams) (118) 
+PASS XMLHttpRequest.send(URLSearchParams) (119) 
+PASS XMLHttpRequest.send(URLSearchParams) (120) 
+PASS XMLHttpRequest.send(URLSearchParams) (121) 
+PASS XMLHttpRequest.send(URLSearchParams) (122) 
+PASS XMLHttpRequest.send(URLSearchParams) (123) 
+PASS XMLHttpRequest.send(URLSearchParams) (124) 
+PASS XMLHttpRequest.send(URLSearchParams) (125) 
+PASS XMLHttpRequest.send(URLSearchParams) (126) 
+PASS XMLHttpRequest.send(URLSearchParams) (127) 
 

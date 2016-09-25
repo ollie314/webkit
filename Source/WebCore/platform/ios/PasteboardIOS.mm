@@ -26,7 +26,6 @@
 #import "Pasteboard.h"
 
 #import "CachedImage.h"
-#import "DOMRangeInternal.h"
 #import "Document.h"
 #import "DocumentFragment.h"
 #import "DocumentLoader.h"
@@ -44,9 +43,8 @@
 #import "PasteboardStrategy.h"
 #import "PlatformStrategies.h"
 #import "RenderImage.h"
-#import "RuntimeApplicationChecksIOS.h"
+#import "RuntimeApplicationChecks.h"
 #import "SharedBuffer.h"
-#import "SoftLinking.h"
 #import "Text.h"
 #import "URL.h"
 #import "WebNSAttributedStringExtras.h"
@@ -61,37 +59,6 @@
 - (NSData *)RTFDFromRange:(NSRange)range documentAttributes:(NSDictionary *)dict;
 - (BOOL)containsAttachments;
 @end
-
-// FIXME: The following soft linking and #define needs to be shared with PlatformPasteboardIOS.mm and EditorIOS.mm
-
-SOFT_LINK_FRAMEWORK(MobileCoreServices)
-
-SOFT_LINK(MobileCoreServices, UTTypeCreatePreferredIdentifierForTag, CFStringRef, (CFStringRef inTagClass, CFStringRef inTag, CFStringRef inConformingToUTI), (inTagClass, inTag, inConformingToUTI))
-SOFT_LINK(MobileCoreServices, UTTypeCopyPreferredTagWithClass, CFStringRef, (CFStringRef inUTI, CFStringRef inTagClass), (inUTI, inTagClass))
-
-SOFT_LINK_CONSTANT(MobileCoreServices, kUTTypeText, CFStringRef)
-SOFT_LINK_CONSTANT(MobileCoreServices, kUTTypePNG, CFStringRef)
-SOFT_LINK_CONSTANT(MobileCoreServices, kUTTypeJPEG, CFStringRef)
-SOFT_LINK_CONSTANT(MobileCoreServices, kUTTypeURL, CFStringRef)
-SOFT_LINK_CONSTANT(MobileCoreServices, kUTTypeTIFF, CFStringRef)
-SOFT_LINK_CONSTANT(MobileCoreServices, kUTTypeGIF, CFStringRef)
-SOFT_LINK_CONSTANT(MobileCoreServices, kUTTagClassMIMEType, CFStringRef)
-SOFT_LINK_CONSTANT(MobileCoreServices, kUTTagClassFilenameExtension, CFStringRef)
-SOFT_LINK_CONSTANT(MobileCoreServices, kUTTypeHTML, CFStringRef)
-SOFT_LINK_CONSTANT(MobileCoreServices, kUTTypeRTFD, CFStringRef)
-SOFT_LINK_CONSTANT(MobileCoreServices, kUTTypeRTF, CFStringRef)
-
-#define kUTTypeText getkUTTypeText()
-#define kUTTypePNG  getkUTTypePNG()
-#define kUTTypeJPEG getkUTTypeJPEG()
-#define kUTTypeURL  getkUTTypeURL()
-#define kUTTypeTIFF getkUTTypeTIFF()
-#define kUTTypeGIF  getkUTTypeGIF()
-#define kUTTagClassMIMEType getkUTTagClassMIMEType()
-#define kUTTagClassFilenameExtension getkUTTagClassFilenameExtension()
-#define kUTTypeHTML getkUTTypeHTML()
-#define kUTTypeRTFD getkUTTypeRTFD()
-#define kUTTypeRTF getkUTTypeRTF()
 
 namespace WebCore {
 
@@ -196,7 +163,7 @@ void Pasteboard::read(PasteboardWebContentReader& reader)
 
             if ([type isEqualToString:WebArchivePboardType]) {
                 if (RefPtr<SharedBuffer> buffer = strategy.readBufferFromPasteboard(i, WebArchivePboardType)) {
-                    if (reader.readWebArchive(buffer.release()))
+                    if (reader.readWebArchive(buffer.get()))
                         break;
                 }
             }
@@ -207,23 +174,23 @@ void Pasteboard::read(PasteboardWebContentReader& reader)
                     break;
             }
 
-             if ([type isEqualToString:(NSString *)kUTTypeRTFD]) {
-                if (RefPtr<SharedBuffer> buffer = strategy.readBufferFromPasteboard(i, kUTTypeRTFD)) {
-                    if (reader.readRTFD(buffer.release()))
+            if ([type isEqualToString:(NSString *)kUTTypeFlatRTFD]) {
+                if (RefPtr<SharedBuffer> buffer = strategy.readBufferFromPasteboard(i, kUTTypeFlatRTFD)) {
+                    if (reader.readRTFD(*buffer))
                         break;
                 }
             }
 
             if ([type isEqualToString:(NSString *)kUTTypeRTF]) {
                 if (RefPtr<SharedBuffer> buffer = strategy.readBufferFromPasteboard(i, kUTTypeRTF)) {
-                    if (reader.readRTF(buffer.release()))
+                    if (reader.readRTF(*buffer))
                         break;
                 }
             }
 
             if ([supportedImageTypes() containsObject:type]) {
                 if (RefPtr<SharedBuffer> buffer = strategy.readBufferFromPasteboard(i, type)) {
-                    if (reader.readImage(buffer.release(), type))
+                    if (reader.readImage(buffer.releaseNonNull(), type))
                         break;
                 }
         }
@@ -246,7 +213,7 @@ void Pasteboard::read(PasteboardWebContentReader& reader)
 
 NSArray* Pasteboard::supportedPasteboardTypes()
 {
-    return @[(id)WebArchivePboardType, (id)kUTTypeRTFD, (id)kUTTypeRTF, (id)kUTTypeHTML, (id)kUTTypePNG, (id)kUTTypeTIFF, (id)kUTTypeJPEG, (id)kUTTypeGIF, (id)kUTTypeURL, (id)kUTTypeText];
+    return @[(id)WebArchivePboardType, (id)kUTTypeFlatRTFD, (id)kUTTypeRTF, (id)kUTTypeHTML, (id)kUTTypePNG, (id)kUTTypeTIFF, (id)kUTTypeJPEG, (id)kUTTypeGIF, (id)kUTTypeURL, (id)kUTTypeText];
 }
 
 bool Pasteboard::hasData()

@@ -83,6 +83,7 @@
     click_fired = true;
     assert_false(input_fired, "click event should fire before input event");
     assert_false(change_fired, "click event should fire before change event");
+    assert_false(e.isTrusted, "click()-initiated click event shouldn't be trusted");
   });
 
   radio5.oninput = t1.step_func(function(e) {

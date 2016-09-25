@@ -38,8 +38,8 @@
 #include "HTTPParsers.h"
 #include "LocalizedStrings.h"
 #include "MIMETypeRegistry.h"
+#include "NetworkStorageSession.h"
 #include "NetworkingContext.h"
-#include "NotImplemented.h"
 #include "ResourceError.h"
 #include "ResourceHandleClient.h"
 #include "ResourceHandleInternal.h"
@@ -136,17 +136,17 @@ public:
     }
 #endif // SOUP_CHECK_VERSION(2, 49, 91)
 
-    virtual void didReceiveResponse(ResourceHandle*, const ResourceResponse& response) override
+    void didReceiveResponse(ResourceHandle*, ResourceResponse&& response) override
     {
         m_response = response;
     }
 
-    virtual void didReceiveData(ResourceHandle*, const char* /* data */, unsigned /* length */, int) override
+    void didReceiveData(ResourceHandle*, const char* /* data */, unsigned /* length */, int) override
     {
         ASSERT_NOT_REACHED();
     }
 
-    virtual void didReceiveBuffer(ResourceHandle*, PassRefPtr<SharedBuffer> buffer, int /* encodedLength */) override
+    void didReceiveBuffer(ResourceHandle*, Ref<SharedBuffer>&& buffer, int /* encodedLength */) override
     {
         // This pattern is suggested by SharedBuffer.h.
         const char* segment;
@@ -157,26 +157,26 @@ public:
         }
     }
 
-    virtual void didFinishLoading(ResourceHandle*, double) override
+    void didFinishLoading(ResourceHandle*, double) override
     {
         if (g_main_loop_is_running(m_mainLoop.get()))
             g_main_loop_quit(m_mainLoop.get());
         m_finished = true;
     }
 
-    virtual void didFail(ResourceHandle* handle, const ResourceError& error) override
+    void didFail(ResourceHandle* handle, const ResourceError& error) override
     {
         m_error = error;
         didFinishLoading(handle, 0);
     }
 
-    virtual void didReceiveAuthenticationChallenge(ResourceHandle*, const AuthenticationChallenge& challenge) override
+    void didReceiveAuthenticationChallenge(ResourceHandle*, const AuthenticationChallenge& challenge) override
     {
         // We do not handle authentication for synchronous XMLHttpRequests.
         challenge.authenticationClient()->receivedRequestToContinueWithoutCredential(challenge);
     }
 
-    virtual bool shouldUseCredentialStorage(ResourceHandle*) override
+    bool shouldUseCredentialStorage(ResourceHandle*) override
     {
         return m_storedCredentials == AllowStoredCredentials;
     }
@@ -238,7 +238,7 @@ static void cleanupSoupRequestOperation(ResourceHandle*, bool isDestroying = fal
 static void sendRequestCallback(GObject*, GAsyncResult*, gpointer);
 static void readCallback(GObject*, GAsyncResult*, gpointer);
 #if ENABLE(WEB_TIMING)
-static int  milisecondsSinceRequest(double requestTime);
+static double milisecondsSinceRequest(double requestTime);
 #endif
 static void continueAfterDidReceiveResponse(ResourceHandle*);
 
@@ -464,18 +464,17 @@ static bool shouldRedirectAsGET(SoupMessage* message, URL& newURL, bool crossOri
     return false;
 }
 
-static void continueAfterWillSendRequest(ResourceHandle* handle, const ResourceRequest& request)
+static void continueAfterWillSendRequest(ResourceHandle* handle, ResourceRequest&& request)
 {
     // willSendRequest might cancel the load.
     if (handle->cancelledOrClientless())
         return;
 
-    ResourceRequest newRequest(request);
     ResourceHandleInternal* d = handle->getInternal();
-    if (protocolHostAndPortAreEqual(newRequest.url(), d->m_response.url()))
-        applyAuthenticationToRequest(handle, newRequest, true);
+    if (protocolHostAndPortAreEqual(request.url(), d->m_response.url()))
+        applyAuthenticationToRequest(handle, request, true);
 
-    if (!createSoupRequestAndMessageForHandle(handle, newRequest)) {
+    if (!createSoupRequestAndMessageForHandle(handle, request)) {
         d->client()->cannotShowURL(handle);
         return;
     }
@@ -532,11 +531,12 @@ static void doRedirect(ResourceHandle* handle)
 
     cleanupSoupRequestOperation(handle);
 
+    ResourceResponse responseCopy = d->m_response;
     if (d->client()->usesAsyncCallbacks())
-        d->client()->willSendRequestAsync(handle, newRequest, d->m_response);
+        d->client()->willSendRequestAsync(handle, WTFMove(newRequest), WTFMove(responseCopy));
     else {
-        d->client()->willSendRequest(handle, newRequest, d->m_response);
-        continueAfterWillSendRequest(handle, newRequest);
+        auto request = d->client()->willSendRequest(handle, WTFMove(newRequest), WTFMove(responseCopy));
+        continueAfterWillSendRequest(handle, WTFMove(request));
     }
 
 }
@@ -654,9 +654,9 @@ static void nextMultipartResponsePartCallback(GObject* /*source*/, GAsyncResult*
     d->m_previousPosition = 0;
 
     if (handle->client()->usesAsyncCallbacks())
-        handle->client()->didReceiveResponseAsync(handle.get(), d->m_response);
+        handle->client()->didReceiveResponseAsync(handle.get(), ResourceResponse(d->m_response));
     else {
-        handle->client()->didReceiveResponse(handle.get(), d->m_response);
+        handle->client()->didReceiveResponse(handle.get(), ResourceResponse(d->m_response));
         continueAfterDidReceiveResponse(handle.get());
     }
 }
@@ -709,7 +709,7 @@ static void sendRequestCallback(GObject*, GAsyncResult* result, gpointer data)
     }
 
 #if ENABLE(WEB_TIMING)
-    d->m_response.resourceLoadTiming().responseStart = milisecondsSinceRequest(handle->m_requestTime);
+    d->m_response.networkLoadTiming().responseStart = milisecondsSinceRequest(handle->m_requestTime);
 #endif
 
     if (soupMessage && d->m_response.isMultipart())
@@ -718,9 +718,9 @@ static void sendRequestCallback(GObject*, GAsyncResult* result, gpointer data)
         d->m_inputStream = inputStream;
 
     if (d->client()->usesAsyncCallbacks())
-        handle->client()->didReceiveResponseAsync(handle.get(), d->m_response);
+        handle->client()->didReceiveResponseAsync(handle.get(), ResourceResponse(d->m_response));
     else {
-        handle->client()->didReceiveResponse(handle.get(), d->m_response);
+        handle->client()->didReceiveResponse(handle.get(), ResourceResponse(d->m_response));
         continueAfterDidReceiveResponse(handle.get());
     }
 }
@@ -769,30 +769,30 @@ static bool addFileToSoupMessageBody(SoupMessage* message, const String& fileNam
 
 static bool blobIsOutOfDate(const BlobDataItem& blobItem)
 {
-    ASSERT(blobItem.type == BlobDataItem::File);
-    if (!isValidFileTime(blobItem.file->expectedModificationTime()))
+    ASSERT(blobItem.type() == BlobDataItem::Type::File);
+    if (!isValidFileTime(blobItem.file()->expectedModificationTime()))
         return false;
 
     time_t fileModificationTime;
-    if (!getFileModificationTime(blobItem.file->path(), fileModificationTime))
+    if (!getFileModificationTime(blobItem.file()->path(), fileModificationTime))
         return true;
 
-    return fileModificationTime != static_cast<time_t>(blobItem.file->expectedModificationTime());
+    return fileModificationTime != static_cast<time_t>(blobItem.file()->expectedModificationTime());
 }
 
 static void addEncodedBlobItemToSoupMessageBody(SoupMessage* message, const BlobDataItem& blobItem, unsigned long& totalBodySize)
 {
-    if (blobItem.type == BlobDataItem::Data) {
+    if (blobItem.type() == BlobDataItem::Type::Data) {
         totalBodySize += blobItem.length();
-        soup_message_body_append(message->request_body, SOUP_MEMORY_TEMPORARY, blobItem.data->data() + blobItem.offset(), blobItem.length());
+        soup_message_body_append(message->request_body, SOUP_MEMORY_TEMPORARY, blobItem.data().data()->data() + blobItem.offset(), blobItem.length());
         return;
     }
 
-    ASSERT(blobItem.type == BlobDataItem::File);
+    ASSERT(blobItem.type() == BlobDataItem::Type::File);
     if (blobIsOutOfDate(blobItem))
         return;
 
-    addFileToSoupMessageBody(message, blobItem.file->path(), blobItem.offset(), blobItem.length() == BlobDataItem::toEndOfFile ? 0 : blobItem.length(),  totalBodySize);
+    addFileToSoupMessageBody(message, blobItem.file()->path(), blobItem.offset(), blobItem.length() == BlobDataItem::toEndOfFile ? 0 : blobItem.length(),  totalBodySize);
 }
 
 static void addEncodedBlobToSoupMessageBody(SoupMessage* message, const FormDataElement& element, unsigned long& totalBodySize)
@@ -836,14 +836,14 @@ static bool addFormElementsToSoupMessage(SoupMessage* message, const char*, Form
 }
 
 #if ENABLE(WEB_TIMING)
-static int milisecondsSinceRequest(double requestTime)
+static double milisecondsSinceRequest(double requestTime)
 {
-    return static_cast<int>((monotonicallyIncreasingTime() - requestTime) * 1000.0);
+    return (monotonicallyIncreasingTime() - requestTime) * 1000.0;
 }
 
 void ResourceHandle::didStartRequest()
 {
-    getInternal()->m_response.resourceLoadTiming().requestStart = milisecondsSinceRequest(m_requestTime);
+    getInternal()->m_response.networkLoadTiming().requestStart = milisecondsSinceRequest(m_requestTime);
 }
 
 #if SOUP_CHECK_VERSION(2, 49, 91)
@@ -863,24 +863,24 @@ static void networkEventCallback(SoupMessage*, GSocketClientEvent event, GIOStre
         return;
 
     ResourceHandleInternal* d = handle->getInternal();
-    int deltaTime = milisecondsSinceRequest(handle->m_requestTime);
+    double deltaTime = milisecondsSinceRequest(handle->m_requestTime);
     switch (event) {
     case G_SOCKET_CLIENT_RESOLVING:
-        d->m_response.resourceLoadTiming().domainLookupStart = deltaTime;
+        d->m_response.networkLoadTiming().domainLookupStart = deltaTime;
         break;
     case G_SOCKET_CLIENT_RESOLVED:
-        d->m_response.resourceLoadTiming().domainLookupEnd = deltaTime;
+        d->m_response.networkLoadTiming().domainLookupEnd = deltaTime;
         break;
     case G_SOCKET_CLIENT_CONNECTING:
-        d->m_response.resourceLoadTiming().connectStart = deltaTime;
-        if (d->m_response.resourceLoadTiming().domainLookupStart != -1) {
+        d->m_response.networkLoadTiming().connectStart = deltaTime;
+        if (d->m_response.networkLoadTiming().domainLookupStart != -1) {
             // WebCore/inspector/front-end/RequestTimingView.js assumes
             // that DNS time is included in connection time so must
             // substract here the DNS delta that will be added later (see
             // WebInspector.RequestTimingView.createTimingTable in the
             // file above for more details).
-            d->m_response.resourceLoadTiming().connectStart -=
-                d->m_response.resourceLoadTiming().domainLookupEnd - d->m_response.resourceLoadTiming().domainLookupStart;
+            d->m_response.networkLoadTiming().connectStart -=
+                d->m_response.networkLoadTiming().domainLookupEnd - d->m_response.networkLoadTiming().domainLookupStart;
         }
         break;
     case G_SOCKET_CLIENT_CONNECTED:
@@ -892,12 +892,12 @@ static void networkEventCallback(SoupMessage*, GSocketClientEvent event, GIOStre
     case G_SOCKET_CLIENT_PROXY_NEGOTIATED:
         break;
     case G_SOCKET_CLIENT_TLS_HANDSHAKING:
-        d->m_response.resourceLoadTiming().secureConnectionStart = deltaTime;
+        d->m_response.networkLoadTiming().secureConnectionStart = deltaTime;
         break;
     case G_SOCKET_CLIENT_TLS_HANDSHAKED:
         break;
     case G_SOCKET_CLIENT_COMPLETE:
-        d->m_response.resourceLoadTiming().connectEnd = deltaTime;
+        d->m_response.networkLoadTiming().connectEnd = deltaTime;
         break;
     default:
         ASSERT_NOT_REACHED();
@@ -1247,9 +1247,11 @@ void ResourceHandle::receivedRequestToPerformDefaultHandling(const Authenticatio
     ASSERT_NOT_REACHED();
 }
 
-void ResourceHandle::receivedChallengeRejection(const AuthenticationChallenge&)
+void ResourceHandle::receivedChallengeRejection(const AuthenticationChallenge& challenge)
 {
-    ASSERT_NOT_REACHED();
+    // This is only used by layout tests, soup based ports don't implement this.
+    notImplemented();
+    receivedRequestToContinueWithoutCredential(challenge);
 }
 
 static bool waitingToSendRequest(ResourceHandle* handle)
@@ -1367,10 +1369,10 @@ static void readCallback(GObject*, GAsyncResult* asyncResult, gpointer data)
         d->m_cancellable.get(), readCallback, handle.get());
 }
 
-void ResourceHandle::continueWillSendRequest(const ResourceRequest& request)
+void ResourceHandle::continueWillSendRequest(ResourceRequest&& request)
 {
     ASSERT(!client() || client()->usesAsyncCallbacks());
-    continueAfterWillSendRequest(this, request);
+    continueAfterWillSendRequest(this, WTFMove(request));
 }
 
 void ResourceHandle::continueDidReceiveResponse()

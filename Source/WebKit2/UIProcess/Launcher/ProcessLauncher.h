@@ -23,14 +23,13 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WebProcessLauncher_h
-#define WebProcessLauncher_h
+#pragma once
 
 #include "Connection.h"
-#include "PlatformProcessIdentifier.h"
 #include <wtf/HashMap.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Threading.h>
+#include <wtf/WeakPtr.h>
 #include <wtf/text/StringHash.h>
 #include <wtf/text/WTFString.h>
 
@@ -61,7 +60,7 @@ public:
         ProcessType processType;
         HashMap<String, String> extraInitializationData;
 
-#if (PLATFORM(EFL) || PLATFORM(GTK)) && !defined(NDEBUG)
+#if ENABLE(DEVELOPER_MODE) && (PLATFORM(GTK) || PLATFORM(EFL))
         String processCmdPrefix;
 #endif
     };
@@ -72,7 +71,7 @@ public:
     }
 
     bool isLaunching() const { return m_isLaunching; }
-    PlatformProcessIdentifier processIdentifier() const { return m_processIdentifier; }
+    pid_t processIdentifier() const { return m_processIdentifier; }
 
     void terminateProcess();
     void invalidate();
@@ -81,17 +80,16 @@ private:
     ProcessLauncher(Client*, const LaunchOptions& launchOptions);
 
     void launchProcess();
-    void didFinishLaunchingProcess(PlatformProcessIdentifier, IPC::Connection::Identifier);
+    void didFinishLaunchingProcess(pid_t, IPC::Connection::Identifier);
 
     void platformInvalidate();
 
     Client* m_client;
 
+    WeakPtrFactory<ProcessLauncher> m_weakPtrFactory;
     const LaunchOptions m_launchOptions;
     bool m_isLaunching;
-    PlatformProcessIdentifier m_processIdentifier;
+    pid_t m_processIdentifier;
 };
 
 } // namespace WebKit
-
-#endif // WebProcessLauncher_h

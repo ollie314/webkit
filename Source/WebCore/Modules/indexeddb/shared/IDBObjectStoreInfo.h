@@ -39,7 +39,7 @@ class IDBKeyPath;
 
 class IDBObjectStoreInfo {
 public:
-    IDBObjectStoreInfo();
+    WEBCORE_EXPORT IDBObjectStoreInfo();
     IDBObjectStoreInfo(uint64_t identifier, const String& name, const IDBKeyPath&, bool autoIncrement);
 
     uint64_t identifier() const { return m_identifier; }
@@ -62,7 +62,10 @@ public:
     void deleteIndex(const String& indexName);
     void deleteIndex(uint64_t indexIdentifier);
 
-#ifndef NDEBUG
+    template<class Encoder> void encode(Encoder&) const;
+    template<class Decoder> static bool decode(Decoder&, IDBObjectStoreInfo&);
+
+#if !LOG_DISABLED
     String loggingString(int indent = 0) const;
 #endif
 
@@ -76,6 +79,36 @@ private:
     HashMap<uint64_t, IDBIndexInfo> m_indexMap;
 
 };
+
+template<class Encoder>
+void IDBObjectStoreInfo::encode(Encoder& encoder) const
+{
+    encoder << m_identifier << m_name << m_keyPath << m_autoIncrement << m_maxIndexID << m_indexMap;
+}
+
+template<class Decoder>
+bool IDBObjectStoreInfo::decode(Decoder& decoder, IDBObjectStoreInfo& info)
+{
+    if (!decoder.decode(info.m_identifier))
+        return false;
+
+    if (!decoder.decode(info.m_name))
+        return false;
+
+    if (!decoder.decode(info.m_keyPath))
+        return false;
+
+    if (!decoder.decode(info.m_autoIncrement))
+        return false;
+
+    if (!decoder.decode(info.m_maxIndexID))
+        return false;
+
+    if (!decoder.decode(info.m_indexMap))
+        return false;
+
+    return true;
+}
 
 } // namespace WebCore
 

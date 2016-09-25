@@ -10,17 +10,20 @@ class ChartPaneBase extends ComponentBase {
         this._metricId = null;
         this._platform = null;
         this._metric = null;
+        this._disableSampling = false;
+        this._showOutliers = false;
 
         this._overviewChart = null;
         this._mainChart = null;
         this._mainChartStatus = null;
         this._commitLogViewer = null;
         this._tasksForAnnotations = null;
+        this._renderedAnnotations = false;
     }
 
     configure(platformId, metricId)
     {
-        var result = ChartStyles.createChartSourceList(platformId, metricId);
+        var result = ChartStyles.resolveConfiguration(platformId, metricId);
         this._errorMessage = result.error;
         this._platformId = platformId;
         this._metricId = metricId;
@@ -41,8 +44,7 @@ class ChartPaneBase extends ComponentBase {
 
         var overviewOptions = ChartStyles.overviewChartOptions(formatter);
         overviewOptions.selection.onchange = this._overviewSelectionDidChange.bind(this);
-
-        this._overviewChart = new InteractiveTimeSeriesChart(result.sourceList, overviewOptions);
+        this._overviewChart = new InteractiveTimeSeriesChart(this._createSourceList(false), overviewOptions);
         this.renderReplace(this.content().querySelector('.chart-pane-overview'), this._overviewChart);
 
         var mainOptions = ChartStyles.mainChartOptions(formatter);
@@ -51,23 +53,49 @@ class ChartPaneBase extends ComponentBase {
         mainOptions.selection.onzoom = this._mainSelectionDidZoom.bind(this);
         mainOptions.annotations.onclick = this._openAnalysisTask.bind(this);
         mainOptions.ondata = this._didFetchData.bind(this);
-        this._mainChart = new InteractiveTimeSeriesChart(result.sourceList, mainOptions);
+        this._mainChart = new InteractiveTimeSeriesChart(this._createSourceList(true), mainOptions);
         this.renderReplace(this.content().querySelector('.chart-pane-main'), this._mainChart);
 
-        this._mainChartStatus = new ChartPaneStatusView(result.metric, this._mainChart, this._openCommitViewer.bind(this));
+        this._mainChartStatus = new ChartPaneStatusView(result.metric, this._mainChart, this._requestOpeningCommitViewer.bind(this));
         this.renderReplace(this.content().querySelector('.chart-pane-details'), this._mainChartStatus);
 
         this.content().querySelector('.chart-pane').addEventListener('keyup', this._keyup.bind(this));
 
-        this._fetchAnalysisTasks(platformId, metricId);
+        this.fetchAnalysisTasks(false);
     }
 
-    _fetchAnalysisTasks(platformId, metricId)
+    isSamplingEnabled() { return !this._disableSampling; }
+    setSamplingEnabled(enabled)
+    {
+        this._disableSampling = !enabled;
+        this._updateSourceList();
+    }
+
+    isShowingOutliers() { return this._showOutliers; }
+    setShowOutliers(show)
+    {
+        this._showOutliers = !!show;
+        this._updateSourceList();
+    }
+
+    _createSourceList(isMainChart)
+    {
+        return ChartStyles.createSourceList(this._platform, this._metric, this._disableSampling, this._showOutliers, isMainChart);
+    }
+
+    _updateSourceList()
+    {
+        this._mainChart.setSourceList(this._createSourceList(true));
+        this._overviewChart.setSourceList(this._createSourceList(false));
+    }
+
+    fetchAnalysisTasks(noCache)
     {
         // FIXME: we need to update the annotation bars when the change type of tasks change.
         var self = this;
-        AnalysisTask.fetchByPlatformAndMetric(platformId, metricId).then(function (tasks) {
+        AnalysisTask.fetchByPlatformAndMetric(this._platformId, this._metricId, noCache).then(function (tasks) {
             self._tasksForAnnotations = tasks;
+            self._renderedAnnotations = false;
             self.render();
         });
     }
@@ -97,7 +125,7 @@ class ChartPaneBase extends ComponentBase {
 
     _mainSelectionDidChange(selection, didEndDrag)
     {
-        this.render();
+        this._updateStatus();
     }
 
     _mainSelectionDidZoom(selection)
@@ -109,13 +137,18 @@ class ChartPaneBase extends ComponentBase {
 
     _indicatorDidChange(indicatorID, isLocked)
     {
-        this._mainChartStatus.updateRevisionListWithNotification();
-        this.render();
+        this._updateStatus();
     }
 
     _didFetchData()
     {
-        this._mainChartStatus.updateRevisionListWithNotification();
+        this._updateStatus();
+    }
+
+    _updateStatus()
+    {
+        var range = this._mainChartStatus.updateRevisionList();
+        this._commitLogViewer.view(range.repository, range.from, range.to).then(this.render.bind(this));
         this.render();
     }
 
@@ -128,7 +161,7 @@ class ChartPaneBase extends ComponentBase {
 
     router() { return null; }
 
-    _openCommitViewer(repository, from, to)
+    _requestOpeningCommitViewer(repository, from, to)
     {
         this._mainChartStatus.setCurrentRepository(repository);
         this._commitLogViewer.view(repository, from, to).then(this.render.bind(this));
@@ -168,6 +201,12 @@ class ChartPaneBase extends ComponentBase {
 
         super.render();
 
+        if (this._overviewChart)
+            this._overviewChart.enqueueToRender();
+
+        if (this._mainChart)
+            this._mainChart.enqueueToRender();
+
         if (this._errorMessage) {
             this.renderReplace(this.content().querySelector('.chart-pane-main'), this._errorMessage);
             return;
@@ -190,14 +229,16 @@ class ChartPaneBase extends ComponentBase {
 
     _renderAnnotations()
     {
-        if (!this._tasksForAnnotations)
+        if (!this._tasksForAnnotations || this._renderedAnnotations)
             return;
+        this._renderedAnnotations = true;
 
         var annotations = this._tasksForAnnotations.map(function (task) {
             var fillStyle = '#fc6';
             switch (task.changeType()) {
             case 'inconclusive':
                 fillStyle = '#fcc';
+                break;
             case 'progression':
                 fillStyle = '#39f';
                 break;

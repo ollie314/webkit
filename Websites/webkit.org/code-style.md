@@ -713,6 +713,46 @@ setResizable(NotResizable);
 #define _HTML_DOCUMENT_H_
 ```
 
+[](#names-protectors-this) Ref and RefPtr objects meant to protect `this` from deletion should be named "protectedThis".
+
+###### Right:
+
+```cpp
+RefPtr<Node> protectedThis(this);
+Ref<Element> protectedThis(*this);
+RefPtr<Widget> protectedThis = this;
+```
+
+###### Wrong:
+
+```cpp
+RefPtr<Node> protector(this);
+Ref<Node> protector = *this;
+RefPtr<Widget> self(this);
+Ref<Element> elementRef(*this);
+```
+
+[](#names-protectors) Ref and RefPtr objects meant to protect variables other than `this` from deletion should be named either "protector", or "protected" combined with the capitalized form of the variable name.
+
+###### Right:
+
+```cpp
+RefPtr<Element> protector(&element);
+RefPtr<Element> protector = &element;
+RefPtr<Node> protectedNode(node);
+RefPtr<Widget> protectedMainWidget(m_mainWidget);
+RefPtr<Loader> protectedFontLoader = m_fontLoader;
+```
+
+###### Wrong:
+
+```cpp
+RefPtr<Node> nodeRef(&rootNode);
+Ref<Element> protect(*element);
+RefPtr<Node> protectorNode(node);
+RefPtr<Widget> protected = widget;
+```
+
 ### Other Punctuation
 
 [](#punctuation-member-init) Constructors for C++ classes should initialize all of their members using C++ initializer syntax. Each member (and superclass) should be indented on a separate line, with the colon or comma preceding the member on that line.
@@ -1187,4 +1227,74 @@ drawJpg(); // FIXME(joe): Make this code handle jpg in addition to the png suppo
 
 ```cpp
 drawJpg(); // TODO: Make this code handle jpg in addition to the png support.
+```
+
+### Overriding Virtual Methods
+
+[](#override-methods) The base level declaration of a virtual method inside a class must be declared with the `virtual` keyword. All subclasses of that class must either specify the `override` keyword when overriding the virtual method or the `final` keyword when overriding the virtual method and requiring that no further subclasses can override it. You never want to annotate a method with more than one of the `virtual`, `override`, or `final` keywords.
+
+###### Right:
+
+```cpp
+class Person {
+public:
+    virtual String description() { ... };
+}
+
+class Student : public Person {
+public:
+    String description() override { ... }; // This is correct because it only contains the "override" keyword to indicate that the method is overridden.
+}
+
+```
+
+```cpp
+class Person {
+public:
+    virtual String description() { ... };
+}
+
+class Student : public Person {
+public:
+    String description() final { ... }; // This is correct because it only contains the "final" keyword to indicate that the method is overridden and that no subclasses of "Student" can override "description".
+}
+
+```
+
+###### Wrong:
+
+```cpp
+class Person {
+public:
+    virtual String description() { ... };
+}
+
+class Student : public Person {
+public:
+    virtual String description() override { ... }; // This is incorrect because it uses both the "virtual" and "override" keywords to indicate that the method is overridden. Instead, it should only use the "override" keyword.
+}
+```
+
+```cpp
+class Person {
+public:
+    virtual String description() { ... };
+}
+
+class Student : public Person {
+public:
+    virtual String description() final { ... }; // This is incorrect because it uses both the "virtual" and "final" keywords to indicate that the method is overridden and final. Instead, it should only use the "final" keyword.
+}
+```
+
+```cpp
+class Person {
+public:
+    virtual String description() { ... };
+}
+
+class Student : public Person {
+public:
+    virtual String description() { ... }; // This is incorrect because it uses the "virtual" keyword to indicate that the method is overridden.
+}
 ```

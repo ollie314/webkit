@@ -717,32 +717,19 @@ public:
 
     // Context creation attributes.
     struct Attributes {
-        Attributes()
-            : alpha(true)
-            , depth(true)
-            , stencil(false)
-            , antialias(true)
-            , premultipliedAlpha(true)
-            , preserveDrawingBuffer(false)
-            , noExtensions(false)
-            , shareResources(true)
-            , preferDiscreteGPU(false)
-            , forceSoftwareRenderer(false)
-            , devicePixelRatio(1)
-        {
-        }
-
-        bool alpha;
-        bool depth;
-        bool stencil;
-        bool antialias;
-        bool premultipliedAlpha;
-        bool preserveDrawingBuffer;
-        bool noExtensions;
-        bool shareResources;
-        bool preferDiscreteGPU;
-        bool forceSoftwareRenderer;
-        float devicePixelRatio;
+        bool alpha { true };
+        bool depth { true };
+        bool stencil { false };
+        bool antialias { true };
+        bool premultipliedAlpha { true };
+        bool preserveDrawingBuffer { false };
+        bool noExtensions { false };
+        bool shareResources { true };
+        bool preferLowPowerToHighPerformance { false };
+        bool forceSoftwareRenderer { false };
+        bool failIfMajorPerformanceCaveat { false };
+        bool useGLES3 { false };
+        float devicePixelRatio { 1 };
     };
 
     enum RenderStyle {
@@ -766,7 +753,7 @@ public:
     void setContextLostCallback(std::unique_ptr<ContextLostCallback>);
     void setErrorMessageCallback(std::unique_ptr<ErrorMessageCallback>);
 
-    static PassRefPtr<GraphicsContext3D> create(Attributes, HostWindow*, RenderStyle = RenderOffscreen);
+    static RefPtr<GraphicsContext3D> create(Attributes, HostWindow*, RenderStyle = RenderOffscreen);
     static PassRefPtr<GraphicsContext3D> createForCurrentGLContext();
     ~GraphicsContext3D();
 
@@ -1136,6 +1123,7 @@ public:
     void markLayerComposited();
     bool layerComposited() const;
     void forceContextLost();
+    void recycleContext();
 
     void paintRenderingResultsToCanvas(ImageBuffer*);
     PassRefPtr<ImageData> paintRenderingResultsToImageData();
@@ -1245,7 +1233,7 @@ public:
         ImageSource* m_decoder;
         RefPtr<cairo_surface_t> m_imageSurface;
 #elif USE(CG)
-        CGImageRef m_cgImage;
+        RetainPtr<CGImageRef> m_cgImage;
         RetainPtr<CGImageRef> m_decodedImage;
         RetainPtr<CFDataRef> m_pixelData;
         std::unique_ptr<uint8_t[]> m_formalizedRGBA8Data;
@@ -1263,7 +1251,6 @@ public:
 
 private:
     GraphicsContext3D(Attributes, HostWindow*, RenderStyle = RenderOffscreen);
-    static int numActiveContexts;
     static int GPUCheckCounter;
 
     // Helper for packImageData/extractImageData/extractTextureData which implement packing of pixel
@@ -1289,7 +1276,7 @@ private:
     void readPixelsAndConvertToBGRAIfNecessary(int x, int y, int width, int height, unsigned char* pixels);
 
 #if PLATFORM(IOS)
-    bool setRenderbufferStorageFromDrawable(GC3Dsizei width, GC3Dsizei height);
+    void setRenderbufferStorageFromDrawable(GC3Dsizei width, GC3Dsizei height);
 #endif
 
     bool reshapeFBOs(const IntSize&);
@@ -1420,7 +1407,7 @@ private:
     GC3Duint m_compositorTexture;
     GC3Duint m_fbo;
 #if USE(COORDINATED_GRAPHICS_THREADED)
-    GC3Duint m_compositorFBO;
+    GC3Duint m_intermediateTexture;
 #endif
 
     GC3Duint m_depthBuffer;

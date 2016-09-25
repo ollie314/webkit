@@ -30,9 +30,11 @@
 #include "PlatformExportMacros.h"
 #include "WebCoreJSBuiltinInternals.h"
 #include <runtime/JSGlobalObject.h>
+#include <runtime/StructureInlines.h>
 
 namespace WebCore {
 
+    class DeferredPromise;
     class Document;
     class Event;
     class DOMWrapperWorld;
@@ -40,13 +42,14 @@ namespace WebCore {
 
     typedef HashMap<const JSC::ClassInfo*, JSC::WriteBarrier<JSC::Structure>> JSDOMStructureMap;
     typedef HashMap<const JSC::ClassInfo*, JSC::WriteBarrier<JSC::JSObject>> JSDOMConstructorMap;
+    typedef HashSet<DeferredPromise*> DeferredPromiseSet;
 
     class WEBCORE_EXPORT JSDOMGlobalObject : public JSC::JSGlobalObject {
         typedef JSC::JSGlobalObject Base;
     protected:
         struct JSDOMGlobalObjectData;
 
-        JSDOMGlobalObject(JSC::VM&, JSC::Structure*, PassRefPtr<DOMWrapperWorld>, const JSC::GlobalObjectMethodTable* = 0);
+        JSDOMGlobalObject(JSC::VM&, JSC::Structure*, Ref<DOMWrapperWorld>&&, const JSC::GlobalObjectMethodTable* = 0);
         static void destroy(JSC::JSCell*);
         void finishCreation(JSC::VM&);
         void finishCreation(JSC::VM&, JSC::JSObject*);
@@ -54,6 +57,8 @@ namespace WebCore {
     public:
         JSDOMStructureMap& structures() { return m_structures; }
         JSDOMConstructorMap& constructors() { return m_constructors; }
+
+        DeferredPromiseSet& deferredPromises() { return m_deferredPromises; }
 
         ScriptExecutionContext* scriptExecutionContext() const;
 
@@ -65,13 +70,17 @@ namespace WebCore {
 
         static void visitChildren(JSC::JSCell*, JSC::SlotVisitor&);
 
-        DOMWrapperWorld& world() { return *m_world; }
+        DOMWrapperWorld& world() { return m_world.get(); }
         bool worldIsNormal() const { return m_worldIsNormal; }
+
+        JSBuiltinInternalFunctions& builtinInternalFunctions() { return m_builtinInternalFunctions; }
 
     protected:
         static const JSC::ClassInfo s_info;
 
     public:
+        ~JSDOMGlobalObject();
+
         static const JSC::ClassInfo* info() { return &s_info; }
 
         static JSC::Structure* createStructure(JSC::VM& vm, JSC::JSValue prototype)
@@ -82,14 +91,15 @@ namespace WebCore {
     protected:
         JSDOMStructureMap m_structures;
         JSDOMConstructorMap m_constructors;
+        DeferredPromiseSet m_deferredPromises;
 
         Event* m_currentEvent;
-        const RefPtr<DOMWrapperWorld> m_world;
+        Ref<DOMWrapperWorld> m_world;
         bool m_worldIsNormal;
 
     private:
         void addBuiltinGlobals(JSC::VM&);
-        friend void JSBuiltinInternalFunctions::initialize(JSDOMGlobalObject&, JSC::VM&);
+        friend void JSBuiltinInternalFunctions::initialize(JSDOMGlobalObject&);
 
         JSBuiltinInternalFunctions m_builtinInternalFunctions;
     };

@@ -456,6 +456,16 @@ String AXSearchFieldCancelButtonText()
     return String::fromUTF8(_("cancel"));
 }
 
+String AXAutoFillCredentialsLabel()
+{
+    return String::fromUTF8(_("password auto fill"));
+}
+
+String AXAutoFillContactsLabel()
+{
+    return String::fromUTF8(_("contact info auto fill"));
+}
+    
 String AXButtonActionVerb()
 {
     return String::fromUTF8(_("press"));
@@ -743,6 +753,11 @@ String validationMessagePatternMismatchText()
     return String::fromUTF8(_("pattern mismatch"));
 }
 
+String validationMessageTooShortText(int, int)
+{
+    return String::fromUTF8(_("too short"));
+}
+
 String validationMessageTooLongText(int, int)
 {
     return String::fromUTF8(_("too long"));
@@ -792,7 +807,7 @@ String textTrackOffMenuItemText()
 
 String textTrackAutomaticMenuItemText()
 {
-    return String::fromUTF8(C_("Menu item label for the automatically choosen track", "Auto"));
+    return String::fromUTF8(C_("Menu item label for the automatically chosen track", "Auto"));
 }
 
 String textTrackNoLabelText()

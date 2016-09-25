@@ -73,7 +73,8 @@ const RegisterSet& StackmapSpecial::extraEarlyClobberedRegs(Inst& inst)
 
 void StackmapSpecial::forEachArgImpl(
     unsigned numIgnoredB3Args, unsigned numIgnoredAirArgs,
-    Inst& inst, RoleMode roleMode, const ScopedLambda<Inst::EachArgCallback>& callback)
+    Inst& inst, RoleMode roleMode, Optional<unsigned> firstRecoverableIndex,
+    const ScopedLambda<Inst::EachArgCallback>& callback)
 {
     StackmapValue* value = inst.origin->as<StackmapValue>();
     ASSERT(value);
@@ -89,6 +90,13 @@ void StackmapSpecial::forEachArgImpl(
 
         Arg::Role role;
         switch (roleMode) {
+        case ForceLateUseUnlessRecoverable:
+            ASSERT(firstRecoverableIndex);
+            if (arg != inst.args[*firstRecoverableIndex] && arg != inst.args[*firstRecoverableIndex + 1]) {
+                role = Arg::LateColdUse;
+                break;
+            }
+            FALLTHROUGH;
         case SameAsRep:
             switch (child.rep().kind()) {
             case ValueRep::WarmAny:
@@ -99,11 +107,17 @@ void StackmapSpecial::forEachArgImpl(
             case ValueRep::Constant:
                 role = Arg::Use;
                 break;
+            case ValueRep::LateRegister:
+                role = Arg::LateUse;
+                break;
             case ValueRep::ColdAny:
                 role = Arg::ColdUse;
                 break;
             case ValueRep::LateColdAny:
                 role = Arg::LateColdUse;
+                break;
+            default:
+                RELEASE_ASSERT_NOT_REACHED();
                 break;
             }
             break;
@@ -199,7 +213,7 @@ bool StackmapSpecial::isArgValidForValue(const Air::Arg& arg, Value* value)
     switch (arg.kind()) {
     case Arg::Tmp:
     case Arg::Imm:
-    case Arg::Imm64:
+    case Arg::BigImm:
         break;
     default:
         if (!arg.isStackMemory())
@@ -219,7 +233,9 @@ bool StackmapSpecial::isArgValidForRep(Air::Code& code, const Air::Arg& arg, con
         // We already verified by isArgValidForValue().
         return true;
     case ValueRep::SomeRegister:
+    case ValueRep::SomeEarlyRegister:
         return arg.isTmp();
+    case ValueRep::LateRegister:
     case ValueRep::Register:
         return arg == Tmp(rep.reg());
     case ValueRep::StackArgument:
@@ -247,7 +263,7 @@ ValueRep StackmapSpecial::repForArg(Code& code, const Arg& arg)
         return ValueRep::reg(arg.reg());
         break;
     case Arg::Imm:
-    case Arg::Imm64:
+    case Arg::BigImm:
         return ValueRep::constant(arg.value());
         break;
     case Arg::Addr:
@@ -272,6 +288,9 @@ void printInternal(PrintStream& out, StackmapSpecial::RoleMode mode)
     switch (mode) {
     case StackmapSpecial::SameAsRep:
         out.print("SameAsRep");
+        return;
+    case StackmapSpecial::ForceLateUseUnlessRecoverable:
+        out.print("ForceLateUseUnlessRecoverable");
         return;
     case StackmapSpecial::ForceLateUse:
         out.print("ForceLateUse");

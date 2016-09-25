@@ -64,13 +64,13 @@ public:
 private:
 
     // CachedResourceClient
-    virtual void notifyFinished(CachedResource*) override;
-    virtual void deprecatedDidReceiveCachedResource(CachedResource*) override;
+    void notifyFinished(CachedResource*) override;
+    void deprecatedDidReceiveCachedResource(CachedResource*) override;
     
     // WebVTTParserClient
-    virtual void newCuesParsed() override;
-    virtual void newRegionsParsed() override;
-    virtual void fileFailedToParse() override;
+    void newCuesParsed() override;
+    void newRegionsParsed() override;
+    void fileFailedToParse() override;
     
     void processNewCueData(CachedResource*);
     void cueLoadTimerFired();
@@ -83,7 +83,6 @@ private:
     CachedResourceHandle<CachedTextTrack> m_resource;
     ScriptExecutionContext* m_scriptExecutionContext;
     Timer m_cueLoadTimer;
-    String m_crossOriginMode;
     State m_state;
     unsigned m_parseOffset;
     bool m_newCuesAvailable;

@@ -288,7 +288,7 @@ bool SQLiteStatement::isColumnDeclaredAsBlob(int col)
         if (prepare() != SQLITE_OK)
             return false;
     }
-    return equalLettersIgnoringASCIICase(StringView(reinterpret_cast<const UChar*>(sqlite3_column_decltype16(m_statement, col))), "blob");
+    return equalLettersIgnoringASCIICase(StringView(sqlite3_column_decltype(m_statement, col)), "blob");
 }
 
 String SQLiteStatement::getColumnName(int col)
@@ -534,7 +534,7 @@ bool SQLiteStatement::returnDoubleResults(int col, Vector<double>& v)
 
 bool SQLiteStatement::isExpired()
 {
-    return !m_statement || sqlite3_expired(m_statement);
+    return !m_statement;
 }
 
 } // namespace WebCore

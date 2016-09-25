@@ -172,7 +172,7 @@
     if (frame)
         topOrigin = core(frame)->document()->topOrigin();
 #endif
-    return WebCore::MemoryCache::singleton().addImageToCache(image, url, topOrigin ? topOrigin->domainForCachePartition() : emptyString());
+    return WebCore::MemoryCache::singleton().addImageToCache(RetainPtr<CGImageRef>(image), url, topOrigin ? topOrigin->domainForCachePartition() : emptyString());
 }
 
 + (void)removeImageFromCacheForURL:(NSURL *)url
@@ -204,7 +204,7 @@
     WebCore::CachedImage& cachedImage = downcast<WebCore::CachedImage>(*cachedResource);
     if (!cachedImage.hasImage())
         return nullptr;
-    return cachedImage.image()->getCGImageRef();
+    return cachedImage.image()->nativeImage().get();
 }
 
 #endif // PLATFORM(IOS)

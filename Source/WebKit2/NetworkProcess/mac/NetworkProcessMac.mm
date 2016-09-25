@@ -48,10 +48,6 @@
 
 using namespace WebCore;
 
-@interface NSURLRequest (Details) 
-+ (void)setAllowsSpecificHTTPSCertificate:(NSArray *)allow forHost:(NSString *)host;
-@end
-
 namespace WebKit {
 
 void NetworkProcess::initializeProcess(const ChildProcessInitializationParameters&)
@@ -104,7 +100,7 @@ void NetworkProcess::platformInitializeNetworkProcess(const NetworkProcessCreati
     platformInitializeNetworkProcessCocoa(parameters);
 
 #if ENABLE(SEC_ITEM_SHIM)
-    SecItemShim::singleton().initialize(this);
+    initializeSecItemShim(*this);
 #endif
 
     if (!parameters.httpProxy.isNull() || !parameters.httpsProxy.isNull())

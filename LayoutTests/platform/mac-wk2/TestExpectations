@@ -13,9 +13,6 @@ fast/events/force-click-link-selection-behavior.html [ Pass ]
 fast/events/force-click-on-link-navigation.html [ Pass ]
 fast/events/force-click-text-selection-behavior.html [ Failure ]
 
-fast/harness/ui-side-scripts.html [ Pass ]
-fast/harness/concurrent-ui-side-scripts.html [ Pass ]
-
 #//////////////////////////////////////////////////////////////////////////////////////////
 # End platform-specific directories.
 #//////////////////////////////////////////////////////////////////////////////////////////
@@ -27,9 +24,8 @@ fast/harness/concurrent-ui-side-scripts.html [ Pass ]
 ### (2) Classified failures without bug reports (yet)
 ### (3) Unclassified failures
 ### (4) Features that are not supported in WebKit2 and likely never will be
-### (5) IndexedDB related failures
-### (6) Features that are not supported in WebKit2, on Mavericks
-### (7) New WebKit2-only failures in Yosemite
+### (5) Features that are not supported in WebKit2, on Mavericks
+### (6) New WebKit2-only failures in Yosemite
 
 ########################################
 ### START OF (1) Classified failures with bug reports
@@ -93,6 +89,8 @@ fast/events/drag-and-drop-link.html
 fast/events/drag-and-drop-link-fast-multiple-times-does-not-crash.html
 fast/events/drag-in-frames.html
 fast/events/drag-parent-node.html
+fast/events/draggable-div-nodata.html
+fast/events/draggable-div-customdata.html
 fast/events/dropzone-001.html
 fast/events/dropzone-002.html
 fast/events/dropzone-003.html
@@ -128,11 +126,11 @@ editing/pasteboard/drag-drop-paragraph-crasher.html
 # [WK2] [Mac] Spellcheck tests don't seem to work
 webkit.org/b/105616 editing/spelling/context-menu-suggestions-multiword-selection.html
 webkit.org/b/105616 editing/spelling/context-menu-suggestions-subword-selection.html
+webkit.org/b/105616 editing/spelling/copy-paste-crash.html
 webkit.org/b/105616 editing/spelling/delete-into-misspelled-word.html
 webkit.org/b/105616 editing/spelling/editing-multiple-words-with-markers.html
 webkit.org/b/105616 editing/spelling/editing-word-with-marker-2.html
 webkit.org/b/105616 editing/spelling/move-cursor-around-misspelled-word.html
-webkit.org/b/105616 editing/inserting/inserting-slash-inside-url-with-smart-link.html
 webkit.org/b/105616 editing/spelling/spelling-changed-text.html
 webkit.org/b/105616 editing/spelling/spelling-backspace-between-lines.html
 webkit.org/b/105616 editing/spelling/design-mode-spellcheck-off.html
@@ -162,6 +160,7 @@ webkit.org/b/105616 editing/mac/spelling/forward-delete-into-autocorrected-word.
 webkit.org/b/105616 editing/mac/spelling/move-cursor-to-autocorrected-word.html [ Failure ]
 webkit.org/b/105616 editing/mac/spelling/move-cursor-to-beginning-of-autocorrected-word.html [ Failure ]
 webkit.org/b/105616 editing/mac/spelling/removing-underline-after-accepting-autocorrection-using-punctuation.html [ Failure ]
+webkit.org/b/105616 editing/mac/spelling/accept-candidate-allows-autocorrect-on-next-word.html [ Failure ]
 
 # [WK2] [Mac] Support drag in mouse events for WebKit2 EventSender
 # <https://bugs.webkit.org/show_bug.cgi?id=68552>
@@ -273,8 +272,6 @@ webkit.org/b/150095 http/tests/xmlhttprequest/xmlhttprequest-overridemimetype-in
 
 webkit.org/b/150241 webarchive/loading/object.html [ Pass Crash ] 
 
-webkit.org/b/150736 http/tests/notifications/legacy/events.html [ Pass Crash ]
-
 webkit.org/b/150942 animations/multiple-backgrounds.html [ Pass ImageOnlyFailure ]
 
 webkit.org/b/151053 http/tests/security/cross-frame-access-put.html [ Pass Failure ]
@@ -291,9 +288,13 @@ webkit.org/b/151709 [ Release ] http/tests/xmlhttprequest/workers/methods.html [
 
 webkit.org/b/151729 [ Yosemite ] http/tests/xmlhttprequest/methods-async.html [ Pass Timeout ]
 
-webkit.org/b/152025 [ Debug ] inspector/console/messagesCleared.html [ Pass Timeout ]
+webkit.org/b/155138 [ Yosemite ElCapitan ] inspector/console/addInspectedNode.html [ Pass Timeout ]
 
-webkit.org/b/152492 [ Debug ] inspector/debugger/break-on-exception-catch.html [ Pass Timeout ]
+webkit.org/b/155151 [ Debug ElCapitan ] media/track/track-cues-pause-on-exit.html [ Pass Timeout ]
+
+webkit.org/b/155312 inspector/heap/getPreview.html [ Pass Timeout ]
+
+webkit.org/b/156077 inspector/heap/getRemoteObject.html [ Pass Failure ]
 
 ### END OF (1) Classified failures with bug reports
 ########################################
@@ -365,6 +366,9 @@ webkit.org/b/142726 [ Yosemite ] fast/images/animated-png.html [ Skip ]
 
 [ Debug ] editing/undo/remove-css-property-and-remove-style.html [ Pass Failure ]
 
+# This test fails every time on El Capitan
+[ ElCapitan ] fast/mediastream/MediaStream-video-element-video-tracks-disabled.html [ Skip ]
+
 ### END OF (3) Unclassified failures
 ########################################
 
@@ -375,136 +379,7 @@ webkit.org/b/142726 [ Yosemite ] fast/images/animated-png.html [ Skip ]
 ########################################
 
 ########################################
-### START OF (5) IndexedDB related failures
-
-# Mozilla test failures.
-storage/indexeddb/mozilla/global-data.html [ Skip ]
-storage/indexeddb/mozilla/cursor-update-updates-indexes.html [ Pass Failure ]
-
-# Blink tests with unexplained timeouts
-storage/indexeddb/exceptions.html [ Skip ]
-storage/indexeddb/transaction-basics.html [ Skip ]
-
-# Blink tests with non-trivial text failures.
-storage/indexeddb/create-object-store-options.html [ Skip ]
-storage/indexeddb/cursor-advance.html [ Skip ]
-storage/indexeddb/cursor-basics.html [ Skip ]
-storage/indexeddb/cursor-continue-validity.html [ Skip ]
-storage/indexeddb/cursor-index-delete.html [ Skip ]
-storage/indexeddb/cursor-key-order.html [ Skip ]
-storage/indexeddb/cursor-leak.html [ Skip ] # Missing needed WKTR feature?
-storage/indexeddb/cursor-overloads.html [ Skip ]
-storage/indexeddb/cursor-primary-key-order.html [ Skip ]
-storage/indexeddb/cursor-request-cycle.html [ Skip ] # Missing needed WKTR feature?
-storage/indexeddb/cursor-update.html [ Skip ]
-storage/indexeddb/database-close.html [ Skip ]
-storage/indexeddb/database-quota.html [ Skip ]
-storage/indexeddb/duplicates.html [ Skip ] # Difference between null + undefined
-storage/indexeddb/events.html [ Skip ]
-storage/indexeddb/factory-cmp.html [ Skip ]
-storage/indexeddb/get-keyrange.html [ Skip ]
-storage/indexeddb/index-basics.html [ Skip ] # Difference between null + undefined
-storage/indexeddb/index-duplicate-keypaths.html [ Skip ]
-storage/indexeddb/index-multientry.html [ Skip ]
-storage/indexeddb/index-population.html [ Skip ]
-storage/indexeddb/index-unique.html [ Skip ]
-storage/indexeddb/intversion-close-between-events.html [ Skip ]
-storage/indexeddb/intversion-open-with-version.html [ Skip ] # INTMAX exposed to script as database version
-storage/indexeddb/intversion-two-opens-no-versions.html [ Skip ] # INTMAX exposed to script as database version
-storage/indexeddb/key-generator.html [ Skip ]
-storage/indexeddb/key-type-binary.html [ Skip ]
-storage/indexeddb/lazy-index-population.html [ Skip ]
-storage/indexeddb/noblobs.html [ Skip ] # Missing DRT file/blob support
-storage/indexeddb/objectstore-autoincrement.html [ Skip ]
-storage/indexeddb/optional-arguments.html [ Skip ]
-storage/indexeddb/request-leak.html [ Skip ] # Missing WKTR support? GC?
-storage/indexeddb/setversion-blocked-by-versionchange-close.html [ Skip ]
-storage/indexeddb/structured-clone.html [ Skip ] # Missing DRT file/blob support
-storage/indexeddb/transaction-and-objectstore-calls.html [ Skip ]
-storage/indexeddb/transaction-error.html [ Skip ]
-storage/indexeddb/transaction-scope-sequencing.html [ Skip ]
-
-# Blink tests that crash the WebProcess.
-storage/indexeddb/cursor-cast.html [ Skip ]
-storage/indexeddb/deleted-objects.html [ Skip ] # Crashes under WebCore::GetOperation::GetOperation
-storage/indexeddb/metadata.html [ Skip ] # Crashes under IDBDatabaseBackend::createIndex
-storage/indexeddb/persistence.html [ Skip ] # Crash under IDBDatabaseBackend::createObjectStore
-webkit.org/b/137314 storage/indexeddb/database-basics.html [ Pass Crash Timeout ] # IDBDatabaseBackend::createObjectStore()
-
-# Blink tests that crash the WebProcess under IDBDatabase::dispatchEvent or IDBRequest::dispatchEvent (possibly all related).
-storage/indexeddb/database-deletepending-flag.html [ Skip ]	  
-storage/indexeddb/database-wrapper.html [ Skip ]
-storage/indexeddb/delete-in-upgradeneeded-close-in-open-success.html [ Skip ]
-storage/indexeddb/delete-in-upgradeneeded-close-in-versionchange.html [ Skip ]
-storage/indexeddb/deletedatabase-blocked.html [ Skip ]
-storage/indexeddb/deletedatabase-delayed-by-open-and-versionchange.html [ Skip ]
-storage/indexeddb/deletedatabase-delayed-by-versionchange.html [ Skip ]
-storage/indexeddb/deletedatabase-not-blocked.html [ Skip ]
-storage/indexeddb/factory-deletedatabase.html [ Skip ]
-storage/indexeddb/intversion-blocked.html [ Skip ]
-storage/indexeddb/intversion-gated-on-delete.html [ Skip ]
-storage/indexeddb/intversion-long-queue.html [ Skip ]
-storage/indexeddb/intversion-open-in-upgradeneeded.html [ Skip ]
-storage/indexeddb/intversion-pending-version-changes-ascending.html [ Skip ]
-storage/indexeddb/intversion-pending-version-changes-descending.html [ Skip ]
-storage/indexeddb/intversion-pending-version-changes-same.html [ Skip ]
-storage/indexeddb/intversion-upgrades.html [ Skip ]
-storage/indexeddb/objectstore-basics.html [ Skip ]
-storage/indexeddb/set_version_blocked.html [ Skip ]
-storage/indexeddb/setversion-not-blocked.html [ Skip ]
-
-# Blink tests that crash the DatabaseProcess.
-storage/indexeddb/createIndex-after-failure.html [ Skip ]
-storage/indexeddb/database-odd-names.html [ Skip ] # Crashes under WebKit::DatabaseProcess::ensurePathExists
-storage/indexeddb/deleteIndex.html [ Skip ] # Crashes under WebKit::UniqueIDBDatabase::deleteIndex
-storage/indexeddb/index-cursor.html [ Skip ] # Flaky crash under UniqueIDBDatabase::unregisterConnection
-storage/indexeddb/open-ordering.html [ Skip ] # DatabaseProcessIDBConnection::GetOrEstablishIDBDatabaseMetadata
-storage/indexeddb/transaction-coordination-within-database.html [ Skip ] # SQLiteTransaction::begin
-
-# Blink tests that crash the DatabaseProcess under DatabaseProcessIDBConnection::deleteDatabase.
-storage/indexeddb/database-closepending-flag.html [ Skip ]
-storage/indexeddb/key-sort-order-date.html [ Skip ]
-storage/indexeddb/key-type-infinity.html [ Skip ]
-storage/indexeddb/keypath-fetch-key.html [ Skip ]
-storage/indexeddb/odd-strings.html [ Skip ]
-storage/indexeddb/prefetch-invalidation.html [ Skip ]
-storage/indexeddb/queued-commands.html [ Skip ]
-
-# Blink tests that pass once, but are known to cause trouble downstream.
-storage/indexeddb/clone-exception.html [ Skip ]
-storage/indexeddb/connection-leak.html [ Skip ]
-storage/indexeddb/dont-wedge.html [ Skip ]
-storage/indexeddb/key-sort-order-across-types.html [ Skip ]
-
-# We don't currently support indexeddb in workers
-storage/indexeddb/basics-workers.html [ Skip ]
-storage/indexeddb/cursor-advance-workers.html [ Skip ]
-storage/indexeddb/deletedatabase-delayed-by-open-and-versionchange-workers.html [ Skip ]
-storage/indexeddb/dont-commit-on-blocked.html [ Skip ]
-storage/indexeddb/factory-basics-workers.html [ Skip ]
-storage/indexeddb/index-basics-workers.html [ Skip ]
-storage/indexeddb/objectstore-basics-workers.html [ Skip ]
-storage/indexeddb/open-twice-workers.html [ Skip ]
-storage/indexeddb/pending-activity-workers.html [ Skip ]
-storage/indexeddb/pending-version-change-on-exit.html [ Skip ]
-storage/indexeddb/pending-version-change-stuck-works-with-terminate.html [ Skip ]
-storage/indexeddb/pending-version-change-stuck.html [ Skip ]
-storage/indexeddb/transaction-complete-workers.html [ Skip ]
-storage/indexeddb/unprefix-workers.html [ Skip ]
-http/tests/security/cross-origin-worker-indexeddb-allowed.html [ Skip ]
-http/tests/security/cross-origin-worker-indexeddb.html [ Skip ]
-
-# Bindings changes in https://bugs.webkit.org/show_bug.cgi?id=150868 cause this to fail, but this test is probably wrong
-storage/indexeddb/keypath-basics.html [ Skip ]
-
-webkit.org/b/153849 [ Yosemite Release ] imported/w3c/indexeddb/idbcursor-direction-index-keyrange.htm [ Skip ]
-webkit.org/b/153848 [ Yosemite Release ] imported/w3c/indexeddb/idbcursor-advance-invalid.htm [ Skip ]
-
-### END OF (5) IndexedDB related failures
-########################################
-
-########################################
-### START OF (6) Features that are not supported when NetworkProcess is enabled (i.e. they only work on Mountain Lion, and not on newer OS versions).
+### START OF (5) Features that are not supported when NetworkProcess is enabled (i.e. they only work on Mountain Lion, and not on newer OS versions).
 
 # https://bugs.webkit.org/show_bug.cgi?id=115274
 # PPT: testRunner.setPrivateBrowsingEnabled doesn't work with NetworkProcess
@@ -535,11 +410,11 @@ webkit.org/b/123431 http/tests/local/link-stylesheet-load-order.html [ Failure ]
 # This test times out, likely because appcache still loads in WebProcess, not NetworkProcess
 webkit.org/b/138736 http/tests/appcache/auth.html [ Skip ]
 
-### END OF (6) Features that are not supported in WebKit2, on Mavericks
+### END OF (5) Features that are not supported in WebKit2, on Mavericks
 ########################################
 
 ########################################
-### START OF (7) New WebKit2-only failures in Yosemite
+### START OF (6) New WebKit2-only failures in Yosemite
 
 media/video-background-tab-playback.html [ Pass Failure ]
 
@@ -553,11 +428,12 @@ webkit.org/b/141085 http/tests/media/video-query-url.html [ Pass Timeout ]
 
 webkit.org/b/145702 [ Debug Yosemite ] http/tests/misc/acid3.html [ Pass Timeout ]
 
-### END OF (7) New WebKit2-only failures in Yosemite
+### END OF (6) New WebKit2-only failures in Yosemite
 ########################################
 
 # Content Extensions tests must be enabled explicitly on mac-wk2.
 http/tests/contentextensions [ Pass ]
+http/tests/websocket/tests/hybi/contentextensions [ Pass ]
 webkit.org/b/146400 http/tests/contentextensions/character-set-basic-support.html [ Pass Failure ]
 
 # WebKit1-only failure.
@@ -576,4 +452,102 @@ imported/blink/fast/multicol/vertical-rl/float-big-line.html [ Pass ImageOnlyFai
 imported/blink/fast/multicol/span/adjacent-spanners-with-margin.html [ Pass ImageOnlyFailure ]
 imported/blink/fast/overflow/hidden-html-auto-body.html [ Pass ImageOnlyFailure ]
 
-webkit.org/b/154005 [ ElCapitan+ ] fast/text/crash-complex-text-surrogate.html [ Pass Failure ]
+webkit.org/b/155757 [ ElCapitan ] media/media-document-audio-repaint.html [ Pass Failure ]
+
+webkit.org/b/157589 fast/text-autosizing/ios/text-autosizing-after-back.html [ Pass Timeout ]
+
+webkit.org/b/158237 fast/scrolling/scroll-container-horizontally.html [ Pass Timeout ]
+
+webkit.org/b/158639 [ Release Yosemite ] imported/blink/storage/indexeddb/blob-delete-objectstore-db.html [ Pass Timeout ]
+
+# PiP tests are only enabled for Sierra WebKit2.
+# rdar://problem/27574303
+[ Sierra+ ] media/controls/picture-in-picture.html [ Pass ]
+[ Sierra+ ] media/controls/pip-placeholder-without-video-controls.html [ Pass ]
+[ Sierra+ ] media/element-containing-pip-video-going-into-fullscreen.html [ Pass ]
+[ Sierra+ ] media/fullscreen-api-enabled-media-with-presentation-mode.html [ Pass ]
+[ Sierra+ ] media/fullscreen-video-going-into-pip.html [ Pass ]
+[ Sierra+ ] media/navigate-with-pip-should-not-crash.html [ Pass ]
+[ Sierra+ ] media/pip-video-going-into-fullscreen.html [ Pass ]
+[ Sierra+ ] media/video-contained-in-fullscreen-element-going-into-pip.html [ Pass ]
+
+# rdar://problem/26885345
+[ Release Sierra+ ] media/click-placeholder-not-pausing.html [ Pass ]
+[ Debug Sierra+ ] media/click-placeholder-not-pausing.html [ Skip ]
+
+# RTL Scrollbars are enabled on Sierra WebKit2.
+[ Sierra+ ] fast/scrolling/rtl-scrollbars.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-simple.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-overflow-contents.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-overflow-dir-rtl.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-overflow-padding.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-overflow-simple.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-overflow.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-overflow-elementFromPoint.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-overflow-position-absolute.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-overflow-text-selection-scrolled.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-position-absolute.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-position-fixed.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-text-selection-scrolled.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-text-selection.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-iframe-offset.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-elementFromPoint-static.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-iframe-scrolled.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-positioning.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-listbox-scroll.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-listbox-select-left.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-listbox-select-right.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-listbox-simple.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-listbox.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-positioned-intersect-scrollbars.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-alternate-body-dir-attr-does-not-update-scrollbar-placement.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-alternate-body-dir-attr-does-not-update-scrollbar-placement-2.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-alternate-iframe-body-dir-attr-does-not-update-scrollbar-placement.html [ Pass ]
+[ Sierra+ ] fast/scrolling/rtl-scrollbars-animation-property.html [ Pass ]
+# This test only produces an RTL token on Sierra.
+[ Yosemite ElCapitan ] fast/scrolling/rtl-scrollbars-animation-property.html [ Failure ]
+
+# <rdar://problem/25063128>
+[ Sierra+ ] media/media-controls-drag-timeline-set-controls-property.html [ Pass Timeout ]
+
+# <rdar://problem/23379930> swipe tests crashing
+[ Sierra+ ] swipe/basic-cached-back-swipe.html [ Skip ]
+[ Sierra+ ] swipe/main-frame-pinning-requirement.html [ Skip ]
+[ Sierra+ ] swipe/pushState-cached-back-swipe.html [ Skip ]
+[ Sierra+ ] swipe/swipe-start-hysteresis-failures.html [ Skip ]
+
+# Hitting "The certificate for this server is invalid" loading error (not happening in WK1)
+webkit.org/b/160445 [ Sierra+ ] http/tests/security/contentSecurityPolicy/upgrade-insecure-requests/upgrade-insecure-fetch-in-worker.html [ Failure ]
+webkit.org/b/160445 [ Sierra+ ] http/tests/security/contentSecurityPolicy/upgrade-insecure-requests/upgrade-insecure-fetch-in-main-frame.html [ Failure ]
+
+webkit.org/b/161774 inspector/debugger/breakpoint-columns.html [ Pass Failure ]
+webkit.org/b/159447 [ Debug ] inspector/debugger/tail-deleted-frames-from-vm-entry.html [ Pass Failure ]
+
+webkit.org/b/159430 [ Debug Sierra+ ] media/restore-from-page-cache.html [ Pass Crash ]
+
+webkit.org/b/159884 http/tests/loading/basic-auth-resend-wrong-credentials.html [ Pass Failure ]
+
+webkit.org/b/159896 storage/indexeddb/modern/handle-user-delete.html [ Pass Timeout ]
+
+webkit.org/b/160042 accessibility/mac/value-change/value-change-user-info-contenteditable.html [ Pass Failure ]
+
+webkit.org/b/159427 http/tests/loading/basic-credentials-sent-automatically.html [ Pass Failure ]
+
+webkit.org/b/160309 fast/dom/Window/child-window-focus.html [ Pass Failure ]
+
+webkit.org/b/161148 gamepad/gamepad-timestamp.html [ Pass Failure ]
+
+webkit.org/b/161633 [ Debug ] storage/indexeddb/objectstore-cursor.html [ Pass Timeout ]
+
+webkit.org/b/161539 [ Release ] http/tests/security/cross-origin-plugin-allowed.html [ Pass Failure ]
+
+webkit.org/b/161742 [ Debug ] imported/w3c/web-platform-tests/IndexedDB/keyorder.htm [ Pass Failure ]
+
+webkit.org/b/161547 [ Debug ] tiled-drawing/scrolling/fixed/four-bars-zoomed.html [ Pass Failure ]
+
+webkit.org/b/161549 fast/scrolling/arrow-key-scroll-in-rtl-document.html [ Pass Failure ]
+
+webkit.org/b/162081 editing/inserting/typing-space-to-trigger-smart-link.html [ Failure ]
+webkit.org/b/162081 editing/inserting/smart-quote-with-all-configurations.html [ Failure ]
+
+webkit.org/b/160017 js/regress-139548.html [ Pass Timeout ]

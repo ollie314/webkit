@@ -30,7 +30,6 @@
 
 #include "APIProcessPoolConfiguration.h"
 #include "Logging.h"
-#include "NetworkProcessMessages.h"
 #include "WebCookieManagerProxy.h"
 #include "WebInspectorServer.h"
 #include "WebProcessCreationParameters.h"
@@ -86,15 +85,14 @@ WTF::String WebProcessPool::legacyPlatformDefaultApplicationCacheDirectory()
     return API::WebsiteDataStore::defaultApplicationCacheDirectory();
 }
 
+WTF::String WebProcessPool::legacyPlatformDefaultMediaCacheDirectory()
+{
+    return API::WebsiteDataStore::defaultMediaCacheDirectory();
+}
+
 void WebProcessPool::platformInitializeWebProcess(WebProcessCreationParameters& parameters)
 {
     initInspectorServer();
-
-    if (!parameters.urlSchemesRegisteredAsLocal.contains("resource")) {
-        WebCore::SchemeRegistry::registerURLSchemeAsLocal("resource");
-        parameters.urlSchemesRegisteredAsLocal.append("resource");
-    }
-
     parameters.memoryCacheDisabled = m_memoryCacheDisabled || cacheModel() == CacheModelDocumentViewer;
 }
 
@@ -131,13 +129,6 @@ String WebProcessPool::legacyPlatformDefaultMediaKeysStorageDirectory()
 String WebProcessPool::legacyPlatformDefaultNetworkCacheDirectory()
 {
     return API::WebsiteDataStore::defaultNetworkCacheDirectory();
-}
-
-void WebProcessPool::setIgnoreTLSErrors(bool ignoreTLSErrors)
-{
-    m_ignoreTLSErrors = ignoreTLSErrors;
-    if (networkProcess())
-        networkProcess()->send(Messages::NetworkProcess::SetIgnoreTLSErrors(m_ignoreTLSErrors), 0);
 }
 
 } // namespace WebKit

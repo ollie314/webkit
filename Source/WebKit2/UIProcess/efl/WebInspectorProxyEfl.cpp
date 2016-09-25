@@ -107,14 +107,14 @@ WebPageProxy* WebInspectorProxy::platformCreateInspectorPage()
         return 0;
 
     WKContextRef wkContext = toAPI(&inspectorProcessPool(inspectionLevel()));
-    WKRetainPtr<WKStringRef> wkGroupIdentifier = adoptWK(WKStringCreateWithUTF8CString(inspectorPageGroupIdentifier().utf8().data()));
+    WKRetainPtr<WKStringRef> wkGroupIdentifier = adoptWK(WKStringCreateWithUTF8CString(inspectorPageGroupIdentifierForPage(inspectedPage()).utf8().data()));
     WKPageGroupRef wkPageGroup = WKPageGroupCreateWithIdentifier(wkGroupIdentifier.get());
 
     WKRetainPtr<WKPageConfigurationRef> wkPageConfiguration = adoptWK(WKPageConfigurationCreate());
     WKPageConfigurationSetContext(wkPageConfiguration.get(), wkContext);
     WKPageConfigurationSetPageGroup(wkPageConfiguration.get(), wkPageGroup);
 
-    m_inspectorView = EWKViewCreate(wkContext, wkPageConfiguration.get(), ecore_evas_get(m_inspectorWindow), /* smart */ 0);
+    m_inspectorView = EWKViewCreate(wkPageConfiguration.get(), ecore_evas_get(m_inspectorWindow), /* smart */ 0);
     WKViewRef wkView = EWKViewGetWKView(m_inspectorView);
 
     WKRetainPtr<WKStringRef> wkTheme = adoptWK(WKStringCreateWithUTF8CString(DEFAULT_THEME_DIR "/default.edj"));
@@ -146,6 +146,10 @@ void WebInspectorProxy::platformDidClose()
     }
 }
 
+void WebInspectorProxy::platformDidCloseForCrash()
+{
+}
+
 void WebInspectorProxy::platformInvalidate()
 {
 }
@@ -156,6 +160,11 @@ void WebInspectorProxy::platformHide()
 }
 
 void WebInspectorProxy::platformBringToFront()
+{
+    notImplemented();
+}
+
+void WebInspectorProxy::platformBringInspectedPageToFront()
 {
     notImplemented();
 }

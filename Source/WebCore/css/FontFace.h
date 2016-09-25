@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2008, 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,21 +23,27 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef FontFace_h
-#define FontFace_h
+#pragma once
 
-#include "ExceptionCode.h"
-#include <wtf/RefCounted.h>
-#include <wtf/RefPtr.h>
-#include <wtf/text/WTFString.h>
+#include "CSSFontFace.h"
+#include "CSSPropertyNames.h"
+#include "JSDOMPromise.h"
+#include <wtf/WeakPtr.h>
 
 namespace WebCore {
 
-class CSSFontFace;
-
-class FontFace : public RefCounted<FontFace> {
+class FontFace final : public RefCounted<FontFace>, private CSSFontFace::Client {
 public:
-    static Ref<FontFace> create() { return adoptRef(*new FontFace()); }
+    struct Descriptors {
+        String style;
+        String weight;
+        String stretch;
+        String unicodeRange;
+        String variant;
+        String featureSettings;
+    };
+    static RefPtr<FontFace> create(JSC::ExecState&, Document&, const String& family, JSC::JSValue source, const Descriptors&, ExceptionCode&);
+    static Ref<FontFace> create(CSSFontFace&);
     virtual ~FontFace();
 
     void setFamily(const String&, ExceptionCode&);
@@ -56,12 +62,35 @@ public:
     String variant() const;
     String featureSettings() const;
 
-private:
-    FontFace();
+    enum class LoadStatus { Unloaded, Loading, Loaded, Error };
+    LoadStatus status() const;
 
+    typedef DOMPromise<FontFace&> Promise;
+    Optional<Promise>& promise() { return m_promise; }
+    void registerLoaded(Promise&&);
+
+    void adopt(CSSFontFace&);
+
+    void load();
+
+    CSSFontFace& backing() { return m_backing; }
+
+    static RefPtr<CSSValue> parseString(const String&, CSSPropertyID);
+
+    void fontStateChanged(CSSFontFace&, CSSFontFace::Status oldState, CSSFontFace::Status newState) final;
+
+    WeakPtr<FontFace> createWeakPtr() const;
+
+    void ref() final { RefCounted::ref(); }
+    void deref() final { RefCounted::deref(); }
+
+private:
+    explicit FontFace(CSSFontSelector&);
+    explicit FontFace(CSSFontFace&);
+
+    WeakPtrFactory<FontFace> m_weakPtrFactory;
     Ref<CSSFontFace> m_backing;
+    Optional<Promise> m_promise;
 };
 
 }
-
-#endif

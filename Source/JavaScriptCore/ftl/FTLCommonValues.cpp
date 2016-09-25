@@ -34,7 +34,6 @@
 #include "B3ProcedureInlines.h"
 #include "B3Type.h"
 #include "B3ValueInlines.h"
-#include "FTLAbbreviations.h"
 
 #if ENABLE(FTL_JIT)
 
@@ -42,55 +41,10 @@ namespace JSC { namespace FTL {
 
 using namespace B3;
 
-CommonValues::CommonValues(LContext context)
-#if FTL_USES_B3
-    : voidType(B3::Void)
-    , boolean(B3::Int32)
-    , int32(B3::Int32)
-    , int64(B3::Int64)
-    , intPtr(B3::pointerType())
-    , floatType(B3::Float)
-    , doubleType(B3::Double)
-#else
-    : voidType(FTL::voidType(context))
-    , boolean(int1Type(context))
-    , int32(int32Type(context))
-    , int64(int64Type(context))
-    , intPtr(intPtrType(context))
-    , floatType(FTL::floatType(context))
-    , doubleType(FTL::doubleType(context))
-    , int8(int8Type(context))
-    , int16(int16Type(context))
-    , ref8(pointerType(int8))
-    , ref16(pointerType(int16))
-    , ref32(pointerType(int32))
-    , ref64(pointerType(int64))
-    , refPtr(pointerType(intPtr))
-    , refFloat(pointerType(floatType))
-    , refDouble(pointerType(doubleType))
-    , booleanTrue(constInt(boolean, true, ZeroExtend))
-    , booleanFalse(constInt(boolean, false, ZeroExtend))
-    , int8Zero(constInt(int8, 0, SignExtend))
-    , int32Zero(constInt(int32, 0, SignExtend))
-    , int32One(constInt(int32, 1, SignExtend))
-    , int64Zero(constInt(int64, 0, SignExtend))
-    , intPtrZero(constInt(intPtr, 0, SignExtend))
-    , intPtrOne(constInt(intPtr, 1, SignExtend))
-    , intPtrTwo(constInt(intPtr, 2, SignExtend))
-    , intPtrThree(constInt(intPtr, 3, SignExtend))
-    , intPtrEight(constInt(intPtr, 8, SignExtend))
-    , doubleZero(constReal(doubleType, 0))
-    , rangeKind(mdKindID(context, "range"))
-    , profKind(mdKindID(context, "prof"))
-    , branchWeights(mdString(context, "branch_weights"))
-    , nonNegativeInt32(constInt(int32, 0, SignExtend), constInt(int32, 1ll << 31, SignExtend))
-#endif // !FTL_USES_B3
-    , m_context(context)
-    , m_module(0)
+CommonValues::CommonValues()
 {
 }
 
-#if FTL_USES_B3
 void CommonValues::initializeConstants(B3::Procedure& proc, B3::BasicBlock* block)
 {
     int32Zero = block->appendNew<Const32Value>(proc, Origin(), 0);
@@ -105,7 +59,6 @@ void CommonValues::initializeConstants(B3::Procedure& proc, B3::BasicBlock* bloc
     intPtrEight = block->appendNew<ConstPtrValue>(proc, Origin(), 8);
     doubleZero = block->appendNew<ConstDoubleValue>(proc, Origin(), 0.);
 }
-#endif
 
 } } // namespace JSC::FTL
 

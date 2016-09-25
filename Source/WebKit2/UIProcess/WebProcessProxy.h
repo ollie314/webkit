@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2010-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,14 +23,13 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WebProcessProxy_h
-#define WebProcessProxy_h
+#pragma once
 
 #include "APISession.h"
+#include "APIUserInitiatedAction.h"
 #include "ChildProcessProxy.h"
 #include "CustomProtocolManagerProxy.h"
 #include "MessageReceiverMap.h"
-#include "PlatformProcessIdentifier.h"
 #include "PluginInfoStore.h"
 #include "ProcessLauncher.h"
 #include "ProcessThrottlerClient.h"
@@ -38,7 +37,6 @@
 #include "WebConnectionToWebProcess.h"
 #include "WebPageProxy.h"
 #include "WebProcessProxyMessages.h"
-#include "WebsiteDataTypes.h"
 #include <WebCore/LinkHash.h>
 #include <memory>
 #include <wtf/Forward.h>
@@ -62,21 +60,19 @@ class NetworkProcessProxy;
 class WebBackForwardListItem;
 class WebPageGroup;
 class WebProcessPool;
+enum class WebsiteDataType;
 struct WebNavigationDataStore;
-    
+struct WebsiteData;
+
 class WebProcessProxy : public ChildProcessProxy, ResponsivenessTimer::Client, private ProcessThrottlerClient {
 public:
     typedef HashMap<uint64_t, RefPtr<WebBackForwardListItem>> WebBackForwardListItemMap;
     typedef HashMap<uint64_t, RefPtr<WebFrameProxy>> WebFrameProxyMap;
     typedef HashMap<uint64_t, WebPageProxy*> WebPageProxyMap;
+    typedef HashMap<uint64_t, RefPtr<API::UserInitiatedAction>> UserInitiatedActionMap;
 
     static Ref<WebProcessProxy> create(WebProcessPool&);
     ~WebProcessProxy();
-
-    static WebProcessProxy* fromConnection(IPC::Connection* connection)
-    {
-        return static_cast<WebProcessProxy*>(ChildProcessProxy::fromConnection(connection));
-    }
 
     WebConnection* webConnection() const { return m_webConnection.get(); }
 
@@ -96,6 +92,7 @@ public:
     void didDestroyWebUserContentControllerProxy(WebUserContentControllerProxy&);
 
     WebBackForwardListItem* webBackForwardItem(uint64_t itemID) const;
+    RefPtr<API::UserInitiatedAction> userInitiatedActivity(uint64_t);
 
     ResponsivenessTimer& responsivenessTimer() { return m_responsivenessTimer; }
 
@@ -122,9 +119,9 @@ public:
     void didSaveToPageCache();
     void releasePageCache();
 
-    void fetchWebsiteData(WebCore::SessionID, WebsiteDataTypes, std::function<void (WebsiteData)> completionHandler);
-    void deleteWebsiteData(WebCore::SessionID, WebsiteDataTypes, std::chrono::system_clock::time_point modifiedSince, std::function<void ()> completionHandler);
-    void deleteWebsiteDataForOrigins(WebCore::SessionID, WebsiteDataTypes, const Vector<RefPtr<WebCore::SecurityOrigin>>& origins, std::function<void ()> completionHandler);
+    void fetchWebsiteData(WebCore::SessionID, OptionSet<WebsiteDataType>, Function<void (WebsiteData)> completionHandler);
+    void deleteWebsiteData(WebCore::SessionID, OptionSet<WebsiteDataType>, std::chrono::system_clock::time_point modifiedSince, Function<void ()> completionHandler);
+    void deleteWebsiteDataForOrigins(WebCore::SessionID, OptionSet<WebsiteDataType>, const Vector<RefPtr<WebCore::SecurityOrigin>>& origins, Function<void ()> completionHandler);
 
     void enableSuddenTermination();
     void disableSuddenTermination();
@@ -158,10 +155,9 @@ private:
     explicit WebProcessProxy(WebProcessPool&);
 
     // From ChildProcessProxy
-    virtual void getLaunchOptions(ProcessLauncher::LaunchOptions&) override;
-    void platformGetLaunchOptions(ProcessLauncher::LaunchOptions&);
-    virtual void connectionWillOpen(IPC::Connection&) override;
-    virtual void processWillShutDown(IPC::Connection&) override;
+    void getLaunchOptions(ProcessLauncher::LaunchOptions&) override;
+    void connectionWillOpen(IPC::Connection&) override;
+    void processWillShutDown(IPC::Connection&) override;
 
     // Called when the web process has crashed or we know that it will terminate soon.
     // Will potentially cause the WebProcessProxy object to be freed.
@@ -170,12 +166,9 @@ private:
     // IPC message handlers.
     void addBackForwardItem(uint64_t itemID, uint64_t pageID, const PageState&);
     void didDestroyFrame(uint64_t);
-    
-    void shouldTerminate(bool& shouldTerminate);
+    void didDestroyUserGestureToken(uint64_t);
 
-    void didFetchWebsiteData(uint64_t callbackID, const WebsiteData&);
-    void didDeleteWebsiteData(uint64_t callbackID);
-    void didDeleteWebsiteDataForOrigins(uint64_t callbackID);
+    void shouldTerminate(bool& shouldTerminate);
 
     // Plugins
 #if ENABLE(NETSCAPE_PLUGIN_API)
@@ -193,20 +186,20 @@ private:
     void releaseIconForPageURL(const String& pageURL);
     void releaseRemainingIconsForPageURLs();
 
+    static const HashSet<String>& platformPathsWithAssumedReadAccess();
+
     // IPC::Connection::Client
     friend class WebConnectionToWebProcess;
-    virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
-    virtual void didReceiveSyncMessage(IPC::Connection&, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&) override;
-    virtual void didClose(IPC::Connection&) override;
-    virtual void didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference messageReceiverName, IPC::StringReference messageName) override;
-    virtual IPC::ProcessType localProcessType() override { return IPC::ProcessType::UI; }
-    virtual IPC::ProcessType remoteProcessType() override { return IPC::ProcessType::Web; }
+    void didReceiveMessage(IPC::Connection&, IPC::Decoder&) override;
+    void didReceiveSyncMessage(IPC::Connection&, IPC::Decoder&, std::unique_ptr<IPC::Encoder>&) override;
+    void didClose(IPC::Connection&) override;
+    void didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference messageReceiverName, IPC::StringReference messageName) override;
 
     // ResponsivenessTimer::Client
     void didBecomeUnresponsive() override;
     void didBecomeResponsive() override;
-    virtual void willChangeIsResponsive() override;
-    virtual void didChangeIsResponsive() override;
+    void willChangeIsResponsive() override;
+    void didChangeIsResponsive() override;
 
     // ProcessThrottlerClient
     void sendProcessWillSuspendImminently() override;
@@ -216,11 +209,11 @@ private:
     void didSetAssertionState(AssertionState) override;
 
     // ProcessLauncher::Client
-    virtual void didFinishLaunching(ProcessLauncher*, IPC::Connection::Identifier) override;
+    void didFinishLaunching(ProcessLauncher*, IPC::Connection::Identifier) override;
 
     // Implemented in generated WebProcessProxyMessageReceiver.cpp
-    void didReceiveWebProcessProxyMessage(IPC::Connection&, IPC::MessageDecoder&);
-    void didReceiveSyncWebProcessProxyMessage(IPC::Connection&, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&);
+    void didReceiveWebProcessProxyMessage(IPC::Connection&, IPC::Decoder&);
+    void didReceiveSyncWebProcessProxyMessage(IPC::Connection&, IPC::Decoder&, std::unique_ptr<IPC::Encoder>&);
 
     bool canTerminateChildProcess();
 
@@ -235,15 +228,12 @@ private:
     WebPageProxyMap m_pageMap;
     WebFrameProxyMap m_frameMap;
     WebBackForwardListItemMap m_backForwardListItemMap;
+    UserInitiatedActionMap m_userInitiatedActionMap;
 
     HashSet<VisitedLinkStore*> m_visitedLinkStores;
     HashSet<WebUserContentControllerProxy*> m_webUserContentControllerProxies;
 
     CustomProtocolManagerProxy m_customProtocolManagerProxy;
-
-    HashMap<uint64_t, std::function<void (WebsiteData)>> m_pendingFetchWebsiteDataCallbacks;
-    HashMap<uint64_t, std::function<void ()>> m_pendingDeleteWebsiteDataCallbacks;
-    HashMap<uint64_t, std::function<void ()>> m_pendingDeleteWebsiteDataForOriginsCallbacks;
 
     int m_numberOfTimesSuddenTerminationWasDisabled;
     ProcessThrottler m_throttler;
@@ -260,5 +250,3 @@ private:
 };
 
 } // namespace WebKit
-
-#endif // WebProcessProxy_h

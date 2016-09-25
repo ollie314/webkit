@@ -29,7 +29,6 @@
 #include "RegExpKey.h"
 #include "Strong.h"
 #include "Weak.h"
-#include "WeakInlines.h"
 #include <array>
 #include <wtf/HashMap.h>
 
@@ -54,7 +53,7 @@ private:
 
     static const int maxStrongCacheableEntries = 32;
 
-    virtual void finalize(Handle<Unknown>, void* context) override;
+    void finalize(Handle<Unknown>, void* context) override;
 
     RegExp* lookupOrCreate(const WTF::String& patternString, RegExpFlags);
     void addToStrongCache(RegExp*);

@@ -28,25 +28,29 @@
 
 #include "JSNode.h"
 #include <JavaScriptCore/JSString.h>
+#include <JavaScriptCore/ThrowScope.h>
 
 using namespace JSC;
 
 namespace WebCore {
 
-Vector<NodeOrString> toNodeOrStringVector(ExecState& state)
+Vector<std::experimental::variant<Ref<Node>, String>> toNodeOrStringVector(ExecState& state)
 {
+    VM& vm = state.vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     size_t argumentCount = state.argumentCount();
 
-    Vector<NodeOrString> result;
+    Vector<std::experimental::variant<Ref<Node>, String>> result;
     result.reserveInitialCapacity(argumentCount);
 
     for (size_t i = 0; i < argumentCount; ++i) {
         JSValue value = state.uncheckedArgument(i);
         if (auto* node = jsDynamicCast<JSNode*>(value))
-            result.uncheckedAppend(&node->wrapped());
+            result.uncheckedAppend(node->wrapped());
         else {
             String string = value.toWTFString(&state);
-            if (state.hadException())
+            if (UNLIKELY(scope.exception()))
                 return { };
             result.uncheckedAppend(string);
         }

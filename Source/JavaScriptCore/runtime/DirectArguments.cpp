@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,8 +27,6 @@
 #include "DirectArguments.h"
 
 #include "CodeBlock.h"
-#include "CopiedBlockInlines.h"
-#include "CopyVisitorInlines.h"
 #include "GenericArgumentsInlines.h"
 #include "JSCInlines.h"
 
@@ -85,6 +83,13 @@ DirectArguments* DirectArguments::createByCopying(ExecState* exec)
     return result;
 }
 
+size_t DirectArguments::estimatedSize(JSCell* cell)
+{
+    DirectArguments* thisObject = jsCast<DirectArguments*>(cell);
+    size_t overridesSize = thisObject->m_overrides ? thisObject->overridesSize() : 0;
+    return Base::estimatedSize(cell) + overridesSize;
+}
+
 void DirectArguments::visitChildren(JSCell* thisCell, SlotVisitor& visitor)
 {
     DirectArguments* thisObject = static_cast<DirectArguments*>(thisCell);
@@ -94,27 +99,8 @@ void DirectArguments::visitChildren(JSCell* thisCell, SlotVisitor& visitor)
     visitor.appendValues(thisObject->storage(), std::max(thisObject->m_length, thisObject->m_minCapacity));
     visitor.append(&thisObject->m_callee);
     
-    if (thisObject->m_overrides) {
-        visitor.copyLater(
-            thisObject, DirectArgumentsOverridesCopyToken,
-            thisObject->m_overrides.getWithoutBarrier(), thisObject->overridesSize());
-    }
-}
-
-void DirectArguments::copyBackingStore(JSCell* thisCell, CopyVisitor& visitor, CopyToken token)
-{
-    DirectArguments* thisObject = static_cast<DirectArguments*>(thisCell);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, info());
-    
-    RELEASE_ASSERT(token == DirectArgumentsOverridesCopyToken);
-    
-    void* oldOverrides = thisObject->m_overrides.getWithoutBarrier();
-    if (visitor.checkIfShouldCopy(oldOverrides)) {
-        bool* newOverrides = static_cast<bool*>(visitor.allocateNewSpace(thisObject->overridesSize()));
-        memcpy(newOverrides, oldOverrides, thisObject->m_length);
-        thisObject->m_overrides.setWithoutBarrier(newOverrides);
-        visitor.didCopy(oldOverrides, thisObject->overridesSize());
-    }
+    if (thisObject->m_overrides)
+        visitor.markAuxiliary(thisObject->m_overrides.get());
 }
 
 Structure* DirectArguments::createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
@@ -130,8 +116,8 @@ void DirectArguments::overrideThings(VM& vm)
     putDirect(vm, vm.propertyNames->callee, m_callee.get(), DontEnum);
     putDirect(vm, vm.propertyNames->iteratorSymbol, globalObject()->arrayProtoValuesFunction(), DontEnum);
     
-    void* backingStore;
-    RELEASE_ASSERT(vm.heap.tryAllocateStorage(this, overridesSize(), &backingStore));
+    void* backingStore = vm.heap.tryAllocateAuxiliary(this, overridesSize());
+    RELEASE_ASSERT(backingStore);
     bool* overrides = static_cast<bool*>(backingStore);
     m_overrides.set(vm, this, overrides);
     for (unsigned i = m_length; i--;)
@@ -147,7 +133,7 @@ void DirectArguments::overrideThingsIfNecessary(VM& vm)
 void DirectArguments::overrideArgument(VM& vm, unsigned index)
 {
     overrideThingsIfNecessary(vm);
-    m_overrides.get(this)[index] = true;
+    m_overrides.get()[index] = true;
 }
 
 void DirectArguments::copyToArguments(ExecState* exec, VirtualRegister firstElementDest, unsigned offset, unsigned length)

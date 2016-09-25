@@ -29,12 +29,8 @@
  */
 
 #include "config.h"
-
-#if ENABLE(TEMPLATE_ELEMENT)
-
 #include "HTMLTemplateElement.h"
 
-#include "DOMImplementation.h"
 #include "DocumentFragment.h"
 #include "HTMLDocument.h"
 #include "TemplateContentDocumentFragment.h"
@@ -60,12 +56,12 @@ Ref<HTMLTemplateElement> HTMLTemplateElement::create(const QualifiedName& tagNam
     return adoptRef(*new HTMLTemplateElement(tagName, document));
 }
 
-DocumentFragment* HTMLTemplateElement::content() const
+DocumentFragment& HTMLTemplateElement::content() const
 {
     if (!m_content)
         m_content = TemplateContentDocumentFragment::create(document().ensureTemplateDocument(), this);
 
-    return m_content.get();
+    return *m_content;
 }
 
 Ref<Node> HTMLTemplateElement::cloneNodeInternal(Document& targetDocument, CloningOperation type)
@@ -82,7 +78,7 @@ Ref<Node> HTMLTemplateElement::cloneNodeInternal(Document& targetDocument, Cloni
         break;
     }
     if (m_content)
-        content()->cloneChildNodes(*downcast<HTMLTemplateElement>(clone.get())->content());
+        content().cloneChildNodes(downcast<HTMLTemplateElement>(clone.get())->content());
     return clone.releaseNonNull();
 }
 
@@ -95,5 +91,3 @@ void HTMLTemplateElement::didMoveToNewDocument(Document* oldDocument)
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(TEMPLATE_ELEMENT)

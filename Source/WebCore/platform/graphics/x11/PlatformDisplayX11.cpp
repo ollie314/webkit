@@ -28,17 +28,27 @@
 
 #if PLATFORM(X11)
 #include <X11/Xlib.h>
+#include <X11/extensions/Xcomposite.h>
+#if PLATFORM(GTK)
+#include <X11/extensions/Xdamage.h>
+#endif
 
 #if USE(EGL)
 #include <EGL/egl.h>
+#include <EGL/eglplatform.h>
 #endif
+
+// FIXME: this needs to be here, after eglplatform.h, to avoid EGLNativeDisplayType to be defined as wl_display.
+// Since we support Wayland and X11 to be built at the same time, but eglplatform.h defines are decided at compile time
+// we need to ensure we only include eglplatform.h from X11 or Wayland specific files.
+#include "GLContext.h"
 
 namespace WebCore {
 
 PlatformDisplayX11::PlatformDisplayX11()
     : m_display(XOpenDisplay(nullptr))
-    , m_ownedDisplay(true)
 {
+    m_ownedDisplay = m_display != nullptr;
 }
 
 PlatformDisplayX11::PlatformDisplayX11(Display* display)
@@ -49,6 +59,8 @@ PlatformDisplayX11::PlatformDisplayX11(Display* display)
 
 PlatformDisplayX11::~PlatformDisplayX11()
 {
+    // Clear the sharing context before releasing the display.
+    m_sharingGLContext = nullptr;
     if (m_ownedDisplay)
         XCloseDisplay(m_display);
 }
@@ -60,6 +72,32 @@ void PlatformDisplayX11::initializeEGLDisplay()
     PlatformDisplay::initializeEGLDisplay();
 }
 #endif
+
+bool PlatformDisplayX11::supportsXComposite() const
+{
+    if (!m_supportsXComposite) {
+        int eventBase, errorBase;
+        m_supportsXComposite = XCompositeQueryExtension(m_display, &eventBase, &errorBase);
+    }
+    return m_supportsXComposite.value();
+}
+
+bool PlatformDisplayX11::supportsXDamage(Optional<int>& damageEventBase) const
+{
+    if (!m_supportsXDamage) {
+#if PLATFORM(GTK)
+        int eventBase, errorBase;
+        m_supportsXDamage = XDamageQueryExtension(m_display, &eventBase, &errorBase);
+        if (m_supportsXDamage.value())
+            m_damageEventBase = eventBase;
+#else
+        m_supportsXDamage = false;
+#endif
+    }
+
+    damageEventBase = m_damageEventBase;
+    return m_supportsXDamage.value();
+}
 
 } // namespace WebCore
 

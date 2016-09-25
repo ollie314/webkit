@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2005, 2006 Apple Inc.  All rights reserved.
+ * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2010, 2012, 2014, 2016 Apple Inc.  All rights reserved.
  * Copyright (C) 2007-2008 Torch Mobile, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,17 +27,14 @@
 #ifndef ImageSource_h
 #define ImageSource_h
 
+#include "ImageFrame.h"
 #include "ImageOrientation.h"
-#include "NativeImagePtr.h"
-
+#include "IntPoint.h"
+#include "NativeImage.h"
+#include "TextStream.h"
 #include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
-#include <wtf/Vector.h>
-
-#if USE(CG)
-typedef struct CGImageSource* CGImageSourceRef;
-typedef const struct __CFData* CFDataRef;
-#endif
+#include <wtf/Optional.h>
 
 namespace WebCore {
 
@@ -45,43 +42,11 @@ class ImageOrientation;
 class IntPoint;
 class IntSize;
 class SharedBuffer;
-
-#if USE(CG)
-typedef CGImageSourceRef NativeImageDecoderPtr;
-#else
 class ImageDecoder;
-typedef ImageDecoder* NativeImageDecoderPtr;
-#endif
-
-#if USE(CG)
-#define NativeImageDecoder ImageDecoder
-#else
-typedef ImageDecoder NativeImageDecoder;
-#endif
-
-// Right now GIFs are the only recognized image format that supports animation.
-// The animation system and the constants below are designed with this in mind.
-// GIFs have an optional 16-bit unsigned loop count that describes how an
-// animated GIF should be cycled.  If the loop count is absent, the animation
-// cycles once; if it is 0, the animation cycles infinitely; otherwise the
-// animation plays n + 1 cycles (where n is the specified loop count).  If the
-// GIF decoder defaults to cAnimationLoopOnce in the absence of any loop count
-// and translates an explicit "0" loop count to cAnimationLoopInfinite, then we
-// get a couple of nice side effects:
-//   * By making cAnimationLoopOnce be 0, we allow the animation cycling code in
-//     BitmapImage.cpp to avoid special-casing it, and simply treat all
-//     non-negative loop counts identically.
-//   * By making the other two constants negative, we avoid conflicts with any
-//     real loop count values.
-const int cAnimationLoopOnce = 0;
-const int cAnimationLoopInfinite = -1;
-const int cAnimationNone = -2;
-
-// SubsamplingLevel. 0 is no subsampling, 1 is half dimensions on each axis etc.
-typedef short SubsamplingLevel;
 
 class ImageSource {
     WTF_MAKE_NONCOPYABLE(ImageSource);
+    friend class BitmapImage;
 public:
     enum AlphaOption {
         AlphaPremultiplied,
@@ -93,7 +58,8 @@ public:
         GammaAndColorProfileIgnored
     };
 
-    ImageSource(AlphaOption alphaOption = AlphaPremultiplied, GammaAndColorProfileOption gammaAndColorProfileOption = GammaAndColorProfileApplied);
+    ImageSource(const NativeImagePtr&);
+    ImageSource(AlphaOption = AlphaPremultiplied, GammaAndColorProfileOption = GammaAndColorProfileApplied);
     ~ImageSource();
 
     // Tells the ImageSource that the Image no longer cares about decoded frame
@@ -110,68 +76,76 @@ public:
     // decoded frames.
     //
     // Callers should not call clear(false, n) and subsequently call
-    // createFrameAtIndex(m) with m < n, unless they first call clear(true).
+    // createFrameImageAtIndex(m) with m < n, unless they first call clear(true).
     // This ensures that stateful ImageSources/decoders will work properly.
     //
     // The |data| and |allDataReceived| parameters should be supplied by callers
     // who set |destroyAll| to true if they wish to be able to continue using
     // the ImageSource.  This way implementations which choose to destroy their
     // decoders in some cases can reconstruct them correctly.
-    void clear(bool destroyAll,
-               size_t clearBeforeFrame = 0,
-               SharedBuffer* data = NULL,
-               bool allDataReceived = false);
+    void clear(bool destroyAll, size_t clearBeforeFrame = 0, SharedBuffer* data = nullptr, bool allDataReceived = false);
 
-    bool initialized() const;
+    // FIXME: Remove the decoder() function from this class when caching the ImageFrame is moved outside BitmapImage.
+    ImageDecoder* decoder() const { return m_decoder.get(); }
+    bool initialized() const { return m_decoder.get(); }
 
     void setData(SharedBuffer* data, bool allDataReceived);
-    String filenameExtension() const;
+    
+    void setNeedsUpdateMetadata() { m_needsUpdateMetadata = true; }
 
-    SubsamplingLevel subsamplingLevelForScale(float) const;
-    bool allowSubsamplingOfFrameAtIndex(size_t) const;
-
-    bool isSizeAvailable();
+    SubsamplingLevel subsamplingLevelForScale(float);
+    void setAllowSubsampling(bool allowSubsampling) { m_allowSubsampling = allowSubsampling; }
+    static size_t bytesDecodedToDetermineProperties();
+    
+    bool isSizeAvailable() const;
     // Always original size, without subsampling.
-    IntSize size(ImageOrientationDescription = ImageOrientationDescription()) const;
-    // Size of optionally subsampled frame.
-    IntSize frameSizeAtIndex(size_t, SubsamplingLevel = 0, ImageOrientationDescription = ImageOrientationDescription()) const;
+    IntSize size() const;
+    IntSize sizeRespectingOrientation() const;
 
-    bool getHotSpot(IntPoint&) const;
+    size_t frameCount();
+    RepetitionCount repetitionCount();
+    String filenameExtension() const;
+    Optional<IntPoint> hotSpot() const;
 
-    size_t bytesDecodedToDetermineProperties() const;
-
-    int repetitionCount();
-
-    size_t frameCount() const;
-
-    // Callers should not call this after calling clear() with a higher index;
-    // see comments on clear() above.
-    PassNativeImagePtr createFrameAtIndex(size_t, SubsamplingLevel = 0);
-
-    float frameDurationAtIndex(size_t);
-    bool frameHasAlphaAtIndex(size_t); // Whether or not the frame actually used any alpha.
     bool frameIsCompleteAtIndex(size_t); // Whether or not the frame is completely decoded.
-    ImageOrientation orientationAtIndex(size_t) const; // EXIF image orientation
-
+    bool frameHasAlphaAtIndex(size_t); // Whether or not the frame actually used any alpha.
+    bool frameAllowSubsamplingAtIndex(size_t) const;
+    
+    // Size of optionally subsampled frame.
+    IntSize frameSizeAtIndex(size_t, SubsamplingLevel = SubsamplingLevel::Default, RespectImageOrientationEnum = DoNotRespectImageOrientation) const;
+    
     // Return the number of bytes in the decoded frame. If the frame is not yet
     // decoded then return 0.
-    unsigned frameBytesAtIndex(size_t, SubsamplingLevel = 0) const;
-
-#if ENABLE(IMAGE_DECODER_DOWN_SAMPLING)
-    static unsigned maxPixelsPerDecodedImage() { return s_maxPixelsPerDecodedImage; }
-    static void setMaxPixelsPerDecodedImage(unsigned maxPixels) { s_maxPixelsPerDecodedImage = maxPixels; }
-#endif
-
+    unsigned frameBytesAtIndex(size_t, SubsamplingLevel = SubsamplingLevel::Default) const;
+    
+    float frameDurationAtIndex(size_t);
+    ImageOrientation frameOrientationAtIndex(size_t) const; // EXIF image orientation
+    
+    // Callers should not call this after calling clear() with a higher index;
+    // see comments on clear() above.
+    NativeImagePtr createFrameImageAtIndex(size_t, SubsamplingLevel = SubsamplingLevel::Default);
+    
 private:
-    NativeImageDecoderPtr m_decoder;
+    void clearFrameBufferCache(size_t);
+    SubsamplingLevel calculateMaximumSubsamplingLevel() const;
+    void updateMetadata();
+    void dump(TextStream&) const;
+    
+    std::unique_ptr<ImageDecoder> m_decoder;
+    
+    bool m_needsUpdateMetadata { false };
+    size_t m_frameCount { 0 };
+    Optional<SubsamplingLevel> m_maximumSubsamplingLevel { SubsamplingLevel::Default };
 
-#if !USE(CG)
-    AlphaOption m_alphaOption;
-    GammaAndColorProfileOption m_gammaAndColorProfileOption;
+    // The default value of m_allowSubsampling should be the same as defaultImageSubsamplingEnabled in Settings.cpp
+#if PLATFORM(IOS)
+    bool m_allowSubsampling { true };
+#else
+    bool m_allowSubsampling { false };
 #endif
-#if ENABLE(IMAGE_DECODER_DOWN_SAMPLING)
-    static unsigned s_maxPixelsPerDecodedImage;
-#endif
+
+    AlphaOption m_alphaOption { AlphaPremultiplied };
+    GammaAndColorProfileOption m_gammaAndColorProfileOption { GammaAndColorProfileApplied };
 };
 
 }

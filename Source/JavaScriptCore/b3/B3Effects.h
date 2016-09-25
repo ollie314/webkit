@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -45,13 +45,17 @@ struct Effects {
     // terminates abruptly.
     bool exitsSideways { false };
 
-    // True if the instruction may change semantics if hoisted above some control flow.
+    // True if the instruction may change semantics if hoisted above some control flow. For example,
+    // loads are usually control-dependent because we must assume that any control construct (either
+    // a terminal like Branch or anything that exits sideways, like Check) validates whether the
+    // pointer is valid. Hoisting the load above control may cause the load to trap even though it
+    // would not have otherwise trapped.
     bool controlDependent { false };
 
     // True if this writes to the local state. Operations that write local state don't write to anything
-    // in "memory" but they have a side-effect anyway. This is for modeling Upsilons and Sets. You can ignore
-    // this if you have your own way of modeling Upsilons and Sets or if you intend to just rebuild them
-    // anyway.
+    // in "memory" but they have a side-effect anyway. This is for modeling Upsilons, Sets, and Fences.
+    // This is a way of saying: even though this operation is not a terminal, does not exit sideways,
+    // and does not write to the heap, you still cannot kill this operation.
     bool writesLocalState { false };
 
     // True if this reads from the local state. This is only used for Phi and Get.

@@ -110,6 +110,14 @@ SoupNetworkSession::SoupNetworkSession(SoupCookieJar* cookieJar)
         SOUP_SESSION_USE_THREAD_CONTEXT, TRUE,
         nullptr);
 
+#if SOUP_CHECK_VERSION(2, 53, 92)
+    if (soup_auth_negotiate_supported()) {
+        g_object_set(m_soupSession.get(),
+            SOUP_SESSION_ADD_FEATURE_BY_TYPE, SOUP_TYPE_AUTH_NEGOTIATE,
+            nullptr);
+    }
+#endif
+
     setupLogger();
 
     g_signal_connect(m_soupSession.get(), "authenticate", G_CALLBACK(authenticateCallback), nullptr);
@@ -152,18 +160,6 @@ SoupCookieJar* SoupNetworkSession::cookieJar() const
     return SOUP_COOKIE_JAR(soup_session_get_feature(m_soupSession.get(), SOUP_TYPE_COOKIE_JAR));
 }
 
-void SoupNetworkSession::setCache(SoupCache* cache)
-{
-    ASSERT(!soup_session_get_feature(m_soupSession.get(), SOUP_TYPE_CACHE));
-    soup_session_add_feature(m_soupSession.get(), SOUP_SESSION_FEATURE(cache));
-}
-
-SoupCache* SoupNetworkSession::cache() const
-{
-    SoupSessionFeature* soupCache = soup_session_get_feature(m_soupSession.get(), SOUP_TYPE_CACHE);
-    return soupCache ? SOUP_CACHE(soupCache) : nullptr;
-}
-
 static inline bool stringIsNumeric(const char* str)
 {
     while (*str) {
@@ -174,7 +170,8 @@ static inline bool stringIsNumeric(const char* str)
     return true;
 }
 
-void SoupNetworkSession::clearCache(const String& cacheDirectory)
+// Old versions of WebKit created this cache.
+void SoupNetworkSession::clearOldSoupCache(const String& cacheDirectory)
 {
     CString cachePath = fileSystemRepresentation(cacheDirectory);
     GUniquePtr<char> cacheFile(g_build_filename(cachePath.data(), "soup.cache2", nullptr));

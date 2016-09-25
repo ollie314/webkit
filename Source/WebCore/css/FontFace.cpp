@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008, 2011, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,36 +26,122 @@
 #include "config.h"
 #include "FontFace.h"
 
-#include "CSSFontFace.h"
+#include "CSSFontFaceSource.h"
 #include "CSSFontFeatureValue.h"
+#include "CSSParser.h"
 #include "CSSUnicodeRangeValue.h"
-#include "CSSValue.h"
+#include "CSSValuePool.h"
+#include "Document.h"
 #include "FontVariantBuilder.h"
+#include "JSFontFace.h"
 #include "StyleProperties.h"
-#include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
-FontFace::FontFace()
-    : m_backing(CSSFontFace::create())
+static bool populateFontFaceWithArrayBuffer(CSSFontFace& fontFace, Ref<JSC::ArrayBufferView>&& arrayBufferView)
 {
+    auto source = std::make_unique<CSSFontFaceSource>(fontFace, String(), nullptr, nullptr, WTFMove(arrayBufferView));
+    fontFace.adoptSource(WTFMove(source));
+    return false;
+}
+
+RefPtr<FontFace> FontFace::create(JSC::ExecState& state, Document& document, const String& family, JSC::JSValue source, const Descriptors& descriptors, ExceptionCode& ec)
+{
+    auto result = adoptRef(*new FontFace(document.fontSelector()));
+
+    bool dataRequiresAsynchronousLoading = true;
+
+    ec = 0;
+    result->setFamily(family, ec);
+    if (ec)
+        return nullptr;
+
+    if (source.isString()) {
+        auto value = FontFace::parseString(source.getString(&state), CSSPropertySrc);
+        if (!is<CSSValueList>(value.get())) {
+            ec = SYNTAX_ERR;
+            return nullptr;
+        }
+        CSSFontFace::appendSources(result->backing(), downcast<CSSValueList>(*value), &document, false);
+    } else if (auto arrayBufferView = toArrayBufferView(source))
+        dataRequiresAsynchronousLoading = populateFontFaceWithArrayBuffer(result->backing(), arrayBufferView.releaseNonNull());
+    else if (auto arrayBuffer = toArrayBuffer(source)) {
+        auto arrayBufferView = JSC::Uint8Array::create(arrayBuffer, 0, arrayBuffer->byteLength());
+        dataRequiresAsynchronousLoading = populateFontFaceWithArrayBuffer(result->backing(), arrayBufferView.releaseNonNull());
+    }
+
+    // These ternaries match the default strings inside the FontFaceDescriptors dictionary inside FontFace.idl.
+    result->setStyle(descriptors.style.isEmpty() ? ASCIILiteral("normal") : descriptors.style, ec);
+    if (ec)
+        return nullptr;
+    result->setWeight(descriptors.weight.isEmpty() ? ASCIILiteral("normal") : descriptors.weight, ec);
+    if (ec)
+        return nullptr;
+    result->setStretch(descriptors.stretch.isEmpty() ? ASCIILiteral("normal") : descriptors.stretch, ec);
+    if (ec)
+        return nullptr;
+    result->setUnicodeRange(descriptors.unicodeRange.isEmpty() ? ASCIILiteral("U+0-10FFFF") : descriptors.unicodeRange, ec);
+    if (ec)
+        return nullptr;
+    result->setVariant(descriptors.variant.isEmpty() ? ASCIILiteral("normal") : descriptors.variant, ec);
+    if (ec)
+        return nullptr;
+    result->setFeatureSettings(descriptors.featureSettings.isEmpty() ? ASCIILiteral("normal") : descriptors.featureSettings, ec);
+    if (ec)
+        return nullptr;
+
+    if (!dataRequiresAsynchronousLoading) {
+        result->backing().load();
+        ASSERT(result->backing().status() == CSSFontFace::Status::Success);
+    }
+
+    return WTFMove(result);
+}
+
+Ref<FontFace> FontFace::create(CSSFontFace& face)
+{
+    return adoptRef(*new FontFace(face));
+}
+
+FontFace::FontFace(CSSFontSelector& fontSelector)
+    : m_weakPtrFactory(this)
+    , m_backing(CSSFontFace::create(&fontSelector, nullptr, this))
+{
+    m_backing->addClient(*this);
+}
+
+FontFace::FontFace(CSSFontFace& face)
+    : m_weakPtrFactory(this)
+    , m_backing(face)
+{
+    m_backing->addClient(*this);
 }
 
 FontFace::~FontFace()
 {
+    m_backing->removeClient(*this);
 }
 
-static inline RefPtr<CSSValue> parseString(const String& string, CSSPropertyID propertyID)
+WeakPtr<FontFace> FontFace::createWeakPtr() const
 {
-    Ref<MutableStyleProperties> style = MutableStyleProperties::create();
-    auto result = CSSParser::parseValue(style.ptr(), propertyID, string, true, CSSStrictMode, nullptr);
-    if (result == CSSParser::ParseResult::Error)
+    return m_weakPtrFactory.createWeakPtr();
+}
+
+RefPtr<CSSValue> FontFace::parseString(const String& string, CSSPropertyID propertyID)
+{
+    auto style = MutableStyleProperties::create();
+    if (CSSParser::parseValue(style, propertyID, string, true, HTMLStandardMode, nullptr) == CSSParser::ParseResult::Error)
         return nullptr;
     return style->getPropertyCSSValue(propertyID);
 }
 
 void FontFace::setFamily(const String& family, ExceptionCode& ec)
 {
+    if (family.isEmpty()) {
+        ec = SYNTAX_ERR;
+        return;
+    }
+
     bool success = false;
     if (auto value = parseString(family, CSSPropertyFontFamily))
         success = m_backing->setFamilies(*value);
@@ -65,6 +151,11 @@ void FontFace::setFamily(const String& family, ExceptionCode& ec)
 
 void FontFace::setStyle(const String& style, ExceptionCode& ec)
 {
+    if (style.isEmpty()) {
+        ec = SYNTAX_ERR;
+        return;
+    }
+
     bool success = false;
     if (auto value = parseString(style, CSSPropertyFontStyle))
         success = m_backing->setStyle(*value);
@@ -74,6 +165,11 @@ void FontFace::setStyle(const String& style, ExceptionCode& ec)
 
 void FontFace::setWeight(const String& weight, ExceptionCode& ec)
 {
+    if (weight.isEmpty()) {
+        ec = SYNTAX_ERR;
+        return;
+    }
+
     bool success = false;
     if (auto value = parseString(weight, CSSPropertyFontWeight))
         success = m_backing->setWeight(*value);
@@ -88,6 +184,11 @@ void FontFace::setStretch(const String&, ExceptionCode&)
 
 void FontFace::setUnicodeRange(const String& unicodeRange, ExceptionCode& ec)
 {
+    if (unicodeRange.isEmpty()) {
+        ec = SYNTAX_ERR;
+        return;
+    }
+
     bool success = false;
     if (auto value = parseString(unicodeRange, CSSPropertyUnicodeRange))
         success = m_backing->setUnicodeRange(*value);
@@ -97,46 +198,85 @@ void FontFace::setUnicodeRange(const String& unicodeRange, ExceptionCode& ec)
 
 void FontFace::setVariant(const String& variant, ExceptionCode& ec)
 {
-    Ref<MutableStyleProperties> style = MutableStyleProperties::create();
-    auto result = CSSParser::parseValue(style.ptr(), CSSPropertyFontVariant, variant, true, CSSStrictMode, nullptr);
-    if (result != CSSParser::ParseResult::Error) {
-        FontVariantSettings backup = m_backing->variantSettings();
-        bool success = true;
-        if (auto value = style->getPropertyCSSValue(CSSPropertyFontVariantLigatures))
-            success &= m_backing->setVariantLigatures(*value);
-        if (auto value = style->getPropertyCSSValue(CSSPropertyFontVariantPosition))
-            success &= m_backing->setVariantPosition(*value);
-        if (auto value = style->getPropertyCSSValue(CSSPropertyFontVariantCaps))
-            success &= m_backing->setVariantCaps(*value);
-        if (auto value = style->getPropertyCSSValue(CSSPropertyFontVariantNumeric))
-            success &= m_backing->setVariantNumeric(*value);
-        if (auto value = style->getPropertyCSSValue(CSSPropertyFontVariantAlternates))
-            success &= m_backing->setVariantAlternates(*value);
-        if (auto value = style->getPropertyCSSValue(CSSPropertyFontVariantEastAsian))
-            success &= m_backing->setVariantEastAsian(*value);
-        if (success)
-            return;
-        m_backing->setVariantSettings(backup);
+    if (variant.isEmpty()) {
+        ec = SYNTAX_ERR;
+        return;
     }
-    ec = SYNTAX_ERR;
+
+    auto style = MutableStyleProperties::create();
+    auto result = CSSParser::parseValue(style, CSSPropertyFontVariant, variant, true, HTMLStandardMode, nullptr);
+    if (result == CSSParser::ParseResult::Error) {
+        ec = SYNTAX_ERR;
+        return;
+    }
+
+    // FIXME: Would be much better to stage the new settings and set them all at once
+    // instead of this dance where we make a backup and revert to it if something fails.
+    FontVariantSettings backup = m_backing->variantSettings();
+
+    auto normal = CSSValuePool::singleton().createIdentifierValue(CSSValueNormal);
+    bool success = true;
+
+    if (auto value = style->getPropertyCSSValue(CSSPropertyFontVariantLigatures))
+        success &= m_backing->setVariantLigatures(*value);
+    else
+        m_backing->setVariantLigatures(normal);
+
+    if (auto value = style->getPropertyCSSValue(CSSPropertyFontVariantPosition))
+        success &= m_backing->setVariantPosition(*value);
+    else
+        m_backing->setVariantPosition(normal);
+
+    if (auto value = style->getPropertyCSSValue(CSSPropertyFontVariantCaps))
+        success &= m_backing->setVariantCaps(*value);
+    else
+        m_backing->setVariantCaps(normal);
+
+    if (auto value = style->getPropertyCSSValue(CSSPropertyFontVariantNumeric))
+        success &= m_backing->setVariantNumeric(*value);
+    else
+        m_backing->setVariantNumeric(normal);
+
+    if (auto value = style->getPropertyCSSValue(CSSPropertyFontVariantAlternates))
+        success &= m_backing->setVariantAlternates(*value);
+    else
+        m_backing->setVariantAlternates(normal);
+
+    if (auto value = style->getPropertyCSSValue(CSSPropertyFontVariantEastAsian))
+        success &= m_backing->setVariantEastAsian(*value);
+    else
+        m_backing->setVariantEastAsian(normal);
+
+    if (!success) {
+        m_backing->setVariantSettings(backup);
+        ec = SYNTAX_ERR;
+    }
 }
 
 void FontFace::setFeatureSettings(const String& featureSettings, ExceptionCode& ec)
 {
-    bool success = false;
-    if (auto value = parseString(featureSettings, CSSPropertyFontFeatureSettings))
-        success = m_backing->setFeatureSettings(*value);
-    if (!success)
+    if (featureSettings.isEmpty()) {
         ec = SYNTAX_ERR;
+        return;
+    }
+
+    auto value = parseString(featureSettings, CSSPropertyFontFeatureSettings);
+    if (!value) {
+        ec = SYNTAX_ERR;
+        return;
+    }
+    m_backing->setFeatureSettings(*value);
 }
 
 String FontFace::family() const
 {
+    const_cast<CSSFontFace&>(m_backing.get()).updateStyleIfNeeded();
     return m_backing->families()->cssText();
 }
 
 String FontFace::style() const
 {
+    const_cast<CSSFontFace&>(m_backing.get()).updateStyleIfNeeded();
     switch (m_backing->traitsMask() & FontStyleMask) {
     case FontStyleNormalMask:
         return String("normal", String::ConstructFromLiteral);
@@ -149,6 +289,7 @@ String FontFace::style() const
 
 String FontFace::weight() const
 {
+    const_cast<CSSFontFace&>(m_backing.get()).updateStyleIfNeeded();
     switch (m_backing->traitsMask() & FontWeightMask) {
     case FontWeight100Mask:
         return String("100", String::ConstructFromLiteral);
@@ -175,30 +316,111 @@ String FontFace::weight() const
 
 String FontFace::stretch() const
 {
-    return "normal";
+    return ASCIILiteral("normal");
 }
 
 String FontFace::unicodeRange() const
 {
+    const_cast<CSSFontFace&>(m_backing.get()).updateStyleIfNeeded();
+    if (!m_backing->ranges().size())
+        return ASCIILiteral("U+0-10FFFF");
     RefPtr<CSSValueList> values = CSSValueList::createCommaSeparated();
     for (auto& range : m_backing->ranges())
-        values->append(CSSUnicodeRangeValue::create(range.from(), range.to()));
+        values->append(CSSUnicodeRangeValue::create(range.from, range.to));
     return values->cssText();
 }
 
 String FontFace::variant() const
 {
+    const_cast<CSSFontFace&>(m_backing.get()).updateStyleIfNeeded();
     return computeFontVariant(m_backing->variantSettings())->cssText();
 }
 
 String FontFace::featureSettings() const
 {
+    const_cast<CSSFontFace&>(m_backing.get()).updateStyleIfNeeded();
     if (!m_backing->featureSettings().size())
-        return "normal";
+        return ASCIILiteral("normal");
     RefPtr<CSSValueList> list = CSSValueList::createCommaSeparated();
     for (auto& feature : m_backing->featureSettings())
         list->append(CSSFontFeatureValue::create(FontFeatureTag(feature.tag()), feature.value()));
     return list->cssText();
+}
+
+auto FontFace::status() const -> LoadStatus
+{
+    switch (m_backing->status()) {
+    case CSSFontFace::Status::Pending:
+        return LoadStatus::Unloaded;
+    case CSSFontFace::Status::Loading:
+        return LoadStatus::Loading;
+    case CSSFontFace::Status::TimedOut:
+        return LoadStatus::Error;
+    case CSSFontFace::Status::Success:
+        return LoadStatus::Loaded;
+    case CSSFontFace::Status::Failure:
+        return LoadStatus::Error;
+    }
+    ASSERT_NOT_REACHED();
+    return LoadStatus::Error;
+}
+
+void FontFace::adopt(CSSFontFace& newFace)
+{
+    m_promise = Nullopt;
+    m_backing->removeClient(*this);
+    m_backing = newFace;
+    m_backing->addClient(*this);
+    newFace.setWrapper(*this);
+}
+
+void FontFace::fontStateChanged(CSSFontFace& face, CSSFontFace::Status, CSSFontFace::Status newState)
+{
+    ASSERT_UNUSED(face, &face == m_backing.ptr());
+    switch (newState) {
+    case CSSFontFace::Status::Loading:
+        // We still need to resolve promises when loading completes, even if all references to use have fallen out of scope.
+        ref();
+        break;
+    case CSSFontFace::Status::TimedOut:
+        break;
+    case CSSFontFace::Status::Success:
+        if (m_promise)
+            std::exchange(m_promise, Nullopt)->resolve(*this);
+        deref();
+        return;
+    case CSSFontFace::Status::Failure:
+        if (m_promise)
+            std::exchange(m_promise, Nullopt)->reject(NETWORK_ERR);
+        deref();
+        return;
+    case CSSFontFace::Status::Pending:
+        ASSERT_NOT_REACHED();
+        return;
+    }
+}
+
+void FontFace::registerLoaded(Promise&& promise)
+{
+    ASSERT(!m_promise);
+    switch (m_backing->status()) {
+    case CSSFontFace::Status::Loading:
+    case CSSFontFace::Status::Pending:
+        m_promise = WTFMove(promise);
+        return;
+    case CSSFontFace::Status::Success:
+        promise.resolve(*this);
+        return;
+    case CSSFontFace::Status::TimedOut:
+    case CSSFontFace::Status::Failure:
+        promise.reject(NETWORK_ERR);
+        return;
+    }
+}
+
+void FontFace::load()
+{
+    m_backing->load();
 }
 
 }

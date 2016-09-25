@@ -38,13 +38,7 @@ String WebsiteDataStore::defaultApplicationCacheDirectory()
 
 String WebsiteDataStore::defaultNetworkCacheDirectory()
 {
-#if ENABLE(NETWORK_CACHE)
-    static const char networkCacheSubdirectory[] = "WebKitCache";
-#else
-    static const char networkCacheSubdirectory[] = "webkit";
-#endif
-
-    return cacheDirectoryFileSystemRepresentation(networkCacheSubdirectory);
+    return cacheDirectoryFileSystemRepresentation("WebKitEfl" EINA_PATH_SEP_S "WebKitCache");
 }
 
 String WebsiteDataStore::defaultIndexedDBDatabaseDirectory()
@@ -67,6 +61,11 @@ String WebsiteDataStore::defaultWebSQLDatabaseDirectory()
     return websiteDataDirectoryFileSystemRepresentation("WebKitEfl" EINA_PATH_SEP_S "Databases");
 }
 
+String WebsiteDataStore::defaultResourceLoadStatisticsDirectory()
+{
+    return websiteDataDirectoryFileSystemRepresentation("WebKitEfl" EINA_PATH_SEP_S "ResourceLoadStatistics");
+}
+
 String WebsiteDataStore::cacheDirectoryFileSystemRepresentation(const String& directoryName)
 {
     return WebCore::pathByAppendingComponent(String::fromUTF8(efreet_cache_home_get()), directoryName);
@@ -87,6 +86,7 @@ WebKit::WebsiteDataStore::Configuration WebsiteDataStore::defaultDataStoreConfig
     configuration.webSQLDatabaseDirectory = defaultWebSQLDatabaseDirectory();
     configuration.localStorageDirectory = defaultLocalStorageDirectory();
     configuration.mediaKeysStorageDirectory = defaultMediaKeysStorageDirectory();
+    configuration.resourceLoadStatisticsDirectory = defaultResourceLoadStatisticsDirectory();
 
     return configuration;
 }

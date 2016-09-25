@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 Google Inc. All rights reserved.
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -46,6 +46,7 @@
 #include "MouseEvent.h"
 #include "RenderObject.h"
 #include "RenderView.h"
+#include "ScopedEventQueue.h"
 #include "ScriptController.h"
 #include "ShadowRoot.h"
 
@@ -110,12 +111,12 @@ void ColorInputType::createShadowSubtree()
     ASSERT(element().shadowRoot());
 
     Document& document = element().document();
-    Ref<HTMLDivElement> wrapperElement = HTMLDivElement::create(document);
+    auto wrapperElement = HTMLDivElement::create(document);
     wrapperElement->setPseudo(AtomicString("-webkit-color-swatch-wrapper", AtomicString::ConstructFromLiteral));
-    Ref<HTMLDivElement> colorSwatch = HTMLDivElement::create(document);
+    auto colorSwatch = HTMLDivElement::create(document);
     colorSwatch->setPseudo(AtomicString("-webkit-color-swatch", AtomicString::ConstructFromLiteral));
-    wrapperElement->appendChild(WTFMove(colorSwatch), ASSERT_NO_EXCEPTION);
-    element().userAgentShadowRoot()->appendChild(WTFMove(wrapperElement), ASSERT_NO_EXCEPTION);
+    wrapperElement->appendChild(colorSwatch, ASSERT_NO_EXCEPTION);
+    element().userAgentShadowRoot()->appendChild(wrapperElement, ASSERT_NO_EXCEPTION);
     
     updateColorSwatch();
 }
@@ -132,7 +133,7 @@ void ColorInputType::setValue(const String& value, bool valueChanged, TextFieldE
         m_chooser->setSelectedColor(valueAsColor());
 }
 
-void ColorInputType::handleDOMActivateEvent(Event* event)
+void ColorInputType::handleDOMActivateEvent(Event& event)
 {
     if (element().isDisabledOrReadOnly() || !element().renderer())
         return;
@@ -147,7 +148,7 @@ void ColorInputType::handleDOMActivateEvent(Event* event)
             m_chooser->reattachColorChooser(valueAsColor());
     }
 
-    event->setDefaultHandled();
+    event.setDefaultHandled();
 }
 
 void ColorInputType::detach()
@@ -174,6 +175,7 @@ void ColorInputType::didChooseColor(const Color& color)
 {
     if (element().isDisabledOrReadOnly() || color == valueAsColor())
         return;
+    EventQueueScope scope;
     element().setValueFromRenderer(color.serialized());
     updateColorSwatch();
     element().dispatchFormControlChangeEvent();
@@ -220,7 +222,7 @@ Color ColorInputType::currentColor()
 bool ColorInputType::shouldShowSuggestions() const
 {
 #if ENABLE(DATALIST_ELEMENT)
-    return element().fastHasAttribute(listAttr);
+    return element().hasAttributeWithoutSynchronization(listAttr);
 #else
     return false;
 #endif

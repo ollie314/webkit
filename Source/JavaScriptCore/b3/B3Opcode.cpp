@@ -161,6 +161,9 @@ void printInternal(PrintStream& out, Opcode opcode)
     case Ceil:
         out.print("Ceil");
         return;
+    case Floor:
+        out.print("Floor");
+        return;
     case Sqrt:
         out.print("Sqrt");
         return;
@@ -184,6 +187,9 @@ void printInternal(PrintStream& out, Opcode opcode)
         return;
     case IToD:
         out.print("IToD");
+        return;
+    case IToF:
+        out.print("IToF");
         return;
     case FloatToDouble:
         out.print("FloatToDouble");
@@ -251,6 +257,9 @@ void printInternal(PrintStream& out, Opcode opcode)
     case Store:
         out.print("Store");
         return;
+    case Fence:
+        out.print("Fence");
+        return;
     case CCall:
         out.print("CCall");
         return;
@@ -283,6 +292,9 @@ void printInternal(PrintStream& out, Opcode opcode)
         return;
     case Switch:
         out.print("Switch");
+        return;
+    case EntrySwitch:
+        out.print("EntrySwitch");
         return;
     case Return:
         out.print("Return");

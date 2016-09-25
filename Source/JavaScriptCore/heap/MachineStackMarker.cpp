@@ -85,8 +85,12 @@ static void pthreadSignalHandlerSuspendResume(int, siginfo_t*, void* ucontext)
         return;
     }
 
-    struct ucontext* userContext = static_cast<struct ucontext*>(ucontext);
+    ucontext_t* userContext = static_cast<ucontext_t*>(ucontext);
+#if CPU(PPC)
+    thread->suspendedMachineContext = *userContext->uc_mcontext.uc_regs;
+#else
     thread->suspendedMachineContext = userContext->uc_mcontext;
+#endif
 
     // Allow suspend caller to see that this thread is suspended.
     // sem_post is async-signal-safe function. It means that we can call this from a signal handler.
@@ -140,7 +144,7 @@ public:
         m_set.add(machineThreads);
     }
 
-    void remove(MachineThreads* machineThreads)
+    void THREAD_SPECIFIC_CALL remove(MachineThreads* machineThreads)
     {
         LockHolder managerLock(m_lock);
         auto recordedMachineThreads = m_set.take(machineThreads);
@@ -188,14 +192,12 @@ static inline PlatformThread getCurrentPlatformThread()
 MachineThreads::MachineThreads(Heap* heap)
     : m_registeredThreads(0)
     , m_threadSpecificForMachineThreads(0)
-    , m_threadSpecificForThread(0)
 #if !ASSERT_DISABLED
     , m_heap(heap)
 #endif
 {
     UNUSED_PARAM(heap);
     threadSpecificKeyCreate(&m_threadSpecificForMachineThreads, removeThread);
-    threadSpecificKeyCreate(&m_threadSpecificForThread, nullptr);
     activeMachineThreadsManager().add(this);
 }
 
@@ -203,7 +205,6 @@ MachineThreads::~MachineThreads()
 {
     activeMachineThreadsManager().remove(this);
     threadSpecificKeyDelete(m_threadSpecificForMachineThreads);
-    threadSpecificKeyDelete(m_threadSpecificForThread);
 
     LockHolder registeredThreadsLock(m_registeredThreadsMutex);
     for (Thread* t = m_registeredThreads; t;) {
@@ -230,18 +231,6 @@ bool MachineThreads::Thread::operator==(const PlatformThread& other) const
 #endif
 }
 
-#ifndef NDEBUG
-static bool isThreadInList(Thread* listHead, Thread* target)
-{
-    for (Thread* thread = listHead; thread; thread = thread->next) {
-        if (thread == target)
-            return true;
-    }
-
-    return false;
-}
-#endif
-
 void MachineThreads::addCurrentThread()
 {
     ASSERT(!m_heap->vm()->hasExclusiveThread() || m_heap->vm()->exclusiveThread() == std::this_thread::get_id());
@@ -250,15 +239,12 @@ void MachineThreads::addCurrentThread()
 #ifndef NDEBUG
         LockHolder lock(m_registeredThreadsMutex);
         ASSERT(threadSpecificGet(m_threadSpecificForMachineThreads) == this);
-        ASSERT(threadSpecificGet(m_threadSpecificForThread));
-        ASSERT(isThreadInList(m_registeredThreads, static_cast<Thread*>(threadSpecificGet(m_threadSpecificForThread))));
 #endif
         return;
     }
 
     Thread* thread = Thread::createForCurrentThread();
     threadSpecificSet(m_threadSpecificForMachineThreads, this);
-    threadSpecificSet(m_threadSpecificForThread, thread);
 
     LockHolder lock(m_registeredThreadsMutex);
 
@@ -268,17 +254,18 @@ void MachineThreads::addCurrentThread()
 
 Thread* MachineThreads::machineThreadForCurrentThread()
 {
-    Thread* result = static_cast<Thread*>(threadSpecificGet(m_threadSpecificForThread));
-    RELEASE_ASSERT(result);
-#ifndef NDEBUG
     LockHolder lock(m_registeredThreadsMutex);
-    ASSERT(isThreadInList(m_registeredThreads, result));
-#endif
+    PlatformThread platformThread = getCurrentPlatformThread();
+    for (Thread* thread = m_registeredThreads; thread; thread = thread->next) {
+        if (*thread == platformThread)
+            return thread;
+    }
 
-    return result;
+    RELEASE_ASSERT_NOT_REACHED();
+    return nullptr;
 }
 
-void MachineThreads::removeThread(void* p)
+void THREAD_SPECIFIC_CALL MachineThreads::removeThread(void* p)
 {
     auto& manager = activeMachineThreadsManager();
     ActiveMachineThreadsManager::Locker lock(manager);
@@ -546,7 +533,23 @@ void* MachineThreads::Thread::Registers::stackPointer() const
 
 #elif USE(PTHREADS)
 
-#if defined(__GLIBC__) && ENABLE(JIT)
+#if OS(FREEBSD) && ENABLE(JIT)
+
+#if CPU(X86)
+    return reinterpret_cast<void*>((uintptr_t) regs.machineContext.mc_esp);
+#elif CPU(X86_64)
+    return reinterpret_cast<void*>((uintptr_t) regs.machineContext.mc_rsp);
+#elif CPU(ARM)
+    return reinterpret_cast<void*>((uintptr_t) regs.machineContext.__gregs[_REG_SP]);
+#elif CPU(ARM64)
+    return reinterpret_cast<void*>((uintptr_t) regs.machineContext.mc_gpregs.gp_sp);
+#elif CPU(MIPS)
+    return reinterpret_cast<void*>((uintptr_t) regs.machineContext.mc_regs[29]);
+#else
+#error Unknown Architecture
+#endif
+
+#elif defined(__GLIBC__) && ENABLE(JIT)
 
 #if CPU(X86)
     return reinterpret_cast<void*>((uintptr_t) regs.machineContext.gregs[REG_ESP]);
@@ -629,6 +632,22 @@ void* MachineThreads::Thread::Registers::framePointer() const
 #error Unknown Architecture
 #endif
 
+#elif OS(FREEBSD)
+
+#if CPU(X86)
+    return reinterpret_cast<void*>((uintptr_t) regs.machineContext.mc_ebp);
+#elif CPU(X86_64)
+    return reinterpret_cast<void*>((uintptr_t) regs.machineContext.mc_rbp);
+#elif CPU(ARM)
+    return reinterpret_cast<void*>((uintptr_t) regs.machineContext.__gregs[_REG_FP]);
+#elif CPU(ARM64)
+    return reinterpret_cast<void*>((uintptr_t) regs.machineContext.mc_gpregs.gp_x[29]);
+#elif CPU(MIPS)
+    return reinterpret_cast<void*>((uintptr_t) regs.machineContext.mc_regs[30]);
+#else
+#error Unknown Architecture
+#endif
+
 #elif defined(__GLIBC__)
 
 // The following sequence depends on glibc's sys/ucontext.h.
@@ -691,6 +710,22 @@ void* MachineThreads::Thread::Registers::instructionPointer() const
     return reinterpret_cast<void*>((uintptr_t) regs.Eip);
 #elif CPU(X86_64)
     return reinterpret_cast<void*>((uintptr_t) regs.Rip);
+#else
+#error Unknown Architecture
+#endif
+
+#elif OS(FREEBSD)
+
+#if CPU(X86)
+    return reinterpret_cast<void*>((uintptr_t) regs.machineContext.mc_eip);
+#elif CPU(X86_64)
+    return reinterpret_cast<void*>((uintptr_t) regs.machineContext.mc_rip);
+#elif CPU(ARM)
+    return reinterpret_cast<void*>((uintptr_t) regs.machineContext.__gregs[_REG_PC]);
+#elif CPU(ARM64)
+    return reinterpret_cast<void*>((uintptr_t) regs.machineContext.mc_gpregs.gp_elr);
+#elif CPU(MIPS)
+    return reinterpret_cast<void*>((uintptr_t) regs.machineContext.mc_pc);
 #else
 #error Unknown Architecture
 #endif
@@ -766,6 +801,22 @@ void* MachineThreads::Thread::Registers::llintPC() const
 #elif CPU(X86_64)
     static_assert(LLInt::LLIntPC == X86Registers::r10, "Wrong LLInt PC.");
     return reinterpret_cast<void*>((uintptr_t) regs.R10);
+#else
+#error Unknown Architecture
+#endif
+
+#elif OS(FREEBSD)
+
+#if CPU(X86)
+    return reinterpret_cast<void*>((uintptr_t) regs.machineContext.mc_esi);
+#elif CPU(X86_64)
+    return reinterpret_cast<void*>((uintptr_t) regs.machineContext.mc_r8);
+#elif CPU(ARM)
+    return reinterpret_cast<void*>((uintptr_t) regs.machineContext.__gregs[_REG_R8]);
+#elif CPU(ARM64)
+    return reinterpret_cast<void*>((uintptr_t) regs.machineContext.mc_gpregs.gp_x[4]);
+#elif CPU(MIPS)
+    return reinterpret_cast<void*>((uintptr_t) regs.machineContext.mc_regs[12]);
 #else
 #error Unknown Architecture
 #endif

@@ -278,7 +278,7 @@ RegisterSet RegisterSet::ftlCalleeSaveRegisters()
     result.set(GPRInfo::regCS3);
     result.set(GPRInfo::regCS4);
 #elif CPU(ARM64)
-    // LLVM might save and use all ARM64 callee saves specified in the ABI.
+    // B3 might save and use all ARM64 callee saves specified in the ABI.
     result.set(GPRInfo::regCS0);
     result.set(GPRInfo::regCS1);
     result.set(GPRInfo::regCS2);
@@ -338,6 +338,16 @@ RegisterSet RegisterSet::webAssemblyCalleeSaveRegisters()
     return result;
 }
 #endif
+
+RegisterSet RegisterSet::argumentGPRS()
+{
+    RegisterSet result;
+#if NUMBER_OF_ARGUMENT_REGISTERS
+    for (unsigned i = 0; i < GPRInfo::numberOfArgumentRegisters; i++)
+        result.set(GPRInfo::toArgumentRegister(i));
+#endif
+    return result;
+}
 
 RegisterSet RegisterSet::registersToNotSaveForJSCall()
 {

@@ -34,17 +34,13 @@
 #include "ElementIterator.h"
 #include "Font.h"
 #include "FontCache.h"
-#include "FontDescription.h"
-
-#if ENABLE(SVG_OTF_CONVERTER)
 #include "FontCustomPlatformData.h"
+#include "FontDescription.h"
 #include "SVGToOTFFontConversion.h"
-#endif
 
 #if ENABLE(SVG_FONTS)
 #include "CachedSVGFont.h"
 #include "FontCustomPlatformData.h"
-#include "SVGFontData.h"
 #include "SVGFontElement.h"
 #include "SVGFontFaceElement.h"
 #include "SVGNames.h"
@@ -69,15 +65,23 @@ inline void CSSFontFaceSource::setStatus(Status newStatus)
         ASSERT(status() == Status::Loading);
         break;
     }
+
     m_status = newStatus;
 }
 
-CSSFontFaceSource::CSSFontFaceSource(CSSFontFace& owner, const String& familyNameOrURI, CachedFont* font, SVGFontFaceElement* fontFace)
+CSSFontFaceSource::CSSFontFaceSource(CSSFontFace& owner, const String& familyNameOrURI, CachedFont* font, SVGFontFaceElement* fontFace, RefPtr<JSC::ArrayBufferView>&& arrayBufferView)
     : m_familyNameOrURI(familyNameOrURI)
     , m_font(font)
     , m_face(owner)
+    , m_immediateSource(WTFMove(arrayBufferView))
+#if ENABLE(SVG_FONTS)
     , m_svgFontFaceElement(fontFace)
+#endif
 {
+#if !ENABLE(SVG_FONTS)
+    UNUSED_PARAM(fontFace);
+#endif
+
     // This may synchronously call fontLoaded().
     if (m_font)
         m_font->addClient(this);
@@ -104,11 +108,20 @@ void CSSFontFaceSource::fontLoaded(CachedFont& loadedFont)
     // If the font is in the cache, this will be synchronously called from CachedFont::addClient().
     if (m_status == Status::Pending)
         setStatus(Status::Loading);
+    else if (m_status == Status::Failure) {
+        // This function may be called twice if loading was cancelled.
+        ASSERT(m_font->errorOccurred());
+        return;
+    }
+
+    if (m_face.webFontsShouldAlwaysFallBack())
+        return;
 
     if (m_font->errorOccurred())
         setStatus(Status::Failure);
     else
         setStatus(Status::Success);
+
     m_face.fontLoaded(*this);
 }
 
@@ -116,7 +129,8 @@ void CSSFontFaceSource::load(CSSFontSelector& fontSelector)
 {
     setStatus(Status::Loading);
 
-    fontSelector.beginLoadingFontSoon(m_font.get());
+    ASSERT(m_font);
+    fontSelector.beginLoadingFontSoon(*m_font);
 }
 
 RefPtr<Font> CSSFontFaceSource::font(const FontDescription& fontDescription, bool syntheticBold, bool syntheticItalic, const FontFeatureSettings& fontFaceFeatures, const FontVariantSettings& fontFaceVariantSettings)
@@ -129,9 +143,20 @@ RefPtr<Font> CSSFontFaceSource::font(const FontDescription& fontDescription, boo
 #endif
 
     if (!m_font && !fontFaceElement) {
+        if (m_immediateSource) {
+            if (!m_immediateFontCustomPlatformData) {
+                bool wrapping;
+                RefPtr<SharedBuffer> buffer = SharedBuffer::create(static_cast<const char*>(m_immediateSource->baseAddress()), m_immediateSource->byteLength());
+                ASSERT(buffer);
+                m_immediateFontCustomPlatformData = CachedFont::createCustomFontData(*buffer, wrapping);
+            } if (!m_immediateFontCustomPlatformData)
+                return nullptr;
+            return Font::create(CachedFont::platformDataFromCustomData(*m_immediateFontCustomPlatformData, fontDescription, syntheticBold, syntheticItalic, fontFaceFeatures, fontFaceVariantSettings), true);
+        }
+
         // We're local. Just return a Font from the normal cache.
         // We don't want to check alternate font family names here, so pass true as the checkingAlternateName parameter.
-        return FontCache::singleton().fontForFamily(fontDescription, m_familyNameOrURI, true);
+        return FontCache::singleton().fontForFamily(fontDescription, m_familyNameOrURI, &fontFaceFeatures, &fontFaceVariantSettings, true);
     }
 
     if (m_font) {
@@ -146,26 +171,22 @@ RefPtr<Font> CSSFontFaceSource::font(const FontDescription& fontDescription, boo
         return nullptr;
 
 #if ENABLE(SVG_FONTS)
-#if ENABLE(SVG_OTF_CONVERTER)
     if (!is<SVGFontElement>(m_svgFontFaceElement->parentNode()))
         return nullptr;
-    SVGFontElement& fontElement = downcast<SVGFontElement>(*m_svgFontFaceElement->parentNode());
-    // FIXME: Re-run this when script modifies the element or any of its descendents
-    // FIXME: We might have already converted this font. Make existing conversions discoverable.
-    if (auto otfFont = convertSVGToOTFFont(fontElement))
-        m_generatedOTFBuffer = SharedBuffer::adoptVector(otfFont.value());
-    if (!m_generatedOTFBuffer)
-        return nullptr;
-    m_inDocumentCustomPlatformData = createFontCustomPlatformData(*m_generatedOTFBuffer);
+    if (!m_inDocumentCustomPlatformData) {
+        SVGFontElement& fontElement = downcast<SVGFontElement>(*m_svgFontFaceElement->parentNode());
+        if (auto otfFont = convertSVGToOTFFont(fontElement))
+            m_generatedOTFBuffer = SharedBuffer::adoptVector(otfFont.value());
+        if (!m_generatedOTFBuffer)
+            return nullptr;
+        m_inDocumentCustomPlatformData = createFontCustomPlatformData(*m_generatedOTFBuffer);
+    }
     if (!m_inDocumentCustomPlatformData)
         return nullptr;
 #if PLATFORM(COCOA)
     return Font::create(m_inDocumentCustomPlatformData->fontPlatformData(fontDescription, syntheticBold, syntheticItalic, fontFaceFeatures, fontFaceVariantSettings), true, false);
 #else
     return Font::create(m_inDocumentCustomPlatformData->fontPlatformData(fontDescription, syntheticBold, syntheticItalic), true, false);
-#endif
-#else
-    return Font::create(std::make_unique<SVGFontData>(m_svgFontFaceElement.get()), fontDescription.computedPixelSize(), syntheticBold, syntheticItalic);
 #endif
 #endif
 

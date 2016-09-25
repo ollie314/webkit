@@ -33,7 +33,6 @@
 #endif
 #include "PaintInfo.h"
 #include "PopupMenuStyle.h"
-#include "RenderObject.h"
 #include "ScrollTypes.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
@@ -45,14 +44,18 @@ class Element;
 class FileList;
 class HTMLInputElement;
 class Icon;
+class Page;
 class PopupMenu;
 class RenderAttachment;
+class RenderBox;
 class RenderMenuList;
 #if ENABLE(METER_ELEMENT)
 class RenderMeter;
 #endif
+class RenderObject;
 class RenderProgress;
 class RenderSnapshottedPlugIn;
+class StyleResolver;
 
 class RenderTheme : public RefCounted<RenderTheme> {
 protected:
@@ -77,7 +80,7 @@ public:
     // metrics and defaults given the contents of the style.  This includes sophisticated operations like
     // selection of control size based off the font, the disabling of appearance when certain other properties like
     // "border" are set, or if the appearance is not supported by the theme.
-    void adjustStyle(StyleResolver&, RenderStyle&, Element*,  bool UAHasAppearance, const BorderData&, const FillLayer&, const Color& backgroundColor);
+    void adjustStyle(StyleResolver&, RenderStyle&, const Element*,  bool UAHasAppearance, const BorderData&, const FillLayer&, const Color& backgroundColor);
 
     // This method is called to paint the widget as a background of the RenderObject.  A widget's foreground, e.g., the
     // text of a button, is always rendered by the engine itself.  The boolean return value indicates
@@ -170,7 +173,7 @@ public:
     static float platformFocusRingOffset(float outlineWidth) { return std::max<float>(outlineWidth - platformFocusRingWidth(), 0); }
 #if ENABLE(TOUCH_EVENTS)
     static Color tapHighlightColor();
-    virtual Color platformTapHighlightColor() const { return RenderTheme::defaultTapHighlightColor; }
+    virtual Color platformTapHighlightColor() const;
 #endif
     virtual void platformColorsDidChange();
 
@@ -180,14 +183,11 @@ public:
     void systemFont(CSSValueID, FontCascadeDescription&) const;
     virtual Color systemColor(CSSValueID) const;
 
-    virtual int minimumMenuListSize(RenderStyle&) const { return 0; }
+    virtual int minimumMenuListSize(const RenderStyle&) const { return 0; }
 
-    virtual void adjustSliderThumbSize(RenderStyle&, Element*) const;
+    virtual void adjustSliderThumbSize(RenderStyle&, const Element*) const;
 
-    virtual int popupInternalPaddingLeft(RenderStyle&) const { return 0; }
-    virtual int popupInternalPaddingRight(RenderStyle&) const { return 0; }
-    virtual int popupInternalPaddingTop(RenderStyle&) const { return 0; }
-    virtual int popupInternalPaddingBottom(RenderStyle&) const { return 0; }
+    virtual LengthBox popupInternalPaddingBox(const RenderStyle&) const { return { 0, 0, 0, 0 }; }
     virtual bool popupOptionSupportsTextIndent() const { return false; }
     virtual PopupMenuStyle::PopupMenuSize popupMenuSize(const RenderStyle&, IntRect&) const { return PopupMenuStyle::PopupMenuSizeNormal; }
 
@@ -232,8 +232,8 @@ public:
     void paintSliderTicks(const RenderObject&, const PaintInfo&, const IntRect&);
 #endif
 
-    virtual bool shouldHaveSpinButton(HTMLInputElement&) const;
-    virtual bool shouldHaveCapsLockIndicator(HTMLInputElement&) const;
+    virtual bool shouldHaveSpinButton(const HTMLInputElement&) const;
+    virtual bool shouldHaveCapsLockIndicator(const HTMLInputElement&) const;
 
     // Functions for <select> elements.
     virtual bool delegatesMenuListRendering() const { return false; }
@@ -256,6 +256,9 @@ public:
     virtual int attachmentBaseline(const RenderAttachment&) const { return -1; }
 #endif
 
+    enum class InnerSpinButtonLayout { Vertical, HorizontalUpLeft, HorizontalUpRight };
+    virtual InnerSpinButtonLayout innerSpinButtonLayout(const RenderObject&) const { return InnerSpinButtonLayout::Vertical; }
+
 protected:
     virtual FontCascadeDescription& cachedSystemFontDescription(CSSValueID systemFontID) const;
     virtual void updateCachedSystemFontDescription(CSSValueID systemFontID, FontCascadeDescription&) const = 0;
@@ -276,19 +279,19 @@ protected:
 
 #if !USE(NEW_THEME)
     // Methods for each appearance value.
-    virtual void adjustCheckboxStyle(StyleResolver&, RenderStyle&, Element*) const;
+    virtual void adjustCheckboxStyle(StyleResolver&, RenderStyle&, const Element*) const;
     virtual bool paintCheckbox(const RenderObject&, const PaintInfo&, const IntRect&) { return true; }
     virtual void setCheckboxSize(RenderStyle&) const { }
 
-    virtual void adjustRadioStyle(StyleResolver&, RenderStyle&, Element*) const;
+    virtual void adjustRadioStyle(StyleResolver&, RenderStyle&, const Element*) const;
     virtual bool paintRadio(const RenderObject&, const PaintInfo&, const IntRect&) { return true; }
     virtual void setRadioSize(RenderStyle&) const { }
 
-    virtual void adjustButtonStyle(StyleResolver&, RenderStyle&, Element*) const;
+    virtual void adjustButtonStyle(StyleResolver&, RenderStyle&, const Element*) const;
     virtual bool paintButton(const RenderObject&, const PaintInfo&, const IntRect&) { return true; }
     virtual void setButtonSize(RenderStyle&) const { }
 
-    virtual void adjustInnerSpinButtonStyle(StyleResolver&, RenderStyle&, Element*) const;
+    virtual void adjustInnerSpinButtonStyle(StyleResolver&, RenderStyle&, const Element*) const;
     virtual bool paintInnerSpinButton(const RenderObject&, const PaintInfo&, const IntRect&) { return true; }
 #endif
 
@@ -296,64 +299,69 @@ protected:
     virtual bool paintRadioDecorations(const RenderObject&, const PaintInfo&, const IntRect&) { return true; }
     virtual bool paintButtonDecorations(const RenderObject&, const PaintInfo&, const IntRect&) { return true; }
 
-    virtual void adjustTextFieldStyle(StyleResolver&, RenderStyle&, Element*) const;
+    virtual void adjustTextFieldStyle(StyleResolver&, RenderStyle&, const Element*) const;
     virtual bool paintTextField(const RenderObject&, const PaintInfo&, const FloatRect&) { return true; }
     virtual bool paintTextFieldDecorations(const RenderObject&, const PaintInfo&, const FloatRect&) { return true; }
 
-    virtual void adjustTextAreaStyle(StyleResolver&, RenderStyle&, Element*) const;
+    virtual void adjustTextAreaStyle(StyleResolver&, RenderStyle&, const Element*) const;
     virtual bool paintTextArea(const RenderObject&, const PaintInfo&, const FloatRect&) { return true; }
     virtual bool paintTextAreaDecorations(const RenderObject&, const PaintInfo&, const FloatRect&) { return true; }
 
-    virtual void adjustMenuListStyle(StyleResolver&, RenderStyle&, Element*) const;
+    virtual void adjustMenuListStyle(StyleResolver&, RenderStyle&, const Element*) const;
     virtual bool paintMenuList(const RenderObject&, const PaintInfo&, const FloatRect&) { return true; }
     virtual bool paintMenuListDecorations(const RenderObject&, const PaintInfo&, const IntRect&) { return true; }
 
-    virtual void adjustMenuListButtonStyle(StyleResolver&, RenderStyle&, Element*) const;
+    virtual void adjustMenuListButtonStyle(StyleResolver&, RenderStyle&, const Element*) const;
     virtual bool paintMenuListButtonDecorations(const RenderBox&, const PaintInfo&, const FloatRect&) { return true; }
 
     virtual bool paintPushButtonDecorations(const RenderObject&, const PaintInfo&, const IntRect&) { return true; }
     virtual bool paintSquareButtonDecorations(const RenderObject&, const PaintInfo&, const IntRect&) { return true; }
 
 #if ENABLE(METER_ELEMENT)
-    virtual void adjustMeterStyle(StyleResolver&, RenderStyle&, Element*) const;
+    virtual void adjustMeterStyle(StyleResolver&, RenderStyle&, const Element*) const;
     virtual bool paintMeter(const RenderObject&, const PaintInfo&, const IntRect&);
 #endif
 
-    virtual void adjustCapsLockIndicatorStyle(StyleResolver&, RenderStyle&, Element*) const;
+    virtual void adjustCapsLockIndicatorStyle(StyleResolver&, RenderStyle&, const Element*) const;
     virtual bool paintCapsLockIndicator(const RenderObject&, const PaintInfo&, const IntRect&);
 
+#if ENABLE(APPLE_PAY)
+    virtual void adjustApplePayButtonStyle(StyleResolver&, RenderStyle&, const Element*) const { }
+    virtual bool paintApplePayButton(const RenderObject&, const PaintInfo&, const IntRect&) { return true; }
+#endif
+
 #if ENABLE(ATTACHMENT_ELEMENT)
-    virtual void adjustAttachmentStyle(StyleResolver&, RenderStyle&, Element*) const;
+    virtual void adjustAttachmentStyle(StyleResolver&, RenderStyle&, const Element*) const;
     virtual bool paintAttachment(const RenderObject&, const PaintInfo&, const IntRect&);
 #endif
 
-    virtual void adjustProgressBarStyle(StyleResolver&, RenderStyle&, Element*) const;
+    virtual void adjustProgressBarStyle(StyleResolver&, RenderStyle&, const Element*) const;
     virtual bool paintProgressBar(const RenderObject&, const PaintInfo&, const IntRect&) { return true; }
 
-    virtual void adjustSliderTrackStyle(StyleResolver&, RenderStyle&, Element*) const;
+    virtual void adjustSliderTrackStyle(StyleResolver&, RenderStyle&, const Element*) const;
     virtual bool paintSliderTrack(const RenderObject&, const PaintInfo&, const IntRect&) { return true; }
 
-    virtual void adjustSliderThumbStyle(StyleResolver&, RenderStyle&, Element*) const;
+    virtual void adjustSliderThumbStyle(StyleResolver&, RenderStyle&, const Element*) const;
     virtual bool paintSliderThumb(const RenderObject&, const PaintInfo&, const IntRect&) { return true; }
     virtual bool paintSliderThumbDecorations(const RenderObject&, const PaintInfo&, const IntRect&) { return true; }
 
-    virtual void adjustSearchFieldStyle(StyleResolver&, RenderStyle&, Element*) const;
+    virtual void adjustSearchFieldStyle(StyleResolver&, RenderStyle&, const Element*) const;
     virtual bool paintSearchField(const RenderObject&, const PaintInfo&, const IntRect&) { return true; }
     virtual bool paintSearchFieldDecorations(const RenderObject&, const PaintInfo&, const IntRect&) { return true; }
 
-    virtual void adjustSearchFieldCancelButtonStyle(StyleResolver&, RenderStyle&, Element*) const;
+    virtual void adjustSearchFieldCancelButtonStyle(StyleResolver&, RenderStyle&, const Element*) const;
     virtual bool paintSearchFieldCancelButton(const RenderBox&, const PaintInfo&, const IntRect&) { return true; }
 
-    virtual void adjustSearchFieldDecorationPartStyle(StyleResolver&, RenderStyle&, Element*) const;
+    virtual void adjustSearchFieldDecorationPartStyle(StyleResolver&, RenderStyle&, const Element*) const;
     virtual bool paintSearchFieldDecorationPart(const RenderObject&, const PaintInfo&, const IntRect&) { return true; }
 
-    virtual void adjustSearchFieldResultsDecorationPartStyle(StyleResolver&, RenderStyle&, Element*) const;
+    virtual void adjustSearchFieldResultsDecorationPartStyle(StyleResolver&, RenderStyle&, const Element*) const;
     virtual bool paintSearchFieldResultsDecorationPart(const RenderBox&, const PaintInfo&, const IntRect&) { return true; }
 
-    virtual void adjustSearchFieldResultsButtonStyle(StyleResolver&, RenderStyle&, Element*) const;
+    virtual void adjustSearchFieldResultsButtonStyle(StyleResolver&, RenderStyle&, const Element*) const;
     virtual bool paintSearchFieldResultsButton(const RenderBox&, const PaintInfo&, const IntRect&) { return true; }
 
-    virtual void adjustMediaControlStyle(StyleResolver&, RenderStyle&, Element*) const;
+    virtual void adjustMediaControlStyle(StyleResolver&, RenderStyle&, const Element*) const;
     virtual bool paintMediaFullscreenButton(const RenderObject&, const PaintInfo&, const IntRect&) { return true; }
     virtual bool paintMediaPlayButton(const RenderObject&, const PaintInfo&, const IntRect&) { return true; }
     virtual bool paintMediaOverlayPlayButton(const RenderObject&, const PaintInfo&, const IntRect&) { return true; }
@@ -405,12 +413,6 @@ private:
     mutable Color m_inactiveListBoxSelectionBackgroundColor;
     mutable Color m_activeListBoxSelectionForegroundColor;
     mutable Color m_inactiveListBoxSelectionForegroundColor;
-
-#if ENABLE(TOUCH_EVENTS)
-    // This color is expected to be drawn on a semi-transparent overlay,
-    // making it more transparent than its alpha value indicates.
-    static const RGBA32 defaultTapHighlightColor = 0x66000000;
-#endif
 
 #if USE(NEW_THEME)
     Theme* m_theme; // The platform-specific theme.

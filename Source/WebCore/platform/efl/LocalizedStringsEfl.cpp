@@ -407,6 +407,16 @@ String AXSearchFieldCancelButtonText()
 {
     return String::fromUTF8("cancel");
 }
+    
+String AXAutoFillCredentialsLabel()
+{
+    return String::fromUTF8("password auto fill");
+}
+
+String AXAutoFillContactsLabel()
+{
+    return String::fromUTF8("contact info auto fill");
+}
 
 String AXButtonActionVerb()
 {
@@ -544,6 +554,11 @@ String validationMessageRangeUnderflowText(const String& minimum)
 String validationMessageStepMismatchText(const String&, const String&)
 {
     return String::fromUTF8("step mismatch");
+}
+
+String validationMessageTooShortText(int, int)
+{
+    return String::fromUTF8("too short");
 }
 
 String validationMessageTooLongText(int, int)

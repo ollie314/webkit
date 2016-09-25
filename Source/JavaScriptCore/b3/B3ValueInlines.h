@@ -41,8 +41,22 @@
 
 namespace JSC { namespace B3 {
 
+template<typename BottomProvider>
+void Value::replaceWithBottom(const BottomProvider& bottomProvider)
+{
+    if (m_type == Void) {
+        replaceWithNop();
+        return;
+    }
+    
+    if (isConstant())
+        return;
+    
+    replaceWithIdentity(bottomProvider(m_origin, m_type));
+}
+
 template<typename T>
-T* Value::as()
+inline T* Value::as()
 {
     if (T::accepts(opcode()))
         return static_cast<T*>(this);
@@ -50,7 +64,7 @@ T* Value::as()
 }
 
 template<typename T>
-const T* Value::as() const
+inline const T* Value::as() const
 {
     return const_cast<Value*>(this)->as<T>();
 }

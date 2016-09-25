@@ -149,7 +149,19 @@ public:
     void setPrivate(void* data);
     void* getPrivate();
 
+    // FIXME: We should fix the warnings for extern-template in JSObject template classes: https://bugs.webkit.org/show_bug.cgi?id=161979
+#if COMPILER(CLANG)
+#if __has_warning("-Wundefined-var-template")
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wundefined-var-template"
+#endif
+#endif
     DECLARE_INFO;
+#if COMPILER(CLANG)
+#if __has_warning("-Wundefined-var-template")
+#pragma clang diagnostic pop
+#endif
+#endif
 
     JSClassRef classRef() const { return m_callbackObjectData->jsClass; }
     bool inherits(JSClassRef) const;
@@ -181,8 +193,8 @@ private:
     static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
     static bool getOwnPropertySlotByIndex(JSObject*, ExecState*, unsigned propertyName, PropertySlot&);
     
-    static void put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
-    static void putByIndex(JSCell*, ExecState*, unsigned, JSValue, bool shouldThrow);
+    static bool put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
+    static bool putByIndex(JSCell*, ExecState*, unsigned, JSValue, bool shouldThrow);
 
     static bool deleteProperty(JSCell*, ExecState*, PropertyName);
     static bool deletePropertyByIndex(JSCell*, ExecState*, unsigned);

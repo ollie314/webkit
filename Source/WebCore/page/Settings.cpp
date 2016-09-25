@@ -43,8 +43,8 @@
 #include "MainFrame.h"
 #include "Page.h"
 #include "PageCache.h"
+#include "RuntimeApplicationChecks.h"
 #include "StorageMap.h"
-#include "TextAutosizer.h"
 #include <limits>
 #include <wtf/NeverDestroyed.h>
 #include <wtf/StdLibExtras.h>
@@ -61,6 +61,8 @@ static void setImageLoadingSettings(Page* page)
         return;
 
     for (Frame* frame = &page->mainFrame(); frame; frame = frame->tree().traverseNext()) {
+        if (!frame->document())
+            continue;
         frame->document()->cachedResourceLoader().setImagesEnabled(page->settings().areImagesEnabled());
         frame->document()->cachedResourceLoader().setAutoLoadImages(page->settings().loadsImagesAutomatically());
     }
@@ -75,7 +77,7 @@ static void invalidateAfterGenericFamilyChange(Page* page)
 
 #if USE(AVFOUNDATION)
 bool Settings::gAVFoundationEnabled = true;
-bool Settings::gAVFoundationNSURLSessionEnabled = false;
+bool Settings::gAVFoundationNSURLSessionEnabled = true;
 #endif
 
 #if PLATFORM(COCOA)
@@ -84,6 +86,7 @@ bool Settings::gQTKitEnabled = false;
 
 bool Settings::gMockScrollbarsEnabled = false;
 bool Settings::gUsesOverlayScrollbars = false;
+bool Settings::gMockScrollAnimatorEnabled = false;
 
 #if ENABLE(MEDIA_STREAM)
 bool Settings::gMockCaptureDevicesEnabled = false;
@@ -93,9 +96,10 @@ bool Settings::gMockCaptureDevicesEnabled = false;
 bool Settings::gShouldUseHighResolutionTimers = true;
 #endif
     
-bool Settings::gShouldRewriteConstAsVar = false;
 bool Settings::gShouldRespectPriorityInCSSAttributeSetters = false;
 bool Settings::gLowPowerVideoAudioBufferSizeEnabled = false;
+bool Settings::gResourceLoadStatisticsEnabledEnabled = false;
+bool Settings::gAllowsAnySSLCertificate = false;
 
 #if PLATFORM(IOS)
 bool Settings::gNetworkDataUsageTrackingEnabled = false;
@@ -127,32 +131,40 @@ static EditingBehaviorType editingBehaviorTypeForPlatform()
     ;
 }
 
+#if PLATFORM(COCOA)
+static const bool defaultYouTubeFlashPluginReplacementEnabled = true;
+#else
+static const bool defaultYouTubeFlashPluginReplacementEnabled = false;
+#endif
+
 #if PLATFORM(IOS)
 static const bool defaultFixedPositionCreatesStackingContext = true;
 static const bool defaultFixedBackgroundsPaintRelativeToDocument = true;
 static const bool defaultAcceleratedCompositingForFixedPositionEnabled = true;
 static const bool defaultAllowsInlineMediaPlayback = false;
 static const bool defaultInlineMediaPlaybackRequiresPlaysInlineAttribute = true;
-static const bool defaultRequiresUserGestureForMediaPlayback = true;
+static const bool defaultVideoPlaybackRequiresUserGesture = true;
 static const bool defaultAudioPlaybackRequiresUserGesture = true;
 static const bool defaultMediaDataLoadsAutomatically = false;
 static const bool defaultShouldRespectImageOrientation = true;
 static const bool defaultImageSubsamplingEnabled = true;
 static const bool defaultScrollingTreeIncludesFrames = true;
 static const bool defaultMediaControlsScaleWithPageZoom = true;
+static const bool defaultQuickTimePluginReplacementEnabled = true;
 #else
 static const bool defaultFixedPositionCreatesStackingContext = false;
 static const bool defaultFixedBackgroundsPaintRelativeToDocument = false;
 static const bool defaultAcceleratedCompositingForFixedPositionEnabled = false;
 static const bool defaultAllowsInlineMediaPlayback = true;
 static const bool defaultInlineMediaPlaybackRequiresPlaysInlineAttribute = false;
-static const bool defaultRequiresUserGestureForMediaPlayback = false;
+static const bool defaultVideoPlaybackRequiresUserGesture = false;
 static const bool defaultAudioPlaybackRequiresUserGesture = false;
 static const bool defaultMediaDataLoadsAutomatically = true;
 static const bool defaultShouldRespectImageOrientation = false;
 static const bool defaultImageSubsamplingEnabled = false;
 static const bool defaultScrollingTreeIncludesFrames = false;
 static const bool defaultMediaControlsScaleWithPageZoom = true;
+static const bool defaultQuickTimePluginReplacementEnabled = false;
 #endif
 
 static const bool defaultAllowsPictureInPictureMediaPlayback = true;
@@ -169,7 +181,7 @@ static const bool defaultSelectTrailingWhitespaceEnabled = false;
 // This amount of time must have elapsed before we will even consider scheduling a layout without a delay.
 // FIXME: For faster machines this value can really be lowered to 200. 250 is adequate, but a little high
 // for dual G5s. :)
-static const auto layoutScheduleThreshold = std::chrono::milliseconds(250);
+static const auto layoutScheduleThreshold = 250ms;
 
 Settings::Settings(Page* page)
     : m_page(nullptr)
@@ -178,27 +190,17 @@ Settings::Settings(Page* page)
     , m_storageBlockingPolicy(SecurityOrigin::AllowAllStorage)
     , m_layoutInterval(layoutScheduleThreshold)
     , m_minimumDOMTimerInterval(DOMTimer::defaultMinimumInterval())
-    , m_domTimerAlignmentInterval(DOMTimer::defaultAlignmentInterval())
-#if ENABLE(TEXT_AUTOSIZING)
-    , m_textAutosizingFontScaleFactor(1)
-#if HACK_FORCE_TEXT_AUTOSIZING_ON_DESKTOP
-    , m_textAutosizingWindowSizeOverride(320, 480)
-    , m_textAutosizingEnabled(true)
-#else
-    , m_textAutosizingEnabled(false)
-#endif
-#endif
     SETTINGS_INITIALIZER_LIST
     , m_isJavaEnabled(false)
     , m_isJavaEnabledForLocalFiles(true)
     , m_loadsImagesAutomatically(false)
     , m_areImagesEnabled(true)
+    , m_preferMIMETypeForImages(false)
     , m_arePluginsEnabled(false)
     , m_isScriptEnabled(false)
     , m_needsAdobeFrameReloadingQuirk(false)
     , m_usesPageCache(false)
     , m_fontRenderingMode(0)
-    , m_antialiasedFontDilationEnabled(false)
     , m_showTiledScrollingIndicator(false)
     , m_backgroundShouldExtendBeyondPage(false)
     , m_dnsPrefetchingEnabled(false)
@@ -208,11 +210,10 @@ Settings::Settings(Page* page)
     , m_scrollingPerformanceLoggingEnabled(false)
     , m_timeWithoutMouseMovementBeforeHidingControls(3)
     , m_setImageLoadingSettingsTimer(*this, &Settings::imageLoadingSettingsTimerFired)
-#if ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
     , m_hiddenPageDOMTimerThrottlingEnabled(false)
-#endif
     , m_hiddenPageCSSAnimationSuspensionEnabled(false)
     , m_fontFallbackPrefersPictographs(false)
+    , m_webFontsAlwaysFallBack(false)
     , m_forcePendingWebGLPolicy(false)
 {
     // A Frame may not have been created yet, so we initialize the AtomicString
@@ -324,48 +325,17 @@ void Settings::setPictographFontFamily(const AtomicString& family, UScriptCode s
         invalidateAfterGenericFamilyChange(m_page);
 }
 
-#if ENABLE(TEXT_AUTOSIZING)
-void Settings::setTextAutosizingEnabled(bool textAutosizingEnabled)
+float Settings::defaultMinimumZoomFontSize()
 {
-    if (m_textAutosizingEnabled == textAutosizingEnabled)
-        return;
-
-    m_textAutosizingEnabled = textAutosizingEnabled;
-    if (m_page)
-        m_page->setNeedsRecalcStyleInAllFrames();
+    return 15;
 }
 
-void Settings::setTextAutosizingWindowSizeOverride(const IntSize& textAutosizingWindowSizeOverride)
+#if !PLATFORM(IOS)
+bool Settings::defaultTextAutosizingEnabled()
 {
-    if (m_textAutosizingWindowSizeOverride == textAutosizingWindowSizeOverride)
-        return;
-
-    m_textAutosizingWindowSizeOverride = textAutosizingWindowSizeOverride;
-    if (m_page)
-        m_page->setNeedsRecalcStyleInAllFrames();
+    return false;
 }
-
-void Settings::setTextAutosizingFontScaleFactor(float fontScaleFactor)
-{
-    m_textAutosizingFontScaleFactor = fontScaleFactor;
-
-    if (!m_page)
-        return;
-
-    // FIXME: I wonder if this needs to traverse frames like in WebViewImpl::resize, or whether there is only one document per Settings instance?
-    for (Frame* frame = m_page->mainFrame(); frame; frame = frame->tree().traverseNext())
-        frame->document()->textAutosizer()->recalculateMultipliers();
-
-    m_page->setNeedsRecalcStyleInAllFrames();
-}
-
 #endif
-
-void Settings::setAntialiasedFontDilationEnabled(bool enabled)
-{
-    // FIXME: It's wrong for a setting to toggle a global, but this code is temporary.
-    FontCascade::setAntialiasedFontDilationEnabled(enabled);
-}
 
 void Settings::setMediaTypeOverride(const String& mediaTypeOverride)
 {
@@ -437,6 +407,11 @@ void Settings::setImagesEnabled(bool areImagesEnabled)
     m_setImageLoadingSettingsTimer.startOneShot(0);
 }
 
+void Settings::setPreferMIMETypeForImages(bool preferMIMETypeForImages)
+{
+    m_preferMIMETypeForImages = preferMIMETypeForImages;
+}
+
 void Settings::setForcePendingWebGLPolicy(bool forced)
 {
     m_forcePendingWebGLPolicy = forced;
@@ -469,9 +444,9 @@ void Settings::setNeedsAdobeFrameReloadingQuirk(bool shouldNotReloadIFramesForUn
     m_needsAdobeFrameReloadingQuirk = shouldNotReloadIFramesForUnchangedSRC;
 }
 
-void Settings::setMinimumDOMTimerInterval(double interval)
+void Settings::setMinimumDOMTimerInterval(std::chrono::milliseconds interval)
 {
-    double oldTimerInterval = m_minimumDOMTimerInterval;
+    auto oldTimerInterval = m_minimumDOMTimerInterval;
     m_minimumDOMTimerInterval = interval;
 
     if (!m_page)
@@ -481,11 +456,6 @@ void Settings::setMinimumDOMTimerInterval(double interval)
         if (frame->document())
             frame->document()->adjustMinimumTimerInterval(oldTimerInterval);
     }
-}
-
-void Settings::setDOMTimerAlignmentInterval(double alignmentInterval)
-{
-    m_domTimerAlignmentInterval = alignmentInterval;
 }
 
 void Settings::setLayoutInterval(std::chrono::milliseconds layoutInterval)
@@ -632,6 +602,10 @@ void Settings::setScrollingPerformanceLoggingEnabled(bool enabled)
         m_page->mainFrame().view()->setScrollingPerformanceLoggingEnabled(enabled);
 }
 
+// It's very important that this setting doesn't change in the middle of a document's lifetime.
+// The Mac port uses this flag when registering and deregistering platform-dependent scrollbar
+// objects. Therefore, if this changes at an unexpected time, deregistration may not happen
+// correctly, which may cause the platform to follow dangling pointers.
 void Settings::setMockScrollbarsEnabled(bool flag)
 {
     gMockScrollbarsEnabled = flag;
@@ -654,6 +628,16 @@ bool Settings::usesOverlayScrollbars()
     return gUsesOverlayScrollbars;
 }
 
+void Settings::setUsesMockScrollAnimator(bool flag)
+{
+    gMockScrollAnimatorEnabled = flag;
+}
+
+bool Settings::usesMockScrollAnimator()
+{
+    return gMockScrollAnimatorEnabled;
+}
+
 void Settings::setShouldRespectPriorityInCSSAttributeSetters(bool flag)
 {
     gShouldRespectPriorityInCSSAttributeSetters = flag;
@@ -664,7 +648,6 @@ bool Settings::shouldRespectPriorityInCSSAttributeSetters()
     return gShouldRespectPriorityInCSSAttributeSetters;
 }
 
-#if ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
 void Settings::setHiddenPageDOMTimerThrottlingEnabled(bool flag)
 {
     if (m_hiddenPageDOMTimerThrottlingEnabled == flag)
@@ -673,7 +656,15 @@ void Settings::setHiddenPageDOMTimerThrottlingEnabled(bool flag)
     if (m_page)
         m_page->hiddenPageDOMTimerThrottlingStateChanged();
 }
-#endif
+
+void Settings::setHiddenPageDOMTimerThrottlingAutoIncreases(bool flag)
+{
+    if (m_hiddenPageDOMTimerThrottlingAutoIncreases == flag)
+        return;
+    m_hiddenPageDOMTimerThrottlingAutoIncreases = flag;
+    if (m_page)
+        m_page->hiddenPageDOMTimerThrottlingStateChanged();
+}
 
 void Settings::setHiddenPageCSSAnimationSuspensionEnabled(bool flag)
 {
@@ -694,9 +685,22 @@ void Settings::setFontFallbackPrefersPictographs(bool preferPictographs)
         m_page->setNeedsRecalcStyleInAllFrames();
 }
 
+void Settings::setWebFontsAlwaysFallBack(bool enable)
+{
+    if (m_webFontsAlwaysFallBack == enable)
+        return;
+
+    m_webFontsAlwaysFallBack = enable;
+}
+
 void Settings::setLowPowerVideoAudioBufferSizeEnabled(bool flag)
 {
     gLowPowerVideoAudioBufferSizeEnabled = flag;
+}
+
+void Settings::setResourceLoadStatisticsEnabled(bool flag)
+{
+    gResourceLoadStatisticsEnabledEnabled = flag;
 }
 
 #if PLATFORM(IOS)
@@ -736,5 +740,26 @@ const String& Settings::networkInterfaceName()
     return sharedNetworkInterfaceNameGlobal();
 }
 #endif
+
+bool Settings::globalConstRedeclarationShouldThrow()
+{
+#if PLATFORM(MAC)
+    return !MacApplication::isIBooks();
+#elif PLATFORM(IOS)
+    return !IOSApplication::isIBooks();
+#else
+    return true;
+#endif
+}
+
+void Settings::setAllowsAnySSLCertificate(bool allowAnySSLCertificate)
+{
+    gAllowsAnySSLCertificate = allowAnySSLCertificate;
+}
+
+bool Settings::allowsAnySSLCertificate()
+{
+    return gAllowsAnySSLCertificate;
+}
 
 } // namespace WebCore

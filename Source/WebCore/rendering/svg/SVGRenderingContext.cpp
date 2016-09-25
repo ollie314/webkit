@@ -90,7 +90,7 @@ void SVGRenderingContext::prepareToRenderSVGContent(RenderElement& renderer, Pai
         m_renderingFlags |= RestoreGraphicsContext;
     }
 
-    RenderStyle& style = m_renderer->style();
+    auto& style = m_renderer->style();
 
     const SVGRenderStyle& svgStyle = style.svgStyle();
 
@@ -153,7 +153,7 @@ void SVGRenderingContext::prepareToRenderSVGContent(RenderElement& renderer, Pai
 
     auto* resources = SVGResourcesCache::cachedResourcesForRenderer(*m_renderer);
     if (!resources) {
-        if (style.hasFilter())
+        if (style.hasReferenceFilterOnly())
             return;
 
         m_renderingFlags |= RenderingPrepared;
@@ -351,7 +351,7 @@ bool SVGRenderingContext::bufferForeground(std::unique_ptr<ImageBuffer>& imageBu
 
     // Create a new buffer and paint the foreground into it.
     if (!imageBuffer) {
-        if ((imageBuffer = m_paintInfo->context().createCompatibleBuffer(expandedIntSize(boundingBox.size()), true))) {
+        if ((imageBuffer = ImageBuffer::createCompatibleBuffer(expandedIntSize(boundingBox.size()), ColorSpaceSRGB, m_paintInfo->context()))) {
             GraphicsContext& bufferedRenderingContext = imageBuffer->context();
             bufferedRenderingContext.translate(-boundingBox.x(), -boundingBox.y());
             PaintInfo bufferedInfo(*m_paintInfo);

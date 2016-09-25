@@ -18,12 +18,19 @@ class InteractiveTimeSeriesChart extends TimeSeriesChart {
 
     currentPoint(diff)
     {
-        if (!this._sampledTimeSeriesData)
-            return null;
-
         var id = this._indicatorID;
         if (!id)
             return null;
+
+        if (!this._sampledTimeSeriesData) {
+            this._ensureFetchedTimeSeries();
+            for (var series of this._fetchedTimeSeries) {
+                var point = series.findById(id);
+                if (point)
+                    return point;
+            }
+            return null;
+        }
 
         for (var data of this._sampledTimeSeriesData) {
             if (!data)
@@ -39,6 +46,21 @@ class InteractiveTimeSeriesChart extends TimeSeriesChart {
     }
 
     currentSelection() { return this._selectionTimeRange; }
+
+    selectedPoints(type)
+    {
+        var selection = this._selectionTimeRange;
+        return selection ? this.sampledDataBetween(type, selection[0], selection[1]) : null;
+    }
+
+    firstSelectedPoint(type)
+    {
+        var selection = this._selectionTimeRange;
+        return selection ? this.firstSampledPointBetweenTime(type, selection[0], selection[1]) : null;
+    }
+
+    lockedIndicator() { return this._indicatorIsLocked ? this.currentPoint() : null; }
+
 
     setIndicator(id, shouldLock)
     {
@@ -175,13 +197,21 @@ class InteractiveTimeSeriesChart extends TimeSeriesChart {
 
         var oldIndicatorID = this._indicatorID;
 
-        this._currentAnnotation = this._findAnnotation(cursorLocation);
+        var newAnnotation = this._findAnnotation(cursorLocation);
+        var newIndicatorID = null;
         if (this._currentAnnotation)
-            this._indicatorID = null;
+            newIndicatorID = null;
         else
-            this._indicatorID = this._findClosestPoint(cursorLocation);
+            newIndicatorID = this._findClosestPoint(cursorLocation);
 
         this._forceRender = true;
+
+        if (this._currentAnnotation == newAnnotation && this._indicatorID == newIndicatorID)
+            return;
+
+        this._currentAnnotation = newAnnotation;
+        this._indicatorID = newIndicatorID;
+
         this._notifyIndicatorChanged();
     }
 
@@ -353,10 +383,11 @@ class InteractiveTimeSeriesChart extends TimeSeriesChart {
         return metrics;
     }
 
-    _sampleTimeSeries(data, maximumNumberOfPoints, exclusionPointID)
+    _sampleTimeSeries(data, maximumNumberOfPoints, excludedPoints)
     {
-        console.assert(!exclusionPointID);
-        return super._sampleTimeSeries(data, maximumNumberOfPoints, this._indicatorID);
+        if (this._indicatorID)
+            excludedPoints.push(this._indicatorID);
+        return super._sampleTimeSeries(data, maximumNumberOfPoints, excludedPoints);
     }
 
     _renderChartContent(context, metrics)

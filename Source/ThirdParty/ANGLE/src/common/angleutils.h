@@ -33,6 +33,7 @@ class NonCopyable
     void operator=(const NonCopyable&) = delete;
 };
 
+extern const uintptr_t DirtyPointer;
 }
 
 template <typename T, size_t N>
@@ -70,9 +71,9 @@ void SafeDelete(T*& resource)
 template <typename T>
 void SafeDeleteContainer(T& resource)
 {
-    for (typename T::iterator i = resource.begin(); i != resource.end(); i++)
+    for (auto &element : resource)
     {
-        SafeDelete(*i);
+        SafeDelete(element);
     }
     resource.clear();
 }
@@ -115,7 +116,7 @@ inline bool IsMaskFlagSet(T mask, T flag)
 
 inline const char* MakeStaticString(const std::string &str)
 {
-    static std::set<std::string> strings;
+    static auto& strings = *new std::set<std::string>;
     std::set<std::string>::iterator it = strings.find(str);
     if (it != strings.end())
     {

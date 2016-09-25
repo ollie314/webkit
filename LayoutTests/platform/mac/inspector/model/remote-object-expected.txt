@@ -1120,7 +1120,7 @@ EXPRESSION: new Int32Array(new ArrayBuffer(16))
     "_type": "object",
     "_subtype": "array",
     "_description": "Int32Array",
-    "_lossless": true,
+    "_lossless": false,
     "_overflow": false,
     "_size": 4,
     "_properties": [
@@ -1166,7 +1166,7 @@ EXPRESSION: var intArray = new Int32Array(new ArrayBuffer(16)); for (var i = 0; 
     "_type": "object",
     "_subtype": "array",
     "_description": "Int32Array",
-    "_lossless": true,
+    "_lossless": false,
     "_overflow": false,
     "_size": 4,
     "_properties": [
@@ -1481,7 +1481,7 @@ EXPRESSION: function Foo() {}; new Foo
     "_listeners": null,
     "_type": "object",
     "_description": "Foo",
-    "_lossless": true,
+    "_lossless": false,
     "_overflow": false,
     "_properties": [],
     "_entries": null
@@ -1498,7 +1498,7 @@ EXPRESSION: var Foo2 = function() {}; new Foo2
     "_listeners": null,
     "_type": "object",
     "_description": "Foo2",
-    "_lossless": true,
+    "_lossless": false,
     "_overflow": false,
     "_properties": [],
     "_entries": null
@@ -1515,7 +1515,7 @@ EXPRESSION: var namespace = {}; namespace.Foo3 = function() {}; new namespace.Fo
     "_listeners": null,
     "_type": "object",
     "_description": "Foo3",
-    "_lossless": true,
+    "_lossless": false,
     "_overflow": false,
     "_properties": [],
     "_entries": null
@@ -1567,7 +1567,7 @@ EXPRESSION: function Bar2() { this._x = 5 }; Bar.prototype = {get x() {return th
     "_listeners": null,
     "_type": "object",
     "_description": "Bar2",
-    "_lossless": true,
+    "_lossless": false,
     "_overflow": false,
     "_properties": [
       {
@@ -1640,7 +1640,7 @@ EXPRESSION: new ArrayBuffer(16)
     "_listeners": null,
     "_type": "object",
     "_description": "ArrayBuffer",
-    "_lossless": true,
+    "_lossless": false,
     "_overflow": false,
     "_properties": [
       {
@@ -1744,12 +1744,12 @@ EXPRESSION: document.body
   "_type": "object",
   "_subtype": "node",
   "_objectId": "<filtered>",
-  "_description": "body",
+  "_description": "<body>",
   "_preview": {
     "_listeners": null,
     "_type": "object",
     "_subtype": "node",
-    "_description": "body",
+    "_description": "<body>",
     "_lossless": false,
     "_overflow": true,
     "_properties": [
@@ -1794,12 +1794,12 @@ EXPRESSION: div = document.createElement('div'); div.className = 'foo bar'; div
   "_type": "object",
   "_subtype": "node",
   "_objectId": "<filtered>",
-  "_description": "div.foo.bar",
+  "_description": "<div class=\"foo bar\">",
   "_preview": {
     "_listeners": null,
     "_type": "object",
     "_subtype": "node",
-    "_description": "div.foo.bar",
+    "_description": "<div class=\"foo bar\">",
     "_lossless": false,
     "_overflow": true,
     "_properties": [
@@ -1844,12 +1844,12 @@ EXPRESSION: span = document.createElement('span'); span.id = 'foo'; span
   "_type": "object",
   "_subtype": "node",
   "_objectId": "<filtered>",
-  "_description": "span#foo",
+  "_description": "<span id=\"foo\">",
   "_preview": {
     "_listeners": null,
     "_type": "object",
     "_subtype": "node",
-    "_description": "span#foo",
+    "_description": "<span id=\"foo\">",
     "_lossless": false,
     "_overflow": true,
     "_properties": [
@@ -1894,12 +1894,12 @@ EXPRESSION: input = document.createElement('input'); input.type = 'password'; in
   "_type": "object",
   "_subtype": "node",
   "_objectId": "<filtered>",
-  "_description": "input",
+  "_description": "<input type=\"password\">",
   "_preview": {
     "_listeners": null,
     "_type": "object",
     "_subtype": "node",
-    "_description": "input",
+    "_description": "<input type=\"password\">",
     "_lossless": false,
     "_overflow": true,
     "_properties": [
@@ -1944,12 +1944,12 @@ EXPRESSION: text = document.createTextNode('text content'); text
   "_type": "object",
   "_subtype": "node",
   "_objectId": "<filtered>",
-  "_description": "#text",
+  "_description": "#text \"text content\"",
   "_preview": {
     "_listeners": null,
     "_type": "object",
     "_subtype": "node",
-    "_description": "#text",
+    "_description": "#text \"text content\"",
     "_lossless": false,
     "_overflow": true,
     "_properties": [
@@ -1961,13 +1961,14 @@ EXPRESSION: text = document.createTextNode('text content'); text
       },
       {
         "_listeners": null,
-        "_name": "splitText",
-        "_type": "function",
-        "_value": ""
+        "_name": "assignedSlot",
+        "_type": "object",
+        "_subtype": "null",
+        "_value": "null"
       },
       {
         "_listeners": null,
-        "_name": "replaceWholeText",
+        "_name": "splitText",
         "_type": "function",
         "_value": ""
       },
@@ -1994,12 +1995,12 @@ EXPRESSION: comment = document.createComment('comment content'); comment
   "_type": "object",
   "_subtype": "node",
   "_objectId": "<filtered>",
-  "_description": "#comment",
+  "_description": "<!--comment content-->",
   "_preview": {
     "_listeners": null,
     "_type": "object",
     "_subtype": "node",
-    "_description": "#comment",
+    "_description": "<!--comment content-->",
     "_lossless": false,
     "_overflow": true,
     "_properties": [
@@ -2031,10 +2032,9 @@ EXPRESSION: comment = document.createComment('comment content'); comment
       },
       {
         "_listeners": null,
-        "_name": "assignedSlot",
-        "_type": "object",
-        "_subtype": "null",
-        "_value": "null"
+        "_name": "substringData",
+        "_type": "function",
+        "_value": ""
       }
     ],
     "_entries": null
@@ -2047,12 +2047,12 @@ EXPRESSION: svgElement = document.createElementNS('http://www.w3.org/2000/svg', 
   "_type": "object",
   "_subtype": "node",
   "_objectId": "<filtered>",
-  "_description": "rect.test",
+  "_description": "<rect class=\"test\">",
   "_preview": {
     "_listeners": null,
     "_type": "object",
     "_subtype": "node",
-    "_description": "rect.test",
+    "_description": "<rect class=\"test\">",
     "_lossless": false,
     "_overflow": true,
     "_properties": [
@@ -2303,7 +2303,7 @@ EXPRESSION: error = null; try { [].x.x; } catch (e) { error = e; }; error
     "_type": "object",
     "_subtype": "error",
     "_description": "TypeError: undefined is not an object (evaluating '[].x.x')",
-    "_lossless": true,
+    "_lossless": false,
     "_overflow": false,
     "_properties": [
       {
@@ -2328,7 +2328,7 @@ EXPRESSION: error = null; try { [].x.x; } catch (e) { error = e; }; error
         "_listeners": null,
         "_name": "stack",
         "_type": "string",
-        "_value": "eval code\neval@[native code]\n_evaluateOn\n_evaluateAndWrap\nevaluate"
+        "_value": "global code\nevaluateWithScopeExtension@[native code]\n_evaluateOn\n_evaluateAndWrap\nevaluate"
       }
     ],
     "_entries": null
@@ -2347,7 +2347,7 @@ EXPRESSION: error = null; try { eval('if()'); } catch (e) { error = e; }; error
     "_type": "object",
     "_subtype": "error",
     "_description": "SyntaxError: Unexpected token ')'",
-    "_lossless": true,
+    "_lossless": false,
     "_overflow": false,
     "_properties": [
       {
@@ -2372,7 +2372,7 @@ EXPRESSION: error = null; try { eval('if()'); } catch (e) { error = e; }; error
         "_listeners": null,
         "_name": "stack",
         "_type": "string",
-        "_value": "eval@[native code]\neval code\neval@[native code]\n_evaluateOn\n_evaluateAndWrap\nevaluate"
+        "_value": "eval@[native code]\nglobal code\nevaluateWithScopeEx…ative code]\n_evaluateOn\n_evaluateAndWrap\nevaluate"
       }
     ],
     "_entries": null
@@ -2385,12 +2385,12 @@ EXPRESSION: error = null; try { document.createTextNode('').splitText(100); } ca
   "_type": "object",
   "_subtype": "error",
   "_objectId": "<filtered>",
-  "_description": "Error: IndexSizeError: DOM Exception 1",
+  "_description": "IndexSizeError (DOM Exception 1): The index is not in the allowed range.",
   "_preview": {
     "_listeners": null,
     "_type": "object",
     "_subtype": "error",
-    "_description": "Error: IndexSizeError: DOM Exception 1",
+    "_description": "IndexSizeError (DOM Exception 1): The index is not in the allowed range.",
     "_lossless": false,
     "_overflow": true,
     "_properties": [
@@ -2410,7 +2410,7 @@ EXPRESSION: error = null; try { document.createTextNode('').splitText(100); } ca
         "_listeners": null,
         "_name": "message",
         "_type": "string",
-        "_value": "IndexSizeError: DOM Exception 1"
+        "_value": "The index is not in the allowed range."
       },
       {
         "_listeners": null,
@@ -2573,7 +2573,7 @@ EXPRESSION: map = new Map; map.set({a:1}, {b:2}); map.set(document.body, [1,2]);
           "_listeners": null,
           "_type": "object",
           "_subtype": "node",
-          "_description": "body",
+          "_description": "<body>",
           "_lossless": false,
           "_overflow": true,
           "_properties": [
@@ -3000,7 +3000,7 @@ EXPRESSION: set = new Set; set.add({a:1}); set.add(document.body); set.add([1,2]
           "_listeners": null,
           "_type": "object",
           "_subtype": "node",
-          "_description": "body",
+          "_description": "<body>",
           "_lossless": false,
           "_overflow": true,
           "_properties": [
@@ -4498,7 +4498,7 @@ EXPRESSION: new Promise(function(){})
     "_listeners": null,
     "_type": "object",
     "_description": "Promise",
-    "_lossless": true,
+    "_lossless": false,
     "_overflow": false,
     "_properties": [
       {
@@ -4523,7 +4523,7 @@ EXPRESSION: Promise.reject()
     "_listeners": null,
     "_type": "object",
     "_description": "Promise",
-    "_lossless": true,
+    "_lossless": false,
     "_overflow": false,
     "_properties": [
       {
@@ -4555,7 +4555,7 @@ EXPRESSION: Promise.reject('result')
     "_listeners": null,
     "_type": "object",
     "_description": "Promise",
-    "_lossless": true,
+    "_lossless": false,
     "_overflow": false,
     "_properties": [
       {
@@ -4587,7 +4587,7 @@ EXPRESSION: Promise.resolve()
     "_listeners": null,
     "_type": "object",
     "_description": "Promise",
-    "_lossless": true,
+    "_lossless": false,
     "_overflow": false,
     "_properties": [
       {
@@ -4619,7 +4619,7 @@ EXPRESSION: Promise.resolve({result:1})
     "_listeners": null,
     "_type": "object",
     "_description": "Promise",
-    "_lossless": true,
+    "_lossless": false,
     "_overflow": false,
     "_properties": [
       {
@@ -4657,6 +4657,86 @@ EXPRESSION: Promise.resolve({result:1})
 }
 
 -----------------------------------------------------
+EXPRESSION: new Proxy({x:1, y:1}, {handler: true})
+{
+  "_type": "object",
+  "_objectId": "<filtered>",
+  "_description": "ProxyObject",
+  "_preview": {
+    "_listeners": null,
+    "_type": "object",
+    "_description": "ProxyObject",
+    "_lossless": true,
+    "_overflow": false,
+    "_properties": [
+      {
+        "_listeners": null,
+        "_name": "target",
+        "_type": "object",
+        "_valuePreview": {
+          "_listeners": null,
+          "_type": "object",
+          "_description": "Object",
+          "_lossless": true,
+          "_overflow": false,
+          "_properties": [
+            {
+              "_listeners": null,
+              "_name": "x",
+              "_type": "number",
+              "_value": "1"
+            },
+            {
+              "_listeners": null,
+              "_name": "y",
+              "_type": "number",
+              "_value": "1"
+            }
+          ],
+          "_entries": null
+        },
+        "_internal": true
+      },
+      {
+        "_listeners": null,
+        "_name": "handler",
+        "_type": "object",
+        "_valuePreview": {
+          "_listeners": null,
+          "_type": "object",
+          "_description": "Object",
+          "_lossless": true,
+          "_overflow": false,
+          "_properties": [
+            {
+              "_listeners": null,
+              "_name": "handler",
+              "_type": "boolean",
+              "_value": "true"
+            }
+          ],
+          "_entries": null
+        },
+        "_internal": true
+      },
+      {
+        "_listeners": null,
+        "_name": "x",
+        "_type": "number",
+        "_value": "1"
+      },
+      {
+        "_listeners": null,
+        "_name": "y",
+        "_type": "number",
+        "_value": "1"
+      }
+    ],
+    "_entries": null
+  }
+}
+
+-----------------------------------------------------
 EXPRESSION: Person = class Person { constructor(name){} get fullName(){} methodName(p1, p2){} }; Person
 {
   "_type": "function",
@@ -4668,7 +4748,7 @@ EXPRESSION: Person = class Person { constructor(name){} get fullName(){} methodN
     "_objectId": "<filtered>",
     "_description": "Person"
   },
-  "_functionDescription": "function Person(name){}"
+  "_functionDescription": "class Person { constructor(name){} get fullName(){} methodName(p1, p2){} }"
 }
 
 -----------------------------------------------------
@@ -4677,6 +4757,23 @@ EXPRESSION: Person.prototype.methodName
   "_type": "function",
   "_objectId": "<filtered>",
   "_description": "function methodName(p1, p2){}"
+}
+
+-----------------------------------------------------
+EXPRESSION: new Person
+{
+  "_type": "object",
+  "_objectId": "<filtered>",
+  "_description": "Person",
+  "_preview": {
+    "_listeners": null,
+    "_type": "object",
+    "_description": "Person",
+    "_lossless": false,
+    "_overflow": false,
+    "_properties": [],
+    "_entries": null
+  }
 }
 
 -----------------------------------------------------
@@ -4691,7 +4788,7 @@ EXPRESSION: Alpha = class A { methodA(){} }; Beta = class B extends Alpha { meth
     "_objectId": "<filtered>",
     "_description": "B"
   },
-  "_functionDescription": "function B() { super(...arguments); }"
+  "_functionDescription": "class B extends Alpha { methodB(){} }"
 }
 
 -----------------------------------------------------

@@ -56,8 +56,8 @@ public:
     static const char* supplementName();
 
 #if USE(NETWORK_SESSION)
-    void didReceiveAuthenticationChallenge(uint64_t pageID, uint64_t frameID, const WebCore::AuthenticationChallenge&, ChallengeCompletionHandler);
-    void didReceiveAuthenticationChallenge(PendingDownload&, const WebCore::AuthenticationChallenge&, ChallengeCompletionHandler);
+    void didReceiveAuthenticationChallenge(uint64_t pageID, uint64_t frameID, const WebCore::AuthenticationChallenge&, ChallengeCompletionHandler&&);
+    void didReceiveAuthenticationChallenge(PendingDownload&, const WebCore::AuthenticationChallenge&, ChallengeCompletionHandler&&);
     void continueCanAuthenticateAgainstProtectionSpace(DownloadID, bool canAuthenticate);
 #endif
     // Called for resources in the WebProcess (NetworkProcess disabled)
@@ -76,6 +76,12 @@ public:
 
     uint64_t outstandingAuthenticationChallengeCount() const { return m_challenges.size(); }
 
+    static void receivedCredential(const WebCore::AuthenticationChallenge&, const WebCore::Credential&);
+    static void receivedRequestToContinueWithoutCredential(const WebCore::AuthenticationChallenge&);
+    static void receivedCancellation(const WebCore::AuthenticationChallenge&);
+    static void receivedRequestToPerformDefaultHandling(const WebCore::AuthenticationChallenge&);
+    static void receivedChallengeRejection(const WebCore::AuthenticationChallenge&);
+
 private:
     struct Challenge {
         uint64_t pageID;
@@ -86,11 +92,11 @@ private:
     };
     
     // IPC::MessageReceiver
-    virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
+    void didReceiveMessage(IPC::Connection&, IPC::Decoder&) override;
 
-    bool tryUseCertificateInfoForChallenge(const WebCore::AuthenticationChallenge&, const WebCore::CertificateInfo&);
+    bool tryUseCertificateInfoForChallenge(const WebCore::AuthenticationChallenge&, const WebCore::CertificateInfo&, const ChallengeCompletionHandler&);
 
-    uint64_t addChallengeToChallengeMap(const Challenge&);
+    uint64_t addChallengeToChallengeMap(Challenge&&);
     bool shouldCoalesceChallenge(uint64_t pageID, uint64_t challengeID, const WebCore::AuthenticationChallenge&) const;
 
     void useCredentialForSingleChallenge(uint64_t challengeID, const WebCore::Credential&, const WebCore::CertificateInfo&);

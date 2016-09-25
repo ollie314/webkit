@@ -54,19 +54,15 @@ class Lighttpd(http_server_base.HttpServerBase):
         self._root = root
         self._run_background = run_background
         self._additional_dirs = additional_dirs
-        self._layout_tests_dir = layout_tests_dir
+        if layout_tests_dir:
+            self.tests_dir = layout_tests_dir
 
         self._pid_file = self._filesystem.join(self._runtime_path, '%s.pid' % self._name)
 
         if self._port:
             self._port = int(self._port)
 
-        if not self._layout_tests_dir:
-            self._layout_tests_dir = self._port_obj.layout_tests_dir()
-
-        self._webkit_tests = os.path.join(self._layout_tests_dir, 'http', 'tests')
-        self._js_test_resource = os.path.join(self._layout_tests_dir, 'resources')
-        self._media_resource = os.path.join(self._layout_tests_dir, 'media')
+        self._webkit_tests = os.path.join(self.tests_dir, 'http', 'tests')
 
         # Self generated certificate for SSL server (for client cert get
         # <base-path>\chrome\test\data\ssl\certs\root_ca_cert.crt)
@@ -94,6 +90,12 @@ class Lighttpd(http_server_base.HttpServerBase):
         log_file_name = "error.log-" + time_str + ".txt"
         error_log = os.path.join(self._output_dir, log_file_name)
 
+        if self._port_obj.get_option('http_access_log'):
+            access_log = self._port_obj.get_option('http_access_log')
+
+        if self._port_obj.get_option('http_error_log'):
+            error_log = self._port_obj.get_option('http_error_log')
+
         # Write out the config
         base_conf = self._filesystem.read_text_file(base_conf_file)
 
@@ -120,17 +122,15 @@ class Lighttpd(http_server_base.HttpServerBase):
         # does POST.
         f.write(('server.upload-dirs = ( "%s" )\n\n') % (self._output_dir))
 
-        # Setup a link to where the js test templates are stored
-        f.write(('alias.url = ( "/js-test-resources" => "%s" )\n\n') %
-                    (self._js_test_resource))
+        # Setup a link to where the js test templates and media resources are stored.
+        operator = "="
+        for alias in self.aliases():
+            f.write(('alias.url %s ( "%s" => "%s" )\n\n') % (operator, alias[0], alias[1]))
+            operator = "+="
 
         if self._additional_dirs:
             for alias, path in self._additional_dirs.iteritems():
                 f.write(('alias.url += ( "%s" => "%s" )\n\n') % (alias, path))
-
-        # Setup a link to where the media resources are stored.
-        f.write(('alias.url += ( "/media-resources" => "%s" )\n\n') %
-                    (self._media_resource))
 
         # dump out of virtual host config at the bottom.
         if self._root:
@@ -149,16 +149,18 @@ class Lighttpd(http_server_base.HttpServerBase):
                              'sslcert': self._pem_file}]
         else:
             mappings = self.VIRTUALCONFIG
+
+        bind_address = '' if self._port_obj.get_option('http_all_addresses') else '127.0.0.1'
         for mapping in mappings:
             ssl_setup = ''
             if 'sslcert' in mapping:
                 ssl_setup = ('  ssl.engine = "enable"\n'
                              '  ssl.pemfile = "%s"\n' % mapping['sslcert'])
 
-            f.write(('$SERVER["socket"] == "127.0.0.1:%d" {\n'
+            f.write(('$SERVER["socket"] == "%s:%d" {\n'
                      '  server.document-root = "%s"\n' +
                      ssl_setup +
-                     '}\n\n') % (mapping['port'], mapping['docroot']))
+                     '}\n\n') % (bind_address, mapping['port'], mapping['docroot']))
         f.close()
 
         executable = self._port_obj._path_to_lighttpd()

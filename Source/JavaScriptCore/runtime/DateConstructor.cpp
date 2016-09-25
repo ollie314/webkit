@@ -107,11 +107,6 @@ void DateConstructor::finishCreation(VM& vm, DatePrototype* datePrototype)
     putDirectWithoutTransition(vm, vm.propertyNames->length, jsNumber(7), ReadOnly | DontEnum | DontDelete);
 }
 
-bool DateConstructor::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot &slot)
-{
-    return getStaticFunctionSlot<InternalFunction>(exec, dateConstructorTable, jsCast<DateConstructor*>(object), propertyName, slot);
-}
-
 static double millisecondsFromComponents(ExecState* exec, const ArgList& args, WTF::TimeType timeType)
 {
     double doubleArguments[] = {
@@ -152,6 +147,7 @@ static double millisecondsFromComponents(ExecState* exec, const ArgList& args, W
 JSObject* constructDate(ExecState* exec, JSGlobalObject* globalObject, JSValue newTarget, const ArgList& args)
 {
     VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
     int numArgs = args.size();
 
     double value;
@@ -172,6 +168,8 @@ JSObject* constructDate(ExecState* exec, JSGlobalObject* globalObject, JSValue n
         value = millisecondsFromComponents(exec, args, WTF::LocalTime);
 
     Structure* dateStructure = InternalFunction::createSubclassStructure(exec, newTarget, globalObject->dateStructure());
+    if (UNLIKELY(scope.exception()))
+        return nullptr;
 
     return DateInstance::create(vm, dateStructure, value);
 }
@@ -185,7 +183,7 @@ static EncodedJSValue JSC_HOST_CALL constructWithDateConstructor(ExecState* exec
 ConstructType DateConstructor::getConstructData(JSCell*, ConstructData& constructData)
 {
     constructData.native.function = constructWithDateConstructor;
-    return ConstructTypeHost;
+    return ConstructType::Host;
 }
 
 // ECMA 15.9.2
@@ -200,12 +198,17 @@ static EncodedJSValue JSC_HOST_CALL callDate(ExecState* exec)
 CallType DateConstructor::getCallData(JSCell*, CallData& callData)
 {
     callData.native.function = callDate;
-    return CallTypeHost;
+    return CallType::Host;
 }
 
 EncodedJSValue JSC_HOST_CALL dateParse(ExecState* exec)
 {
-    return JSValue::encode(jsNumber(parseDate(exec->vm(), exec->argument(0).toString(exec)->value(exec))));
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+    String dateStr = exec->argument(0).toString(exec)->value(exec);
+    if (UNLIKELY(scope.exception()))
+        return JSValue::encode(jsUndefined());
+    return JSValue::encode(jsNumber(parseDate(vm, dateStr)));
 }
 
 EncodedJSValue JSC_HOST_CALL dateNow(ExecState* exec)

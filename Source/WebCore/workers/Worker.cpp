@@ -95,7 +95,7 @@ RefPtr<Worker> Worker::create(ScriptExecutionContext& context, const String& url
 
     worker->m_scriptLoader = WorkerScriptLoader::create();
     auto contentSecurityPolicyEnforcement = shouldBypassMainWorldContentSecurityPolicy ? ContentSecurityPolicyEnforcement::DoNotEnforce : ContentSecurityPolicyEnforcement::EnforceChildSrcDirective;
-    worker->m_scriptLoader->loadAsynchronously(&context, scriptURL, DenyCrossOriginRequests, contentSecurityPolicyEnforcement, worker.ptr());
+    worker->m_scriptLoader->loadAsynchronously(&context, scriptURL, FetchOptions::Mode::SameOrigin, contentSecurityPolicyEnforcement, worker.ptr());
     return WTFMove(worker);
 }
 
@@ -107,21 +107,13 @@ Worker::~Worker()
     m_contextProxy->workerObjectDestroyed();
 }
 
-void Worker::postMessage(PassRefPtr<SerializedScriptValue> message, MessagePort* port, ExceptionCode& ec)
-{
-    MessagePortArray ports;
-    if (port)
-        ports.append(port);
-    postMessage(message, &ports, ec);
-}
-
-void Worker::postMessage(PassRefPtr<SerializedScriptValue> message, const MessagePortArray* ports, ExceptionCode& ec)
+void Worker::postMessage(RefPtr<SerializedScriptValue>&& message, const MessagePortArray* ports, ExceptionCode& ec)
 {
     // Disentangle the port in preparation for sending it to the remote context.
-    std::unique_ptr<MessagePortChannelArray> channels = MessagePort::disentanglePorts(ports, ec);
+    auto channels = MessagePort::disentanglePorts(ports, ec);
     if (ec)
         return;
-    m_contextProxy->postMessageToWorkerGlobalScope(message, WTFMove(channels));
+    m_contextProxy->postMessageToWorkerGlobalScope(WTFMove(message), WTFMove(channels));
 }
 
 void Worker::terminate()
@@ -158,7 +150,7 @@ void Worker::notifyNetworkStateChange(bool isOnLine)
 void Worker::didReceiveResponse(unsigned long identifier, const ResourceResponse& response)
 {
     const URL& responseURL = response.url();
-    if (!responseURL.protocolIs("blob") && !responseURL.protocolIs("file") && !SecurityOrigin::create(responseURL)->isUnique())
+    if (!responseURL.protocolIsBlob() && !responseURL.protocolIs("file") && !SecurityOrigin::create(responseURL)->isUnique())
         m_contentSecurityPolicyResponseHeaders = ContentSecurityPolicyResponseHeaders(response);
     InspectorInstrumentation::didReceiveScriptResponse(scriptExecutionContext(), identifier);
 }

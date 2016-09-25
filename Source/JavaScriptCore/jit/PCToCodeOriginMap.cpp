@@ -32,6 +32,11 @@
 #include "DFGNode.h"
 #include "LinkBuffer.h"
 
+#if COMPILER(MSVC)
+// See https://msdn.microsoft.com/en-us/library/4wz07268.aspx
+#pragma warning(disable: 4333)
+#endif
+
 namespace JSC {
 
 namespace {
@@ -104,7 +109,7 @@ PCToCodeOriginMapBuilder::PCToCodeOriginMapBuilder(PCToCodeOriginMapBuilder&& ot
     , m_shouldBuildMapping(other.m_shouldBuildMapping)
 { }
 
-#if FTL_USES_B3
+#if ENABLE(FTL_JIT)
 PCToCodeOriginMapBuilder::PCToCodeOriginMapBuilder(VM& vm, B3::PCToOriginMap&& b3PCToOriginMap)
     : m_vm(vm)
     , m_shouldBuildMapping(vm.shouldBuilderPCToCodeOriginMapping())

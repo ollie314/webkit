@@ -42,7 +42,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-RenderHTMLCanvas::RenderHTMLCanvas(HTMLCanvasElement& element, Ref<RenderStyle>&& style)
+RenderHTMLCanvas::RenderHTMLCanvas(HTMLCanvasElement& element, RenderStyle&& style)
     : RenderReplaced(element, WTFMove(style), element.size())
 {
     // Actual size is not known yet, report the default intrinsic size.
@@ -101,18 +101,7 @@ void RenderHTMLCanvas::canvasSizeChanged()
 
     if (!parent())
         return;
-
-    if (!preferredLogicalWidthsDirty())
-        setPreferredLogicalWidthsDirty(true);
-
-    LayoutSize oldSize = size();
-    updateLogicalWidth();
-    updateLogicalHeight();
-    if (oldSize == size())
-        return;
-
-    if (!selfNeedsLayout())
-        setNeedsLayout();
+    setNeedsLayoutIfNeededAfterIntrinsicSizeChange();
 }
 
 } // namespace WebCore

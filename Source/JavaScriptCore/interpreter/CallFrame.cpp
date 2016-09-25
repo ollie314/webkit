@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2013, 2014 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2008, 2013-2014, 2016 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,12 +29,20 @@
 #include "CodeBlock.h"
 #include "InlineCallFrame.h"
 #include "Interpreter.h"
-#include "JSLexicalEnvironment.h"
 #include "JSCInlines.h"
 #include "VMEntryScope.h"
 #include <wtf/StringPrintStream.h>
 
 namespace JSC {
+
+void ExecState::initGlobalExec(ExecState* globalExec, JSCallee* globalCallee)
+{
+    globalExec->setCodeBlock(nullptr);
+    globalExec->setCallerFrame(noCaller());
+    globalExec->setReturnPC(0);
+    globalExec->setArgumentCountIncludingThis(0);
+    globalExec->setCallee(globalCallee);
+}
 
 bool CallFrame::callSiteBitsAreBytecodeOffset() const
 {
@@ -76,7 +84,12 @@ bool CallFrame::callSiteBitsAreCodeOriginIndex() const
 
 unsigned CallFrame::callSiteAsRawBits() const
 {
-    return this[JSStack::ArgumentCount].tag();
+    return this[CallFrameSlot::argumentCount].tag();
+}
+
+SUPPRESS_ASAN unsigned CallFrame::unsafeCallSiteAsRawBits() const
+{
+    return this[CallFrameSlot::argumentCount].unsafeTag();
 }
 
 CallSiteIndex CallFrame::callSiteIndex() const
@@ -84,13 +97,10 @@ CallSiteIndex CallFrame::callSiteIndex() const
     return CallSiteIndex(callSiteAsRawBits());
 }
 
-#ifndef NDEBUG
-JSStack* CallFrame::stack()
+SUPPRESS_ASAN CallSiteIndex CallFrame::unsafeCallSiteIndex() const
 {
-    return &interpreter()->stack();
+    return CallSiteIndex(unsafeCallSiteAsRawBits());
 }
-
-#endif
 
 #if USE(JSVALUE32_64)
 Instruction* CallFrame::currentVPC() const
@@ -101,7 +111,7 @@ Instruction* CallFrame::currentVPC() const
 void CallFrame::setCurrentVPC(Instruction* vpc)
 {
     CallSiteIndex callSite(vpc);
-    this[JSStack::ArgumentCount].tag() = callSite.bits();
+    this[CallFrameSlot::argumentCount].tag() = callSite.bits();
 }
 
 unsigned CallFrame::callSiteBitsAsBytecodeOffset() const
@@ -121,7 +131,7 @@ Instruction* CallFrame::currentVPC() const
 void CallFrame::setCurrentVPC(Instruction* vpc)
 {
     CallSiteIndex callSite(vpc - codeBlock()->instructions().begin());
-    this[JSStack::ArgumentCount].tag() = static_cast<int32_t>(callSite.bits());
+    this[CallFrameSlot::argumentCount].tag() = static_cast<int32_t>(callSite.bits());
 }
 
 unsigned CallFrame::callSiteBitsAsBytecodeOffset() const
@@ -194,6 +204,16 @@ CallFrame* CallFrame::callerFrame(VMEntryFrame*& currVMEntryFrame)
     return static_cast<CallFrame*>(callerFrameOrVMEntryFrame());
 }
 
+SUPPRESS_ASAN CallFrame* CallFrame::unsafeCallerFrame(VMEntryFrame*& currVMEntryFrame)
+{
+    if (unsafeCallerFrameOrVMEntryFrame() == currVMEntryFrame) {
+        VMEntryRecord* currVMEntryRecord = vmEntryRecord(currVMEntryFrame);
+        currVMEntryFrame = currVMEntryRecord->unsafePrevTopVMEntryFrame();
+        return currVMEntryRecord->unsafePrevTopCallFrame();
+    }
+    return static_cast<CallFrame*>(unsafeCallerFrameOrVMEntryFrame());
+}
+
 String CallFrame::friendlyFunctionName()
 {
     CodeBlock* codeBlock = this->codeBlock();
@@ -209,7 +229,7 @@ String CallFrame::friendlyFunctionName()
         return ASCIILiteral("global code");
     case FunctionCode:
         if (callee())
-            return getCalculatedDisplayName(this, callee());
+            return getCalculatedDisplayName(vm(), callee());
         return emptyString();
     }
 

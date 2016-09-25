@@ -39,10 +39,9 @@
 #import <AVFoundation/AVFoundation.h>
 #import <objc/runtime.h>
 #import <wtf/MainThread.h>
-#import <wtf/NeverDestroyed.h>
 
 typedef AVCaptureConnection AVCaptureConnectionType;
-typedef AVCaptureDevice AVCaptureDeviceType;
+typedef AVCaptureDevice AVCaptureDeviceTypedef;
 typedef AVCaptureDeviceInput AVCaptureDeviceInputType;
 typedef AVCaptureOutput AVCaptureOutputType;
 typedef AVCaptureSession AVCaptureSessionType;
@@ -123,15 +122,15 @@ static dispatch_queue_t globaVideoCaptureSerialQueue()
     return globalQueue;
 }
 
-AVMediaCaptureSource::AVMediaCaptureSource(AVCaptureDeviceType* device, const AtomicString& id, RealtimeMediaSource::Type type, PassRefPtr<MediaConstraints> constraints)
+AVMediaCaptureSource::AVMediaCaptureSource(AVCaptureDeviceTypedef* device, const AtomicString& id, RealtimeMediaSource::Type type, PassRefPtr<MediaConstraints> constraints)
     : RealtimeMediaSource(id, type, emptyString())
-    , m_weakPtrFactory(this)
     , m_objcObserver(adoptNS([[WebCoreAVMediaCaptureSourceObserver alloc] initWithCallback:this]))
     , m_constraints(constraints)
     , m_device(device)
 {
     setName(device.localizedName);
     setPersistentID(device.uniqueID);
+    setMuted(true);
 }
 
 AVMediaCaptureSource::~AVMediaCaptureSource()
@@ -225,6 +224,7 @@ void AVMediaCaptureSource::captureSessionIsRunningDidChange(bool state)
             return;
 
         m_isRunning = state;
+        setMuted(!m_isRunning);
     });
 }
 
@@ -236,19 +236,6 @@ void AVMediaCaptureSource::setVideoSampleBufferDelegate(AVCaptureVideoDataOutput
 void AVMediaCaptureSource::setAudioSampleBufferDelegate(AVCaptureAudioDataOutputType* audioOutput)
 {
     [audioOutput setSampleBufferDelegate:m_objcObserver.get() queue:globaAudioCaptureSerialQueue()];
-}
-
-void AVMediaCaptureSource::scheduleDeferredTask(std::function<void ()> function)
-{
-    ASSERT(function);
-
-    auto weakThis = createWeakPtr();
-    callOnMainThread([weakThis, function] {
-        if (!weakThis)
-            return;
-
-        function();
-    });
 }
 
 AudioSourceProvider* AVMediaCaptureSource::audioSourceProvider()

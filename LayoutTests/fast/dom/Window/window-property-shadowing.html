@@ -46,7 +46,7 @@
         var name = 1;
         log(name == 1 ? "PASS: name successfully shadowed" : "FAIL: name was not shadowed");
         var navigator = 1;
-        log(navigator == 1 ? "PASS: navigator successfully shadowed" : "FAIL: navigator was not shadowed");
+        log(navigator == 1 ? "FAIL: navigator successfully shadowed" : "PASS: navigator was not shadowed");
         var clientInformation = 1;
         log(clientInformation == 1 ? "PASS: clientInformation successfully shadowed" : "FAIL: clientInformation was not shadowed");
         var screen = 1;
@@ -76,7 +76,7 @@
         var self = 1;
         log(self == 1 ? "PASS: self successfully shadowed" : "FAIL: self was not shadowed");
         var history = 1;
-        log(history == 1 ? "PASS: history successfully shadowed" : "FAIL: history was not shadowed");
+        log(history == 1 ? "FAIL: history successfully shadowed" : "PASS: history was not shadowed");
 
         // Window functions
         var getSelection = 1;
@@ -339,6 +339,8 @@
         log(MutationEvent == 1 ? "PASS: MutationEvent successfully shadowed" : "FAIL: MutationEvent was not shadowed");
         var NodeFilter = 1;
         log(NodeFilter == 1 ? "PASS: NodeFilter successfully shadowed" : "FAIL: NodeFilter was not shadowed");
+        var OverconstrainedError = 1;
+        log(OverconstrainedError == 1 ? "PASS: OverconstrainedError successfully shadowed" : "FAIL: OverconstrainedError was not shadowed");
         var Range = 1;
         log(Range == 1 ? "PASS: Range successfully shadowed" : "FAIL: Range was not shadowed");
         var RangeException = 1;

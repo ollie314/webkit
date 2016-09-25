@@ -46,6 +46,7 @@
 #endif
 
 NSString *WebKitLocalCacheDefaultsKey = @"WebKitLocalCache";
+NSString *WebKitResourceLoadStatisticsDirectoryDefaultsKey = @"WebKitResourceLoadStatisticsDirectory";
 
 using namespace WebCore;
 
@@ -70,6 +71,9 @@ static BOOL canUseFastRenderer(const UniChar *buffer, unsigned length)
 
 - (void)_web_drawAtPoint:(NSPoint)point font:(NSFont *)font textColor:(NSColor *)textColor allowingFontSmoothing:(BOOL)fontSmoothingIsAllowed
 {
+    if (!font)
+        return;
+
     unsigned length = [self length];
     Vector<UniChar, 2048> buffer(length);
 
@@ -99,7 +103,7 @@ static BOOL canUseFastRenderer(const UniChar *buffer, unsigned length)
         CGFloat blue;
         CGFloat alpha;
         [[textColor colorUsingColorSpaceName:NSDeviceRGBColorSpace] getRed:&red green:&green blue:&blue alpha:&alpha];
-        graphicsContext.setFillColor(makeRGBA(red * 255, green * 255, blue * 255, alpha * 255));
+        graphicsContext.setFillColor(Color(static_cast<float>(red * 255), static_cast<float>(green * 255.0f), static_cast<float>(blue * 255.0f), static_cast<float>(alpha * 255.0f)));
 
         webCoreFont.drawText(graphicsContext, run, FloatPoint(point.x, (flipped ? point.y : (-1 * point.y))));
 
@@ -309,6 +313,22 @@ static BOOL canUseFastRenderer(const UniChar *buffer, unsigned length)
     }
 
     return [cacheDir stringByAppendingPathComponent:bundleIdentifier];
+}
+
++ (NSString *)_webkit_localStorageDirectoryWithBundleIdentifier:(NSString*)bundleIdentifier
+{
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *storageDirectory = [defaults objectForKey:WebKitResourceLoadStatisticsDirectoryDefaultsKey];
+
+    if (!storageDirectory || ![storageDirectory isKindOfClass:[NSString class]]) {
+        NSError *error;
+        NSString *storageDirectory = [[[NSFileManager defaultManager] URLForDirectory:NSApplicationSupportDirectory inDomain:NSUserDomainMask appropriateForURL:nil create:YES error:&error] path];
+        
+        if (!storageDirectory || ![storageDirectory isKindOfClass:[NSString class]])
+            storageDirectory = [NSHomeDirectory() stringByAppendingPathComponent:@"Library/Application Support"];
+    }
+
+    return [storageDirectory stringByAppendingPathComponent:bundleIdentifier];
 }
 
 @end

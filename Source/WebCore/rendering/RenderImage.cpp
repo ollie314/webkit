@@ -28,8 +28,10 @@
 #include "config.h"
 #include "RenderImage.h"
 
+#include "AXObjectCache.h"
 #include "BitmapImage.h"
 #include "CachedImage.h"
+#include "FocusController.h"
 #include "FontCache.h"
 #include "FontCascade.h"
 #include "Frame.h"
@@ -54,6 +56,11 @@
 #if PLATFORM(IOS)
 #include "LogicalSelectionOffsetCaches.h"
 #include "SelectionRect.h"
+#endif
+
+#if USE(CG)
+#include "PDFDocumentImage.h"
+#include "Settings.h"
 #endif
 
 namespace WebCore {
@@ -118,32 +125,20 @@ void RenderImage::collectSelectionRects(Vector<SelectionRect>& rects, unsigned, 
 
 using namespace HTMLNames;
 
-RenderImage::RenderImage(Element& element, Ref<RenderStyle>&& style, StyleImage* styleImage, const float imageDevicePixelRatio)
+RenderImage::RenderImage(Element& element, RenderStyle&& style, StyleImage* styleImage, const float imageDevicePixelRatio)
     : RenderReplaced(element, WTFMove(style), IntSize())
     , m_imageResource(styleImage ? std::make_unique<RenderImageResourceStyleImage>(*styleImage) : std::make_unique<RenderImageResource>())
-    , m_needsToSetSizeForAltText(false)
-    , m_didIncrementVisuallyNonEmptyPixelCount(false)
-    , m_isGeneratedContent(false)
-    , m_hasShadowControls(false)
     , m_imageDevicePixelRatio(imageDevicePixelRatio)
 {
     updateAltText();
-    imageResource().initialize(this);
-
     if (is<HTMLImageElement>(element))
         m_hasShadowControls = downcast<HTMLImageElement>(element).hasShadowControls();
 }
 
-RenderImage::RenderImage(Document& document, Ref<RenderStyle>&& style, StyleImage* styleImage)
+RenderImage::RenderImage(Document& document, RenderStyle&& style, StyleImage* styleImage)
     : RenderReplaced(document, WTFMove(style), IntSize())
     , m_imageResource(styleImage ? std::make_unique<RenderImageResourceStyleImage>(*styleImage) : std::make_unique<RenderImageResource>())
-    , m_needsToSetSizeForAltText(false)
-    , m_didIncrementVisuallyNonEmptyPixelCount(false)
-    , m_isGeneratedContent(false)
-    , m_hasShadowControls(false)
-    , m_imageDevicePixelRatio(1.0f)
 {
-    imageResource().initialize(this);
 }
 
 RenderImage::~RenderImage()
@@ -193,7 +188,7 @@ ImageSizeChangeType RenderImage::setImageSizeForAltText(CachedImage* newImage /*
     // we have an alt and the user meant it (its not a text we invented)
     if (!m_altText.isEmpty()) {
         const FontCascade& font = style().fontCascade();
-        IntSize paddedTextSize(paddingWidth + std::min(ceilf(font.width(RenderBlock::constructTextRun(this, font, m_altText, style()))), maxAltTextWidth), paddingHeight + std::min(font.fontMetrics().height(), maxAltTextHeight));
+        IntSize paddedTextSize(paddingWidth + std::min(ceilf(font.width(RenderBlock::constructTextRun(m_altText, style()))), maxAltTextWidth), paddingHeight + std::min(font.fontMetrics().height(), maxAltTextHeight));
         imageSize = imageSize.expandedTo(paddedTextSize);
     }
 
@@ -202,6 +197,13 @@ ImageSizeChangeType RenderImage::setImageSizeForAltText(CachedImage* newImage /*
 
     setIntrinsicSize(imageSize);
     return ImageSizeChangeForAltText;
+}
+
+void RenderImage::styleWillChange(StyleDifference diff, const RenderStyle& newStyle)
+{
+    if (!hasInitializedStyle())
+        imageResource().initialize(this);
+    RenderReplaced::styleWillChange(diff, newStyle);
 }
 
 void RenderImage::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
@@ -231,10 +233,10 @@ void RenderImage::imageChanged(WrappedImagePtr newImage, const IntRect* rect)
     // FIXME (86669): Instead of the RenderImage determining whether its document is in the page
     // cache, the RenderImage should remove itself as a client when its document is put into the
     // page cache.
-    if (documentBeingDestroyed() || document().inPageCache())
+    if (documentBeingDestroyed() || document().pageCacheState() != Document::NotInPageCache)
         return;
 
-    if (hasBoxDecorations() || hasMask() || hasShapeOutside())
+    if (hasVisibleBoxDecorations() || hasMask() || hasShapeOutside())
         RenderReplaced::imageChanged(newImage, rect);
 
     if (newImage != imageResource().imagePtr() || !newImage)
@@ -259,6 +261,11 @@ void RenderImage::imageChanged(WrappedImagePtr newImage, const IntRect* rect)
             return;
         }
         imageSizeChange = setImageSizeForAltText(imageResource().cachedImage());
+    }
+
+    if (UNLIKELY(AXObjectCache::accessibilityEnabled())) {
+        if (AXObjectCache* cache = document().existingAXObjectCache())
+            cache->recomputeIsIgnored(this);
     }
 
     repaintOrMarkForLayout(imageSizeChange, rect);
@@ -304,29 +311,8 @@ void RenderImage::repaintOrMarkForLayout(ImageSizeChangeType imageSizeChange, co
 
     bool imageSourceHasChangedSize = oldIntrinsicSize != newIntrinsicSize || imageSizeChange != ImageSizeChangeNone;
 
-    if (imageSourceHasChangedSize) {
-        setPreferredLogicalWidthsDirty(true);
-
-        // If the actual area occupied by the image has changed and it is not constrained by style then a layout is required.
-        bool imageSizeIsConstrained = style().logicalWidth().isSpecified() && style().logicalHeight().isSpecified();
-
-        // FIXME: We only need to recompute the containing block's preferred size
-        // if the containing block's size depends on the image's size (i.e., the container uses shrink-to-fit sizing).
-        // There's no easy way to detect that shrink-to-fit is needed, always force a layout.
-        bool containingBlockNeedsToRecomputePreferredSize =
-            style().logicalWidth().isPercentOrCalculated()
-            || style().logicalMaxWidth().isPercentOrCalculated()
-            || style().logicalMinWidth().isPercentOrCalculated();
-
-        bool layoutSizeDependsOnIntrinsicSize = style().aspectRatioType() == AspectRatioFromIntrinsic;
-
-        if (!imageSizeIsConstrained || containingBlockNeedsToRecomputePreferredSize || layoutSizeDependsOnIntrinsicSize) {
-            // FIXME: It's not clear that triggering a layout guarantees a repaint in all cases.
-            // But many callers do depend on this code causing a layout.
-            setNeedsLayout();
-            return;
-        }
-    }
+    if (imageSourceHasChangedSize && setNeedsLayoutIfNeededAfterIntrinsicSizeChange())
+        return;
 
     if (everHadLayout() && !selfNeedsLayout()) {
         // The inner content rectangle is calculated during layout, but may need an update now
@@ -439,7 +425,7 @@ void RenderImage::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintOf
 
                 // Only draw the alt text if it'll fit within the content box,
                 // and only if it fits above the error image.
-                TextRun textRun = RenderBlock::constructTextRun(this, font, text, style());
+                TextRun textRun = RenderBlock::constructTextRun(text, style());
                 LayoutUnit textWidth = font.width(textRun);
                 if (errorPictureDrawn) {
                     if (usableWidth >= textWidth && fontMetrics.height() <= imageOffset.height())
@@ -484,18 +470,22 @@ void RenderImage::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
     RenderReplaced::paint(paintInfo, paintOffset);
     
     if (paintInfo.phase == PaintPhaseOutline)
-        paintAreaElementFocusRing(paintInfo);
+        paintAreaElementFocusRing(paintInfo, paintOffset);
 }
     
-void RenderImage::paintAreaElementFocusRing(PaintInfo& paintInfo)
+void RenderImage::paintAreaElementFocusRing(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 {
 #if PLATFORM(IOS)
     UNUSED_PARAM(paintInfo);
+    UNUSED_PARAM(paintOffset);
 #else
     if (document().printing() || !frame().selection().isFocusedAndActive())
         return;
     
     if (paintInfo.context().paintingDisabled() && !paintInfo.context().updatingControlTints())
+        return;
+
+    if (!document().page())
         return;
 
     Element* focusedElement = document().focusedElement();
@@ -506,23 +496,36 @@ void RenderImage::paintAreaElementFocusRing(PaintInfo& paintInfo)
     if (areaElement.imageElement() != element())
         return;
 
-    // Even if the theme handles focus ring drawing for entire elements, it won't do it for
-    // an area within an image, so we don't call RenderTheme::supportsFocusRing here.
-
-    Path path = areaElement.computePath(this);
-    if (path.isEmpty())
+    auto* areaElementStyle = areaElement.computedStyle();
+    if (!areaElementStyle)
         return;
 
-    // FIXME: Do we need additional code to clip the path to the image's bounding box?
-
-    RenderStyle* areaElementStyle = areaElement.computedStyle();
     float outlineWidth = areaElementStyle->outlineWidth();
     if (!outlineWidth)
         return;
 
-    paintInfo.context().drawFocusRing(path, outlineWidth,
-        areaElementStyle->outlineOffset(),
-        areaElementStyle->visitedDependentColor(CSSPropertyOutlineColor));
+    // Even if the theme handles focus ring drawing for entire elements, it won't do it for
+    // an area within an image, so we don't call RenderTheme::supportsFocusRing here.
+    auto path = areaElement.computePathForFocusRing(size());
+    if (path.isEmpty())
+        return;
+
+    AffineTransform zoomTransform;
+    zoomTransform.scale(style().effectiveZoom());
+    path.transform(zoomTransform);
+
+    auto adjustedOffset = paintOffset;
+    adjustedOffset.moveBy(location());
+    path.translate(toFloatSize(adjustedOffset));
+
+#if PLATFORM(MAC)
+    bool needsRepaint;
+    paintInfo.context().drawFocusRing(path, document().page()->focusController().timeSinceFocusWasSet(), needsRepaint);
+    if (needsRepaint)
+        document().page()->focusController().setFocusedElementNeedsRepaint();
+#else
+    paintInfo.context().drawFocusRing(path, outlineWidth, areaElementStyle->outlineOffset(), areaElementStyle->visitedDependentColor(CSSPropertyOutlineColor));
+#endif
 #endif
 }
 
@@ -551,6 +554,11 @@ void RenderImage::paintIntoRect(GraphicsContext& context, const FloatRect& rect)
     // FIXME: Document when image != img.get().
     Image* image = imageResource().image().get();
     InterpolationQuality interpolation = image ? chooseInterpolationQuality(context, *image, image, LayoutSize(rect.size())) : InterpolationDefault;
+
+#if USE(CG)
+    if (is<PDFDocumentImage>(image))
+        downcast<PDFDocumentImage>(*image).setPdfImageCachingPolicy(frame().settings().pdfImageCachingPolicy());
+#endif
 
     ImageOrientationDescription orientationDescription(shouldRespectImageOrientation(), style().imageOrientation());
     context.drawImage(*img, rect, ImagePaintingOptions(compositeOperator, BlendModeNormal, orientationDescription, interpolation));
@@ -584,6 +592,11 @@ bool RenderImage::foregroundIsKnownToBeOpaqueInRect(const LayoutRect& localRect,
     ObjectFit objectFit = style().objectFit();
     if (objectFit != ObjectFitFill && objectFit != ObjectFitCover)
         return false;
+
+    LengthPoint objectPosition = style().objectPosition();
+    if (objectPosition != RenderStyle::initialObjectPosition())
+        return false;
+
     // Check for image with alpha.
     return imageResource().cachedImage() && imageResource().cachedImage()->currentFrameKnownToBeOpaque(this);
 }
@@ -607,7 +620,7 @@ LayoutUnit RenderImage::minimumReplacedHeight() const
 HTMLMapElement* RenderImage::imageMap() const
 {
     HTMLImageElement* image = is<HTMLImageElement>(element()) ? downcast<HTMLImageElement>(element()) : nullptr;
-    return image ? image->treeScope().getImageMap(image->fastGetAttribute(usemapAttr)) : nullptr;
+    return image ? image->treeScope().getImageMap(image->attributeWithoutSynchronization(usemapAttr)) : nullptr;
 }
 
 bool RenderImage::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction hitTestAction)
@@ -693,8 +706,8 @@ void RenderImage::layoutShadowControls(const LayoutSize& oldSize)
 
     if (shadowControlsNeedCustomLayoutMetrics()) {
         controlsRenderer->setLocation(LayoutPoint(borderLeft(), borderTop()) + LayoutSize(paddingLeft(), paddingTop()));
-        controlsRenderer->style().setHeight(Length(newSize.height(), Fixed));
-        controlsRenderer->style().setWidth(Length(newSize.width(), Fixed));
+        controlsRenderer->mutableStyle().setHeight(Length(newSize.height(), Fixed));
+        controlsRenderer->mutableStyle().setWidth(Length(newSize.width(), Fixed));
     }
 
     controlsRenderer->setNeedsLayout(MarkOnlyThis);

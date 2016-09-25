@@ -139,6 +139,10 @@ namespace WebCore {
     String contextMenuItemTagToggleMediaLoop();
     String contextMenuItemTagEnterVideoFullscreen();
     String contextMenuItemTagExitVideoFullscreen();
+#if PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE)
+    String contextMenuItemTagEnterVideoEnhancedFullscreen();
+    String contextMenuItemTagExitVideoEnhancedFullscreen();
+#endif
     String contextMenuItemTagMediaPlay();
     String contextMenuItemTagMediaPause();
     String contextMenuItemTagMediaMute();
@@ -149,6 +153,7 @@ namespace WebCore {
     String searchMenuNoRecentSearchesText();
     String searchMenuRecentSearchesText();
     String searchMenuClearRecentSearchesText();
+#endif
 
     String AXWebAreaText();
     String AXLinkText();
@@ -162,6 +167,7 @@ namespace WebCore {
     String AXFooterRoleDescriptionText();
     String AXFileUploadButtonText();
     String AXSearchFieldCancelButtonText();
+    String AXAttachmentRoleText();
     
     String AXButtonActionVerb();
     String AXRadioButtonActionVerb();
@@ -172,7 +178,6 @@ namespace WebCore {
     String AXMenuListPopupActionVerb();
     String AXLinkActionVerb();
     String AXListItemActionVerb();
-#endif
 
 #if ENABLE(INPUT_TYPE_WEEK)
     // weekFormatInLDML() returns week and year format in LDML, Unicode
@@ -183,6 +188,9 @@ namespace WebCore {
     String AXARIAContentGroupText(const String& ariaType);
     String AXHorizontalRuleDescriptionText();
 #endif
+    
+    String AXAutoFillCredentialsLabel();
+    String AXAutoFillContactsLabel();
 
     String missingPluginText();
     String crashedPluginText();
@@ -234,6 +242,7 @@ namespace WebCore {
     String validationMessageTypeMismatchForMultipleEmailText();
     String validationMessageTypeMismatchForURLText();
     String validationMessagePatternMismatchText();
+    String validationMessageTooShortText(int valueLength, int minLength);
     String validationMessageTooLongText(int valueLength, int maxLength);
     String validationMessageRangeUnderflowText(const String& minimum);
     String validationMessageRangeOverflowText(const String& maximum);
@@ -258,6 +267,7 @@ namespace WebCore {
     String sdhTrackMenuItemText(const String&);
     String easyReaderTrackMenuItemText(const String&);
     String forcedTrackMenuItemText(const String&);
+    String audioDescriptionTrackSuffixText(const String&);
 #endif
 #endif
 
@@ -269,6 +279,15 @@ namespace WebCore {
 #if ENABLE(SUBTLE_CRYPTO)
     String webCryptoMasterKeyKeychainLabel(const String& localizedApplicationName);
     String webCryptoMasterKeyKeychainComment();
+#endif
+
+#if PLATFORM(MAC)
+    WEBCORE_EXPORT String insertListTypeNone();
+    WEBCORE_EXPORT String insertListTypeBulleted();
+    WEBCORE_EXPORT String insertListTypeBulletedAccessibilityTitle();
+    WEBCORE_EXPORT String insertListTypeNumbered();
+    WEBCORE_EXPORT String insertListTypeNumberedAccessibilityTitle();
+    WEBCORE_EXPORT String exitFullScreenButtonAccessibilityTitle();
 #endif
 
 #define WEB_UI_STRING(string, description) WebCore::localizedString(string)

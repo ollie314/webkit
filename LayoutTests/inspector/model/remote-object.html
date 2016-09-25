@@ -168,10 +168,14 @@ function test()
         {expression: "Promise.resolve()"},
         {expression: "Promise.resolve({result:1})"},
 
+        // Proxy
+        {expression: "new Proxy({x:1, y:1}, {handler: true})"},
+
     // Classes
 
         {expression: "Person = class Person { constructor(name){} get fullName(){} methodName(p1, p2){} }; Person"}, // Constructor => class type
         {expression: "Person.prototype.methodName"}, // Method => just a function type
+        {expression: "new Person"}, // Instance, not lossless, it's prototype may have interesting methods to show
         {expression: "Alpha = class A { methodA(){} }; Beta = class B extends Alpha { methodB(){} }; Beta"},
         {expression: "[Beta]"},
 
@@ -211,7 +215,7 @@ function test()
                 return;
             }
 
-            WebInspector.runtimeManager.evaluateInInspectedWindow(step.expression, "test", false, true, false, true, false, function(remoteObject, wasThrown) {
+            WebInspector.runtimeManager.evaluateInInspectedWindow(step.expression, {objectGroup: "test", doNotPauseOnExceptionsAndMuteConsole: true, generatePreview: true}, function(remoteObject, wasThrown) {
                 InspectorTest.log("");
                 InspectorTest.log("-----------------------------------------------------");
                 InspectorTest.log("EXPRESSION: " + step.expression);

@@ -32,6 +32,7 @@
 #include "CSSStyleRule.h"
 #include "CSSSupportsRule.h"
 #include "CSSUnknownRule.h"
+#include "MediaList.h"
 #include "StyleProperties.h"
 #include "StyleRuleImport.h"
 #include "WebKitCSSRegionRule.h"
@@ -45,14 +46,14 @@ struct SameSizeAsStyleRuleBase : public WTF::RefCountedBase {
 
 COMPILE_ASSERT(sizeof(StyleRuleBase) == sizeof(SameSizeAsStyleRuleBase), StyleRuleBase_should_stay_small);
 
-PassRefPtr<CSSRule> StyleRuleBase::createCSSOMWrapper(CSSStyleSheet* parentSheet) const
+RefPtr<CSSRule> StyleRuleBase::createCSSOMWrapper(CSSStyleSheet* parentSheet) const
 {
-    return createCSSOMWrapper(parentSheet, 0);
+    return createCSSOMWrapper(parentSheet, nullptr);
 }
 
-PassRefPtr<CSSRule> StyleRuleBase::createCSSOMWrapper(CSSRule* parentRule) const
+RefPtr<CSSRule> StyleRuleBase::createCSSOMWrapper(CSSRule* parentRule) const
 { 
-    return createCSSOMWrapper(0, parentRule);
+    return createCSSOMWrapper(nullptr, parentRule);
 }
 
 void StyleRuleBase::destroy()
@@ -89,9 +90,14 @@ void StyleRuleBase::destroy()
         delete downcast<StyleRuleViewport>(this);
         return;
 #endif
+    case Namespace:
+        delete downcast<StyleRuleNamespace>(this);
+        return;
+    case Keyframe:
+        delete downcast<StyleKeyframe>(this);
+        return;
     case Unknown:
     case Charset:
-    case Keyframe:
 #if !ENABLE(CSS_REGIONS)
     case Region:
 #endif
@@ -125,7 +131,8 @@ Ref<StyleRuleBase> StyleRuleBase::copy() const
         return downcast<StyleRuleViewport>(*this).copy();
 #endif
     case Import:
-        // FIXME: Copy import rules.
+    case Namespace:
+        // FIXME: Copy import and namespace rules.
         break;
     case Unknown:
     case Charset:
@@ -140,7 +147,7 @@ Ref<StyleRuleBase> StyleRuleBase::copy() const
     return Ref<StyleRuleBase>(*static_cast<StyleRuleBase*>(nullptr));
 }
 
-PassRefPtr<CSSRule> StyleRuleBase::createCSSOMWrapper(CSSStyleSheet* parentSheet, CSSRule* parentRule) const
+RefPtr<CSSRule> StyleRuleBase::createCSSOMWrapper(CSSStyleSheet* parentSheet, CSSRule* parentRule) const
 {
     RefPtr<CSSRule> rule;
     StyleRuleBase& self = const_cast<StyleRuleBase&>(*this);
@@ -178,6 +185,7 @@ PassRefPtr<CSSRule> StyleRuleBase::createCSSOMWrapper(CSSStyleSheet* parentSheet
 #endif
     case Unknown:
     case Charset:
+    case Namespace: // FIXME: Add support for CSSNamespaceRule.
     case Keyframe:
 #if !ENABLE(CSS_REGIONS)
     case Region:
@@ -187,7 +195,7 @@ PassRefPtr<CSSRule> StyleRuleBase::createCSSOMWrapper(CSSStyleSheet* parentSheet
     }
     if (parentRule)
         rule->setParentRule(parentRule);
-    return rule.release();
+    return rule;
 }
 
 unsigned StyleRule::averageSizeInBytes()
@@ -329,9 +337,9 @@ void StyleRuleGroup::wrapperRemoveRule(unsigned index)
 }
 
 
-StyleRuleMedia::StyleRuleMedia(PassRefPtr<MediaQuerySet> media, Vector<RefPtr<StyleRuleBase>>& adoptRules)
+StyleRuleMedia::StyleRuleMedia(Ref<MediaQuerySet>&& media, Vector<RefPtr<StyleRuleBase>>& adoptRules)
     : StyleRuleGroup(Media, adoptRules)
-    , m_mediaQueries(media)
+    , m_mediaQueries(WTFMove(media))
 {
 }
 
@@ -394,5 +402,37 @@ MutableStyleProperties& StyleRuleViewport::mutableProperties()
     return static_cast<MutableStyleProperties&>(m_properties.get());
 }
 #endif // ENABLE(CSS_DEVICE_ADAPTATION)
+
+StyleRuleCharset::StyleRuleCharset()
+    : StyleRuleBase(Charset, 0)
+{
+}
+
+StyleRuleCharset::StyleRuleCharset(const StyleRuleCharset& o)
+    : StyleRuleBase(o)
+{
+}
+
+StyleRuleCharset::~StyleRuleCharset()
+{
+}
+
+StyleRuleNamespace::StyleRuleNamespace(AtomicString prefix, AtomicString uri)
+    : StyleRuleBase(Namespace, 0)
+    , m_prefix(prefix)
+    , m_uri(uri)
+{
+}
+
+StyleRuleNamespace::StyleRuleNamespace(const StyleRuleNamespace& o)
+    : StyleRuleBase(o)
+    , m_prefix(o.m_prefix)
+    , m_uri(o.m_uri)
+{
+}
+
+StyleRuleNamespace::~StyleRuleNamespace()
+{
+}
 
 } // namespace WebCore

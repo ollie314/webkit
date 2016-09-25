@@ -73,18 +73,22 @@ bool JSDOMStringMap::deletePropertyByIndex(JSCell* cell, ExecState* exec, unsign
     return deleteProperty(cell, exec, Identifier::from(exec, index));
 }
 
-bool JSDOMStringMap::putDelegate(ExecState* exec, PropertyName propertyName, JSValue value, PutPropertySlot&)
+bool JSDOMStringMap::putDelegate(ExecState* exec, PropertyName propertyName, JSValue value, PutPropertySlot&, bool& putResult)
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     if (propertyName.isSymbol())
         return false;
 
     String stringValue = value.toString(exec)->value(exec);
-    if (exec->hadException())
+    if (UNLIKELY(scope.exception()))
         return false;
 
     ExceptionCode ec = 0;
     wrapped().setItem(propertyNameToString(propertyName), stringValue, ec);
     setDOMException(exec, ec);
+    putResult = !ec;
     return !ec;
 }
 

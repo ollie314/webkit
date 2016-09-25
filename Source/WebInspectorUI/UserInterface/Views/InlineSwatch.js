@@ -39,6 +39,9 @@ WebInspector.InlineSwatch = class InlineSwatch extends WebInspector.Object
         case WebInspector.InlineSwatch.Type.Bezier:
             this._swatchElement.title = WebInspector.UIString("Click to open a cubic-bezier editor.");
             break;
+        case WebInspector.InlineSwatch.Type.Spring:
+            this._swatchElement.title = WebInspector.UIString("Click to open a spring editor.");
+            break;
         case WebInspector.InlineSwatch.Type.Gradient:
             this._swatchElement.title = WebInspector.UIString("Click to select a gradient.");
             break;
@@ -57,6 +60,7 @@ WebInspector.InlineSwatch = class InlineSwatch extends WebInspector.Object
         this._swatchInnerElement = this._swatchElement.createChild("span");
 
         this._value = value || this._fallbackValue();
+        this._valueEditor = null;
 
         this._updateSwatch();
     }
@@ -79,6 +83,19 @@ WebInspector.InlineSwatch = class InlineSwatch extends WebInspector.Object
         this._updateSwatch(true);
     }
 
+    // Protected
+
+    didDismissPopover(popover)
+    {
+        if (!this._valueEditor)
+            return;
+
+        if (typeof this._valueEditor.removeListeners === "function")
+            this._valueEditor.removeListeners();
+
+        this.dispatchEventToListeners(WebInspector.InlineSwatch.Event.Deactivated);
+    }
+
     // Private
 
     _fallbackValue()
@@ -86,10 +103,12 @@ WebInspector.InlineSwatch = class InlineSwatch extends WebInspector.Object
         switch (this._type) {
         case WebInspector.InlineSwatch.Type.Bezier:
             return WebInspector.CubicBezier.fromString("linear");
+        case WebInspector.InlineSwatch.Type.Spring:
+            return WebInspector.Spring.fromString("1 100 10 0");
         case WebInspector.InlineSwatch.Type.Gradient:
             return WebInspector.Gradient.fromString("linear-gradient(transparent, transparent)");
         case WebInspector.InlineSwatch.Type.Color:
-            return WebInspector.Color.fromString("transparent");
+            return WebInspector.Color.fromString("white");
         default:
             return null;
         }
@@ -106,6 +125,8 @@ WebInspector.InlineSwatch = class InlineSwatch extends WebInspector.Object
 
     _swatchElementClicked(event)
     {
+        this.dispatchEventToListeners(WebInspector.InlineSwatch.Event.BeforeClicked);
+
         if (this._type === WebInspector.InlineSwatch.Type.Color && event.shiftKey && this._value) {
             let nextFormat = this._value.nextFormat();
             console.assert(nextFormat);
@@ -120,35 +141,49 @@ WebInspector.InlineSwatch = class InlineSwatch extends WebInspector.Object
         let bounds = WebInspector.Rect.rectFromClientRect(this._swatchElement.getBoundingClientRect());
         let popover = new WebInspector.Popover(this);
 
-        let valueEditor = null;
+        popover.windowResizeHandler = () => {
+            let bounds = WebInspector.Rect.rectFromClientRect(this._swatchElement.getBoundingClientRect());
+            popover.present(bounds.pad(2), [WebInspector.RectEdge.MIN_X]);
+        };
+
+        this._valueEditor = null;
         if (this._type === WebInspector.InlineSwatch.Type.Bezier) {
-            valueEditor = new WebInspector.BezierEditor;
-            valueEditor.addEventListener(WebInspector.BezierEditor.Event.BezierChanged, this._valueEditorValueDidChange, this);
+            this._valueEditor = new WebInspector.BezierEditor;
+            this._valueEditor.addEventListener(WebInspector.BezierEditor.Event.BezierChanged, this._valueEditorValueDidChange, this);
+        } else if (this._type === WebInspector.InlineSwatch.Type.Spring) {
+            this._valueEditor = new WebInspector.SpringEditor;
+            this._valueEditor.addEventListener(WebInspector.SpringEditor.Event.SpringChanged, this._valueEditorValueDidChange, this);
         } else if (this._type === WebInspector.InlineSwatch.Type.Gradient) {
-            valueEditor = new WebInspector.GradientEditor;
-            valueEditor.addEventListener(WebInspector.GradientEditor.Event.GradientChanged, this._valueEditorValueDidChange, this);
-            valueEditor.addEventListener(WebInspector.GradientEditor.Event.ColorPickerToggled, (event) => popover.update());
+            this._valueEditor = new WebInspector.GradientEditor;
+            this._valueEditor.addEventListener(WebInspector.GradientEditor.Event.GradientChanged, this._valueEditorValueDidChange, this);
+            this._valueEditor.addEventListener(WebInspector.GradientEditor.Event.ColorPickerToggled, (event) => popover.update());
         } else {
-            valueEditor = new WebInspector.ColorPicker;
-            valueEditor.addEventListener(WebInspector.ColorPicker.Event.ColorChanged, this._valueEditorValueDidChange, this);
+            this._valueEditor = new WebInspector.ColorPicker;
+            this._valueEditor.addEventListener(WebInspector.ColorPicker.Event.ColorChanged, this._valueEditorValueDidChange, this);
         }
 
-        popover.content = valueEditor.element;
+        popover.content = this._valueEditor.element;
         popover.present(bounds.pad(2), [WebInspector.RectEdge.MIN_X]);
+
+        this.dispatchEventToListeners(WebInspector.InlineSwatch.Event.Activated);
 
         let value = this._value || this._fallbackValue();
         if (this._type === WebInspector.InlineSwatch.Type.Bezier)
-            valueEditor.bezier = value;
+            this._valueEditor.bezier = value;
+        else if (this._type === WebInspector.InlineSwatch.Type.Spring)
+            this._valueEditor.spring = value;
         else if (this._type === WebInspector.InlineSwatch.Type.Gradient)
-            valueEditor.gradient = value;
+            this._valueEditor.gradient = value;
         else
-            valueEditor.color = value;
+            this._valueEditor.color = value;
     }
 
     _valueEditorValueDidChange(event)
     {
         if (this._type === WebInspector.InlineSwatch.Type.Bezier)
             this._value = event.data.bezier;
+        else if (this._type === WebInspector.InlineSwatch.Type.Spring)
+            this._value = event.data.spring;
         else if (this._type === WebInspector.InlineSwatch.Type.Gradient)
             this._value = event.data.gradient;
         else
@@ -159,6 +194,9 @@ WebInspector.InlineSwatch = class InlineSwatch extends WebInspector.Object
 
     _handleContextMenuEvent(event)
     {
+        if (!this._value)
+            return;
+
         let contextMenu = WebInspector.ContextMenu.createFromEvent(event);
 
         if (this._value.isKeyword() && this._value.format !== WebInspector.Color.Format.Keyword) {
@@ -237,10 +275,7 @@ WebInspector.InlineSwatch = class InlineSwatch extends WebInspector.Object
             }
         ];
 
-        // FIXME: <https://webkit.org/b/152497> Arrow functions: "this" isn't lexically bound
-        let currentColorIsHEX = hexFormats.some(function(info) {
-            return info.format === this._value.format;
-        }.bind(this));
+        let currentColorIsHEX = hexFormats.some((info) => info.format === this._value.format);
 
         for (let i = 0; i < hexFormats.length; ++i) {
             if (currentColorIsHEX && this._value.format !== hexFormats[i].format)
@@ -260,9 +295,13 @@ WebInspector.InlineSwatch = class InlineSwatch extends WebInspector.Object
 WebInspector.InlineSwatch.Type = {
     Color: "inline-swatch-type-color",
     Gradient: "inline-swatch-type-gradient",
-    Bezier: "inline-swatch-type-bezier"
+    Bezier: "inline-swatch-type-bezier",
+    Spring: "inline-swatch-type-spring",
 };
 
 WebInspector.InlineSwatch.Event = {
-    ValueChanged: "inline-swatch-value-changed"
+    BeforeClicked: "inline-swatch-before-clicked",
+    ValueChanged: "inline-swatch-value-changed",
+    Activated: "inline-swatch-activated",
+    Deactivated: "inline-swatch-deactivated",
 };

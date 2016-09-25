@@ -1,3 +1,40 @@
+Sampler = Utilities.createClass(
+    function(seriesCount, expectedSampleCount, processor)
+    {
+        this._processor = processor;
+
+        this.samples = [];
+        for (var i = 0; i < seriesCount; ++i) {
+            var array = new Array(expectedSampleCount);
+            array.fill(0);
+            this.samples[i] = array;
+        }
+        this.sampleCount = 0;
+    }, {
+
+    record: function() {
+        // Assume that arguments.length == this.samples.length
+        for (var i = 0; i < arguments.length; i++) {
+            this.samples[i][this.sampleCount] = arguments[i];
+        }
+        ++this.sampleCount;
+    },
+
+    processSamples: function()
+    {
+        var results = {};
+
+        // Remove unused capacity
+        this.samples = this.samples.map(function(array) {
+            return array.slice(0, this.sampleCount);
+        }, this);
+
+        this._processor.processSamples(results);
+
+        return results;
+    }
+});
+
 Controller = Utilities.createClass(
     function(benchmark, options)
     {
@@ -14,9 +51,9 @@ Controller = Utilities.createClass(
         this._isFrameLengthEstimatorEnabled = true;
 
         // Length of subsequent intervals; a value of 0 means use no intervals
-        this._intervalLength = options["interval-length"] || 100;
+        this.intervalSamplingLength = 100;
 
-        this.initialComplexity = 0;
+        this.initialComplexity = 1;
     }, {
 
     set isFrameLengthEstimatorEnabled(enabled) {
@@ -27,6 +64,7 @@ Controller = Utilities.createClass(
     {
         this._startTimestamp = startTimestamp;
         this._endTimestamp += startTimestamp;
+        this._previousTimestamp = startTimestamp;
         this._measureAndResetInterval(startTimestamp);
         this.recordFirstSample(startTimestamp, stage);
     },
@@ -59,18 +97,21 @@ Controller = Utilities.createClass(
         }
 
         this._intervalStartIndex = sampleCount;
-        this._intervalEndTimestamp = currentTimestamp + this._intervalLength;
+        this._intervalEndTimestamp = currentTimestamp + this.intervalSamplingLength;
 
         return averageFrameLength;
     },
 
     update: function(timestamp, stage)
     {
-        var frameLengthEstimate = -1;
+        var lastFrameLength = timestamp - this._previousTimestamp;
+        this._previousTimestamp = timestamp;
+
+        var frameLengthEstimate = -1, intervalAverageFrameLength = -1;
         var didFinishInterval = false;
-        if (!this._intervalLength) {
+        if (!this.intervalSamplingLength) {
             if (this._isFrameLengthEstimatorEnabled) {
-                this._frameLengthEstimator.sample(timestamp - this._sampler.samples[0][this._sampler.sampleCount - 1]);
+                this._frameLengthEstimator.sample(lastFrameLength);
                 frameLengthEstimate = this._frameLengthEstimator.estimate;
             }
         } else if (timestamp >= this._intervalEndTimestamp) {
@@ -85,14 +126,14 @@ Controller = Utilities.createClass(
         }
 
         this._sampler.record(timestamp, stage.complexity(), frameLengthEstimate);
-        this.tune(timestamp, stage, didFinishInterval);
+        this.tune(timestamp, stage, lastFrameLength, didFinishInterval, intervalAverageFrameLength);
     },
 
     didFinishInterval: function(timestamp, stage, intervalAverageFrameLength)
     {
     },
 
-    tune: function(timestamp, stage, didFinishInterval)
+    tune: function(timestamp, stage, lastFrameLength, didFinishInterval, intervalAverageFrameLength)
     {
     },
 
@@ -106,6 +147,44 @@ Controller = Utilities.createClass(
         return this._sampler.processSamples();
     },
 
+    _processComplexitySamples: function(complexitySamples, complexityAverageSamples)
+    {
+        complexityAverageSamples.addField(Strings.json.complexity, 0);
+        complexityAverageSamples.addField(Strings.json.frameLength, 1);
+        complexityAverageSamples.addField(Strings.json.measurements.stdev, 2);
+
+        complexitySamples.sort(function(a, b) {
+            return complexitySamples.getFieldInDatum(a, Strings.json.complexity) - complexitySamples.getFieldInDatum(b, Strings.json.complexity);
+        });
+
+        // Samples averaged based on complexity
+        var currentComplexity = -1;
+        var experimentAtComplexity;
+        function addSample() {
+            var mean = experimentAtComplexity.mean();
+            var stdev = experimentAtComplexity.standardDeviation();
+
+            var averageSample = complexityAverageSamples.createDatum();
+            complexityAverageSamples.push(averageSample);
+            complexityAverageSamples.setFieldInDatum(averageSample, Strings.json.complexity, currentComplexity);
+            complexityAverageSamples.setFieldInDatum(averageSample, Strings.json.frameLength, mean);
+            complexityAverageSamples.setFieldInDatum(averageSample, Strings.json.measurements.stdev, stdev);
+        }
+        complexitySamples.forEach(function(sample) {
+            var sampleComplexity = complexitySamples.getFieldInDatum(sample, Strings.json.complexity);
+            if (sampleComplexity != currentComplexity) {
+                if (currentComplexity > -1)
+                    addSample();
+
+                currentComplexity = sampleComplexity;
+                experimentAtComplexity = new Experiment;
+            }
+            experimentAtComplexity.sample(complexitySamples.getFieldInDatum(sample, Strings.json.frameLength));
+        });
+        // Finish off the last one
+        addSample();
+    },
+
     processSamples: function(results)
     {
         var complexityExperiment = new Experiment;
@@ -113,65 +192,62 @@ Controller = Utilities.createClass(
 
         var samples = this._sampler.samples;
 
-        var samplingStartIndex = 0, samplingEndIndex = -1;
-        if (Strings.json.samplingStartTimeOffset in this._marks)
-            samplingStartIndex = this._marks[Strings.json.samplingStartTimeOffset].index;
-        if (Strings.json.samplingEndTimeOffset in this._marks)
-            samplingEndIndex = this._marks[Strings.json.samplingEndTimeOffset].index;
-
         for (var markName in this._marks)
             this._marks[markName].time -= this._startTimestamp;
         results[Strings.json.marks] = this._marks;
 
-        results[Strings.json.samples] = samples[0].map(function(timestamp, i) {
-            var result = {
-                // Represent time in milliseconds
-                time: timestamp - this._startTimestamp,
-                complexity: samples[1][i]
-            };
+        results[Strings.json.samples] = {};
+
+        var controllerSamples = new SampleData;
+        results[Strings.json.samples][Strings.json.controller] = controllerSamples;
+
+        controllerSamples.addField(Strings.json.time, 0);
+        controllerSamples.addField(Strings.json.complexity, 1);
+        controllerSamples.addField(Strings.json.frameLength, 2);
+        controllerSamples.addField(Strings.json.smoothedFrameLength, 3);
+
+        var complexitySamples = new SampleData(controllerSamples.fieldMap);
+        results[Strings.json.samples][Strings.json.complexity] = complexitySamples;
+
+        samples[0].forEach(function(timestamp, i) {
+            var sample = controllerSamples.createDatum();
+            controllerSamples.push(sample);
+            complexitySamples.push(sample);
+
+            // Represent time in milliseconds
+            controllerSamples.setFieldInDatum(sample, Strings.json.time, timestamp - this._startTimestamp);
+            controllerSamples.setFieldInDatum(sample, Strings.json.complexity, samples[1][i]);
 
             if (i == 0)
-                result.frameLength = 1000/60;
+                controllerSamples.setFieldInDatum(sample, Strings.json.frameLength, 1000/60);
             else
-                result.frameLength = timestamp - samples[0][i - 1];
+                controllerSamples.setFieldInDatum(sample, Strings.json.frameLength, timestamp - samples[0][i - 1]);
 
             if (samples[2][i] != -1)
-                result.smoothedFrameLength = samples[2][i];
-
-            // Don't start adding data to the experiments until we reach the sampling timestamp
-            if (i >= samplingStartIndex && (samplingEndIndex == -1 || i < samplingEndIndex)) {
-                complexityExperiment.sample(result.complexity);
-                if (result.smoothedFrameLength && result.smoothedFrameLength != -1)
-                    smoothedFrameLengthExperiment.sample(result.smoothedFrameLength);
-            }
-
-            return result;
+                controllerSamples.setFieldInDatum(sample, Strings.json.smoothedFrameLength, samples[2][i]);
         }, this);
 
-        results[Strings.json.score] = complexityExperiment.score(Experiment.defaults.CONCERN);
-
-        var complexityResults = {};
-        results[Strings.json.experiments.complexity] = complexityResults;
-        complexityResults[Strings.json.measurements.average] = complexityExperiment.mean();
-        complexityResults[Strings.json.measurements.concern] = complexityExperiment.concern(Experiment.defaults.CONCERN);
-        complexityResults[Strings.json.measurements.stdev] = complexityExperiment.standardDeviation();
-        complexityResults[Strings.json.measurements.percent] = complexityExperiment.percentage();
-
-        var smoothedFrameLengthResults = {};
-        results[Strings.json.experiments.frameRate] = smoothedFrameLengthResults;
-        smoothedFrameLengthResults[Strings.json.measurements.average] = 1000 / smoothedFrameLengthExperiment.mean();
-        smoothedFrameLengthResults[Strings.json.measurements.concern] = smoothedFrameLengthExperiment.concern(Experiment.defaults.CONCERN);
-        smoothedFrameLengthResults[Strings.json.measurements.stdev] = smoothedFrameLengthExperiment.standardDeviation();
-        smoothedFrameLengthResults[Strings.json.measurements.percent] = smoothedFrameLengthExperiment.percentage();
+        var complexityAverageSamples = new SampleData;
+        results[Strings.json.samples][Strings.json.complexityAverage] = complexityAverageSamples;
+        this._processComplexitySamples(complexitySamples, complexityAverageSamples);
     }
 });
+
+FixedController = Utilities.createSubclass(Controller,
+    function(benchmark, options)
+    {
+        Controller.call(this, benchmark, options);
+        this.initialComplexity = options["complexity"];
+        this.intervalSamplingLength = 0;
+    }
+);
 
 StepController = Utilities.createSubclass(Controller,
     function(benchmark, options)
     {
-        options["interval-length"] = 0;
         Controller.call(this, benchmark, options);
         this.initialComplexity = options["complexity"];
+        this.intervalSamplingLength = 0;
         this._stepped = false;
         this._stepTime = options["test-interval"] / 2;
     }, {
@@ -250,174 +326,6 @@ AdaptiveController = Utilities.createSubclass(Controller,
         // Start the next interval.
         this._intervalFrameCount = 0;
         this._intervalTimestamp = timestamp;
-    },
-
-    processSamples: function(results)
-    {
-        Controller.prototype.processSamples.call(this, results);
-        results[Strings.json.targetFrameLength] = 1000 / this._targetFrameRate;
-    }
-});
-
-Regression = Utilities.createClass(
-    function(samples, getComplexity, getFrameLength, startIndex, endIndex, options)
-    {
-        var slope = this._calculateRegression(samples, getComplexity, getFrameLength, startIndex, endIndex, {
-            shouldClip: true,
-            s1: 1000/60,
-            t1: 0
-        });
-        var flat = this._calculateRegression(samples, getComplexity, getFrameLength, startIndex, endIndex, {
-            shouldClip: true,
-            t1: 0,
-            t2: 0
-        });
-        var desired;
-        if (slope.error < flat.error)
-            desired = slope;
-        else
-            desired = flat;
-
-        this.startIndex = Math.min(startIndex, endIndex);
-        this.endIndex = Math.max(startIndex, endIndex);
-
-        this.complexity = desired.complexity;
-        this.s1 = desired.s1;
-        this.t1 = desired.t1;
-        this.s2 = desired.s2;
-        this.t2 = desired.t2;
-        this.error = desired.error;
-    }, {
-
-    // A generic two-segment piecewise regression calculator. Based on Kundu/Ubhaya
-    //
-    // Minimize sum of (y - y')^2
-    // where                        y = s1 + t1*x
-    //                              y = s2 + t2*x
-    //                y' = s1 + t1*x' = s2 + t2*x'   if x_0 <= x' <= x_n
-    //
-    // Allows for fixing s1, t1, s2, t2
-    //
-    // x is assumed to be complexity, y is frame length. Can be used for pure complexity-FPS
-    // analysis or for ramp controllers since complexity monotonically decreases with time.
-    _calculateRegression: function(samples, getComplexity, getFrameLength, startIndex, endIndex, options)
-    {
-        var iterationDirection = endIndex > startIndex ? 1 : -1;
-        var lowComplexity = getComplexity(samples, startIndex);
-        var highComplexity = getComplexity(samples, endIndex);
-        var a1 = 0, b1 = 0, c1 = 0, d1 = 0, h1 = 0, k1 = 0;
-        var a2 = 0, b2 = 0, c2 = 0, d2 = 0, h2 = 0, k2 = 0;
-
-        // Iterate from low to high complexity
-        for (var i = startIndex; iterationDirection * (endIndex - i) > -1; i += iterationDirection) {
-            var x = getComplexity(samples, i);
-            var y = getFrameLength(samples, i);
-            a2 += 1;
-            b2 += x;
-            c2 += x * x;
-            d2 += y;
-            h2 += y * x;
-            k2 += y * y;
-        }
-
-        var s1_best, t1_best, s2_best, t2_best, x_best, error_best, x_prime;
-
-        function setBest(s1, t1, s2, t2, error, x_prime, x)
-        {
-            s1_best = s1;
-            t1_best = t1;
-            s2_best = s2;
-            t2_best = t2;
-            error_best = error;
-            if (!options.shouldClip || (x_prime >= lowComplexity && x_prime <= highComplexity))
-                x_best = x_prime;
-            else {
-                // Discontinuous piecewise regression
-                x_best = x;
-            }
-        }
-
-        // Iterate from startIndex to endIndex - 1, inclusive
-        for (var i = startIndex; iterationDirection * (endIndex - i) > 0; i += iterationDirection) {
-            var x = getComplexity(samples, i);
-            var y = getFrameLength(samples, i);
-            var xx = x * x;
-            var yx = y * x;
-            var yy = y * y;
-            // a1, b1, etc. is sum from startIndex to i, inclusive
-            a1 += 1;
-            b1 += x;
-            c1 += xx;
-            d1 += y;
-            h1 += yx;
-            k1 += yy;
-            // a2, b2, etc. is sum from i+1 to endIndex, inclusive
-            a2 -= 1;
-            b2 -= x;
-            c2 -= xx;
-            d2 -= y;
-            h2 -= yx;
-            k2 -= yy;
-
-            var A = c1*d1 - b1*h1;
-            var B = a1*h1 - b1*d1;
-            var C = a1*c1 - b1*b1;
-            var D = c2*d2 - b2*h2;
-            var E = a2*h2 - b2*d2;
-            var F = a2*c2 - b2*b2;
-            var s1 = options.s1 !== undefined ? options.s1 : (A / C);
-            var t1 = options.t1 !== undefined ? options.t1 : (B / C);
-            var s2 = options.s2 !== undefined ? options.s2 : (D / F);
-            var t2 = options.t2 !== undefined ? options.t2 : (E / F);
-            // Assumes that the two segments meet
-            var x_prime = (s1 - s2) / (t2 - t1);
-
-            var error1 = (k1 + a1*s1*s1 + c1*t1*t1 - 2*d1*s1 - 2*h1*t1 + 2*b1*s1*t1) || 0;
-            var error2 = (k2 + a2*s2*s2 + c2*t2*t2 - 2*d2*s2 - 2*h2*t2 + 2*b2*s2*t2) || 0;
-
-            if (i == startIndex) {
-                setBest(s1, t1, s2, t2, error1 + error2, x_prime, x);
-                continue;
-            }
-
-            // Projected point is not between this and the next sample
-            if (x_prime > getComplexity(samples, i + iterationDirection) || x_prime < x) {
-                // Calculate lambda, which divides the weight of this sample between the two lines
-
-                // These values remove the influence of this sample
-                var I = c1 - 2*b1*x + a1*xx;
-                var H = C - I;
-                var G = A + B*x - C*y;
-
-                var J = D + E*x - F*y;
-                var K = c2 - 2*b2*x + a2*xx;
-
-                var lambda = (G*F + G*K - H*J) / (I*J + G*K);
-                if (lambda > 0 && lambda < 1) {
-                    var lambda1 = 1 - lambda;
-                    s1 = options.s1 !== undefined ? options.s1 : ((A - lambda1*(-h1*x + d1*xx + c1*y - b1*yx)) / (C - lambda1*I));
-                    t1 = options.t1 !== undefined ? options.t1 : ((B - lambda1*(h1 - d1*x - b1*y + a1*yx)) / (C - lambda1*I));
-                    s2 = options.s2 !== undefined ? options.s2 : ((D + lambda1*(-h2*x + d2*xx + c2*y - b2*yx)) / (F + lambda1*K));
-                    t2 = options.t2 !== undefined ? options.t2 : ((E + lambda1*(h2 - d2*x - b2*y + a2*yx)) / (F + lambda1*K));
-                    x_prime = (s1 - s2) / (t2 - t1);
-
-                    error1 = ((k1 + a1*s1*s1 + c1*t1*t1 - 2*d1*s1 - 2*h1*t1 + 2*b1*s1*t1) - lambda1 * Math.pow(y - (s1 + t1*x), 2)) || 0;
-                    error2 = ((k2 + a2*s2*s2 + c2*t2*t2 - 2*d2*s2 - 2*h2*t2 + 2*b2*s2*t2) + lambda1 * Math.pow(y - (s2 + t2*x), 2)) || 0;
-                }
-            }
-
-            if (error1 + error2 < error_best)
-                setBest(s1, t1, s2, t2, error1 + error2, x_prime, x);
-        }
-
-        return {
-            complexity: x_best,
-            s1: s1_best,
-            t1: t1_best,
-            s2: s2_best,
-            t2: t2_best,
-            error: error_best
-        };
     }
 });
 
@@ -430,91 +338,125 @@ RampController = Utilities.createSubclass(Controller,
 
         // Initially start with a tier test to find the bounds
         // The number of objects in a tier test is 10^|_tier|
-        this._tier = 0;
+        this._tier = -.5;
         // The timestamp is first set after the first interval completes
         this._tierStartTimestamp = 0;
-        // If the engine can handle the tier's complexity at 60 FPS, test for a short
-        // period, then move on to the next tier
-        this._tierFastTestLength = 250;
-        // If the engine is under stress, let the test run a little longer to let
-        // the measurement settle
-        this._tierSlowTestLength = 750;
-        this._maximumComplexity = 0;
-        this._minimumTier = 0;
+        this._minimumComplexity = 1;
+        this._maximumComplexity = 1;
 
         // After the tier range is determined, figure out the number of ramp iterations
         var minimumRampLength = 3000;
         var totalRampIterations = Math.max(1, Math.floor(this._endTimestamp / minimumRampLength));
         // Give a little extra room to run since the ramps won't be exactly this length
-        this._rampLength = Math.floor((this._endTimestamp - totalRampIterations * this._intervalLength) / totalRampIterations);
-        this._rampWarmupLength = 200;
+        this._rampLength = Math.floor((this._endTimestamp - totalRampIterations * this.intervalSamplingLength) / totalRampIterations);
         this._rampDidWarmup = false;
         this._rampRegressions = [];
 
-        // Add some tolerance; frame lengths shorter than this are considered to be @ 60 fps
-        this._fps60Threshold = 1000/58;
-        // We are looking for the complexity that will get us at least as slow this threshold
-        this._fpsLowestThreshold = 1000/30;
-
         this._finishedTierSampling = false;
-        this._startedRamps = false;
-        this._complexityPrime = new Experiment;
+        this._changePointEstimator = new Experiment;
+        this._minimumComplexityEstimator = new Experiment;
+        // Estimates all frames within an interval
+        this._intervalFrameLengthEstimator = new Experiment;
     }, {
+
+    // If the engine can handle the tier's complexity at the desired frame rate, test for a short
+    // period, then move on to the next tier
+    tierFastTestLength: 250,
+    // If the engine is under stress, let the test run a little longer to let the measurement settle
+    tierSlowTestLength: 750,
+
+    rampWarmupLength: 200,
+
+    // Used for regression calculations in the ramps
+    frameLengthDesired: 1000/60,
+    // Add some tolerance; frame lengths shorter than this are considered to be @ the desired frame length
+    frameLengthDesiredThreshold: 1000/58,
+    // During tier sampling get at least this slow to find the right complexity range
+    frameLengthTierThreshold: 1000/30,
+    // Try to make each ramp get this slow so that we can cross the break point
+    frameLengthRampLowerThreshold: 1000/45,
+    // Do not let the regression calculation at the maximum complexity of a ramp get slower than this threshold
+    frameLengthRampUpperThreshold: 1000/20,
 
     start: function(startTimestamp, stage)
     {
         Controller.prototype.start.call(this, startTimestamp, stage);
         this._rampStartTimestamp = 0;
+        this.intervalSamplingLength = 100;
     },
 
     didFinishInterval: function(timestamp, stage, intervalAverageFrameLength)
     {
         if (!this._finishedTierSampling) {
-            if (this._tierStartTimestamp > 0 && timestamp < this._tierStartTimestamp + this._tierFastTestLength)
+            if (this._tierStartTimestamp > 0 && timestamp < this._tierStartTimestamp + this.tierFastTestLength)
                 return;
 
             var currentComplexity = stage.complexity();
             var currentFrameLength = this._frameLengthEstimator.estimate;
-            if (currentFrameLength < this._fpsLowestThreshold) {
-                var isAnimatingAt60FPS = currentFrameLength < this._fps60Threshold;
-                var hasFinishedSlowTierTest = timestamp > this._tierStartTimestamp + this._tierSlowTestLength;
+            if (currentFrameLength < this.frameLengthTierThreshold) {
+                var isAnimatingAt60FPS = currentFrameLength < this.frameLengthDesiredThreshold;
+                var hasFinishedSlowTierTest = timestamp > this._tierStartTimestamp + this.tierSlowTestLength;
+
+                if (!isAnimatingAt60FPS && !hasFinishedSlowTierTest)
+                    return;
 
                 // We're measuring at 60 fps, so quickly move on to the next tier, or
                 // we've slower than 60 fps, but we've let this tier run long enough to
                 // get an estimate
-                if (currentFrameLength < this._fps60Threshold || timestamp > this._tierStartTimestamp + this._tierSlowTestLength) {
-                    this._lastComplexity = currentComplexity;
-                    this._lastFrameLength = currentFrameLength;
+                this._lastTierComplexity = currentComplexity;
+                this._lastTierFrameLength = currentFrameLength;
 
+                this._tier += .5;
+                var nextTierComplexity = Math.round(Math.pow(10, this._tier));
+                stage.tune(nextTierComplexity - currentComplexity);
+
+                // Some tests may be unable to go beyond a certain capacity. If so, don't keep moving up tiers
+                if (stage.complexity() - currentComplexity > 0 || nextTierComplexity == 1) {
                     this._tierStartTimestamp = timestamp;
-                    this._tier += .5;
-                    var nextTierComplexity = Math.round(Math.pow(10, this._tier));
                     this.mark("Complexity: " + nextTierComplexity, timestamp);
-
-                    stage.tune(nextTierComplexity - currentComplexity);
+                    return;
                 }
-                return;
-            } else if (timestamp < this._tierStartTimestamp + this._tierSlowTestLength)
+            } else if (timestamp < this._tierStartTimestamp + this.tierSlowTestLength)
                 return;
 
             this._finishedTierSampling = true;
+            this.isFrameLengthEstimatorEnabled = false;
+            this.intervalSamplingLength = 120;
+
             // Extend the test length so that the full test length is made of the ramps
             this._endTimestamp += timestamp;
             this.mark(Strings.json.samplingStartTimeOffset, timestamp);
 
-            // Sometimes this last tier will drop the frame length well below the threshold
-            // Avoid going down that far since it means fewer measurements are taken in the 60 fps area
-            // Interpolate a maximum complexity that gets us around the lowest threshold
-            this._maximumComplexity = Math.floor(this._lastComplexity + (this._fpsLowestThreshold - this._lastFrameLength) / (currentFrameLength - this._lastFrameLength) * (currentComplexity - this._lastComplexity));
+            this._minimumComplexity = 1;
+            this._possibleMinimumComplexity = this._minimumComplexity;
+            this._minimumComplexityEstimator.sample(this._minimumComplexity);
+
+            // Sometimes this last tier will drop the frame length well below the threshold.
+            // Avoid going down that far since it means fewer measurements are taken in the 60 fps area.
+            // Interpolate a maximum complexity that gets us around the lowest threshold.
+            // Avoid doing this calculation if we never get out of the first tier (where this._lastTierComplexity is undefined).
+            if (this._lastTierComplexity && this._lastTierComplexity != currentComplexity)
+                this._maximumComplexity = Math.floor(Utilities.lerp(Utilities.progressValue(this.frameLengthTierThreshold, this._lastTierFrameLength, currentFrameLength), this._lastTierComplexity, currentComplexity));
+            else {
+                // If the browser is capable of handling the most complex version of the test, use that
+                this._maximumComplexity = currentComplexity;
+            }
+            this._possibleMaximumComplexity = this._maximumComplexity;
+
+            // If we get ourselves onto a ramp where the maximum complexity does not yield slow enough FPS,
+            // We'll use this as a boundary to find a higher maximum complexity for the next ramp
+            this._lastTierComplexity = currentComplexity;
+            this._lastTierFrameLength = currentFrameLength;
+
+            // First ramp
             stage.tune(this._maximumComplexity - currentComplexity);
-            this._rampStartTimestamp = timestamp;
             this._rampDidWarmup = false;
-            this.isFrameLengthEstimatorEnabled = false;
-            this._intervalCount = 0;
+            // Start timestamp represents start of ramp iteration and warm up
+            this._rampStartTimestamp = timestamp;
             return;
         }
 
-        if ((timestamp - this._rampStartTimestamp) < this._rampWarmupLength)
+        if ((timestamp - this._rampStartTimestamp) < this.rampWarmupLength)
             return;
 
         if (this._rampDidWarmup)
@@ -527,30 +469,74 @@ RampController = Utilities.createSubclass(Controller,
         this._rampStartIndex = this._sampler.sampleCount;
     },
 
-    tune: function(timestamp, stage, didFinishInterval)
+    tune: function(timestamp, stage, lastFrameLength, didFinishInterval, intervalAverageFrameLength)
     {
-        if (!didFinishInterval || !this._rampDidWarmup)
+        if (!this._rampDidWarmup)
             return;
+
+        this._intervalFrameLengthEstimator.sample(lastFrameLength);
+        if (!didFinishInterval)
+            return;
+
+        var currentComplexity = stage.complexity();
+        var intervalFrameLengthMean = this._intervalFrameLengthEstimator.mean();
+        var intervalFrameLengthStandardDeviation = this._intervalFrameLengthEstimator.standardDeviation();
+
+        if (intervalFrameLengthMean < this.frameLengthDesiredThreshold && this._intervalFrameLengthEstimator.cdf(this.frameLengthDesiredThreshold) > .9) {
+            this._possibleMinimumComplexity = Math.max(this._possibleMinimumComplexity, currentComplexity);
+        } else if (intervalFrameLengthStandardDeviation > 2) {
+            // In the case where we might have found a previous interval where 60fps was reached. We hit a significant blip,
+            // so we should resample this area in the next ramp.
+            this._possibleMinimumComplexity = 1;
+        }
+        if (intervalFrameLengthMean - intervalFrameLengthStandardDeviation > this.frameLengthRampLowerThreshold)
+            this._possibleMaximumComplexity = Math.min(this._possibleMaximumComplexity, currentComplexity);
+        this._intervalFrameLengthEstimator.reset();
 
         var progress = (timestamp - this._rampStartTimestamp) / this._currentRampLength;
 
         if (progress < 1) {
-            stage.tune(Math.round((1 - progress) * this._maximumComplexity) - stage.complexity());
+            // Reframe progress percentage so that the last interval of the ramp can sample at minimum complexity
+            progress = (timestamp - this._rampStartTimestamp) / (this._currentRampLength - this.intervalSamplingLength);
+            stage.tune(Math.max(this._minimumComplexity, Math.floor(Utilities.lerp(progress, this._maximumComplexity, this._minimumComplexity))) - currentComplexity);
             return;
         }
 
         var regression = new Regression(this._sampler.samples, this._getComplexity, this._getFrameLength,
-            this._sampler.sampleCount - 1, this._rampStartIndex);
+            this._sampler.sampleCount - 1, this._rampStartIndex, { desiredFrameLength: this.frameLengthDesired });
         this._rampRegressions.push(regression);
 
-        this._complexityPrime.sample(regression.complexity);
-        this._maximumComplexity = Math.max(5, Math.round(this._complexityPrime.mean() * 2));
+        var frameLengthAtMaxComplexity = regression.valueAt(this._maximumComplexity);
+        if (frameLengthAtMaxComplexity < this.frameLengthRampLowerThreshold)
+            this._possibleMaximumComplexity = Math.floor(Utilities.lerp(Utilities.progressValue(this.frameLengthRampLowerThreshold, frameLengthAtMaxComplexity, this._lastTierFrameLength), this._maximumComplexity, this._lastTierComplexity));
+        // If the regression doesn't fit the first segment at all, keep the minimum bound at 1
+        if ((timestamp - this._sampler.samples[0][this._sampler.sampleCount - regression.n1]) / this._currentRampLength < .25)
+            this._possibleMinimumComplexity = 1;
+
+        this._minimumComplexityEstimator.sample(this._possibleMinimumComplexity);
+        this._minimumComplexity = Math.round(this._minimumComplexityEstimator.mean());
+
+        if (frameLengthAtMaxComplexity < this.frameLengthRampUpperThreshold) {
+            this._changePointEstimator.sample(regression.complexity);
+            // Ideally we'll target the change point in the middle of the ramp. If the range of the ramp is too small, there isn't enough
+            // range along the complexity (x) axis for a good regression calculation to be made, so force at least a range of 5
+            // particles. Make it possible to increase the maximum complexity in case unexpected noise caps the regression too low.
+            this._maximumComplexity = Math.round(this._minimumComplexity +
+                Math.max(5,
+                    this._possibleMaximumComplexity - this._minimumComplexity,
+                    (this._changePointEstimator.mean() - this._minimumComplexity) * 2));
+        } else {
+            // The slowest samples weighed the regression too heavily
+            this._maximumComplexity = Math.max(Math.round(.8 * this._maximumComplexity), this._minimumComplexity + 5);
+        }
 
         // Next ramp
+        stage.tune(this._maximumComplexity - stage.complexity());
         this._rampDidWarmup = false;
         // Start timestamp represents start of ramp iteration and warm up
         this._rampStartTimestamp = timestamp;
-        stage.tune(this._maximumComplexity - stage.complexity());
+        this._possibleMinimumComplexity = 1;
+        this._possibleMaximumComplexity = this._maximumComplexity;
     },
 
     _getComplexity: function(samples, i) {
@@ -567,26 +553,30 @@ RampController = Utilities.createSubclass(Controller,
 
         // Have samplingTimeOffset represent time 0
         var startTimestamp = this._marks[Strings.json.samplingStartTimeOffset].time;
-        results[Strings.json.samples].forEach(function(sample) {
-            sample.time -= startTimestamp;
-        });
+
         for (var markName in results[Strings.json.marks]) {
             results[Strings.json.marks][markName].time -= startTimestamp;
         }
 
-        var samples = results[Strings.json.samples];
-        results[Strings.json.regressions.timeRegressions] = [];
-        var complexityRegressionSamples = [];
-        var timeComplexityScore = new Experiment;
+        var controllerSamples = results[Strings.json.samples][Strings.json.controller];
+        controllerSamples.forEach(function(timeSample) {
+            controllerSamples.setFieldInDatum(timeSample, Strings.json.time, controllerSamples.getFieldInDatum(timeSample, Strings.json.time) - startTimestamp);
+        });
+
+        // Aggregate all of the ramps into one big complexity-frameLength dataset
+        var complexitySamples = new SampleData(controllerSamples.fieldMap);
+        results[Strings.json.samples][Strings.json.complexity] = complexitySamples;
+
+        results[Strings.json.controller] = [];
         this._rampRegressions.forEach(function(ramp) {
             var startIndex = ramp.startIndex, endIndex = ramp.endIndex;
-            var startTime = samples[startIndex].time, endTime = samples[endIndex].time;
-            var startComplexity = samples[startIndex].complexity, endComplexity = samples[endIndex].complexity;
-
-            timeComplexityScore.sample(ramp.complexity);
+            var startTime = controllerSamples.getFieldInDatum(startIndex, Strings.json.time);
+            var endTime = controllerSamples.getFieldInDatum(endIndex, Strings.json.time);
+            var startComplexity = controllerSamples.getFieldInDatum(startIndex, Strings.json.complexity);
+            var endComplexity = controllerSamples.getFieldInDatum(endIndex, Strings.json.complexity);
 
             var regression = {};
-            results[Strings.json.regressions.timeRegressions].push(regression);
+            results[Strings.json.controller].push(regression);
 
             var percentage = (ramp.complexity - startComplexity) / (endComplexity - startComplexity);
             var inflectionTime = startTime + percentage * (endTime - startTime);
@@ -599,79 +589,32 @@ RampController = Utilities.createSubclass(Controller,
                 [inflectionTime, ramp.s1 + ramp.t1 * ramp.complexity],
                 [endTime, ramp.s1 + ramp.t1 * endComplexity]
             ];
-            regression[Strings.json.regressions.complexity] = ramp.complexity;
-            regression[Strings.json.regressions.maxComplexity] = Math.max(startComplexity, endComplexity);
+            regression[Strings.json.complexity] = ramp.complexity;
             regression[Strings.json.regressions.startIndex] = startIndex;
             regression[Strings.json.regressions.endIndex] = endIndex;
+            regression[Strings.json.regressions.profile] = ramp.profile;
 
             for (var j = startIndex; j <= endIndex; ++j)
-                complexityRegressionSamples.push(samples[j]);
+                complexitySamples.push(controllerSamples.at(j));
         });
 
-        // Aggregate all of the ramps into one big dataset and calculate a regression from this
-        complexityRegressionSamples.sort(function(a, b) {
-            return a.complexity - b.complexity;
-        });
-
-        // Samples averaged based on complexity
-        results[Strings.json.complexityAverageSamples] = [];
-        var currentComplexity = -1;
-        var experimentAtComplexity;
-        function addSample() {
-            results[Strings.json.complexityAverageSamples].push({
-                complexity: currentComplexity,
-                frameLength: experimentAtComplexity.mean(),
-                stdev: experimentAtComplexity.standardDeviation(),
-            });
-        }
-        complexityRegressionSamples.forEach(function(sample) {
-            if (sample.complexity != currentComplexity) {
-                if (currentComplexity > -1)
-                    addSample();
-
-                currentComplexity = sample.complexity;
-                experimentAtComplexity = new Experiment;
-            }
-            experimentAtComplexity.sample(sample.frameLength);
-        });
-        // Finish off the last one
-        addSample();
-
-        function calculateRegression(samples, key) {
-            var complexityRegression = new Regression(
-                samples,
-                function (samples, i) { return samples[i].complexity; },
-                function (samples, i) { return samples[i].frameLength; },
-                0, samples.length - 1
-            );
-            var minComplexity = samples[0].complexity;
-            var maxComplexity = samples[samples.length - 1].complexity;
-            var regression = {};
-            results[key] = regression;
-            regression[Strings.json.regressions.segment1] = [
-                [minComplexity, complexityRegression.s1 + complexityRegression.t1 * minComplexity],
-                [complexityRegression.complexity, complexityRegression.s1 + complexityRegression.t1 * complexityRegression.complexity]
-            ];
-            regression[Strings.json.regressions.segment2] = [
-                [complexityRegression.complexity, complexityRegression.s2 + complexityRegression.t2 * complexityRegression.complexity],
-                [maxComplexity, complexityRegression.s2 + complexityRegression.t2 * maxComplexity]
-            ];
-            regression[Strings.json.regressions.complexity] = complexityRegression.complexity;
-            regression[Strings.json.measurements.stdev] = Math.sqrt(complexityRegression.error / samples.length);
-        }
-
-        calculateRegression(complexityRegressionSamples, Strings.json.regressions.complexityRegression);
-        calculateRegression(results[Strings.json.complexityAverageSamples], Strings.json.regressions.complexityAverageRegression);
-
-        // Frame rate experiment result is unneeded
-        delete results[Strings.json.experiments.frameRate];
-
-        results[Strings.json.score] = timeComplexityScore.mean();
-        results[Strings.json.experiments.complexity] = {};
-        results[Strings.json.experiments.complexity][Strings.json.measurements.average] = timeComplexityScore.mean();
-        results[Strings.json.experiments.complexity][Strings.json.measurements.stdev] = timeComplexityScore.standardDeviation();
-        results[Strings.json.experiments.complexity][Strings.json.measurements.percent] = timeComplexityScore.percentage();
+        var complexityAverageSamples = new SampleData;
+        results[Strings.json.samples][Strings.json.complexityAverage] = complexityAverageSamples;
+        this._processComplexitySamples(complexitySamples, complexityAverageSamples);
     }
+});
+
+Ramp30Controller = Utilities.createSubclass(RampController,
+    function(benchmark, options)
+    {
+        RampController.call(this, benchmark, options);
+    }, {
+
+    frameLengthDesired: 1000/30,
+    frameLengthDesiredThreshold: 1000/29,
+    frameLengthTierThreshold: 1000/20,
+    frameLengthRampLowerThreshold: 1000/20,
+    frameLengthRampUpperThreshold: 1000/12
 });
 
 Stage = Utilities.createClass(
@@ -722,17 +665,17 @@ Stage = Utilities.createClass(
 Utilities.extendObject(Stage, {
     random: function(min, max)
     {
-        return (Math.random() * (max - min)) + min;
+        return (Pseudo.random() * (max - min)) + min;
     },
 
     randomBool: function()
     {
-        return !!Math.round(Math.random());
+        return !!Math.round(Pseudo.random());
     },
 
     randomSign: function()
     {
-        return Math.random() >= .5 ? 1 : -1;
+        return Pseudo.random() >= .5 ? 1 : -1;
     },
 
     randomInt: function(min, max)
@@ -791,7 +734,7 @@ Utilities.extendObject(Stage, {
           'color',
           'luminosity'
         ];
-        
+
         return mixBlendModeList[this.randomInt(0, mixBlendModeList.length)];
     },
 
@@ -809,8 +752,13 @@ Utilities.extendObject(Stage, {
             'blur(10px)',
             'drop-shadow(10px 10px 10px gray)'
         ];
-        
+
         return filterList[this.randomInt(0, filterList.length)];
+    },
+
+    randomElementInArray: function(array)
+    {
+        return array[Stage.randomInt(0, array.length - 1)];
     },
 
     rotatingColor: function(cycleLengthMs, saturation, lightness)
@@ -884,7 +832,13 @@ Benchmark = Utilities.createClass(
         switch (options["time-measurement"])
         {
         case "performance":
-            this._getTimestamp = performance.now.bind(performance);
+            if (window.performance && window.performance.now)
+                this._getTimestamp = performance.now.bind(performance);
+            else
+                this._getTimestamp = null;
+            break;
+        case "raf":
+            this._getTimestamp = null;
             break;
         case "date":
             this._getTimestamp = Date.now;
@@ -892,8 +846,11 @@ Benchmark = Utilities.createClass(
         }
 
         options["test-interval"] *= 1000;
-        switch (options["adjustment"])
+        switch (options["controller"])
         {
+        case "fixed":
+            this._controller = new FixedController(this, options);
+            break;
         case "step":
             this._controller = new StepController(this, options);
             break;
@@ -903,6 +860,8 @@ Benchmark = Utilities.createClass(
         case "ramp":
             this._controller = new RampController(this, options);
             break;
+        case "ramp30":
+            this._controller = new Ramp30Controller(this, options);
         }
     }, {
 
@@ -926,7 +885,7 @@ Benchmark = Utilities.createClass(
     {
         return this.waitUntilReady().then(function() {
             this._finishPromise = new SimplePromise;
-            this._previousTimestamp = this._getTimestamp();
+            this._previousTimestamp = undefined;
             this._didWarmUp = false;
             this._stage.tune(this._controller.initialComplexity - this._stage.complexity());
             this._animateLoop();
@@ -942,21 +901,24 @@ Benchmark = Utilities.createClass(
         return promise;
     },
 
-    _animateLoop: function()
+    _animateLoop: function(timestamp)
     {
-        this._currentTimestamp = this._getTimestamp();
+        timestamp = (this._getTimestamp && this._getTimestamp()) || timestamp;
+        this._currentTimestamp = timestamp;
 
-        if (this._controller.shouldStop(this._currentTimestamp)) {
+        if (this._controller.shouldStop(timestamp)) {
             this._finishPromise.resolve(this._controller.results());
             return;
         }
 
         if (!this._didWarmUp) {
-            if (this._currentTimestamp - this._previousTimestamp >= 100) {
+            if (!this._previousTimestamp)
+                this._previousTimestamp = timestamp;
+            else if (timestamp - this._previousTimestamp >= 100) {
                 this._didWarmUp = true;
-                this._startTimestamp = this._currentTimestamp;
-                this._controller.start(this._currentTimestamp, this._stage);
-                this._previousTimestamp = this._currentTimestamp;
+                this._startTimestamp = timestamp;
+                this._controller.start(timestamp, this._stage);
+                this._previousTimestamp = timestamp;
             }
 
             this._stage.animate(0);
@@ -964,9 +926,9 @@ Benchmark = Utilities.createClass(
             return;
         }
 
-        this._controller.update(this._currentTimestamp, this._stage);
-        this._stage.animate(this._currentTimestamp - this._previousTimestamp);
-        this._previousTimestamp = this._currentTimestamp;
+        this._controller.update(timestamp, this._stage);
+        this._stage.animate(timestamp - this._previousTimestamp);
+        this._previousTimestamp = timestamp;
         requestAnimationFrame(this._animateLoop);
     }
 });

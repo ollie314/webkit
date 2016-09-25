@@ -35,14 +35,6 @@
 
 namespace JSC { namespace DFG {
 
-// We are in the middle of a transition from LLVM to B3 as the backend for the FTL. This flag will go
-// away once that transition is finished. For now, we enable B3 only on some platforms.
-#if CPU(X86_64) && ENABLE(FTL_JIT)
-#define FTL_USES_B3 1
-#else
-#define FTL_USES_B3 0
-#endif
-
 struct Node;
 
 typedef uint32_t BlockIndex;
@@ -262,15 +254,6 @@ enum class PlanStage {
     Initial,
     AfterFixup
 };
-
-template<typename T, typename U>
-bool checkAndSet(T& left, U right)
-{
-    if (left == right)
-        return false;
-    left = right;
-    return true;
-}
 
 // If possible, this will acquire a lock to make sure that if multiple threads
 // start crashing at the same time, you get coherent dump output. Use this only

@@ -279,6 +279,9 @@ void ContextMenuController::contextMenuItemSelected(ContextMenuAction action, co
     case ContextMenuItemTagMediaMute:
         m_context.hitTestResult().toggleMediaMuteState();
         break;
+    case ContextMenuItemTagToggleVideoEnhancedFullscreen:
+        m_context.hitTestResult().toggleEnhancedFullscreenForVideo();
+        break;
     case ContextMenuItemTagOpenFrameInNewWindow: {
         DocumentLoader* loader = frame->loader().documentLoader();
         if (!loader->unreachableURL().isEmpty())
@@ -367,9 +370,9 @@ void ContextMenuController::contextMenuItemSelected(ContextMenuAction action, co
 
             Document* document = frame->document();
             ASSERT(document);
-            RefPtr<ReplaceSelectionCommand> command = ReplaceSelectionCommand::create(*document, createFragmentFromMarkup(*document, title, ""), replaceOptions);
+            RefPtr<ReplaceSelectionCommand> command = ReplaceSelectionCommand::create(*document, createFragmentFromMarkup(*document, title, emptyString()), replaceOptions);
             applyCommand(command);
-            frame->selection().revealSelection(ScrollAlignment::alignToEdgeIfNeeded);
+            frame->selection().revealSelection(SelectionRevealMode::Reveal, ScrollAlignment::alignToEdgeIfNeeded);
         }
         break;
     }
@@ -410,7 +413,8 @@ void ContextMenuController::contextMenuItemSelected(ContextMenuAction action, co
         if (!selectedRange || selectedRange->collapsed()) {
             Document& document = m_context.hitTestResult().innerNonSharedNode()->document();
             selectedRange = document.createRange();
-            selectedRange->selectNode(document.documentElement(), IGNORE_EXCEPTION);
+            if (document.documentElement())
+                selectedRange->selectNode(*document.documentElement(), IGNORE_EXCEPTION);
         }
         m_client.speak(plainText(selectedRange.get()));
         break;
@@ -766,6 +770,9 @@ void ContextMenuController::populate()
         contextMenuItemTagEnterVideoFullscreen());
     ContextMenuItem ToggleVideoFullscreen(ActionType, ContextMenuItemTagToggleVideoFullscreen,
         contextMenuItemTagEnterVideoFullscreen());
+#if PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE)
+    ContextMenuItem ToggleVideoEnhancedFullscreen(ActionType, ContextMenuItemTagToggleVideoEnhancedFullscreen, contextMenuItemTagEnterVideoEnhancedFullscreen());
+#endif
 #if PLATFORM(COCOA)
     ContextMenuItem SearchSpotlightItem(ActionType, ContextMenuItemTagSearchInSpotlight, 
         contextMenuItemTagSearchInSpotlight());
@@ -862,6 +869,9 @@ void ContextMenuController::populate()
             appendItem(ToggleVideoFullscreen, m_contextMenu.get());
 #else
             appendItem(EnterVideoFullscreen, m_contextMenu.get());
+#endif
+#if PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE)
+            appendItem(ToggleVideoEnhancedFullscreen, m_contextMenu.get());
 #endif
             appendItem(*separatorItem(), m_contextMenu.get());
             appendItem(CopyMediaLinkItem, m_contextMenu.get());
@@ -1362,6 +1372,12 @@ void ContextMenuController::checkOrEnableIfNeeded(ContextMenuItem& item) const
         case ContextMenuItemTagEnterVideoFullscreen:
             shouldEnable = m_context.hitTestResult().mediaSupportsFullscreen();
             break;
+        case ContextMenuItemTagToggleVideoEnhancedFullscreen:
+#if PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE)
+            item.setTitle(m_context.hitTestResult().mediaIsInEnhancedFullscreen() ? contextMenuItemTagExitVideoEnhancedFullscreen() : contextMenuItemTagEnterVideoEnhancedFullscreen());
+#endif
+            shouldEnable = m_context.hitTestResult().mediaSupportsEnhancedFullscreen();
+            break;
         case ContextMenuItemTagOpenFrameInNewWindow:
         case ContextMenuItemTagSpellingGuess:
         case ContextMenuItemTagOther:
@@ -1418,7 +1434,7 @@ void ContextMenuController::showContextMenuAt(Frame* frame, const IntPoint& clic
     clearContextMenu();
     
     // Simulate a click in the middle of the accessibility object.
-    PlatformMouseEvent mouseEvent(clickPoint, clickPoint, RightButton, PlatformEvent::MousePressed, 1, false, false, false, false, currentTime(), ForceAtClick);
+    PlatformMouseEvent mouseEvent(clickPoint, clickPoint, RightButton, PlatformEvent::MousePressed, 1, false, false, false, false, currentTime(), ForceAtClick, NoTap);
     frame->eventHandler().handleMousePressEvent(mouseEvent);
     bool handled = frame->eventHandler().sendContextMenuEvent(mouseEvent);
     if (handled)

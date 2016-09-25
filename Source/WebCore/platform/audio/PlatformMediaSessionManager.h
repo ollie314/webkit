@@ -46,6 +46,9 @@ class PlatformMediaSessionManager : private RemoteCommandListenerClient, private
 public:
     WEBCORE_EXPORT static PlatformMediaSessionManager* sharedManagerIfExists();
     WEBCORE_EXPORT static PlatformMediaSessionManager& sharedManager();
+
+    static void updateNowPlayingInfoIfNecessary();
+
     virtual ~PlatformMediaSessionManager() { }
 
     bool has(PlatformMediaSession::MediaType) const;
@@ -82,6 +85,7 @@ public:
     virtual bool sessionWillBeginPlayback(PlatformMediaSession&);
     virtual void sessionWillEndPlayback(PlatformMediaSession&);
     virtual bool sessionCanLoadMedia(const PlatformMediaSession&) const;
+    virtual void clientCharacteristicsChanged(PlatformMediaSession&) { }
 
 #if PLATFORM(IOS)
     virtual void configureWireLessTargetMonitoring() { }
@@ -89,7 +93,9 @@ public:
 #endif
 
     void setCurrentSession(PlatformMediaSession&);
-    PlatformMediaSession* currentSession();
+    PlatformMediaSession* currentSession() const;
+
+    Vector<PlatformMediaSession*> currentSessionsMatching(std::function<bool(const PlatformMediaSession&)>);
 
     void sessionIsPlayingToWirelessPlaybackTargetChanged(PlatformMediaSession&);
     void sessionCanProduceAudioChanged(PlatformMediaSession&);
@@ -99,7 +105,7 @@ protected:
     explicit PlatformMediaSessionManager();
 
     void addSession(PlatformMediaSession&);
-    void removeSession(PlatformMediaSession&);
+    virtual void removeSession(PlatformMediaSession&);
 
     Vector<PlatformMediaSession*> sessions() { return m_sessions; }
 
@@ -109,16 +115,17 @@ private:
     void updateSessionState();
 
     // RemoteCommandListenerClient
-    WEBCORE_EXPORT virtual void didReceiveRemoteControlCommand(PlatformMediaSession::RemoteControlCommandType) override;
+    WEBCORE_EXPORT void didReceiveRemoteControlCommand(PlatformMediaSession::RemoteControlCommandType, const PlatformMediaSession::RemoteCommandArgument*) override;
+    WEBCORE_EXPORT bool supportsSeeking() const override;
 
     // AudioHardwareListenerClient
-    virtual void audioHardwareDidBecomeActive() override { }
-    virtual void audioHardwareDidBecomeInactive() override { }
-    virtual void audioOutputDeviceChanged() override;
+    void audioHardwareDidBecomeActive() override { }
+    void audioHardwareDidBecomeInactive() override { }
+    void audioOutputDeviceChanged() override;
 
     // SystemSleepListener
-    virtual void systemWillSleep() override;
-    virtual void systemDidWake() override;
+    void systemWillSleep() override;
+    void systemDidWake() override;
 
     SessionRestrictions m_restrictions[PlatformMediaSession::WebAudio + 1];
     Vector<PlatformMediaSession*> m_sessions;

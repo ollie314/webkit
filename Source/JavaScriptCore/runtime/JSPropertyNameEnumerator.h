@@ -33,8 +33,6 @@
 
 namespace JSC {
 
-class Identifier;
-
 class JSPropertyNameEnumerator final : public JSCell {
 public:
     typedef JSCell Base;
@@ -102,6 +100,7 @@ private:
 inline JSPropertyNameEnumerator* propertyNameEnumerator(ExecState* exec, JSObject* base)
 {
     VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
 
     uint32_t indexedLength = base->methodTable(vm)->getEnumerableLength(exec, base);
 
@@ -117,17 +116,21 @@ inline JSPropertyNameEnumerator* propertyNameEnumerator(ExecState* exec, JSObjec
 
     PropertyNameArray propertyNames(exec, PropertyNameMode::Strings);
 
-    if (structure->canAccessPropertiesQuickly() && indexedLength == base->getArrayLength()) {
+    if (structure->canAccessPropertiesQuicklyForEnumeration() && indexedLength == base->getArrayLength()) {
         base->methodTable(vm)->getStructurePropertyNames(base, exec, propertyNames, EnumerationMode());
+        ASSERT(!scope.exception());
 
         numberStructureProperties = propertyNames.size();
 
         base->methodTable(vm)->getGenericPropertyNames(base, exec, propertyNames, EnumerationMode());
+        ASSERT(!scope.exception());
     } else {
         // Generic property names vector contains all indexed property names.
         // So disable indexed property enumeration phase by setting |indexedLength| to 0.
         indexedLength = 0;
         base->methodTable(vm)->getPropertyNames(base, exec, propertyNames, EnumerationMode());
+        if (UNLIKELY(scope.exception()))
+            return nullptr;
     }
 
     ASSERT(propertyNames.size() < UINT32_MAX);

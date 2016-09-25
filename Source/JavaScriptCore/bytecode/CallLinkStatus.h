@@ -38,7 +38,6 @@
 namespace JSC {
 
 class CodeBlock;
-class ExecutableBase;
 class InternalFunction;
 class JSFunction;
 class Structure;
@@ -100,6 +99,8 @@ public:
     bool operator!() const { return !isSet(); }
     
     bool couldTakeSlowPath() const { return m_couldTakeSlowPath; }
+    
+    void setCouldTakeSlowPath(bool value) { m_couldTakeSlowPath = value; }
     
     CallVariantList variants() const { return m_variants; }
     unsigned size() const { return m_variants.size(); }

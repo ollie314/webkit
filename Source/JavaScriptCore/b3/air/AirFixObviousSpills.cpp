@@ -28,10 +28,11 @@
 
 #if ENABLE(B3_JIT)
 
+#include "AirArgInlines.h"
 #include "AirCode.h"
 #include "AirInstInlines.h"
 #include "AirPhaseScope.h"
-#include "B3IndexMap.h"
+#include <wtf/IndexMap.h>
 #include <wtf/ListDump.h>
 
 namespace JSC { namespace B3 { namespace Air {
@@ -237,7 +238,7 @@ private:
                 if (Arg::isValidImmForm(alias->constant))
                     arg = Arg::imm(alias->constant);
                 else
-                    arg = Arg::imm64(alias->constant);
+                    arg = Arg::bigImm(alias->constant);
                 didThings = true;
                 return;
             }

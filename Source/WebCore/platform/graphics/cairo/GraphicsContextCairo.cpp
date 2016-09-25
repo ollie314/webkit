@@ -259,17 +259,15 @@ void GraphicsContext::drawRect(const FloatRect& rect, float borderThickness)
     cairo_restore(cr);
 }
 
-void GraphicsContext::drawNativeImage(PassNativeImagePtr imagePtr, const FloatSize& imageSize, const FloatRect& destRect, const FloatRect& srcRect, CompositeOperator op, BlendMode blendMode, ImageOrientation orientation)
+void GraphicsContext::drawNativeImage(const NativeImagePtr& image, const FloatSize& imageSize, const FloatRect& destRect, const FloatRect& srcRect, CompositeOperator op, BlendMode blendMode, ImageOrientation orientation)
 {
     if (paintingDisabled())
         return;
 
     if (isRecording()) {
-        m_displayListRecorder->drawNativeImage(imagePtr, imageSize, destRect, srcRect, op, blendMode, orientation);
+        m_displayListRecorder->drawNativeImage(image, imageSize, destRect, srcRect, op, blendMode, orientation);
         return;
     }
-
-    NativeImagePtr image = imagePtr;
 
     platformContext()->save();
 
@@ -593,6 +591,9 @@ static inline StrokeStyle focusRingStrokeStyle()
 
 void GraphicsContext::drawFocusRing(const Path& path, float width, float /* offset */, const Color& color)
 {
+    if (paintingDisabled())
+        return;
+
     // FIXME: We should draw paths that describe a rectangle with rounded corners
     // so as to be consistent with how we draw rectangular focus rings.
     Color ringColor = color;
@@ -601,45 +602,11 @@ void GraphicsContext::drawFocusRing(const Path& path, float width, float /* offs
 
     cairo_t* cr = platformContext()->cr();
     cairo_save(cr);
+    cairo_push_group(cr);
     appendWebCorePathToCairoContext(cr, path);
     setSourceRGBAFromColor(cr, ringColor);
     cairo_set_line_width(cr, width);
     setPlatformStrokeStyle(focusRingStrokeStyle());
-    cairo_stroke(cr);
-    cairo_restore(cr);
-}
-
-void GraphicsContext::drawFocusRing(const Vector<FloatRect>& rects, float width, float /* offset */, const Color& color)
-{
-    if (paintingDisabled())
-        return;
-
-    cairo_t* cr = platformContext()->cr();
-    cairo_save(cr);
-    cairo_push_group(cr);
-    cairo_new_path(cr);
-
-#if PLATFORM(GTK)
-    for (const auto& rect : rects)
-        cairo_rectangle(cr, rect.x(), rect.y(), rect.width(), rect.height());
-#else
-    unsigned rectCount = rects.size();
-    int radius = (width - 1) / 2;
-    Path path;
-    for (unsigned i = 0; i < rectCount; ++i) {
-        if (i > 0)
-            path.clear();
-        path.addRoundedRect(rects[i], FloatSize(radius, radius));
-        appendWebCorePathToCairoContext(cr, path);
-    }
-#endif
-    Color ringColor = color;
-    adjustFocusRingColor(ringColor);
-    adjustFocusRingLineWidth(width);
-    setSourceRGBAFromColor(cr, ringColor);
-    cairo_set_line_width(cr, width);
-    setPlatformStrokeStyle(focusRingStrokeStyle());
-
     cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
     cairo_stroke_preserve(cr);
 
@@ -653,7 +620,30 @@ void GraphicsContext::drawFocusRing(const Vector<FloatRect>& rects, float width,
     cairo_restore(cr);
 }
 
-void GraphicsContext::drawLineForText(const FloatPoint& origin, float width, bool printing, bool doubleUnderlines)
+void GraphicsContext::drawFocusRing(const Vector<FloatRect>& rects, float width, float /* offset */, const Color& color)
+{
+    if (paintingDisabled())
+        return;
+
+    Path path;
+#if PLATFORM(GTK)
+    for (const auto& rect : rects)
+        path.addRect(rect);
+#else
+    unsigned rectCount = rects.size();
+    int radius = (width - 1) / 2;
+    Path subPath;
+    for (unsigned i = 0; i < rectCount; ++i) {
+        if (i > 0)
+            subPath.clear();
+        subPath.addRoundedRect(rects[i], FloatSize(radius, radius));
+        path.addPath(subPath, AffineTransform());
+    }
+#endif
+    drawFocusRing(path, width, 0, color);
+}
+
+void GraphicsContext::drawLineForText(const FloatPoint& origin, float width, bool printing, bool doubleUnderlines, StrokeStyle)
 {
     DashArray widths;
     widths.append(width);
@@ -661,7 +651,7 @@ void GraphicsContext::drawLineForText(const FloatPoint& origin, float width, boo
     drawLinesForText(origin, widths, printing, doubleUnderlines);
 }
 
-void GraphicsContext::drawLinesForText(const FloatPoint& point, const DashArray& widths, bool printing, bool doubleUnderlines)
+void GraphicsContext::drawLinesForText(const FloatPoint& point, const DashArray& widths, bool printing, bool doubleUnderlines, StrokeStyle)
 {
     if (paintingDisabled())
         return;

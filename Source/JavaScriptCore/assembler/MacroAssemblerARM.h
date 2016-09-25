@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2013-2015 Apple Inc.
+ * Copyright (C) 2008, 2013-2016 Apple Inc.
  * Copyright (C) 2009, 2010 University of Szeged
  * All rights reserved.
  *
@@ -40,6 +40,9 @@ class MacroAssemblerARM : public AbstractMacroAssembler<ARMAssembler, MacroAssem
     static const int DoubleConditionBitSpecial = 0x10;
     COMPILE_ASSERT(!(DoubleConditionBitSpecial & DoubleConditionMask), DoubleConditionBitSpecial_should_not_interfere_with_ARMAssembler_Condition_codes);
 public:
+    static const unsigned numGPRs = 16;
+    static const unsigned numFPRs = 16;
+    
     typedef ARMRegisters::FPRegisterID FPRegisterID;
 
     enum RelationalCondition {
@@ -274,7 +277,10 @@ public:
 
     void rshift32(RegisterID src, TrustedImm32 imm, RegisterID dest)
     {
-        m_assembler.movs(dest, m_assembler.asr(src, imm.m_value & 0x1f));
+        if (!imm.m_value)
+            move(src, dest);
+        else
+            m_assembler.movs(dest, m_assembler.asr(src, imm.m_value & 0x1f));
     }
 
     void urshift32(RegisterID shiftAmount, RegisterID dest)
@@ -297,12 +303,20 @@ public:
     
     void urshift32(RegisterID src, TrustedImm32 imm, RegisterID dest)
     {
-        m_assembler.movs(dest, m_assembler.lsr(src, imm.m_value & 0x1f));
+        if (!imm.m_value)
+            move(src, dest);
+        else
+            m_assembler.movs(dest, m_assembler.lsr(src, imm.m_value & 0x1f));
     }
 
     void sub32(RegisterID src, RegisterID dest)
     {
         m_assembler.subs(dest, dest, src);
+    }
+
+    void sub32(RegisterID left, RegisterID right, RegisterID dest)
+    {
+        m_assembler.subs(dest, left, right);
     }
 
     void sub32(TrustedImm32 imm, RegisterID dest)
@@ -495,14 +509,16 @@ public:
 
     void store8(TrustedImm32 imm, ImplicitAddress address)
     {
-        move(imm, ARMRegisters::S1);
+        TrustedImm32 imm8(static_cast<int8_t>(imm.m_value));
+        move(imm8, ARMRegisters::S1);
         store8(ARMRegisters::S1, address);
     }
 
     void store8(TrustedImm32 imm, const void* address)
     {
+        TrustedImm32 imm8(static_cast<int8_t>(imm.m_value));
         move(TrustedImm32(reinterpret_cast<ARMWord>(address)), ARMRegisters::S0);
-        move(imm, ARMRegisters::S1);
+        move(imm8, ARMRegisters::S1);
         m_assembler.dtrUp(ARMAssembler::StoreUint8, ARMRegisters::S1, ARMRegisters::S0, 0);
     }
 
@@ -617,21 +633,29 @@ public:
 
     Jump branch8(RelationalCondition cond, Address left, TrustedImm32 right)
     {
+        TrustedImm32 right8(static_cast<int8_t>(right.m_value));
         load8(left, ARMRegisters::S1);
-        return branch32(cond, ARMRegisters::S1, right);
+        return branch32(cond, ARMRegisters::S1, right8);
     }
 
     Jump branch8(RelationalCondition cond, BaseIndex left, TrustedImm32 right)
     {
-        ASSERT(!(right.m_value & 0xFFFFFF00));
+        TrustedImm32 right8(static_cast<int8_t>(right.m_value));
         load8(left, ARMRegisters::S1);
-        return branch32(cond, ARMRegisters::S1, right);
+        return branch32(cond, ARMRegisters::S1, right8);
     }
 
     Jump branch8(RelationalCondition cond, AbsoluteAddress left, TrustedImm32 right)
     {
+        TrustedImm32 right8(static_cast<int8_t>(right.m_value));
         move(TrustedImmPtr(left.m_ptr), ARMRegisters::S1);
         load8(Address(ARMRegisters::S1), ARMRegisters::S1);
+        return branch32(cond, ARMRegisters::S1, right8);
+    }
+
+    Jump branchPtr(RelationalCondition cond, BaseIndex left, RegisterID right)
+    {
+        load32(left, ARMRegisters::S1);
         return branch32(cond, ARMRegisters::S1, right);
     }
 
@@ -679,33 +703,36 @@ public:
 
     Jump branchTest8(ResultCondition cond, Address address, TrustedImm32 mask = TrustedImm32(-1))
     {
+        TrustedImm32 mask8(static_cast<int8_t>(mask.m_value));
         load8(address, ARMRegisters::S1);
-        return branchTest32(cond, ARMRegisters::S1, mask);
+        return branchTest32(cond, ARMRegisters::S1, mask8);
     }
 
     Jump branchTest8(ResultCondition cond, BaseIndex address, TrustedImm32 mask = TrustedImm32(-1))
     {
+        TrustedImm32 mask8(static_cast<int8_t>(mask.m_value));
         load8(address, ARMRegisters::S1);
-        return branchTest32(cond, ARMRegisters::S1, mask);
+        return branchTest32(cond, ARMRegisters::S1, mask8);
     }
 
     Jump branchTest8(ResultCondition cond, AbsoluteAddress address, TrustedImm32 mask = TrustedImm32(-1))
     {
+        TrustedImm32 mask8(static_cast<int8_t>(mask.m_value));
         move(TrustedImmPtr(address.m_ptr), ARMRegisters::S1);
         load8(Address(ARMRegisters::S1), ARMRegisters::S1);
-        return branchTest32(cond, ARMRegisters::S1, mask);
+        return branchTest32(cond, ARMRegisters::S1, mask8);
     }
 
     Jump branchTest32(ResultCondition cond, RegisterID reg, RegisterID mask)
     {
-        ASSERT((cond == Zero) || (cond == NonZero));
+        ASSERT(cond == Zero || cond == NonZero || cond == Signed || cond == PositiveOrZero);
         m_assembler.tst(reg, mask);
         return Jump(m_assembler.jmp(ARMCondition(cond)));
     }
 
     Jump branchTest32(ResultCondition cond, RegisterID reg, TrustedImm32 mask = TrustedImm32(-1))
     {
-        ASSERT((cond == Zero) || (cond == NonZero));
+        ASSERT(cond == Zero || cond == NonZero || cond == Signed || cond == PositiveOrZero);
         ARMWord w = m_assembler.getImm(mask.m_value, ARMRegisters::S0, true);
         if (w & ARMAssembler::Op2InvertedImmediate)
             m_assembler.bics(ARMRegisters::S0, reg, w & ~ARMAssembler::Op2InvertedImmediate);
@@ -904,6 +931,14 @@ public:
         return PatchableJump(jump);
     }
 
+    PatchableJump patchableBranch32(RelationalCondition cond, Address address, TrustedImm32 imm)
+    {
+        internalCompare32(address, imm);
+        Jump jump(m_assembler.loadBranchTarget(ARMRegisters::S1, ARMCondition(cond), false));
+        m_assembler.bx(ARMRegisters::S1, ARMCondition(cond));
+        return PatchableJump(jump);
+    }
+
     void breakpoint()
     {
         m_assembler.bkpt(0);
@@ -951,8 +986,9 @@ public:
 
     void compare8(RelationalCondition cond, Address left, TrustedImm32 right, RegisterID dest)
     {
+        TrustedImm32 right8(static_cast<int8_t>(right.m_value));
         load8(left, ARMRegisters::S1);
-        compare32(cond, ARMRegisters::S1, right, dest);
+        compare32(cond, ARMRegisters::S1, right8, dest);
     }
 
     void test32(ResultCondition cond, RegisterID reg, TrustedImm32 mask, RegisterID dest)
@@ -973,8 +1009,9 @@ public:
 
     void test8(ResultCondition cond, Address address, TrustedImm32 mask, RegisterID dest)
     {
+        TrustedImm32 mask8(static_cast<int8_t>(mask.m_value));
         load8(address, ARMRegisters::S1);
-        test32(cond, ARMRegisters::S1, mask, dest);
+        test32(cond, ARMRegisters::S1, mask8, dest);
     }
 
     void add32(TrustedImm32 imm, RegisterID src, RegisterID dest)
@@ -1133,7 +1170,7 @@ public:
         return s_isVFPPresent;
     }
     static bool supportsFloatingPointAbs() { return false; }
-    static bool supportsFloatingPointCeil() { return false; }
+    static bool supportsFloatingPointRounding() { return false; }
 
     void loadFloat(BaseIndex address, FPRegisterID dest)
     {
@@ -1158,7 +1195,19 @@ public:
 
     NO_RETURN_DUE_TO_CRASH void ceilDouble(FPRegisterID, FPRegisterID)
     {
-        ASSERT(!supportsFloatingPointCeil());
+        ASSERT(!supportsFloatingPointRounding());
+        CRASH();
+    }
+
+    NO_RETURN_DUE_TO_CRASH void floorDouble(FPRegisterID, FPRegisterID)
+    {
+        ASSERT(!supportsFloatingPointRounding());
+        CRASH();
+    }
+
+    NO_RETURN_DUE_TO_CRASH void roundTowardZeroDouble(FPRegisterID, FPRegisterID)
+    {
+        ASSERT(!supportsFloatingPointRounding());
         CRASH();
     }
 
@@ -1187,6 +1236,12 @@ public:
     {
         if (src != dest)
             m_assembler.vmov_f64(dest, src);
+    }
+
+    void moveZeroToDouble(FPRegisterID reg)
+    {
+        static double zeroConstant = 0.;
+        loadDouble(TrustedImmPtr(&zeroConstant), reg);
     }
 
     void addDouble(FPRegisterID src, FPRegisterID dest)
@@ -1416,8 +1471,12 @@ public:
     
     static ptrdiff_t maxJumpReplacementSize()
     {
-        ARMAssembler::maxJumpReplacementSize();
-        return 0;
+        return ARMAssembler::maxJumpReplacementSize();
+    }
+
+    static ptrdiff_t patchableJumpSize()
+    {
+        return ARMAssembler::patchableJumpSize();
     }
 
     static bool canJumpReplacePatchableBranchPtrWithPatch() { return false; }
@@ -1506,6 +1565,16 @@ private:
             m_assembler.cmn(left, tmp);
         else
             m_assembler.cmp(left, m_assembler.getImm(right.m_value, ARMRegisters::S0));
+    }
+
+    void internalCompare32(Address left, TrustedImm32 right)
+    {
+        ARMWord tmp = (static_cast<unsigned>(right.m_value) == 0x80000000) ? ARMAssembler::InvalidImmediate : m_assembler.getOp2(-right.m_value);
+        load32(left, ARMRegisters::S1);
+        if (tmp != ARMAssembler::InvalidImmediate)
+            m_assembler.cmn(ARMRegisters::S1, tmp);
+        else
+            m_assembler.cmp(ARMRegisters::S1, m_assembler.getImm(right.m_value, ARMRegisters::S0));
     }
 
     static void linkCall(void* code, Call call, FunctionPtr function)

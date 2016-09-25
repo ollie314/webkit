@@ -42,17 +42,17 @@ namespace WebCore {
 
 class BlobURLRegistry final : public URLRegistry {
 public:
-    virtual void registerURL(SecurityOrigin*, const URL&, URLRegistrable*) override;
-    virtual void unregisterURL(const URL&) override;
+    void registerURL(SecurityOrigin*, const URL&, URLRegistrable&) override;
+    void unregisterURL(const URL&) override;
 
     static URLRegistry& registry();
 };
 
 
-void BlobURLRegistry::registerURL(SecurityOrigin* origin, const URL& publicURL, URLRegistrable* blob)
+void BlobURLRegistry::registerURL(SecurityOrigin* origin, const URL& publicURL, URLRegistrable& blob)
 {
-    ASSERT(&blob->registry() == this);
-    ThreadableBlobRegistry::registerBlobURL(origin, publicURL, static_cast<Blob*>(blob)->url());
+    ASSERT(&blob.registry() == this);
+    ThreadableBlobRegistry::registerBlobURL(origin, publicURL, static_cast<Blob&>(blob).url());
 }
 
 void BlobURLRegistry::unregisterURL(const URL& url)
@@ -77,7 +77,7 @@ Blob::Blob()
     ThreadableBlobRegistry::registerBlobURL(m_internalURL, Vector<BlobPart>(), String());
 }
 
-Blob::Blob(Vector<char> data, const String& contentType)
+Blob::Blob(Vector<uint8_t> data, const String& contentType)
     : m_type(contentType)
     , m_size(data.size())
 {
@@ -95,12 +95,15 @@ Blob::Blob(Vector<BlobPart> blobParts, const String& contentType)
     ThreadableBlobRegistry::registerBlobURL(m_internalURL, WTFMove(blobParts), contentType);
 }
 
-Blob::Blob(DeserializationContructor, const URL& srcURL, const String& type, long long size)
+Blob::Blob(DeserializationContructor, const URL& srcURL, const String& type, long long size, const String& fileBackedPath)
     : m_type(normalizedContentType(type))
     , m_size(size)
 {
     m_internalURL = BlobURL::createInternalURL();
-    ThreadableBlobRegistry::registerBlobURL(nullptr, m_internalURL, srcURL);
+    if (fileBackedPath.isEmpty())
+        ThreadableBlobRegistry::registerBlobURL(nullptr, m_internalURL, srcURL);
+    else
+        ThreadableBlobRegistry::registerBlobURLOptionallyFileBacked(m_internalURL, srcURL, fileBackedPath, m_type);
 }
 
 Blob::Blob(const URL& srcURL, long long start, long long end, const String& type)

@@ -22,6 +22,7 @@
 #include "NativeErrorConstructor.h"
 
 #include "ErrorInstance.h"
+#include "Interpreter.h"
 #include "JSFunction.h"
 #include "JSString.h"
 #include "NativeErrorPrototype.h"
@@ -43,9 +44,9 @@ void NativeErrorConstructor::finishCreation(VM& vm, JSGlobalObject* globalObject
     Base::finishCreation(vm, name);
     ASSERT(inherits(info()));
     
-    NativeErrorPrototype* prototype = NativeErrorPrototype::create(vm, globalObject, prototypeStructure, name, this);
+    NativeErrorPrototype* prototype = NativeErrorPrototype::create(vm, prototypeStructure, name, this);
     
-    putDirect(vm, vm.propertyNames->length, jsNumber(1), DontDelete | ReadOnly | DontEnum); // ECMA 15.11.7.5
+    putDirect(vm, vm.propertyNames->length, jsNumber(1), DontEnum | ReadOnly);
     putDirect(vm, vm.propertyNames->prototype, prototype, DontDelete | ReadOnly | DontEnum);
     m_errorStructure.set(vm, this, ErrorInstance::createStructure(vm, globalObject, prototype));
     ASSERT(m_errorStructure);
@@ -62,8 +63,12 @@ void NativeErrorConstructor::visitChildren(JSCell* cell, SlotVisitor& visitor)
 
 EncodedJSValue JSC_HOST_CALL Interpreter::constructWithNativeErrorConstructor(ExecState* exec)
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
     JSValue message = exec->argument(0);
     Structure* errorStructure = InternalFunction::createSubclassStructure(exec, exec->newTarget(), jsCast<NativeErrorConstructor*>(exec->callee())->errorStructure());
+    if (UNLIKELY(scope.exception()))
+        return JSValue::encode(JSValue());
     ASSERT(errorStructure);
     return JSValue::encode(ErrorInstance::create(exec, errorStructure, message, nullptr, TypeNothing, false));
 }
@@ -71,7 +76,7 @@ EncodedJSValue JSC_HOST_CALL Interpreter::constructWithNativeErrorConstructor(Ex
 ConstructType NativeErrorConstructor::getConstructData(JSCell*, ConstructData& constructData)
 {
     constructData.native.function = Interpreter::constructWithNativeErrorConstructor;
-    return ConstructTypeHost;
+    return ConstructType::Host;
 }
     
 EncodedJSValue JSC_HOST_CALL Interpreter::callNativeErrorConstructor(ExecState* exec)
@@ -84,7 +89,7 @@ EncodedJSValue JSC_HOST_CALL Interpreter::callNativeErrorConstructor(ExecState* 
 CallType NativeErrorConstructor::getCallData(JSCell*, CallData& callData)
 {
     callData.native.function = Interpreter::callNativeErrorConstructor;
-    return CallTypeHost;
+    return CallType::Host;
 }
 
 } // namespace JSC

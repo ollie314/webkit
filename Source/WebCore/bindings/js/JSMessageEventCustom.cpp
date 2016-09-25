@@ -57,11 +57,10 @@ JSValue JSMessageEvent::data(ExecState& state) const
     JSValue result;
     switch (event.dataType()) {
     case MessageEvent::DataTypeScriptValue: {
-        Deprecated::ScriptValue scriptValue = event.dataAsScriptValue();
-        if (scriptValue.hasNoValue())
+        JSValue dataValue = event.dataAsScriptValue();
+        if (!dataValue)
             result = jsNull();
         else {
-            JSValue dataValue = scriptValue.jsValue();
             // We need to make sure MessageEvents do not leak objects in their state property across isolated DOM worlds.
             // Ideally, we would check that the worlds have different privileges but that's not possible yet.
             if (dataValue.isObject() && &worldForDOMObject(dataValue.getObject()) != &currentWorld(&state)) {
@@ -105,28 +104,31 @@ JSValue JSMessageEvent::data(ExecState& state) const
 
 static JSC::JSValue handleInitMessageEvent(JSMessageEvent* jsEvent, JSC::ExecState& state)
 {
+    VM& vm = state.vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     const String& typeArg = state.argument(0).toString(&state)->value(&state);
     bool canBubbleArg = state.argument(1).toBoolean(&state);
     bool cancelableArg = state.argument(2).toBoolean(&state);
-    const String originArg = state.argument(4).toString(&state)->value(&state);
+    const String originArg = valueToUSVString(&state, state.argument(4));
     const String lastEventIdArg = state.argument(5).toString(&state)->value(&state);
-    DOMWindow* sourceArg = JSDOMWindow::toWrapped(state.argument(6));
+    DOMWindow* sourceArg = JSDOMWindow::toWrapped(state, state.argument(6));
     std::unique_ptr<MessagePortArray> messagePorts;
     std::unique_ptr<ArrayBufferArray> arrayBuffers;
     if (!state.argument(7).isUndefinedOrNull()) {
         messagePorts = std::make_unique<MessagePortArray>();
         arrayBuffers = std::make_unique<ArrayBufferArray>();
         fillMessagePortArray(state, state.argument(7), *messagePorts, *arrayBuffers);
-        if (state.hadException())
+        if (UNLIKELY(scope.exception()))
             return jsUndefined();
     }
-    Deprecated::ScriptValue dataArg = Deprecated::ScriptValue(state.vm(), state.argument(3));
-    if (state.hadException())
+    Deprecated::ScriptValue dataArg(vm, state.argument(3));
+    if (UNLIKELY(scope.exception()))
         return jsUndefined();
 
     MessageEvent& event = jsEvent->wrapped();
     event.initMessageEvent(typeArg, canBubbleArg, cancelableArg, dataArg, originArg, lastEventIdArg, sourceArg, WTFMove(messagePorts));
-    jsEvent->m_data.set(state.vm(), jsEvent, dataArg.jsValue());
+    jsEvent->m_data.set(vm, jsEvent, dataArg.jsValue());
     return jsUndefined();
 }
 

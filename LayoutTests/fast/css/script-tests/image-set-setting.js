@@ -1,11 +1,11 @@
-description("Test the setting of the -webkit-image-set function.");
+description("Test the setting of the image-set function.");
 
 function testComputedStyle(property, fullRule)
 {
     var div = document.createElement("div");
     document.body.appendChild(div);
     div.setAttribute("style", property + ": " + fullRule);
-    var computedValue = div.style.background;
+    var computedValue = div.style.backgroundImage;
     document.body.removeChild(div);
     return computedValue;
 }
@@ -15,7 +15,7 @@ function testImageSetRule(description, property, rule, expected)
     debug("");
     debug(description + " : " + rule);
 
-    var fullRule = "-webkit-image-set(" + rule + ")";
+    var fullRule = "image-set(" + rule + ")";
     shouldBeEqualToString('testComputedStyle("' + property + '", "' + fullRule + '")', fullRule);
 }
 

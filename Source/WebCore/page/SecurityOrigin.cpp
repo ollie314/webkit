@@ -56,7 +56,7 @@ static bool schemeRequiresHost(const URL& url)
 bool SecurityOrigin::shouldUseInnerURL(const URL& url)
 {
     // FIXME: Blob URLs don't have inner URLs. Their form is "blob:<inner-origin>/<UUID>", so treating the part after "blob:" as a URL is incorrect.
-    if (url.protocolIs("blob"))
+    if (url.protocolIsBlob())
         return true;
     UNUSED_PARAM(url);
     return false;
@@ -67,8 +67,6 @@ bool SecurityOrigin::shouldUseInnerURL(const URL& url)
 // security origin can be parsed using this algorithm.
 URL SecurityOrigin::extractInnerURL(const URL& url)
 {
-    if (url.innerURL())
-        return *url.innerURL();
     // FIXME: Update this callsite to use the innerURL member function when
     // we finish implementing it.
     return URL(ParsedURLString, decodeURLEscapeSequences(url.path()));
@@ -76,7 +74,7 @@ URL SecurityOrigin::extractInnerURL(const URL& url)
 
 static RefPtr<SecurityOrigin> getCachedOrigin(const URL& url)
 {
-    if (url.protocolIs("blob"))
+    if (url.protocolIsBlob())
         return ThreadableBlobRegistry::getCachedOrigin(url);
     return nullptr;
 }
@@ -467,7 +465,7 @@ String SecurityOrigin::toString() const
 String SecurityOrigin::toRawString() const
 {
     if (m_protocol == "file")
-        return "file://";
+        return ASCIILiteral("file://");
 
     StringBuilder result;
     result.reserveCapacity(m_protocol.length() + m_host.length() + 10);

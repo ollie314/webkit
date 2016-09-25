@@ -28,6 +28,7 @@
 #include "ConstructData.h"
 #include "EnumerationMode.h"
 #include "Heap.h"
+#include "HeapCell.h"
 #include "IndexingType.h"
 #include "JSLock.h"
 #include "JSTypeInfo.h"
@@ -64,7 +65,7 @@ template<typename T> void* allocateCell(Heap&, size_t);
     public:                                                             \
         static const ::JSC::ClassInfo* info() { return &s_info; }
 
-class JSCell {
+class JSCell : public HeapCell {
     friend class JSValue;
     friend class MarkedBlock;
     template<typename T> friend void* allocateCell(Heap&);
@@ -79,7 +80,7 @@ public:
 
     enum CreatingEarlyCellTag { CreatingEarlyCell };
     JSCell(CreatingEarlyCellTag);
-
+    
 protected:
     JSCell(VM&, Structure*);
     JS_EXPORT_PRIVATE static void destroy(JSCell*);
@@ -107,8 +108,6 @@ public:
 
     const char* className() const;
 
-    VM* vm() const;
-
     // Extracting the value.
     JS_EXPORT_PRIVATE bool getString(ExecState*, String&) const;
     JS_EXPORT_PRIVATE String getString(ExecState*) const; // null string if not a string
@@ -134,23 +133,25 @@ public:
 
     void dump(PrintStream&) const;
     JS_EXPORT_PRIVATE static void dumpToStream(const JSCell*, PrintStream&);
+
+    size_t estimatedSizeInBytes() const;
+    JS_EXPORT_PRIVATE static size_t estimatedSize(JSCell*);
+
     static void visitChildren(JSCell*, SlotVisitor&);
-    JS_EXPORT_PRIVATE static void copyBackingStore(JSCell*, CopyVisitor&, CopyToken);
+
+    JS_EXPORT_PRIVATE static void heapSnapshot(JSCell*, HeapSnapshotBuilder&);
 
     // Object operations, with the toObject operation included.
     const ClassInfo* classInfo() const;
     const MethodTable* methodTable() const;
     const MethodTable* methodTable(VM&) const;
-    static void put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
-    static void putByIndex(JSCell*, ExecState*, unsigned propertyName, JSValue, bool shouldThrow);
+    static bool put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
+    static bool putByIndex(JSCell*, ExecState*, unsigned propertyName, JSValue, bool shouldThrow);
         
     static bool deleteProperty(JSCell*, ExecState*, PropertyName);
     static bool deletePropertyByIndex(JSCell*, ExecState*, unsigned propertyName);
 
     static JSValue toThis(JSCell*, ExecState*, ECMAMode);
-
-    void zap() { *reinterpret_cast<uintptr_t**>(this) = 0; }
-    bool isZapped() const { return !*reinterpret_cast<uintptr_t* const*>(this); }
 
     static bool canUseFastGetOwnProperty(const Structure&);
     JSValue fastGetOwnProperty(VM&, Structure&, PropertyName);
@@ -186,6 +187,8 @@ public:
     {
         return OBJECT_OFFSETOF(JSCell, m_cellState);
     }
+    
+    void callDestructor(VM&);
 
     static const TypedArrayType TypedArrayStorageType = NotTypedArray;
 protected:
@@ -202,8 +205,13 @@ protected:
     static uint32_t getEnumerableLength(ExecState*, JSObject*);
     static NO_RETURN_DUE_TO_CRASH void getStructurePropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
     static NO_RETURN_DUE_TO_CRASH void getGenericPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
+    static NO_RETURN_DUE_TO_CRASH bool preventExtensions(JSObject*, ExecState*);
+    static NO_RETURN_DUE_TO_CRASH bool isExtensible(JSObject*, ExecState*);
+    static NO_RETURN_DUE_TO_CRASH bool setPrototype(JSObject*, ExecState*, JSValue, bool);
+    static NO_RETURN_DUE_TO_CRASH JSValue getPrototype(JSObject*, ExecState*);
 
     static String className(const JSObject*);
+    static String toStringName(const JSObject*, ExecState*);
     JS_EXPORT_PRIVATE static bool customHasInstance(JSObject*, ExecState*, JSValue);
     static bool defineOwnProperty(JSObject*, ExecState*, PropertyName, const PropertyDescriptor&, bool shouldThrow);
     static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);

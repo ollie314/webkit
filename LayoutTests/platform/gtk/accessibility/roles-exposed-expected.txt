@@ -44,13 +44,13 @@ canvas
       AXRole: 
       
 cite
-      AXRole: 
+      AXRole: AXStatic
       
 code
-      AXRole: 
+      AXRole: AXStatic
       
 del:not([datetime])
-      AXRole: 
+      AXRole: AXStatic
       
 del[datetime]
       AXRole: AXStatic
@@ -203,7 +203,7 @@ input[type='week']
       AXRole: AXTextField
       
 ins:not([datetime])
-      AXRole: 
+      AXRole: AXStatic
       
 ins[datetime]
       AXRole: AXStatic
@@ -347,10 +347,16 @@ s
       AXRole: 
       
 samp
-      AXRole: 
+      AXRole: AXStatic
       
-section
+section:not([aria-label]:not([aria-labelledby])
       AXRole: AXGroup
+      
+section[aria-label]
+      AXRole: AXLandmarkRegion
+      
+section[aria-labelledby]
+      AXRole: AXLandmarkRegion
       
 select:not([multiple])
       AXRole: AXComboBox
@@ -383,10 +389,10 @@ strong
       AXRole: 
       
 sub
-      AXRole: 
+      AXRole: AXSubscript
       
 sup
-      AXRole: 
+      AXRole: AXSuperscript
       
 svg
       AXRole: 
@@ -440,7 +446,7 @@ li
       AXRole: AXListItem
       
 var
-      AXRole: 
+      AXRole: AXStatic
       
 wbr
       AXRole: 
@@ -623,7 +629,7 @@ div[role=radio]
       AXRole: AXRadioButton
       
 div[role=region]
-      AXRole: AXGroup
+      AXRole: AXLandmarkRegion
       
 div[role=scrollbar]
       AXRole: AXScrollBar

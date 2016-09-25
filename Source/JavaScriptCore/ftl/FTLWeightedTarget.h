@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2014, 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -55,6 +55,11 @@ public:
     LBasicBlock target() const { return m_target; }
     Weight weight() const { return m_weight; }
     
+    B3::FrequentedBlock frequentedBlock() const
+    {
+        return B3::FrequentedBlock(target(), weight().frequencyClass());
+    }
+    
 private:
     LBasicBlock m_target;
     Weight m_weight;
@@ -73,9 +78,8 @@ inline WeightedTarget rarely(LBasicBlock block)
     return WeightedTarget(block, 0);
 }
 
-// This means we let LLVM figure it out basic on its static estimates. LLVM's static
-// estimates are usually pretty darn good, so there's generally nothing wrong with
-// using this.
+// Currently in B3 this is the equivalent of "usually", but we like to make the distinction in
+// case we ever make B3 support proper branch weights. We used to do that in LLVM.
 inline WeightedTarget unsure(LBasicBlock block)
 {
     return WeightedTarget(block, Weight());

@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 1999-2002 Harri Porten (porten@kde.org)
  *  Copyright (C) 2001 Peter Kelly (pmk@post.com)
- *  Copyright (C) 2004, 2007, 2008, 2015 Apple Inc. All rights reserved.
+ *  Copyright (C) 2004, 2007-2008, 2015-2016 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -70,6 +70,25 @@ void JSString::dumpToStream(const JSCell* cell, PrintStream& out)
             out.printf("[16 %p]", ourImpl->characters16());
     }
     out.printf(">");
+}
+
+bool JSString::equalSlowCase(ExecState* exec, JSString* other) const
+{
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+    String str1 = value(exec);
+    String str2 = other->value(exec);
+    if (UNLIKELY(scope.exception()))
+        return false;
+    return WTF::equal(*str1.impl(), *str2.impl());
+}
+
+size_t JSString::estimatedSize(JSCell* cell)
+{
+    JSString* thisObject = jsCast<JSString*>(cell);
+    if (thisObject->isRope())
+        return Base::estimatedSize(cell);
+    return Base::estimatedSize(cell) + thisObject->m_value.impl()->costDuringGC();
 }
 
 void JSString::visitChildren(JSCell* cell, SlotVisitor& visitor)
@@ -237,16 +256,16 @@ void JSRopeString::resolveRope(ExecState* exec) const
     
     if (isSubstring()) {
         ASSERT(!substringBase()->isRope());
-        m_value = substringBase()->m_value.substring(substringOffset(), m_length);
+        m_value = substringBase()->m_value.substringSharingImpl(substringOffset(), m_length);
         substringBase().clear();
         return;
     }
     
     if (is8Bit()) {
         LChar* buffer;
-        if (RefPtr<StringImpl> newImpl = StringImpl::tryCreateUninitialized(m_length, buffer)) {
+        if (auto newImpl = StringImpl::tryCreateUninitialized(m_length, buffer)) {
             Heap::heap(this)->reportExtraMemoryAllocated(newImpl->cost());
-            m_value = newImpl.release();
+            m_value = WTFMove(newImpl);
         } else {
             outOfMemory(exec);
             return;
@@ -258,9 +277,9 @@ void JSRopeString::resolveRope(ExecState* exec) const
     }
 
     UChar* buffer;
-    if (RefPtr<StringImpl> newImpl = StringImpl::tryCreateUninitialized(m_length, buffer)) {
+    if (auto newImpl = StringImpl::tryCreateUninitialized(m_length, buffer)) {
         Heap::heap(this)->reportExtraMemoryAllocated(newImpl->cost());
-        m_value = newImpl.release();
+        m_value = WTFMove(newImpl);
     } else {
         outOfMemory(exec);
         return;
@@ -363,11 +382,14 @@ void JSRopeString::resolveRopeSlowCase(UChar* buffer) const
 
 void JSRopeString::outOfMemory(ExecState* exec) const
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     clearFibers();
     ASSERT(isRope());
     ASSERT(m_value.isNull());
     if (exec)
-        throwOutOfMemoryError(exec);
+        throwOutOfMemoryError(exec, scope);
 }
 
 JSValue JSString::toPrimitive(ExecState*, PreferredPrimitiveType) const

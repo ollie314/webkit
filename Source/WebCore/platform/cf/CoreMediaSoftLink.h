@@ -39,12 +39,16 @@ SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMBlockBufferGetDataLength, si
 #define CMBlockBufferGetDataLength softLink_CoreMedia_CMBlockBufferGetDataLength
 SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMFormatDescriptionGetExtensions, CFDictionaryRef, (CMFormatDescriptionRef desc), (desc))
 #define CMFormatDescriptionGetExtensions softLink_CoreMedia_CMFormatDescriptionGetExtensions
+SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMSampleBufferGetTypeID, CFTypeID, (void), ())
+#define CMSampleBufferGetTypeID softLink_CoreMedia_CMSampleBufferGetTypeID
 SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMSampleBufferGetDataBuffer, CMBlockBufferRef, (CMSampleBufferRef sbuf), (sbuf))
 #define CMSampleBufferGetDataBuffer softLink_CoreMedia_CMSampleBufferGetDataBuffer
 SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMSampleBufferGetFormatDescription, CMFormatDescriptionRef, (CMSampleBufferRef sbuf), (sbuf))
 #define CMSampleBufferGetFormatDescription softLink_CoreMedia_CMSampleBufferGetFormatDescription
 SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMSampleBufferGetSampleTimingInfo, OSStatus, (CMSampleBufferRef sbuf, CMItemIndex sampleIndex, CMSampleTimingInfo* timingInfoOut), (sbuf, sampleIndex, timingInfoOut))
 #define CMSampleBufferGetSampleTimingInfo softLink_CoreMedia_CMSampleBufferGetSampleTimingInfo
+SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMTimeAdd, CMTime, (CMTime time1, CMTime time2), (time1, time2))
+#define CMTimeAdd softLink_CoreMedia_CMTimeAdd
 SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMTimeCompare, int32_t, (CMTime time1, CMTime time2), (time1, time2))
 #define CMTimeCompare softLink_CoreMedia_CMTimeCompare
 SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMTimeGetSeconds, Float64, (CMTime time), (time))
@@ -55,6 +59,8 @@ SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMTimeMakeWithSeconds, CMTime,
 #define CMTimeMakeWithSeconds softLink_CoreMedia_CMTimeMakeWithSeconds
 SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMTimeRangeGetEnd, CMTime, (CMTimeRange range), (range))
 #define CMTimeRangeGetEnd softLink_CoreMedia_CMTimeRangeGetEnd
+SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMTimeRangeMake, CMTimeRange, (CMTime start, CMTime duration), (start, duration))
+#define CMTimeRangeMake softLink_CoreMedia_CMTimeRangeMake
 
 SOFT_LINK_CONSTANT_FOR_HEADER(WebCore, CoreMedia, kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms, CFStringRef)
 #define kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms get_CoreMedia_kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms()
@@ -121,6 +127,8 @@ SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMSampleBufferCreateCopy, OSSt
 #define CMSampleBufferCreateCopy softLink_CoreMedia_CMSampleBufferCreateCopy
 SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMSampleBufferCreateCopyWithNewTiming, OSStatus, (CFAllocatorRef allocator, CMSampleBufferRef originalSBuf, CMItemCount numSampleTimingEntries, const CMSampleTimingInfo *sampleTimingArray, CMSampleBufferRef *sBufCopyOut), (allocator, originalSBuf, numSampleTimingEntries, sampleTimingArray, sBufCopyOut))
 #define CMSampleBufferCreateCopyWithNewTiming softLink_CoreMedia_CMSampleBufferCreateCopyWithNewTiming
+SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMSampleBufferCreateReadyWithImageBuffer, OSStatus, (CFAllocatorRef allocator, CVImageBufferRef imageBuffer, CMVideoFormatDescriptionRef formatDescription, const CMSampleTimingInfo *sampleTiming, CMSampleBufferRef *sBufOut), (allocator, imageBuffer, formatDescription, sampleTiming, sBufOut))
+#define CMSampleBufferCreateReadyWithImageBuffer softLink_CoreMedia_CMSampleBufferCreateReadyWithImageBuffer
 SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMSampleBufferGetDecodeTimeStamp, CMTime, (CMSampleBufferRef sbuf), (sbuf))
 #define CMSampleBufferGetDecodeTimeStamp softLink_CoreMedia_CMSampleBufferGetDecodeTimeStamp
 SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMSampleBufferGetDuration, CMTime, (CMSampleBufferRef sbuf), (sbuf))
@@ -147,6 +155,8 @@ SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMTimebaseSetTime, OSStatus, (
 #define CMTimebaseSetTime softLink_CoreMedia_CMTimebaseSetTime
 SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMTimeCopyAsDictionary, CFDictionaryRef, (CMTime time, CFAllocatorRef allocator), (time, allocator))
 #define CMTimeCopyAsDictionary softLink_CoreMedia_CMTimeCopyAsDictionary
+SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMVideoFormatDescriptionCreateForImageBuffer, OSStatus, (CFAllocatorRef allocator, CVImageBufferRef imageBuffer, CMVideoFormatDescriptionRef *outDesc), (allocator, imageBuffer, outDesc))
+#define CMVideoFormatDescriptionCreateForImageBuffer softLink_CoreMedia_CMVideoFormatDescriptionCreateForImageBuffer
 SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMVideoFormatDescriptionGetDimensions, CMVideoDimensions, (CMVideoFormatDescriptionRef videoDesc), (videoDesc))
 #define CMVideoFormatDescriptionGetDimensions softLink_CoreMedia_CMVideoFormatDescriptionGetDimensions
 SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMVideoFormatDescriptionGetPresentationDimensions, CGSize, (CMVideoFormatDescriptionRef videoDesc, Boolean usePixelAspectRatio, Boolean useCleanAperture), (videoDesc, usePixelAspectRatio, useCleanAperture))
@@ -174,6 +184,12 @@ SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMSampleBufferGetAudioBufferLi
 #define CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer softLink_CoreMedia_CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer
 SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMSampleBufferGetNumSamples, CMItemCount, (CMSampleBufferRef sbuf), (sbuf))
 #define CMSampleBufferGetNumSamples softLink_CoreMedia_CMSampleBufferGetNumSamples
+SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMSampleBufferCallBlockForEachSample, OSStatus, (CMSampleBufferRef sbuf, OSStatus (^handler)(CMSampleBufferRef, CMItemCount)), (sbuf, handler))
+#define CMSampleBufferCallBlockForEachSample softLink_CoreMedia_CMSampleBufferCallBlockForEachSample
+SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMSampleBufferCopySampleBufferForRange, OSStatus, (CFAllocatorRef allocator, CMSampleBufferRef sbuf, CFRange sampleRange, CMSampleBufferRef* sBufOut), (allocator, sbuf, sampleRange, sBufOut))
+#define CMSampleBufferCopySampleBufferForRange softLink_CoreMedia_CMSampleBufferCopySampleBufferForRange
+SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMSampleBufferGetSampleSizeArray, OSStatus, (CMSampleBufferRef sbuf, CMItemCount sizeArrayEntries, size_t* sizeArrayOut, CMItemCount* sizeArrayEntriesNeededOut), (sbuf, sizeArrayEntries, sizeArrayOut, sizeArrayEntriesNeededOut))
+#define CMSampleBufferGetSampleSizeArray softLink_CoreMedia_CMSampleBufferGetSampleSizeArray
 
 #endif // PLATFORM(COCOA)
 
@@ -187,8 +203,6 @@ SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMTimeMinimum, CMTime, (CMTime
 #define CMTimeMinimum softLink_CoreMedia_CMTimeMinimum
 SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMTimeRangeContainsTime, Boolean, (CMTimeRange range, CMTime time), (range, time))
 #define CMTimeRangeContainsTime softLink_CoreMedia_CMTimeRangeContainsTime
-SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMTimeRangeMake, CMTimeRange, (CMTime start, CMTime duration), (start, duration))
-#define CMTimeRangeMake softLink_CoreMedia_CMTimeRangeMake
 SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMTimeSubtract, CMTime, (CMTime minuend, CMTime subtrahend), (minuend, subtrahend))
 #define CMTimeSubtract softLink_CoreMedia_CMTimeSubtract
 
@@ -206,8 +220,6 @@ SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMAudioDeviceClockCreate, OSSt
 
 #if PLATFORM(WIN)
 
-SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMTimeAdd, CMTime, (CMTime addend1, CMTime addend2), (addend1, addend2))
-#define CMTimeAdd softLink_CoreMedia_CMTimeAdd
 SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, CoreMedia, CMTimeMakeFromDictionary, CMTime, (CFDictionaryRef dict), (dict))
 #define CMTimeMakeFromDictionary softLink_CoreMedia_CMTimeMakeFromDictionary
 

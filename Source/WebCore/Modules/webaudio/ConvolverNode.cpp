@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010, Google Inc. All rights reserved.
+ * Copyright (C) 2016, Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -46,7 +47,7 @@ const size_t MaxFFTSize = 32768;
 
 namespace WebCore {
 
-ConvolverNode::ConvolverNode(AudioContext* context, float sampleRate)
+ConvolverNode::ConvolverNode(AudioContext& context, float sampleRate)
     : AudioNode(context, sampleRate)
     , m_normalize(true)
 {
@@ -123,7 +124,7 @@ void ConvolverNode::setBuffer(AudioBuffer* buffer, ExceptionCode& ec)
     if (!buffer)
         return;
 
-    if (buffer->sampleRate() != context()->sampleRate()) {
+    if (buffer->sampleRate() != context().sampleRate()) {
         ec = NOT_SUPPORTED_ERR;
         return;
     }
@@ -131,11 +132,14 @@ void ConvolverNode::setBuffer(AudioBuffer* buffer, ExceptionCode& ec)
     unsigned numberOfChannels = buffer->numberOfChannels();
     size_t bufferLength = buffer->length();
 
-    // The current implementation supports up to four channel impulse responses, which are interpreted as true-stereo (see Reverb class).
-    bool isBufferGood = numberOfChannels > 0 && numberOfChannels <= 4 && bufferLength;
-    ASSERT(isBufferGood);
-    if (!isBufferGood)
+    // The current implementation supports only 1-, 2-, or 4-channel impulse responses, with the
+    // 4-channel response being interpreted as true-stereo (see Reverb class).
+    bool isChannelCountGood = (numberOfChannels == 1 || numberOfChannels == 2 || numberOfChannels == 4) && bufferLength;
+
+    if (!isChannelCountGood) {
+        ec = NOT_SUPPORTED_ERR;
         return;
+    }
 
     // Wrap the AudioBuffer by an AudioBus. It's an efficient pointer set and not a memcpy().
     // This memory is simply used in the Reverb constructor and no reference to it is kept for later use in that class.
@@ -146,7 +150,7 @@ void ConvolverNode::setBuffer(AudioBuffer* buffer, ExceptionCode& ec)
     bufferBus->setSampleRate(buffer->sampleRate());
 
     // Create the reverb with the given impulse response.
-    bool useBackgroundThreads = !context()->isOfflineContext();
+    bool useBackgroundThreads = !context().isOfflineContext();
     auto reverb = std::make_unique<Reverb>(bufferBus.get(), AudioNode::ProcessingSizeInFrames, MaxFFTSize, 2, useBackgroundThreads, m_normalize);
 
     {

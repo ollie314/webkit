@@ -34,6 +34,7 @@
 #include "PublicURLManager.h"
 #include "ResourceRequest.h"
 #include "ScriptExecutionContext.h"
+#include "URLSearchParams.h"
 #include <wtf/MainThread.h>
 
 namespace WebCore {
@@ -43,10 +44,9 @@ Ref<DOMURL> DOMURL::create(const String& url, const String& base, ExceptionCode&
     return adoptRef(*new DOMURL(url, base, ec));
 }
 
-Ref<DOMURL> DOMURL::create(const String& url, const DOMURL* base, ExceptionCode& ec)
+Ref<DOMURL> DOMURL::create(const String& url, const DOMURL& base, ExceptionCode& ec)
 {
-    ASSERT(base);
-    return adoptRef(*new DOMURL(url, *base, ec));
+    return adoptRef(*new DOMURL(url, base, ec));
 }
 
 Ref<DOMURL> DOMURL::create(const String& url, ExceptionCode& ec)
@@ -78,9 +78,22 @@ inline DOMURL::DOMURL(const String& url, ExceptionCode& ec)
         ec = TypeError;
 }
 
+DOMURL::~DOMURL()
+{
+    if (m_searchParams)
+        m_searchParams->associatedURLDestroyed();
+}
+
 void DOMURL::setHref(const String& url)
 {
     m_url = URL(m_baseURL, url);
+    if (m_searchParams)
+        m_searchParams->updateFromAssociatedURL();
+}
+
+void DOMURL::setQuery(const String& query)
+{
+    m_url.setQuery(query);
 }
 
 void DOMURL::setHref(const String& url, ExceptionCode& ec)
@@ -90,37 +103,39 @@ void DOMURL::setHref(const String& url, ExceptionCode& ec)
         ec = TypeError;
 }
 
-String DOMURL::createObjectURL(ScriptExecutionContext* scriptExecutionContext, Blob* blob)
+String DOMURL::createObjectURL(ScriptExecutionContext& scriptExecutionContext, Blob& blob)
 {
-    if (!scriptExecutionContext || !blob)
-        return String();
     return createPublicURL(scriptExecutionContext, blob);
 }
 
-String DOMURL::createPublicURL(ScriptExecutionContext* scriptExecutionContext, URLRegistrable* registrable)
+String DOMURL::createPublicURL(ScriptExecutionContext& scriptExecutionContext, URLRegistrable& registrable)
 {
-    URL publicURL = BlobURL::createPublicURL(scriptExecutionContext->securityOrigin());
+    URL publicURL = BlobURL::createPublicURL(scriptExecutionContext.securityOrigin());
     if (publicURL.isEmpty())
         return String();
 
-    scriptExecutionContext->publicURLManager().registerURL(scriptExecutionContext->securityOrigin(), publicURL, registrable);
+    scriptExecutionContext.publicURLManager().registerURL(scriptExecutionContext.securityOrigin(), publicURL, registrable);
 
     return publicURL.string();
 }
 
-void DOMURL::revokeObjectURL(ScriptExecutionContext* scriptExecutionContext, const String& urlString)
+URLSearchParams& DOMURL::searchParams()
 {
-    if (!scriptExecutionContext)
-        return;
-
+    if (!m_searchParams)
+        m_searchParams = URLSearchParams::create(search(), this);
+    return *m_searchParams;
+}
+    
+void DOMURL::revokeObjectURL(ScriptExecutionContext& scriptExecutionContext, const String& urlString)
+{
     URL url(URL(), urlString);
     ResourceRequest request(url);
 #if ENABLE(CACHE_PARTITIONING)
-    request.setDomainForCachePartition(scriptExecutionContext->topOrigin()->domainForCachePartition());
+    request.setDomainForCachePartition(scriptExecutionContext.topOrigin()->domainForCachePartition());
 #endif
-    MemoryCache::removeRequestFromSessionCaches(*scriptExecutionContext, request);
+    MemoryCache::removeRequestFromSessionCaches(scriptExecutionContext, request);
 
-    scriptExecutionContext->publicURLManager().revoke(url);
+    scriptExecutionContext.publicURLManager().revoke(url);
 }
 
 } // namespace WebCore

@@ -30,7 +30,6 @@
 #include "CodeBlockHash.h"
 #include "CodeSpecializationKind.h"
 #include "WriteBarrier.h"
-#include <wtf/BitVector.h>
 #include <wtf/HashMap.h>
 #include <wtf/PrintStream.h>
 #include <wtf/StdLibExtras.h>
@@ -38,10 +37,9 @@
 
 namespace JSC {
 
+class CodeBlock;
+struct DumpContext;
 struct InlineCallFrame;
-class ExecState;
-class ScriptExecutable;
-class JSFunction;
 
 struct CodeOrigin {
     static const unsigned invalidBytecodeIndex = UINT_MAX;
@@ -109,7 +107,7 @@ struct CodeOrigin {
     // Get the inline stack. This is slow, and is intended for debugging only.
     Vector<CodeOrigin> inlineStack() const;
     
-    void dump(PrintStream&) const;
+    JS_EXPORT_PRIVATE void dump(PrintStream&) const;
     void dumpInContext(PrintStream&, DumpContext*) const;
 
 private:

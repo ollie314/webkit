@@ -190,7 +190,7 @@ def isGF(token)
 end
 
 def isKind(token)
-    token =~ /\A((Tmp)|(Imm)|(Imm64)|(Addr)|(Index)|(RelCond)|(ResCond)|(DoubleCond))\Z/
+    token =~ /\A((Tmp)|(Imm)|(BigImm)|(BitImm)|(BitImm64)|(Addr)|(Index)|(RelCond)|(ResCond)|(DoubleCond))\Z/
 end
 
 def isArch(token)
@@ -264,7 +264,7 @@ class Parser
 
     def consumeKind
         result = token.string
-        parseError("Expected kind (Imm, Imm64, Tmp, Addr, Index, RelCond, ResCond, or DoubleCond)") unless isKind(result)
+        parseError("Expected kind (Imm, BigImm, BitImm, BitImm64, Tmp, Addr, Index, RelCond, ResCond, or DoubleCond)") unless isKind(result)
         advance
         result
     end
@@ -426,7 +426,7 @@ class Parser
                         parseError("Form has wrong number of arguments for overload") unless kinds.length == signature.length
                         kinds.each_with_index {
                             | kind, index |
-                            if kind.name == "Imm" or kind.name == "Imm64"
+                            if kind.name == "Imm" or kind.name == "BigImm" or kind.name == "BitImm" or kind.name == "BitImm64"
                                 if signature[index].role != "U"
                                     parseError("Form has an immediate for a non-use argument")
                                 end
@@ -490,7 +490,7 @@ writeH("Opcode") {
     
     outp.puts "namespace WTF {"
     outp.puts "class PrintStream;"
-    outp.puts "void printInternal(PrintStream&, JSC::B3::Air::Opcode);"
+    outp.puts "JS_EXPORT_PRIVATE void printInternal(PrintStream&, JSC::B3::Air::Opcode);"
     outp.puts "} // namespace WTF"
 }
 
@@ -530,14 +530,14 @@ def matchForms(outp, speed, forms, columnIndex, columnGetter, filter, callback)
     outp.puts "switch (#{columnGetter[columnIndex]}) {"
     groups.each_pair {
         | key, value |
-        outp.puts "#if USE(JSVALUE64)" if key == "Imm64"
+        outp.puts "#if USE(JSVALUE64)" if key == "BigImm" or key == "BitImm64"
         Kind.argKinds(key).each {
             | argKind |
             outp.puts "case Arg::#{argKind}:"
         }
         matchForms(outp, speed, value, columnIndex + 1, columnGetter, filter, callback)
         outp.puts "break;"
-        outp.puts "#endif // USE(JSVALUE64)" if key == "Imm64"
+        outp.puts "#endif // USE(JSVALUE64)" if key == "BigImm" or key == "BitImm64"
     }
     outp.puts "default:"
     outp.puts "break;"
@@ -714,7 +714,7 @@ writeH("OpcodeUtils") {
     outp.puts "return false; "
     outp.puts "}"
 
-    outp.puts "inline bool isTerminal(Opcode opcode)"
+    outp.puts "inline bool isDefinitelyTerminal(Opcode opcode)"
     outp.puts "{"
     outp.puts "switch (opcode) {"
     didFindTerminals = false
@@ -798,6 +798,12 @@ writeH("OpcodeGenerated") {
                 when "Imm"
                     outp.puts "if (!Arg::isValidImmForm(args[#{index}].value()))"
                     outp.puts "OPGEN_RETURN(false);"
+                when "BitImm"
+                    outp.puts "if (!Arg::isValidBitImmForm(args[#{index}].value()))"
+                    outp.puts "OPGEN_RETURN(false);"
+                when "BitImm64"
+                    outp.puts "if (!Arg::isValidBitImm64Form(args[#{index}].value()))"
+                    outp.puts "OPGEN_RETURN(false);"
                 when "Addr"
                     if arg.role == "UA"
                         outp.puts "if (args[#{index}].isStack() && args[#{index}].stackSlot()->isSpill())"
@@ -809,7 +815,7 @@ writeH("OpcodeGenerated") {
                 when "Index"
                     outp.puts "if (!Arg::isValidIndexForm(args[#{index}].scale(), args[#{index}].offset(), #{arg.widthCode}))"
                     outp.puts "OPGEN_RETURN(false);"
-                when "Imm64"
+                when "BigImm"
                 when "RelCond"
                 when "ResCond"
                 when "DoubleCond"
@@ -970,6 +976,32 @@ writeH("OpcodeGenerated") {
     outp.puts "return false;"
     outp.puts "}"
 
+    outp.puts "bool Inst::isTerminal()"
+    outp.puts "{"
+    outp.puts "switch (opcode) {"
+    foundTrue = false
+    $opcodes.values.each {
+        | opcode |
+        if opcode.attributes[:terminal]
+            outp.puts "case #{opcode.name}:"
+            foundTrue = true
+        end
+    }
+    if foundTrue
+        outp.puts "return true;"
+    end
+    $opcodes.values.each {
+        | opcode |
+        if opcode.custom
+            outp.puts "case #{opcode.name}:"
+            outp.puts "return #{opcode.name}Custom::isTerminal(*this);"
+        end
+    }
+    outp.puts "default:"
+    outp.puts "return false;"
+    outp.puts "}"
+    outp.puts "}"
+    
     outp.puts "bool Inst::hasNonArgNonControlEffects()"
     outp.puts "{"
     outp.puts "switch (opcode) {"
@@ -1014,7 +1046,7 @@ writeH("OpcodeGenerated") {
         | opcode |
         if opcode.custom
             outp.puts "case #{opcode.name}:"
-            outp.puts "return #{opcode.name}Custom::hasNonArgNonControlEffects(*this);"
+            outp.puts "return #{opcode.name}Custom::hasNonArgEffects(*this);"
         end
     }
     outp.puts "default:"
@@ -1055,9 +1087,9 @@ writeH("OpcodeGenerated") {
                     else
                         outp.print "args[#{index}].fpr()"
                     end
-                when "Imm"
+                when "Imm", "BitImm"
                     outp.print "args[#{index}].asTrustedImm32()"
-                when "Imm64"
+                when "BigImm", "BitImm64"
                     outp.print "args[#{index}].asTrustedImm64()"
                 when "Addr"
                     outp.print "args[#{index}].asAddress()"
@@ -1082,5 +1114,111 @@ writeH("OpcodeGenerated") {
     outp.puts "}"
 
     outp.puts "} } } // namespace JSC::B3::Air"
+}
+
+# This is a hack for JSAir. It's a joke.
+File.open("JSAir_opcode.js", "w") {
+    | outp |
+    outp.puts "\"use strict\";"
+    outp.puts "// Generated by opcode_generator.rb from #{$fileName} -- do not edit!"
+    
+    $opcodes.values.each {
+        | opcode |
+        outp.puts "const #{opcode.name} = Symbol(#{opcode.name.inspect});"
+    }
+    
+    outp.puts "function Inst_forEachArg(inst, func)"
+    outp.puts "{"
+    outp.puts "let replacement;"
+    outp.puts "switch (inst.opcode) {"
+    $opcodes.values.each {
+        | opcode |
+        outp.puts "case #{opcode.name}:"
+        if opcode.custom
+            outp.puts "#{opcode.name}Custom.forEachArg(inst, func);"
+        else
+            needOverloadSwitch = opcode.overloads.size != 1
+            outp.puts "switch (inst.args.length) {" if needOverloadSwitch
+            opcode.overloads.each {
+                | overload |
+                outp.puts "case #{overload.signature.length}:" if needOverloadSwitch
+                overload.signature.each_with_index {
+                    | arg, index |
+                    role = nil
+                    case arg.role
+                    when "U"
+                        role = "Use"
+                    when "D"
+                        role = "Def"
+                    when "ZD"
+                        role = "ZDef"
+                    when "UD"
+                        role = "UseDef"
+                    when "UZD"
+                        role = "UseZDef"
+                    when "UA"
+                        role = "UseAddr"
+                    when "S"
+                        role = "Scratch"
+                    else
+                        raise
+                    end
+                    
+                    outp.puts "inst.visitArg(#{index}, func, Arg.#{role}, #{arg.type}P, #{arg.width});"
+                }
+                outp.puts "break;"
+            }
+            if needOverloadSwitch
+                outp.puts "default:"
+                outp.puts "throw new Error(\"Bad overload\");"
+                outp.puts "break;"
+                outp.puts "}"
+            end
+        end
+        outp.puts "break;"
+    }
+    outp.puts "default:"
+    outp.puts "throw \"Bad opcode\";"
+    outp.puts "}"
+    outp.puts "}"
+    
+    outp.puts "function Inst_hasNonArgEffects(inst)"
+    outp.puts "{"
+    outp.puts "switch (inst.opcode) {"
+    foundTrue = false
+    $opcodes.values.each {
+        | opcode |
+        if opcode.attributes[:terminal] or opcode.attributes[:effects]
+            outp.puts "case #{opcode.name}:"
+            foundTrue = true
+        end
+    }
+    if foundTrue
+        outp.puts "return true;"
+    end
+    $opcodes.values.each {
+        | opcode |
+        if opcode.custom
+            outp.puts "case #{opcode.name}:"
+            outp.puts "return #{opcode.name}Custom.hasNonArgNonControlEffects(inst);"
+        end
+    }
+    outp.puts "default:"
+    outp.puts "return false;"
+    outp.puts "}"
+    outp.puts "}"
+    
+    outp.puts "function opcodeCode(opcode)"
+    outp.puts "{"
+    outp.puts "switch (opcode) {"
+    $opcodes.keys.sort.each_with_index {
+        | opcode, index |
+        outp.puts "case #{opcode}:"
+        outp.puts "return #{index}"
+    }
+    outp.puts "default:"
+    outp.puts "throw new Error(\"bad opcode\");"
+    outp.puts "}"
+    outp.puts "}"
 }
 

@@ -34,8 +34,9 @@
    Note, this file uses many GCC extensions, but it should be compatible with
    C, Objective C, C++, and Objective C++.
 
-   For non-debug builds, everything is disabled by default.
-   Defining any of the symbols explicitly prevents this from having any effect.
+   For non-debug builds, everything is disabled by default except for "always
+   on" logging. Defining any of the symbols explicitly prevents this from
+   having any effect.
 */
 
 #include <inttypes.h>
@@ -43,6 +44,10 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <wtf/ExportMacros.h>
+
+#if USE(OS_LOG)
+#include <os/log.h>
+#endif
 
 #ifdef NDEBUG
 /* Disable ASSERT* macros in release mode. */
@@ -77,6 +82,10 @@
 
 #ifndef LOG_DISABLED
 #define LOG_DISABLED ASSERTIONS_DISABLED_DEFAULT
+#endif
+
+#ifndef RELEASE_LOG_DISABLED
+#define RELEASE_LOG_DISABLED !(USE(OS_LOG))
 #endif
 
 #if COMPILER(GCC_OR_CLANG)
@@ -121,12 +130,36 @@ extern "C" {
 #define NO_RETURN_DUE_TO_CRASH
 #endif
 
-typedef enum { WTFLogChannelOff, WTFLogChannelOn } WTFLogChannelState;
+typedef enum { WTFLogChannelOff, WTFLogChannelOn, WTFLogChannelOnWithAccumulation } WTFLogChannelState;
 
 typedef struct {
     WTFLogChannelState state;
     const char* name;
+#if !RELEASE_LOG_DISABLED
+    const char* subsystem;
+    __unsafe_unretained os_log_t osLogChannel;
+#endif
 } WTFLogChannel;
+
+#define LOG_CHANNEL(name) JOIN_LOG_CHANNEL_WITH_PREFIX(LOG_CHANNEL_PREFIX, name)
+#define LOG_CHANNEL_ADDRESS(name) &LOG_CHANNEL(name),
+#define JOIN_LOG_CHANNEL_WITH_PREFIX(prefix, channel) JOIN_LOG_CHANNEL_WITH_PREFIX_LEVEL_2(prefix, channel)
+#define JOIN_LOG_CHANNEL_WITH_PREFIX_LEVEL_2(prefix, channel) prefix ## channel
+
+#define LOG_CHANNEL_WEBKIT_SUBSYSTEM "com.apple.WebKit"
+
+#define DECLARE_LOG_CHANNEL(name) \
+    extern WTFLogChannel LOG_CHANNEL(name);
+
+#if !defined(DEFINE_LOG_CHANNEL)
+#if RELEASE_LOG_DISABLED
+#define DEFINE_LOG_CHANNEL(name, subsystem) \
+    WTFLogChannel LOG_CHANNEL(name) = { WTFLogChannelOff, #name };
+#else
+#define DEFINE_LOG_CHANNEL(name, subsystem) \
+    WTFLogChannel LOG_CHANNEL(name) = { WTFLogChannelOff, #name, subsystem, OS_LOG_DEFAULT };
+#endif
+#endif
 
 WTF_EXPORT_PRIVATE void WTFReportAssertionFailure(const char* file, int line, const char* function, const char* assertion);
 WTF_EXPORT_PRIVATE void WTFReportAssertionFailureWithMessage(const char* file, int line, const char* function, const char* assertion, const char* format, ...) WTF_ATTRIBUTE_PRINTF(5, 6);
@@ -155,11 +188,11 @@ WTF_EXPORT_PRIVATE bool WTFIsDebuggerAttached();
 
 #if defined(NDEBUG) && OS(DARWIN)
 #if CPU(X86_64) || CPU(X86)
-#define WTFBreakpointTrap()  asm volatile ("int3")
+#define WTFBreakpointTrap()  __asm__ volatile ("int3")
 #elif CPU(ARM_THUMB2)
-#define WTFBreakpointTrap()  asm volatile ("bkpt #0")
+#define WTFBreakpointTrap()  __asm__ volatile ("bkpt #0")
 #elif CPU(ARM64)
-#define WTFBreakpointTrap()  asm volatile ("brk #0")
+#define WTFBreakpointTrap()  __asm__ volatile ("brk #0")
 #else
 #error "Unsupported CPU".
 #endif
@@ -358,9 +391,7 @@ WTF_EXPORT_PRIVATE NO_RETURN_DUE_TO_CRASH void WTFCrashWithSecurityImplication()
 #if LOG_DISABLED
 #define LOG(channel, ...) ((void)0)
 #else
-#define LOG(channel, ...) WTFLog(&JOIN_LOG_CHANNEL_WITH_PREFIX(LOG_CHANNEL_PREFIX, channel), __VA_ARGS__)
-#define JOIN_LOG_CHANNEL_WITH_PREFIX(prefix, channel) JOIN_LOG_CHANNEL_WITH_PREFIX_LEVEL_2(prefix, channel)
-#define JOIN_LOG_CHANNEL_WITH_PREFIX_LEVEL_2(prefix, channel) prefix ## channel
+#define LOG(channel, ...) WTFLog(&LOG_CHANNEL(channel), __VA_ARGS__)
 #endif
 
 /* LOG_VERBOSE */
@@ -368,8 +399,25 @@ WTF_EXPORT_PRIVATE NO_RETURN_DUE_TO_CRASH void WTFCrashWithSecurityImplication()
 #if LOG_DISABLED
 #define LOG_VERBOSE(channel, ...) ((void)0)
 #else
-#define LOG_VERBOSE(channel, ...) WTFLogVerbose(__FILE__, __LINE__, WTF_PRETTY_FUNCTION, &JOIN_LOG_CHANNEL_WITH_PREFIX(LOG_CHANNEL_PREFIX, channel), __VA_ARGS__)
+#define LOG_VERBOSE(channel, ...) WTFLogVerbose(__FILE__, __LINE__, WTF_PRETTY_FUNCTION, &LOG_CHANNEL(channel), __VA_ARGS__)
 #endif
+
+/* RELEASE_LOG */
+
+#if RELEASE_LOG_DISABLED
+#define RELEASE_LOG(      channel, format, ...) ((void)0)
+#define RELEASE_LOG_ERROR(channel, format, ...) LOG_ERROR(format, ##__VA_ARGS__)
+
+#define RELEASE_LOG_IF(      isAllowed, channel, format, ...) ((void)0)
+#define RELEASE_LOG_ERROR_IF(isAllowed, channel, format, ...) do { if (isAllowed) RELEASE_LOG_ERROR(channel, format, ##__VA_ARGS__); } while (0)
+#else
+#define RELEASE_LOG(      channel, format, ...) os_log(      LOG_CHANNEL(channel).osLogChannel, format, ##__VA_ARGS__)
+#define RELEASE_LOG_ERROR(channel, format, ...) os_log_error(LOG_CHANNEL(channel).osLogChannel, format, ##__VA_ARGS__)
+
+#define RELEASE_LOG_IF(      isAllowed, channel, format, ...) do { if (isAllowed) RELEASE_LOG(      channel, format, ##__VA_ARGS__); } while (0)
+#define RELEASE_LOG_ERROR_IF(isAllowed, channel, format, ...) do { if (isAllowed) RELEASE_LOG_ERROR(channel, format, ##__VA_ARGS__); } while (0)
+#endif
+
 
 /* RELEASE_ASSERT */
 

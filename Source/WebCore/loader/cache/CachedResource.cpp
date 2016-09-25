@@ -42,6 +42,7 @@
 #include "Logging.h"
 #include "MainFrame.h"
 #include "MemoryCache.h"
+#include "Page.h"
 #include "PlatformStrategies.h"
 #include "ResourceHandle.h"
 #include "SchemeRegistry.h"
@@ -61,9 +62,11 @@
 
 using namespace WTF;
 
+#define RELEASE_LOG_IF_ALLOWED(fmt, ...) RELEASE_LOG_IF(cachedResourceLoader.isAlwaysOnLoggingAllowed(), Network, "%p - CachedResource::" fmt, this, ##__VA_ARGS__)
+
 namespace WebCore {
 
-static ResourceLoadPriority defaultPriorityForResourceType(CachedResource::Type type)
+ResourceLoadPriority CachedResource::defaultPriorityForResourceType(Type type)
 {
     switch (type) {
     case CachedResource::MainResource:
@@ -74,6 +77,7 @@ static ResourceLoadPriority defaultPriorityForResourceType(CachedResource::Type 
 #if ENABLE(SVG_FONTS)
     case CachedResource::SVGFontResource:
 #endif
+    case CachedResource::MediaResource:
     case CachedResource::FontResource:
     case CachedResource::RawResource:
         return ResourceLoadPriority::Medium;
@@ -110,12 +114,14 @@ static std::chrono::milliseconds deadDecodedDataDeletionIntervalForResourceType(
 
 DEFINE_DEBUG_ONLY_GLOBAL(RefCountedLeakCounter, cachedResourceLeakCounter, ("CachedResource"));
 
-CachedResource::CachedResource(const ResourceRequest& request, Type type, SessionID sessionID)
-    : m_resourceRequest(request)
+CachedResource::CachedResource(CachedResourceRequest&& request, Type type, SessionID sessionID)
+    : m_resourceRequest(WTFMove(request.mutableResourceRequest()))
+    , m_options(request.options())
     , m_decodedDataDeletionTimer(*this, &CachedResource::destroyDecodedData, deadDecodedDataDeletionIntervalForResourceType(type))
     , m_sessionID(sessionID)
     , m_loadPriority(defaultPriorityForResourceType(type))
     , m_responseTimestamp(std::chrono::system_clock::now())
+    , m_origin(request.releaseOrigin())
     , m_lastDecodedAccessTime(0)
     , m_loadFinishTime(0)
     , m_encodedSize(0)
@@ -143,6 +149,13 @@ CachedResource::CachedResource(const ResourceRequest& request, Type type, Sessio
 #ifndef NDEBUG
     cachedResourceLeakCounter.increment();
 #endif
+    // FIXME: We should have a better way of checking for Navigation loads, maybe FetchMode::Options::Navigate.
+    ASSERT(m_origin || m_type == CachedResource::MainResource);
+
+    if (m_options.mode != FetchOptions::Mode::SameOrigin && m_origin
+        && !(m_resourceRequest.url().protocolIsData() && m_options.sameOriginDataURLFlag == SameOriginDataURLFlag::Set)
+        && !m_origin->canRequest(m_resourceRequest.url()))
+        setCrossOrigin();
 
     if (!m_resourceRequest.url().hasFragmentIdentifier())
         return;
@@ -179,53 +192,99 @@ void CachedResource::failBeforeStarting()
     error(CachedResource::LoadError);
 }
 
-void CachedResource::addAdditionalRequestHeaders(CachedResourceLoader& cachedResourceLoader)
+static void addAdditionalRequestHeadersToRequest(ResourceRequest& request, const CachedResourceLoader& cachedResourceLoader, CachedResource& resource)
 {
+    if (resource.type() == CachedResource::MainResource)
+        return;
+    // In some cases we may try to load resources in frameless documents. Such loads always fail.
+    // FIXME: We shouldn't get this far.
+    if (!cachedResourceLoader.frame())
+        return;
+
     // Note: We skip the Content-Security-Policy check here because we check
     // the Content-Security-Policy at the CachedResourceLoader layer so we can
     // handle different resource types differently.
-
     FrameLoader& frameLoader = cachedResourceLoader.frame()->loader();
     String outgoingReferrer;
     String outgoingOrigin;
-    if (m_resourceRequest.httpReferrer().isNull()) {
+    if (request.httpReferrer().isNull()) {
         outgoingReferrer = frameLoader.outgoingReferrer();
         outgoingOrigin = frameLoader.outgoingOrigin();
     } else {
-        outgoingReferrer = m_resourceRequest.httpReferrer();
+        outgoingReferrer = request.httpReferrer();
         outgoingOrigin = SecurityOrigin::createFromString(outgoingReferrer)->toString();
     }
 
-    outgoingReferrer = SecurityPolicy::generateReferrerHeader(cachedResourceLoader.document()->referrerPolicy(), m_resourceRequest.url(), outgoingReferrer);
-    if (outgoingReferrer.isEmpty())
-        m_resourceRequest.clearHTTPReferrer();
-    else
-        m_resourceRequest.setHTTPReferrer(outgoingReferrer);
-    FrameLoader::addHTTPOriginIfNeeded(m_resourceRequest, outgoingOrigin);
+    // FIXME: Refactor SecurityPolicy::generateReferrerHeader to align with new terminology used in https://w3c.github.io/webappsec-referrer-policy.
+    switch (resource.options().referrerPolicy) {
+    case FetchOptions::ReferrerPolicy::EmptyString: {
+        ReferrerPolicy referrerPolicy = cachedResourceLoader.document() ? cachedResourceLoader.document()->referrerPolicy() : ReferrerPolicy::Default;
+        outgoingReferrer = SecurityPolicy::generateReferrerHeader(referrerPolicy, request.url(), outgoingReferrer);
+        break; }
+    case FetchOptions::ReferrerPolicy::NoReferrerWhenDowngrade:
+        outgoingReferrer = SecurityPolicy::generateReferrerHeader(ReferrerPolicy::Default, request.url(), outgoingReferrer);
+        break;
+    case FetchOptions::ReferrerPolicy::NoReferrer:
+        outgoingReferrer = String();
+        break;
+    case FetchOptions::ReferrerPolicy::Origin:
+        outgoingReferrer = SecurityPolicy::generateReferrerHeader(ReferrerPolicy::Origin, request.url(), outgoingReferrer);
+        break;
+    case FetchOptions::ReferrerPolicy::OriginWhenCrossOrigin:
+        if (resource.isCrossOrigin())
+            outgoingReferrer = SecurityPolicy::generateReferrerHeader(ReferrerPolicy::Origin, request.url(), outgoingReferrer);
+        break;
+    case FetchOptions::ReferrerPolicy::UnsafeUrl:
+        break;
+    };
 
-    frameLoader.addExtraFieldsToSubresourceRequest(m_resourceRequest);
+    if (outgoingReferrer.isEmpty())
+        request.clearHTTPReferrer();
+    else
+        request.setHTTPReferrer(outgoingReferrer);
+    FrameLoader::addHTTPOriginIfNeeded(request, outgoingOrigin);
+
+    frameLoader.addExtraFieldsToSubresourceRequest(request);
 }
 
-void CachedResource::load(CachedResourceLoader& cachedResourceLoader, const ResourceLoaderOptions& options)
+void CachedResource::addAdditionalRequestHeaders(CachedResourceLoader& loader)
+{
+    addAdditionalRequestHeadersToRequest(m_resourceRequest, loader, *this);
+}
+
+void CachedResource::load(CachedResourceLoader& cachedResourceLoader)
 {
     if (!cachedResourceLoader.frame()) {
+        RELEASE_LOG_IF_ALLOWED("load: No associated frame");
         failBeforeStarting();
         return;
     }
+    Frame& frame = *cachedResourceLoader.frame();
 
     // Prevent new loads if we are in the PageCache or being added to the PageCache.
-    if (cachedResourceLoader.frame()->page() && cachedResourceLoader.frame()->page()->inPageCache()) {
+    // We query the top document because new frames may be created in pagehide event handlers
+    // and their pageCacheState will not reflect the fact that they are about to enter page
+    // cache.
+    if (auto* topDocument = frame.mainFrame().document()) {
+        if (topDocument->pageCacheState() != Document::NotInPageCache) {
+            RELEASE_LOG_IF_ALLOWED("load: Already in page cache or being added to it (frame = %p)", &frame);
+            failBeforeStarting();
+            return;
+        }
+    }
+
+    FrameLoader& frameLoader = frame.loader();
+    if (m_options.securityCheck == DoSecurityCheck && (frameLoader.state() == FrameStateProvisional || !frameLoader.activeDocumentLoader() || frameLoader.activeDocumentLoader()->isStopping())) {
+        if (frameLoader.state() == FrameStateProvisional)
+            RELEASE_LOG_IF_ALLOWED("load: Failed security check -- state is provisional (frame = %p)", &frame);
+        else if (!frameLoader.activeDocumentLoader())
+            RELEASE_LOG_IF_ALLOWED("load: Failed security check -- not active document (frame = %p)", &frame);
+        else if (frameLoader.activeDocumentLoader()->isStopping())
+            RELEASE_LOG_IF_ALLOWED("load: Failed security check -- active loader is stopping (frame = %p)", &frame);
         failBeforeStarting();
         return;
     }
 
-    FrameLoader& frameLoader = cachedResourceLoader.frame()->loader();
-    if (options.securityCheck() == DoSecurityCheck && (frameLoader.state() == FrameStateProvisional || !frameLoader.activeDocumentLoader() || frameLoader.activeDocumentLoader()->isStopping())) {
-        failBeforeStarting();
-        return;
-    }
-
-    m_options = options;
     m_loading = true;
 
 #if USE(QUICK_LOOK)
@@ -233,13 +292,10 @@ void CachedResource::load(CachedResourceLoader& cachedResourceLoader, const Reso
         // When QuickLook is invoked to convert a document, it returns a unique URL in the
         // NSURLReponse for the main document. To make safeQLURLForDocumentURLAndResourceURL()
         // work, we need to use the QL URL not the original URL.
-        const URL& documentURL = cachedResourceLoader.frame() ? cachedResourceLoader.frame()->loader().documentLoader()->response().url() : cachedResourceLoader.document()->url();
+        const URL& documentURL = frameLoader.documentLoader()->response().url();
         m_resourceRequest.setURL(safeQLURLForDocumentURLAndResourceURL(documentURL, url()));
     }
 #endif
-
-    if (!accept().isEmpty())
-        m_resourceRequest.setHTTPAccept(accept());
 
     if (isCacheValidator()) {
         CachedResource* resourceToRevalidate = m_resourceToRevalidate;
@@ -264,8 +320,7 @@ void CachedResource::load(CachedResourceLoader& cachedResourceLoader, const Reso
 #endif
     m_resourceRequest.setPriority(loadPriority());
 
-    if (type() != MainResource)
-        addAdditionalRequestHeaders(cachedResourceLoader);
+    addAdditionalRequestHeaders(cachedResourceLoader);
 
     // FIXME: It's unfortunate that the cache layer and below get to know anything about fragment identifiers.
     // We should look into removing the expectation of that knowledge from the platform network stacks.
@@ -277,13 +332,39 @@ void CachedResource::load(CachedResourceLoader& cachedResourceLoader, const Reso
         m_fragmentIdentifierForRequest = String();
     }
 
-    m_loader = platformStrategies()->loaderStrategy()->loadResource(cachedResourceLoader.frame(), this, request, options);
+    m_loader = platformStrategies()->loaderStrategy()->loadResource(frame, *this, request, m_options);
     if (!m_loader) {
+        RELEASE_LOG_IF_ALLOWED("load: Unable to create SubresourceLoader (frame = %p)", &frame);
         failBeforeStarting();
         return;
     }
 
     m_status = Pending;
+}
+
+void CachedResource::loadFrom(const CachedResource& resource)
+{
+    ASSERT(url() == resource.url());
+    ASSERT(type() == resource.type());
+    ASSERT(resource.status() == Status::Cached);
+
+    if (isCrossOrigin() && m_options.mode == FetchOptions::Mode::Cors) {
+        ASSERT(m_origin);
+        String errorMessage;
+        if (!WebCore::passesAccessControlCheck(resource.response(), m_options.allowCredentials, *m_origin, errorMessage)) {
+            setResourceError(ResourceError(String(), 0, url(), errorMessage, ResourceError::Type::AccessControl));
+            return;
+        }
+    }
+
+    setBodyDataFrom(resource);
+    setStatus(Status::Cached);
+    setLoading(false);
+}
+
+void CachedResource::setBodyDataFrom(const CachedResource& resource)
+{
+    m_data = resource.m_data;
 }
 
 void CachedResource::checkNotify()
@@ -341,7 +422,7 @@ void CachedResource::finish()
 bool CachedResource::passesAccessControlCheck(SecurityOrigin& securityOrigin)
 {
     String errorDescription;
-    return WebCore::passesAccessControlCheck(response(), resourceRequest().allowCookies() ? AllowStoredCredentials : DoNotAllowStoredCredentials, &securityOrigin, errorDescription);
+    return WebCore::passesAccessControlCheck(response(), resourceRequest().allowCookies() ? AllowStoredCredentials : DoNotAllowStoredCredentials, securityOrigin, errorDescription);
 }
 
 bool CachedResource::passesSameOriginPolicyCheck(SecurityOrigin& securityOrigin)
@@ -349,6 +430,23 @@ bool CachedResource::passesSameOriginPolicyCheck(SecurityOrigin& securityOrigin)
     if (securityOrigin.canRequest(responseForSameOriginPolicyChecks().url()))
         return true;
     return passesAccessControlCheck(securityOrigin);
+}
+
+void CachedResource::setCrossOrigin()
+{
+    ASSERT(m_options.mode != FetchOptions::Mode::SameOrigin);
+    m_responseTainting = (m_options.mode == FetchOptions::Mode::Cors) ? ResourceResponse::Tainting::Cors : ResourceResponse::Tainting::Opaque;
+}
+
+bool CachedResource::isCrossOrigin() const
+{
+    return m_responseTainting != ResourceResponse::Tainting::Basic;
+}
+
+bool CachedResource::isClean() const
+{
+    // https://html.spec.whatwg.org/multipage/infrastructure.html#cors-same-origin
+    return !loadFailedOrCanceled() && m_responseTainting != ResourceResponse::Tainting::Opaque;
 }
 
 bool CachedResource::isExpired() const
@@ -381,7 +479,7 @@ std::chrono::microseconds CachedResource::freshnessLifetime(const ResourceRespon
             // FIXME: We should not cache subresources either, but when we tried this
             // it caused performance and flakiness issues in our test infrastructure.
             if (m_type == MainResource || SchemeRegistry::shouldAlwaysRevalidateURLScheme(protocol))
-                return std::chrono::microseconds::zero();
+                return 0us;
         }
 
         return std::chrono::microseconds::max();
@@ -406,6 +504,15 @@ void CachedResource::redirectReceived(ResourceRequest& request, const ResourceRe
 const ResourceResponse& CachedResource::responseForSameOriginPolicyChecks() const
 {
     return m_redirectResponseForSameOriginPolicyChecks.isNull() ? m_response : m_redirectResponseForSameOriginPolicyChecks;
+}
+
+void CachedResource::setResponse(const ResourceResponse& response)
+{
+    ASSERT(m_response.type() == ResourceResponse::Type::Default);
+    m_response = response;
+    m_response.setRedirected(m_redirectChainCacheStatus.status != RedirectChainCacheStatus::NoRedirection);
+
+    m_varyingHeaderValues = collectVaryingRequestHeaders(m_resourceRequest, m_response, m_sessionID);
 }
 
 void CachedResource::responseReceived(const ResourceResponse& response)
@@ -752,6 +859,17 @@ CachedResource::RevalidationDecision CachedResource::makeRevalidationDecision(Ca
 bool CachedResource::redirectChainAllowsReuse(ReuseExpiredRedirectionOrNot reuseExpiredRedirection) const
 {
     return WebCore::redirectChainAllowsReuse(m_redirectChainCacheStatus, reuseExpiredRedirection);
+}
+
+bool CachedResource::varyHeaderValuesMatch(const ResourceRequest& request, const CachedResourceLoader& cachedResourceLoader)
+{
+    if (m_varyingHeaderValues.isEmpty())
+        return true;
+
+    ResourceRequest requestWithFullHeaders(request);
+    addAdditionalRequestHeadersToRequest(requestWithFullHeaders, cachedResourceLoader, *this);
+
+    return verifyVaryingRequestHeaders(m_varyingHeaderValues, requestWithFullHeaders, m_sessionID);
 }
 
 unsigned CachedResource::overheadSize() const

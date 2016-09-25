@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,7 +28,7 @@
 
 namespace JSC {
 
-enum Intrinsic {
+enum JS_EXPORT_PRIVATE Intrinsic {
     // Call intrinsics.
     NoIntrinsic,
     AbsIntrinsic,
@@ -38,6 +38,7 @@ enum Intrinsic {
     SinIntrinsic,
     Clz32Intrinsic,
     CosIntrinsic,
+    TanIntrinsic,
     ArrayPushIntrinsic,
     ArrayPopIntrinsic,
     CharCodeAtIntrinsic,
@@ -51,10 +52,20 @@ enum Intrinsic {
     LogIntrinsic,
     RegExpExecIntrinsic,
     RegExpTestIntrinsic,
+    RegExpTestFastIntrinsic,
     StringPrototypeValueOfIntrinsic,
+    StringPrototypeReplaceIntrinsic,
+    StringPrototypeReplaceRegExpIntrinsic,
     IMulIntrinsic,
     RandomIntrinsic,
     FRoundIntrinsic,
+    TruncIntrinsic,
+    IsTypedArrayViewIntrinsic,
+    BoundThisNoArgsFunctionCallIntrinsic,
+    JSMapGetIntrinsic,
+    JSMapHasIntrinsic,
+    JSSetHasIntrinsic,
+    HasOwnPropertyIntrinsic,
 
     // Getter intrinsics.
     TypedArrayLengthIntrinsic,

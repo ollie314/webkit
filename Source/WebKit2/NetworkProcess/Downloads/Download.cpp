@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2010-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,32 +27,40 @@
 #include "Download.h"
 
 #include "AuthenticationManager.h"
+#include "BlobDownloadClient.h"
 #include "Connection.h"
 #include "DataReference.h"
 #include "DownloadManager.h"
 #include "DownloadProxyMessages.h"
+#include "Logging.h"
 #include "SandboxExtension.h"
 #include "WebCoreArgumentCoders.h"
 #include <WebCore/NotImplemented.h>
 
-#if !USE(NETWORK_SESSION)
-#include "DownloadAuthenticationClient.h"
-#endif
-
 using namespace WebCore;
+
+#define RELEASE_LOG_IF_ALLOWED(fmt, ...) RELEASE_LOG_IF(isAlwaysOnLoggingAllowed(), Network, "%p - Download::" fmt, this, ##__VA_ARGS__)
 
 namespace WebKit {
 
-#if USE(NETWORK_SESSION)
-Download::Download(DownloadManager& downloadManager, DownloadID downloadID)
-#else
-Download::Download(DownloadManager& downloadManager, DownloadID downloadID, const ResourceRequest& request)
-#endif
+#if USE(NETWORK_SESSION) && PLATFORM(COCOA)
+Download::Download(DownloadManager& downloadManager, DownloadID downloadID, NSURLSessionDownloadTask* download, const WebCore::SessionID& sessionID, const String& suggestedName)
     : m_downloadManager(downloadManager)
     , m_downloadID(downloadID)
-#if !USE(NETWORK_SESSION)
-    , m_request(request)
+    , m_download(download)
+    , m_suggestedName(suggestedName)
+{
+    ASSERT(m_downloadID.downloadID());
+
+    m_downloadManager.didCreateDownload();
+}
 #endif
+
+Download::Download(DownloadManager& downloadManager, DownloadID downloadID, const ResourceRequest& request, const String& suggestedName)
+    : m_downloadManager(downloadManager)
+    , m_downloadID(downloadID)
+    , m_request(request)
+    , m_suggestedName(suggestedName)
 {
     ASSERT(m_downloadID.downloadID());
 
@@ -66,17 +74,26 @@ Download::~Download()
     m_downloadManager.didDestroyDownload();
 }
 
-#if USE(NETWORK_SESSION)
-void Download::didStart(const ResourceRequest& request)
+void Download::start()
 {
-    send(Messages::DownloadProxy::DidStart(request));
-}
+    if (m_request.url().protocolIsBlob()) {
+        m_downloadClient = std::make_unique<BlobDownloadClient>(*this);
+        m_resourceHandle = ResourceHandle::create(nullptr, m_request, m_downloadClient.get(), false, false);
+        didStart();
+        return;
+    }
+
+#if USE(NETWORK_SESSION)
+    ASSERT_NOT_REACHED();
 #else
+    startNetworkLoad();
+#endif
+}
+
 void Download::didStart()
 {
-    send(Messages::DownloadProxy::DidStart(m_request));
+    send(Messages::DownloadProxy::DidStart(m_request, m_suggestedName));
 }
-#endif
 
 #if !USE(NETWORK_SESSION)
 void Download::didReceiveAuthenticationChallenge(const AuthenticationChallenge& authenticationChallenge)
@@ -87,11 +104,18 @@ void Download::didReceiveAuthenticationChallenge(const AuthenticationChallenge& 
 
 void Download::didReceiveResponse(const ResourceResponse& response)
 {
+    RELEASE_LOG_IF_ALLOWED("didReceiveResponse: Created (id = %llu)", downloadID().downloadID());
+
     send(Messages::DownloadProxy::DidReceiveResponse(response));
 }
 
 void Download::didReceiveData(uint64_t length)
 {
+    if (!m_hasReceivedData) {
+        RELEASE_LOG_IF_ALLOWED("didReceiveData: Started receiving data (id = %llu)", downloadID().downloadID());
+        m_hasReceivedData = true;
+    }
+
     send(Messages::DownloadProxy::DidReceiveData(length));
 }
 
@@ -125,6 +149,8 @@ void Download::didCreateDestination(const String& path)
 
 void Download::didFinish()
 {
+    RELEASE_LOG_IF_ALLOWED("didFinish: (id = %llu)", downloadID().downloadID());
+
     platformDidFinish();
 
     send(Messages::DownloadProxy::DidFinish());
@@ -139,6 +165,9 @@ void Download::didFinish()
 
 void Download::didFail(const ResourceError& error, const IPC::DataReference& resumeData)
 {
+    RELEASE_LOG_IF_ALLOWED("didFail: (id = %llu, isTimeout = %d, isCancellation = %d, errCode = %d)",
+        downloadID().downloadID(), error.isTimeout(), error.isCancellation(), error.errorCode());
+
     send(Messages::DownloadProxy::DidFail(error, resumeData));
 
     if (m_sandboxExtension) {
@@ -150,6 +179,8 @@ void Download::didFail(const ResourceError& error, const IPC::DataReference& res
 
 void Download::didCancel(const IPC::DataReference& resumeData)
 {
+    RELEASE_LOG_IF_ALLOWED("didCancel: (id = %llu)", downloadID().downloadID());
+
     send(Messages::DownloadProxy::DidCancel(resumeData));
 
     if (m_sandboxExtension) {
@@ -167,6 +198,15 @@ IPC::Connection* Download::messageSenderConnection()
 uint64_t Download::messageSenderDestinationID()
 {
     return m_downloadID.downloadID();
+}
+
+bool Download::isAlwaysOnLoggingAllowed() const
+{
+#if USE(NETWORK_SESSION) && PLATFORM(COCOA)
+    return m_sessionID.isAlwaysOnLoggingAllowed();
+#else
+    return false;
+#endif
 }
 
 } // namespace WebKit

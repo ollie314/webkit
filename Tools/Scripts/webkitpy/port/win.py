@@ -50,6 +50,7 @@ try:
 except ImportError:
     _log.warn("Not running on native Windows.")
 
+
 class WinPort(ApplePort):
     port_name = "win"
 
@@ -120,9 +121,6 @@ class WinPort(ApplePort):
 
     def operating_system(self):
         return 'win'
-
-    def default_child_processes(self):
-        return 1
 
     def _port_flag_for_scripts(self):
         if self.get_option('architecture') == 'x86_64':
@@ -298,6 +296,10 @@ class WinPort(ApplePort):
         if '_NT_SYMBOL_PATH' not in os.environ:
             _log.warning("The _NT_SYMBOL_PATH environment variable is not set. Using Microsoft Symbol Server.")
             os.environ['_NT_SYMBOL_PATH'] = 'SRV*http://msdl.microsoft.com/download/symbols'
+
+        # Add build path to symbol path
+        os.environ['_NT_SYMBOL_PATH'] += ";" + self._build_path()
+
         ntsd_path = self._ntsd_location()
         if not ntsd_path:
             _log.warning("Can't find ntsd.exe. Crash logs will not be saved.")
@@ -344,12 +346,12 @@ class WinPort(ApplePort):
     def delete_sem_locks(self):
         os.system("rm -rf /dev/shm/sem.*")
 
-    def setup_test_run(self):
+    def setup_test_run(self, device_class=None):
         atexit.register(self.restore_crash_log_saving)
         self.setup_crash_log_saving()
         self.prevent_error_dialogs()
         self.delete_sem_locks()
-        super(WinPort, self).setup_test_run()
+        super(WinPort, self).setup_test_run(device_class)
 
     def clean_up_test_run(self):
         self.allow_error_dialogs()
@@ -401,6 +403,28 @@ class WinPort(ApplePort):
             if crash_log:
                 crash_logs[test_name] = crash_log
         return crash_logs
+
+    def look_for_new_samples(self, unresponsive_processes, start_time):
+        # No sampling on Windows.
+        pass
+
+    def sample_process(self, name, pid):
+        # No sampling on Windows.
+        pass
+
+    def _make_leak_detector(self):
+        return None
+
+    def check_for_leaks(self, process_name, process_pid):
+        # No leak checking on Windows.
+        pass
+
+    def print_leaks_summary(self):
+        # No leak checking on Windows.
+        pass
+
+    def _path_to_webcore_library(self):
+        return None
 
     def find_system_pid(self, name, pid):
         system_pid = int(pid)

@@ -65,8 +65,8 @@ FillLayer::FillLayer(EFillLayerType type)
     , m_xPosSet(false)
     , m_yPosSet(false)
     , m_backgroundOriginSet(false)
-    , m_backgroundXOrigin(LeftEdge)
-    , m_backgroundYOrigin(TopEdge)
+    , m_backgroundXOrigin(static_cast<unsigned>(Edge::Left))
+    , m_backgroundYOrigin(static_cast<unsigned>(Edge::Top))
     , m_compositeSet(type == MaskFillLayer)
     , m_blendModeSet(false)
     , m_maskSourceTypeSet(false)
@@ -380,16 +380,10 @@ bool FillLayer::hasFixedImage() const
     return false;
 }
 
-static inline bool layerImagesIdentical(const FillLayer& layer1, const FillLayer& layer2)
-{
-    // We just care about pointer equivalency.
-    return layer1.image() == layer2.image();
-}
-
 bool FillLayer::imagesIdentical(const FillLayer* layer1, const FillLayer* layer2)
 {
     for (; layer1 && layer2; layer1 = layer1->next(), layer2 = layer2->next()) {
-        if (!layerImagesIdentical(*layer1, *layer2))
+        if (!arePointingToEqualData(layer1->image(), layer2->image()))
             return false;
     }
 

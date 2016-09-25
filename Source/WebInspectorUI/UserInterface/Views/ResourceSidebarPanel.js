@@ -66,8 +66,10 @@ WebInspector.ResourceSidebarPanel = class ResourceSidebarPanel extends WebInspec
         this.contentTreeOutline.addEventListener(WebInspector.TreeOutline.Event.SelectionDidChange, this._treeSelectionDidChange, this);
         this.contentTreeOutline.includeSourceMapResourceChildren = true;
 
-        if (WebInspector.debuggableType === WebInspector.DebuggableType.JavaScript)
+        if (WebInspector.debuggableType === WebInspector.DebuggableType.JavaScript) {
             this.contentTreeOutline.disclosureButtons = false;
+            WebInspector.SourceCode.addEventListener(WebInspector.SourceCode.Event.SourceMapAdded, () => { this.contentTreeOutline.disclosureButtons = true; }, this);
+        }
 
         if (WebInspector.frameResourceManager.mainFrame)
             this._mainFrameMainResourceDidChange(WebInspector.frameResourceManager.mainFrame);
@@ -273,11 +275,11 @@ WebInspector.ResourceSidebarPanel = class ResourceSidebarPanel extends WebInspec
 
         // We don't add scripts without URLs here. Those scripts can quickly clutter the interface and
         // are usually more transient. They will get added if/when they need to be shown in a content view.
-        if (!script.url)
+        if (!script.url && !script.sourceURL)
             return;
 
         // If the script URL matches a resource we can assume it is part of that resource and does not need added.
-        if (script.resource)
+        if (script.resource || script.dynamicallyAddedScriptElement)
             return;
 
         var insertIntoTopLevel = false;
@@ -318,14 +320,18 @@ WebInspector.ResourceSidebarPanel = class ResourceSidebarPanel extends WebInspec
         if (!scriptTreeElement)
             return;
 
-        scriptTreeElement.parent.removeChild(scriptTreeElement);
+        let parentTreeElement = scriptTreeElement.parent;
+        parentTreeElement.removeChild(scriptTreeElement);
+
+        if (parentTreeElement instanceof WebInspector.FolderTreeElement && !parentTreeElement.children.length)
+            parentTreeElement.parent.removeChild(parentTreeElement);
     }
 
     _scriptsCleared(event)
     {
         const suppressOnDeselect = true;
         const suppressSelectSibling = true;
-        
+
         if (this._extensionScriptsFolderTreeElement) {
             if (this._extensionScriptsFolderTreeElement.parent)
                 this._extensionScriptsFolderTreeElement.parent.removeChild(this._extensionScriptsFolderTreeElement, suppressOnDeselect, suppressSelectSibling);

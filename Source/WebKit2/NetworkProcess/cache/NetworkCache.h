@@ -32,6 +32,7 @@
 #include "NetworkCacheStorage.h"
 #include "ShareableResource.h"
 #include <WebCore/ResourceResponse.h>
+#include <wtf/Function.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
@@ -60,7 +61,8 @@ enum class RetrieveDecision {
     Yes,
     NoDueToHTTPMethod,
     NoDueToConditionalRequest,
-    NoDueToReloadIgnoringCache
+    NoDueToReloadIgnoringCache,
+    NoDueToStreamingMedia,
 };
 
 // FIXME: This enum is used in the Statistics code in a way that prevents removing or reordering anything.
@@ -73,7 +75,7 @@ enum class StoreDecision {
     NoDueToHTTPStatusCode,
     NoDueToNoStoreRequest,
     NoDueToUnlikelyToReuse,
-    NoDueToStreamingMedia
+    NoDueToStreamingMedia,
 };
 
 enum class UseDecision {
@@ -103,12 +105,16 @@ public:
     bool isEnabled() const { return !!m_storage; }
 
     // Completion handler may get called back synchronously on failure.
-    void retrieve(const WebCore::ResourceRequest&, const GlobalFrameID&, std::function<void (std::unique_ptr<Entry>)>);
-    std::unique_ptr<Entry> store(const WebCore::ResourceRequest&, const WebCore::ResourceResponse&, RefPtr<WebCore::SharedBuffer>&&, std::function<void (MappedBody&)>);
+    void retrieve(const WebCore::ResourceRequest&, const GlobalFrameID&, std::function<void (std::unique_ptr<Entry>)>&&);
+    std::unique_ptr<Entry> store(const WebCore::ResourceRequest&, const WebCore::ResourceResponse&, RefPtr<WebCore::SharedBuffer>&&, Function<void (MappedBody&)>&&);
     std::unique_ptr<Entry> storeRedirect(const WebCore::ResourceRequest&, const WebCore::ResourceResponse&, const WebCore::ResourceRequest& redirectRequest);
     std::unique_ptr<Entry> update(const WebCore::ResourceRequest&, const GlobalFrameID&, const Entry&, const WebCore::ResourceResponse& validatingResponse);
 
-    void traverse(std::function<void (const Entry*)>&&);
+    struct TraversalEntry {
+        const Entry& entry;
+        const Storage::RecordInfo& recordInfo;
+    };
+    void traverse(Function<void (const TraversalEntry*)>&&);
     void remove(const Key&);
     void remove(const WebCore::ResourceRequest&);
 
@@ -131,6 +137,8 @@ private:
     std::unique_ptr<SpeculativeLoadManager> m_speculativeLoadManager;
 #endif
     std::unique_ptr<Statistics> m_statistics;
+
+    unsigned m_traverseCount { 0 };
 };
 
 }

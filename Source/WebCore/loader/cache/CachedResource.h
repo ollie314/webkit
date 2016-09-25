@@ -46,10 +46,12 @@ class MemoryCache;
 class CachedResourceClient;
 class CachedResourceHandleBase;
 class CachedResourceLoader;
+class CachedResourceRequest;
 class InspectorResource;
 class SecurityOrigin;
 class SharedBuffer;
 class SubresourceLoader;
+class TextResourceDecoder;
 
 // A resource that is held in the cache. Classes who want to use this object should derive
 // from CachedResourceClient, to get the function calls in case the requested data has arrived.
@@ -69,6 +71,7 @@ public:
 #if ENABLE(SVG_FONTS)
         SVGFontResource,
 #endif
+        MediaResource,
         RawResource,
         SVGDocumentResource
 #if ENABLE(XSLT)
@@ -91,13 +94,14 @@ public:
         DecodeError
     };
 
-    CachedResource(const ResourceRequest&, Type, SessionID);
+    CachedResource(CachedResourceRequest&&, Type, SessionID);
     virtual ~CachedResource();
 
-    virtual void load(CachedResourceLoader&, const ResourceLoaderOptions&);
+    virtual void load(CachedResourceLoader&);
 
     virtual void setEncoding(const String&) { }
     virtual String encoding() const { return String(); }
+    virtual const TextResourceDecoder* textResourceDecoder() const { return nullptr; }
     virtual void addDataBuffer(SharedBuffer&);
     virtual void addData(const char* data, unsigned length);
     virtual void finishLoading(SharedBuffer*);
@@ -108,6 +112,7 @@ public:
 
     virtual bool shouldIgnoreHTTPStatusCodeErrors() const { return false; }
 
+    const ResourceRequest& resourceRequest() const { return m_resourceRequest; }
     ResourceRequest& resourceRequest() { return m_resourceRequest; }
     const URL& url() const { return m_resourceRequest.url();}
 #if ENABLE(CACHE_PARTITIONING)
@@ -159,11 +164,12 @@ public:
     bool areAllClientsXMLHttpRequests() const;
 
     bool isImage() const { return type() == ImageResource; }
-    // FIXME: CachedRawResource could be either a main resource or a raw XHR resource.
-    bool isMainOrRawResource() const { return type() == MainResource || type() == RawResource; }
+    // FIXME: CachedRawResource could be a main resource, an audio/video resource, or a raw XHR/icon resource.
+    bool isMainOrMediaOrRawResource() const { return type() == MainResource || type() == MediaResource || type() == RawResource; }
     bool ignoreForRequestCount() const
     {
-        return type() == MainResource
+        return m_resourceRequest.ignoreForRequestCount()
+            || type() == MainResource
 #if ENABLE(LINK_PREFETCH)
             || type() == LinkPrefetch
             || type() == LinkSubresource
@@ -194,31 +200,37 @@ public:
 
     virtual void redirectReceived(ResourceRequest&, const ResourceResponse&);
     virtual void responseReceived(const ResourceResponse&);
-    void setResponse(const ResourceResponse& response) { m_response = response; }
+    virtual bool shouldCacheResponse(const ResourceResponse&) { return true; }
+    void setResponse(const ResourceResponse&);
     const ResourceResponse& response() const { return m_response; }
     // This is the same as response() except after HTTP redirect to data: URL.
     const ResourceResponse& responseForSameOriginPolicyChecks() const;
+
+    void setCrossOrigin();
+    bool isCrossOrigin() const;
+    bool isClean() const;
+    ResourceResponse::Tainting responseTainting() const { return m_responseTainting; }
+
+    void loadFrom(const CachedResource&);
+
+    SecurityOrigin* origin() const { return m_origin.get(); }
 
     bool canDelete() const { return !hasClients() && !m_loader && !m_preloadCount && !m_handleCount && !m_resourceToRevalidate && !m_proxyResource; }
     bool hasOneHandle() const { return m_handleCount == 1; }
 
     bool isExpired() const;
 
-    // List of acceptable MIME types separated by ",".
-    // A MIME type may contain a wildcard, e.g. "text/*".
-    String accept() const { return m_accept; }
-    void setAccept(const String& accept) { m_accept = accept; }
-
     void cancelLoad();
     bool wasCanceled() const { return m_error.isCancellation(); }
     bool errorOccurred() const { return m_status == LoadError || m_status == DecodeError; }
     bool loadFailedOrCanceled() const { return !m_error.isNull(); }
 
-    bool shouldSendResourceLoadCallbacks() const { return m_options.sendLoadCallbacks() == SendCallbacks; }
-    DataBufferingPolicy dataBufferingPolicy() const { return m_options.dataBufferingPolicy(); }
+    bool shouldSendResourceLoadCallbacks() const { return m_options.sendLoadCallbacks == SendCallbacks; }
+    DataBufferingPolicy dataBufferingPolicy() const { return m_options.dataBufferingPolicy; }
 
-    bool allowsCaching() const { return m_options.cachingPolicy() == CachingPolicy::AllowCaching; }
-    
+    bool allowsCaching() const { return m_options.cachingPolicy == CachingPolicy::AllowCaching; }
+    const FetchOptions& options() const { return m_options; }
+
     virtual void destroyDecodedData() { }
 
     void setOwningCachedResourceLoader(CachedResourceLoader* cachedResourceLoader) { m_owningCachedResourceLoader = cachedResourceLoader; }
@@ -235,6 +247,8 @@ public:
     enum class RevalidationDecision { No, YesDueToCachePolicy, YesDueToNoStore, YesDueToNoCache, YesDueToExpired };
     virtual RevalidationDecision makeRevalidationDecision(CachePolicy) const;
     bool redirectChainAllowsReuse(ReuseExpiredRedirectionOrNot) const;
+
+    bool varyHeaderValuesMatch(const ResourceRequest&, const CachedResourceLoader&);
 
     bool isCacheValidator() const { return m_resourceToRevalidate; }
     CachedResource* resourceToRevalidate() const { return m_resourceToRevalidate; }
@@ -261,6 +275,7 @@ public:
 #endif
 
     unsigned long identifierForLoadWithoutResourceLoader() const { return m_identifierForLoadWithoutResourceLoader; }
+    static ResourceLoadPriority defaultPriorityForResourceType(Type);
 
 protected:
     void setEncodedSize(unsigned);
@@ -275,6 +290,7 @@ protected:
     RefPtr<SubresourceLoader> m_loader;
     ResourceLoaderOptions m_options;
     ResourceResponse m_response;
+    ResourceResponse::Tainting m_responseTainting { ResourceResponse::Tainting::Basic };
     ResourceResponse m_redirectResponseForSameOriginPolicyChecks;
     RefPtr<SharedBuffer> m_data;
     DeferrableOneShotTimer m_decodedDataDeletionTimer;
@@ -288,6 +304,7 @@ private:
 
     virtual void checkNotify();
     virtual bool mayTryReplaceEncodedData() const { return false; }
+    virtual void setBodyDataFrom(const CachedResource&);
 
     std::chrono::microseconds freshnessLifetime(const ResourceResponse&) const;
 
@@ -296,13 +313,13 @@ private:
 
     HashMap<CachedResourceClient*, std::unique_ptr<Callback>> m_clientsAwaitingCallback;
     SessionID m_sessionID;
-    String m_accept;
     ResourceLoadPriority m_loadPriority;
     std::chrono::system_clock::time_point m_responseTimestamp;
 
     String m_fragmentIdentifierForRequest;
 
     ResourceError m_error;
+    RefPtr<SecurityOrigin> m_origin;
 
     double m_lastDecodedAccessTime; // Used as a "thrash guard" in the cache
     double m_loadFinishTime;
@@ -345,6 +362,8 @@ private:
     HashSet<CachedResourceHandleBase*> m_handlesToRevalidate;
 
     RedirectChainCacheStatus m_redirectChainCacheStatus;
+
+    Vector<std::pair<String, String>> m_varyingHeaderValues;
 
     unsigned long m_identifierForLoadWithoutResourceLoader { 0 };
 };

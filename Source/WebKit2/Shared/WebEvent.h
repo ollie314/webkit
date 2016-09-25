@@ -37,8 +37,8 @@
 #include <wtf/text/WTFString.h>
 
 namespace IPC {
-    class ArgumentDecoder;
-    class ArgumentEncoder;
+class Decoder;
+class Encoder;
 }
 
 #if USE(APPKIT)
@@ -111,8 +111,8 @@ protected:
 
     WebEvent(Type, Modifiers, double timestamp);
 
-    void encode(IPC::ArgumentEncoder&) const;
-    static bool decode(IPC::ArgumentDecoder&, WebEvent&);
+    void encode(IPC::Encoder&) const;
+    static bool decode(IPC::Decoder&, WebEvent&);
 
 private:
     uint32_t m_type; // Type
@@ -130,12 +130,14 @@ public:
         RightButton
     };
 
+    enum SyntheticClickType { NoTap, OneFingerTap, TwoFingerTap };
+
     WebMouseEvent();
 
 #if PLATFORM(MAC)
-    WebMouseEvent(Type, Button, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, float deltaX, float deltaY, float deltaZ, int clickCount, Modifiers, double timestamp, double force, int eventNumber = -1, int menuType = 0);
+    WebMouseEvent(Type, Button, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, float deltaX, float deltaY, float deltaZ, int clickCount, Modifiers, double timestamp, double force, SyntheticClickType = NoTap, int eventNumber = -1, int menuType = 0);
 #else
-    WebMouseEvent(Type, Button, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, float deltaX, float deltaY, float deltaZ, int clickCount, Modifiers, double timestamp, double force = 0);
+    WebMouseEvent(Type, Button, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, float deltaX, float deltaY, float deltaZ, int clickCount, Modifiers, double timestamp, double force = 0, SyntheticClickType = NoTap);
 #endif
 
     Button button() const { return static_cast<Button>(m_button); }
@@ -150,9 +152,10 @@ public:
     int32_t menuTypeForEvent() const { return m_menuTypeForEvent; }
 #endif
     double force() const { return m_force; }
+    SyntheticClickType syntheticClickType() const { return static_cast<SyntheticClickType>(m_syntheticClickType); }
 
-    void encode(IPC::ArgumentEncoder&) const;
-    static bool decode(IPC::ArgumentDecoder&, WebMouseEvent&);
+    void encode(IPC::Encoder&) const;
+    static bool decode(IPC::Decoder&, WebMouseEvent&);
 
 private:
     static bool isMouseEventType(Type);
@@ -169,6 +172,7 @@ private:
     int32_t m_menuTypeForEvent;
 #endif
     double m_force { 0 };
+    uint32_t m_syntheticClickType { NoTap };
 };
 
 // FIXME: Move this class to its own header file.
@@ -212,8 +216,8 @@ public:
     const WebCore::FloatSize& unacceleratedScrollingDelta() const { return m_unacceleratedScrollingDelta; }
 #endif
 
-    void encode(IPC::ArgumentEncoder&) const;
-    static bool decode(IPC::ArgumentDecoder&, WebWheelEvent&);
+    void encode(IPC::Encoder&) const;
+    static bool decode(IPC::Decoder&, WebWheelEvent&);
 
 private:
     static bool isWheelEventType(Type);
@@ -265,8 +269,8 @@ public:
     bool isKeypad() const { return m_isKeypad; }
     bool isSystemKey() const { return m_isSystemKey; }
 
-    void encode(IPC::ArgumentEncoder&) const;
-    static bool decode(IPC::ArgumentDecoder&, WebKeyboardEvent&);
+    void encode(IPC::Encoder&) const;
+    static bool decode(IPC::Decoder&, WebKeyboardEvent&);
 
     static bool isKeyboardEventType(Type);
 
@@ -302,6 +306,11 @@ public:
         TouchCancelled
     };
 
+    enum class TouchType {
+        Direct,
+        Stylus
+    };
+
     WebPlatformTouchPoint() { }
     WebPlatformTouchPoint(unsigned identifier, WebCore::IntPoint location, TouchPointState phase)
         : m_identifier(identifier)
@@ -318,10 +327,16 @@ public:
 #if ENABLE(IOS_TOUCH_EVENTS)
     void setForce(double force) { m_force = force; }
     double force() const { return m_force; }
+    void setAltitudeAngle(double altitudeAngle) { m_altitudeAngle = altitudeAngle; }
+    double altitudeAngle() const { return m_altitudeAngle; }
+    void setAzimuthAngle(double azimuthAngle) { m_azimuthAngle = azimuthAngle; }
+    double azimuthAngle() const { return m_azimuthAngle; }
+    void setTouchType(TouchType touchType) { m_touchType = static_cast<uint32_t>(touchType); }
+    TouchType touchType() const { return static_cast<TouchType>(m_touchType); }
 #endif
 
-    void encode(IPC::ArgumentEncoder&) const;
-    static bool decode(IPC::ArgumentDecoder&, WebPlatformTouchPoint&);
+    void encode(IPC::Encoder&) const;
+    static bool decode(IPC::Decoder&, WebPlatformTouchPoint&);
 
 private:
     unsigned m_identifier;
@@ -329,6 +344,9 @@ private:
     uint32_t m_phase;
 #if ENABLE(IOS_TOUCH_EVENTS)
     double m_force { 0 };
+    double m_altitudeAngle { 0 };
+    double m_azimuthAngle { 0 };
+    uint32_t m_touchType { static_cast<uint32_t>(TouchType::Direct) };
 #endif
 };
 
@@ -363,8 +381,8 @@ public:
 
     bool allTouchPointsAreReleased() const;
 
-    void encode(IPC::ArgumentEncoder&) const;
-    static bool decode(IPC::ArgumentDecoder&, WebTouchEvent&);
+    void encode(IPC::Encoder&) const;
+    static bool decode(IPC::Decoder&, WebTouchEvent&);
     
 private:
     Vector<WebPlatformTouchPoint> m_touchPoints;
@@ -407,8 +425,8 @@ public:
 
     void setState(TouchPointState state) { m_state = state; }
 
-    void encode(IPC::ArgumentEncoder&) const;
-    static bool decode(IPC::ArgumentDecoder&, WebPlatformTouchPoint&);
+    void encode(IPC::Encoder&) const;
+    static bool decode(IPC::Decoder&, WebPlatformTouchPoint&);
 
 private:
     uint32_t m_id;
@@ -430,8 +448,8 @@ public:
 
     bool allTouchPointsAreReleased() const;
 
-    void encode(IPC::ArgumentEncoder&) const;
-    static bool decode(IPC::ArgumentDecoder&, WebTouchEvent&);
+    void encode(IPC::Encoder&) const;
+    static bool decode(IPC::Decoder&, WebTouchEvent&);
   
 private:
     static bool isTouchEventType(Type);

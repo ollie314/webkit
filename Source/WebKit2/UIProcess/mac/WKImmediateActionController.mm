@@ -55,8 +55,7 @@ using namespace WebKit;
 @interface WKImmediateActionController () <QLPreviewMenuItemDelegate>
 @end
 
-@interface WKAnimationController : NSObject <NSImmediateActionAnimationController> {
-}
+@interface WKAnimationController : NSObject <NSImmediateActionAnimationController>
 @end
 
 @implementation WKAnimationController
@@ -122,7 +121,8 @@ using namespace WebKit;
 
     if (_currentActionContext && _hasActivatedActionContext) {
         _hasActivatedActionContext = NO;
-        [getDDActionsManagerClass() didUseActions];
+        if (DataDetectorsLibrary())
+            [getDDActionsManagerClass() didUseActions];
     }
 
     _state = ImmediateActionState::None;
@@ -209,8 +209,10 @@ using namespace WebKit;
 
     if (_currentActionContext) {
         _hasActivatedActionContext = YES;
-        if (![getDDActionsManagerClass() shouldUseActionsWithContext:_currentActionContext.get()])
-            [self _cancelImmediateAction];
+        if (DataDetectorsLibrary()) {
+            if (![getDDActionsManagerClass() shouldUseActionsWithContext:_currentActionContext.get()])
+                [self _cancelImmediateAction];
+        }
     }
 }
 
@@ -260,17 +262,15 @@ using namespace WebKit;
     else
         hitTestResult = _page->lastMouseMoveHitTestResult();
 
-    return hitTestResult.release();
+    return WTFMove(hitTestResult);
 }
 
 #pragma mark Immediate actions
 
 - (id <NSImmediateActionAnimationController>)_defaultAnimationController
 {
-    if (_contentPreventsDefault) {
-        RetainPtr<WKAnimationController> dummyController = [[WKAnimationController alloc] init];
-        return dummyController.get();
-    }
+    if (_contentPreventsDefault)
+        return [[[WKAnimationController alloc] init] autorelease];
 
     RefPtr<API::HitTestResult> hitTestResult = [self _webHitTestResult];
 
@@ -392,6 +392,9 @@ using namespace WebKit;
 
 - (id<NSImmediateActionAnimationController>)_animationControllerForDataDetectedText
 {
+    if (!DataDetectorsLibrary())
+        return nil;
+
     DDActionContext *actionContext = _hitTestResultData.detectedDataActionContext.get();
     if (!actionContext)
         return nil;
@@ -428,6 +431,9 @@ using namespace WebKit;
 
 - (id<NSImmediateActionAnimationController>)_animationControllerForDataDetectedLink
 {
+    if (!DataDetectorsLibrary())
+        return nil;
+
     RetainPtr<DDActionContext> actionContext = adoptNS([allocDDActionContextInstance() init]);
 
     if (!actionContext)

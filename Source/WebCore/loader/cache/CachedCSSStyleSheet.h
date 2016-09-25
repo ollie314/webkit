@@ -27,7 +27,6 @@
 #define CachedCSSStyleSheet_h
 
 #include "CachedResource.h"
-#include <wtf/Vector.h>
 
 namespace WebCore {
 
@@ -38,7 +37,7 @@ namespace WebCore {
 
     class CachedCSSStyleSheet final : public CachedResource {
     public:
-        CachedCSSStyleSheet(const ResourceRequest&, const String& charset, SessionID);
+        CachedCSSStyleSheet(CachedResourceRequest&&, SessionID);
         virtual ~CachedCSSStyleSheet();
 
         enum class MIMETypeCheck { Strict, Lax };
@@ -49,17 +48,20 @@ namespace WebCore {
 
     private:
         bool canUseSheet(MIMETypeCheck, bool* hasValidMIMEType) const;
-        virtual bool mayTryReplaceEncodedData() const override { return true; }
+        bool mayTryReplaceEncodedData() const final { return true; }
 
-        virtual void didAddClient(CachedResourceClient*) override;
+        void didAddClient(CachedResourceClient*) final;
 
-        virtual void setEncoding(const String&) override;
-        virtual String encoding() const override;
-        virtual void finishLoading(SharedBuffer*) override;
-        virtual void destroyDecodedData() override;
+        void setEncoding(const String&) final;
+        String encoding() const final;
+        const TextResourceDecoder* textResourceDecoder() const final { return m_decoder.get(); }
+        void finishLoading(SharedBuffer*) final;
+        void destroyDecodedData() final;
+
+        void setBodyDataFrom(const CachedResource&) final;
 
     protected:
-        virtual void checkNotify() override;
+        void checkNotify() final;
 
         RefPtr<TextResourceDecoder> m_decoder;
         String m_decodedSheetText;

@@ -63,8 +63,7 @@ SOFT_LINK_CLASS(QuickLookUI, QLPreviewMenuItem)
 @interface WebImmediateActionController () <QLPreviewMenuItemDelegate>
 @end
 
-@interface WebAnimationController : NSObject <NSImmediateActionAnimationController> {
-}
+@interface WebAnimationController : NSObject <NSImmediateActionAnimationController>
 @end
 
 @implementation WebAnimationController
@@ -124,6 +123,9 @@ using namespace WebCore;
 
 - (void)_clearImmediateActionState
 {
+    if (!DataDetectorsLibrary())
+        return;
+
     DDActionsManager *actionsManager = [getDDActionsManagerClass() sharedManager];
     if ([actionsManager respondsToSelector:@selector(requestBubbleClosureUnanchorOnFailure:)])
         [actionsManager requestBubbleClosureUnanchorOnFailure:YES];
@@ -183,6 +185,9 @@ using namespace WebCore;
 
 - (void)immediateActionRecognizerWillBeginAnimation:(NSImmediateActionGestureRecognizer *)immediateActionRecognizer
 {
+    if (!DataDetectorsLibrary())
+        return;
+
     if (immediateActionRecognizer != _immediateActionRecognizer)
         return;
 
@@ -250,10 +255,8 @@ using namespace WebCore;
 
 - (id <NSImmediateActionAnimationController>)_defaultAnimationController
 {
-    if (_contentPreventsDefault) {
-        RetainPtr<WebAnimationController> dummyController = [[WebAnimationController alloc] init];
-        return dummyController.get();
-    }
+    if (_contentPreventsDefault)
+        return [[[WebAnimationController alloc] init] autorelease];
 
     NSURL *url = _hitTestResult.absoluteLinkURL();
     NSString *absoluteURLString = [url absoluteString];
@@ -272,7 +275,7 @@ using namespace WebCore;
             _type = WebImmediateActionLinkPreview;
 
             RefPtr<Range> linkRange = rangeOfContents(*_hitTestResult.URLElement());
-            auto indicator = TextIndicator::createWithRange(*linkRange, TextIndicatorOptionDefault, TextIndicatorPresentationTransition::FadeIn);
+            auto indicator = TextIndicator::createWithRange(*linkRange, TextIndicatorOptionUseBoundingRectAndPaintAllContentForComplexRanges, TextIndicatorPresentationTransition::FadeIn);
             if (indicator)
                 [_webView _setTextIndicator:*indicator withLifetime:TextIndicatorWindowLifetime::Permanent];
 
@@ -318,11 +321,19 @@ using namespace WebCore;
         customClientAnimationController = [(id)[_webView UIDelegate] _webView:_webView immediateActionAnimationControllerForHitTestResult:webHitTestResult.get() withType:_type];
     }
 
-    // FIXME: We should not permanently disable this for iTunes. rdar://problem/19461358
-    if (customClientAnimationController == [NSNull null] || applicationIsITunes()) {
+    if (customClientAnimationController == [NSNull null]) {
         [self _cancelImmediateAction];
         return;
     }
+
+#if PLATFORM(MAC)
+    // FIXME: We should not permanently disable this for iTunes. rdar://problem/19461358
+    if (MacApplication::isITunes()) {
+        [self _cancelImmediateAction];
+        return;
+    }
+#endif
+
     if (customClientAnimationController && [customClientAnimationController conformsToProtocol:@protocol(NSImmediateActionAnimationController)])
         [_immediateActionRecognizer setAnimationController:(id <NSImmediateActionAnimationController>)customClientAnimationController];
     else
@@ -401,6 +412,9 @@ static IntRect elementBoundingBoxInWindowCoordinatesFromNode(Node* node)
 
 - (id <NSImmediateActionAnimationController>)_animationControllerForDataDetectedText
 {
+    if (!DataDetectorsLibrary())
+        return nil;
+
     RefPtr<Range> detectedDataRange;
     FloatRect detectedDataBoundingBox;
     RetainPtr<DDActionContext> actionContext;
@@ -450,6 +464,9 @@ static IntRect elementBoundingBoxInWindowCoordinatesFromNode(Node* node)
 
 - (id <NSImmediateActionAnimationController>)_animationControllerForDataDetectedLink
 {
+    if (!DataDetectorsLibrary())
+        return nil;
+
     RetainPtr<DDActionContext> actionContext = adoptNS([allocDDActionContextInstance() init]);
 
     if (!actionContext)
@@ -482,12 +499,14 @@ static IntRect elementBoundingBoxInWindowCoordinatesFromNode(Node* node)
 
 #pragma mark Text action
 
-static DictionaryPopupInfo dictionaryPopupInfoForRange(Frame* frame, Range& range, NSDictionary *options, TextIndicatorPresentationTransition presentationTransition)
++ (DictionaryPopupInfo)_dictionaryPopupInfoForRange:(Range&)range inFrame:(Frame*)frame withLookupOptions:(NSDictionary *)lookupOptions indicatorOptions:(TextIndicatorOptions)indicatorOptions transition:(TextIndicatorPresentationTransition)presentationTransition
 {
+    // Dictionary API will accept a whitespace-only string and display UI as if it were real text,
+    // so bail out early to avoid that.
     DictionaryPopupInfo popupInfo;
     if (range.text().stripWhiteSpace().isEmpty())
         return popupInfo;
-    
+
     RenderObject* renderer = range.startContainer().renderer();
     const RenderStyle& style = renderer->style();
 
@@ -499,13 +518,13 @@ static DictionaryPopupInfo dictionaryPopupInfoForRange(Frame* frame, Range& rang
     IntRect rangeRect = frame->view()->contentsToWindow(quads[0].enclosingBoundingBox());
 
     popupInfo.origin = NSMakePoint(rangeRect.x(), rangeRect.y() + (style.fontMetrics().descent() * frame->page()->pageScaleFactor()));
-    popupInfo.options = options;
+    popupInfo.options = lookupOptions;
 
     NSAttributedString *nsAttributedString = editingAttributedStringFromRange(range, IncludeImagesInAttributedString::No);
     RetainPtr<NSMutableAttributedString> scaledNSAttributedString = adoptNS([[NSMutableAttributedString alloc] initWithString:[nsAttributedString string]]);
     NSFontManager *fontManager = [NSFontManager sharedFontManager];
 
-    [nsAttributedString enumerateAttributesInRange:NSMakeRange(0, [nsAttributedString length]) options:0 usingBlock:^(NSDictionary *attributes, NSRange range, BOOL *stop) {
+    [nsAttributedString enumerateAttributesInRange:NSMakeRange(0, [nsAttributedString length]) options:0 usingBlock:^(NSDictionary *attributes, NSRange attributeRange, BOOL *stop) {
         RetainPtr<NSMutableDictionary> scaledAttributes = adoptNS([attributes mutableCopy]);
 
         NSFont *font = [scaledAttributes objectForKey:NSFontAttributeName];
@@ -514,12 +533,12 @@ static DictionaryPopupInfo dictionaryPopupInfoForRange(Frame* frame, Range& rang
             [scaledAttributes setObject:font forKey:NSFontAttributeName];
         }
 
-        [scaledNSAttributedString addAttributes:scaledAttributes.get() range:range];
+        [scaledNSAttributedString addAttributes:scaledAttributes.get() range:attributeRange];
     }];
 
     popupInfo.attributedString = scaledNSAttributedString.get();
 
-    if (auto textIndicator = TextIndicator::createWithRange(range, TextIndicatorOptionDefault, presentationTransition))
+    if (auto textIndicator = TextIndicator::createWithRange(range, indicatorOptions, presentationTransition))
         popupInfo.textIndicator = textIndicator->data();
     return popupInfo;
 }
@@ -542,8 +561,7 @@ static DictionaryPopupInfo dictionaryPopupInfoForRange(Frame* frame, Range& rang
     if (!dictionaryRange)
         return nil;
 
-    RefPtr<Range> selectionRange = frame->page()->focusController().focusedOrMainFrame().selection().selection().firstRange();
-    DictionaryPopupInfo dictionaryPopupInfo = dictionaryPopupInfoForRange(frame, *dictionaryRange, options, TextIndicatorPresentationTransition::FadeIn);
+    DictionaryPopupInfo dictionaryPopupInfo = [WebImmediateActionController _dictionaryPopupInfoForRange:*dictionaryRange inFrame:frame withLookupOptions:options indicatorOptions:TextIndicatorOptionDefault transition: TextIndicatorPresentationTransition::FadeIn];
     if (!dictionaryPopupInfo.attributedString)
         return nil;
 

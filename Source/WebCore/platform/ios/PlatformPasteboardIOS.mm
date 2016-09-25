@@ -32,6 +32,7 @@
 #import "Pasteboard.h"
 #import "SharedBuffer.h"
 #import "SoftLinking.h"
+#import <MobileCoreServices/MobileCoreServices.h>
 
 SOFT_LINK_FRAMEWORK(UIKit)
 SOFT_LINK_CLASS(UIKit, UIPasteboard)
@@ -44,31 +45,6 @@ SOFT_LINK_CLASS(UIKit, UIPasteboard)
 - (NSArray *)valuesForPasteboardType:(NSString *)pasteboardType inItemSet:(NSIndexSet *)itemSet;
 - (NSInteger)changeCount;
 @end
-
-// FIXME: The following soft linking and #define needs to be shared with PasteboardIOS.mm.
-SOFT_LINK_FRAMEWORK(MobileCoreServices)
-
-SOFT_LINK_CONSTANT(MobileCoreServices, kUTTypeText, CFStringRef)
-SOFT_LINK_CONSTANT(MobileCoreServices, kUTTypePNG, CFStringRef)
-SOFT_LINK_CONSTANT(MobileCoreServices, kUTTypeJPEG, CFStringRef)
-SOFT_LINK_CONSTANT(MobileCoreServices, kUTTypeURL, CFStringRef)
-SOFT_LINK_CONSTANT(MobileCoreServices, kUTTypeTIFF, CFStringRef)
-SOFT_LINK_CONSTANT(MobileCoreServices, kUTTypeGIF, CFStringRef)
-SOFT_LINK_CONSTANT(MobileCoreServices, kUTTagClassMIMEType, CFStringRef)
-SOFT_LINK_CONSTANT(MobileCoreServices, kUTTagClassFilenameExtension, CFStringRef)
-SOFT_LINK_CONSTANT(MobileCoreServices, kUTTypeRTFD, CFStringRef)
-SOFT_LINK_CONSTANT(MobileCoreServices, kUTTypeRTF, CFStringRef)
-
-#define kUTTypeText getkUTTypeText()
-#define kUTTypePNG  getkUTTypePNG()
-#define kUTTypeJPEG getkUTTypeJPEG()
-#define kUTTypeURL  getkUTTypeURL()
-#define kUTTypeTIFF getkUTTypeTIFF()
-#define kUTTypeGIF  getkUTTypeGIF()
-#define kUTTagClassMIMEType getkUTTagClassMIMEType()
-#define kUTTagClassFilenameExtension getkUTTagClassFilenameExtension()
-#define kUTTypeRTFD getkUTTypeRTFD()
-#define kUTTypeRTF getkUTTypeRTF()
 
 namespace WebCore {
 
@@ -86,7 +62,7 @@ void PlatformPasteboard::getTypes(Vector<String>&)
 {
 }
 
-PassRefPtr<SharedBuffer> PlatformPasteboard::bufferForType(const String&)
+RefPtr<SharedBuffer> PlatformPasteboard::bufferForType(const String&)
 {
     return nullptr;
 }
@@ -125,7 +101,7 @@ long PlatformPasteboard::setTypes(const Vector<String>&)
     return 0;
 }
 
-long PlatformPasteboard::setBufferForType(PassRefPtr<SharedBuffer>, const String&)
+long PlatformPasteboard::setBufferForType(SharedBuffer*, const String&)
 {
     return 0;
 }
@@ -162,7 +138,7 @@ void PlatformPasteboard::write(const PasteboardWebContent& content)
     }
 
     if (content.dataInRTFDFormat)
-        [representations setValue:content.dataInRTFDFormat->createNSData().get() forKey:(NSString *)kUTTypeRTFD];
+        [representations setValue:content.dataInRTFDFormat->createNSData().get() forKey:(NSString *)kUTTypeFlatRTFD];
     if (content.dataInRTFFormat)
         [representations setValue:content.dataInRTFFormat->createNSData().get() forKey:(NSString *)kUTTypeRTF];
     [representations setValue:content.dataInStringFormat forKey:(NSString *)kUTTypeText];
@@ -196,7 +172,7 @@ int PlatformPasteboard::count()
     return [m_pasteboard numberOfItems];
 }
 
-PassRefPtr<SharedBuffer> PlatformPasteboard::readBuffer(int index, const String& type)
+RefPtr<SharedBuffer> PlatformPasteboard::readBuffer(int index, const String& type)
 {
     NSIndexSet *indexSet = [NSIndexSet indexSetWithIndex:index];
 

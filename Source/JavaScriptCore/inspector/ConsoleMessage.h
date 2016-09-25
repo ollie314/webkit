@@ -28,8 +28,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ConsoleMessage_h
-#define ConsoleMessage_h
+#pragma once
 
 #include "ConsoleTypes.h"
 #include "InspectorFrontendDispatchers.h"
@@ -59,12 +58,14 @@ public:
     void updateRepeatCountInConsole(ConsoleFrontendDispatcher&);
 
     MessageSource source() const { return m_source; }
-    const String& message() const { return m_message; }
     MessageType type() const { return m_type; }
-    JSC::ExecState* scriptState() const;
+    MessageLevel level() const { return m_level; }
+    const String& message() const { return m_message; }
     const String& url() const { return m_url; }
     unsigned line() const { return m_line; }
     unsigned column() const { return m_column; }
+
+    JSC::ExecState* scriptState() const;
 
     void incrementCount() { ++m_repeatCount; }
 
@@ -91,5 +92,3 @@ private:
 };
 
 } // namespace Inspector
-
-#endif // ConsoleMessage_h

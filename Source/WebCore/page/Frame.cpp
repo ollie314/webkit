@@ -5,7 +5,7 @@
  *                     2000 Simon Hausmann <hausmann@kde.org>
  *                     2000 Stefan Schimanski <1Stein@gmx.de>
  *                     2001 George Staikos <staikos@kde.org>
- * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2004-2016 Apple Inc. All rights reserved.
  * Copyright (C) 2005 Alexey Proskuryakov <ap@nypop.com>
  * Copyright (C) 2008 Nokia Corporation and/or its subsidiary(-ies)
  * Copyright (C) 2008 Eric Seidel <eric@webkit.org>
@@ -32,6 +32,7 @@
 
 #include "AnimationController.h"
 #include "ApplyStyleCommand.h"
+#include "AuthorStyleSheets.h"
 #include "BackForwardController.h"
 #include "CSSComputedStyleDeclaration.h"
 #include "CSSPropertyNames.h"
@@ -110,6 +111,7 @@
 #include <bindings/ScriptValue.h>
 #include <wtf/RefCountedLeakCounter.h>
 #include <wtf/StdLibExtras.h>
+#include <wtf/text/StringBuilder.h>
 #include <yarr/RegularExpression.h>
 
 #if PLATFORM(IOS)
@@ -160,7 +162,6 @@ Frame::Frame(Page& page, HTMLFrameOwnerElement* ownerElement, FrameLoaderClient&
     , m_script(std::make_unique<ScriptController>(*this))
     , m_editor(std::make_unique<Editor>(*this))
     , m_selection(std::make_unique<FrameSelection>(this))
-    , m_eventHandler(std::make_unique<EventHandler>(*this))
     , m_animationController(std::make_unique<AnimationController>(*this))
 #if PLATFORM(IOS)
     , m_overflowAutoScrollTimer(*this, &Frame::overflowAutoScrollTimerFired)
@@ -169,6 +170,7 @@ Frame::Frame(Page& page, HTMLFrameOwnerElement* ownerElement, FrameLoaderClient&
     , m_pageZoomFactor(parentPageZoomFactor(this))
     , m_textZoomFactor(parentTextZoomFactor(this))
     , m_activeDOMObjectsAndAnimationsSuspendedCount(0)
+    , m_eventHandler(std::make_unique<EventHandler>(*this))
 {
     AtomicString::init();
     HTMLNames::init();
@@ -217,8 +219,8 @@ Frame::~Frame()
 
     disconnectOwnerElement();
 
-    for (auto& observer : m_destructionObservers)
-        observer->frameDestroyed();
+    while (auto* destructionObserver = m_destructionObservers.takeAny())
+        destructionObserver->frameDestroyed();
 
     if (!isMainFrame())
         m_mainFrame.selfOnlyDeref();
@@ -245,13 +247,15 @@ void Frame::setView(RefPtr<FrameView>&& view)
     // Prepare for destruction now, so any unload event handlers get run and the DOMWindow is
     // notified. If we wait until the view is destroyed, then things won't be hooked up enough for
     // these calls to work.
-    if (!view && m_doc && !m_doc->inPageCache())
+    if (!view && m_doc && m_doc->pageCacheState() != Document::InPageCache)
         m_doc->prepareForDestruction();
     
     if (m_view)
         m_view->unscheduleRelayout();
     
-    eventHandler().clear();
+    // This may be called during destruction, so need to do a null check.
+    if (m_eventHandler)
+        m_eventHandler->clear();
 
     m_view = WTFMove(view);
 
@@ -265,7 +269,7 @@ void Frame::setDocument(RefPtr<Document>&& newDocument)
 {
     ASSERT(!newDocument || newDocument->frame() == this);
 
-    if (m_doc && !m_doc->inPageCache())
+    if (m_doc && m_doc->pageCacheState() != Document::InPageCache)
         m_doc->prepareForDestruction();
 
     m_doc = newDocument.copyRef();
@@ -474,7 +478,7 @@ String Frame::matchLabelsAgainstElement(const Vector<String>& labels, Element* e
     if (!resultFromNameAttribute.isEmpty())
         return resultFromNameAttribute;
     
-    return matchLabelsAgainstString(labels, element->fastGetAttribute(idAttr));
+    return matchLabelsAgainstString(labels, element->attributeWithoutSynchronization(idAttr));
 }
 
 #if PLATFORM(IOS)
@@ -640,7 +644,7 @@ void Frame::setPrinting(bool printing, const FloatSize& pageSize, const FloatSiz
     m_doc->setPrinting(printing);
     view()->adjustMediaTypeForPrinting(printing);
 
-    m_doc->styleResolverChanged(RecalcStyleImmediately);
+    m_doc->authorStyleSheets().didChange(RecalcStyleImmediately);
     if (shouldUsePrintingLayout()) {
         view()->forceLayoutForPagination(pageSize, originalPageSize, maximumShrinkRatio, shouldAdjustViewSize);
     } else {
@@ -689,35 +693,17 @@ void Frame::injectUserScripts(UserScriptInjectionTime injectionTime)
     if (loader().stateMachine().creatingInitialEmptyDocument() && !settings().shouldInjectUserScriptsInInitialEmptyDocument())
         return;
 
-    const auto* userContentController = m_page->userContentController();
-    if (!userContentController)
+    Document* document = this->document();
+    if (!document)
         return;
 
-    // Walk the hashtable. Inject by world.
-    const UserScriptMap* userScripts = userContentController->userScripts();
-    if (!userScripts)
-        return;
+    m_page->userContentProvider().forEachUserScript([&](DOMWrapperWorld& world, const UserScript& script) {
+        if (script.injectedFrames() == InjectInTopFrameOnly && ownerElement())
+            return;
 
-    for (const auto& worldAndUserScript : *userScripts)
-        injectUserScriptsForWorld(*worldAndUserScript.key, *worldAndUserScript.value, injectionTime);
-}
-
-void Frame::injectUserScriptsForWorld(DOMWrapperWorld& world, const UserScriptVector& userScripts, UserScriptInjectionTime injectionTime)
-{
-    if (userScripts.isEmpty())
-        return;
-
-    Document* doc = document();
-    if (!doc)
-        return;
-
-    for (auto& script : userScripts) {
-        if (script->injectedFrames() == InjectInTopFrameOnly && ownerElement())
-            continue;
-
-        if (script->injectionTime() == injectionTime && UserContentURLPattern::matchesPatterns(doc->url(), script->whitelist(), script->blacklist()))
-            m_script->evaluateInWorld(ScriptSourceCode(script->source(), script->url()), world);
-    }
+        if (script.injectionTime() == injectionTime && UserContentURLPattern::matchesPatterns(document->url(), script.whitelist(), script.blacklist()))
+            m_script->evaluateInWorld(ScriptSourceCode(script.source(), script.url()), world);
+    });
 }
 
 RenderView* Frame::contentRenderer() const
@@ -1054,6 +1040,11 @@ bool Frame::isURLAllowed(const URL& url) const
         }
     }
     return true;
+}
+
+bool Frame::isAlwaysOnLoggingAllowed() const
+{
+    return page() && page()->isAlwaysOnLoggingAllowed();
 }
 
 } // namespace WebCore

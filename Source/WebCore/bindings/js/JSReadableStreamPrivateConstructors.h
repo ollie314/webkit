@@ -19,7 +19,7 @@
 #ifndef JSReadableStreamPrivateConstructors_h
 #define JSReadableStreamPrivateConstructors_h
 
-#if ENABLE(STREAMS_API)
+#if ENABLE(READABLE_STREAM_API)
 
 namespace JSC {
 
@@ -33,8 +33,8 @@ namespace WebCore {
 
 class JSDOMGlobalObject;
 
-JSC::JSObject* createReadableStreamControllerPrivateConstructor(JSC::VM&, JSDOMGlobalObject&);
-JSC::JSObject* createReadableStreamReaderPrivateConstructor(JSC::VM&, JSDOMGlobalObject&);
+JSC::JSObject* createReadableStreamDefaultReaderPrivateConstructor(JSC::VM&, JSDOMGlobalObject&);
+JSC::JSObject* createReadableStreamDefaultControllerPrivateConstructor(JSC::VM&, JSDOMGlobalObject&);
 
 } // namespace WebCore
 

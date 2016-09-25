@@ -27,10 +27,6 @@
 #include <functional>
 #include <wtf/text/AtomicString.h>
 
-#if USE(APPLE_INTERNAL_SDK)
-#import <WebKitAdditions/EventNamesAdditions.h>
-#endif
-
 namespace WebCore {
 
 #if !defined(ADDITIONAL_DOM_EVENT_NAMES_FOR_EACH)
@@ -72,6 +68,7 @@ namespace WebCore {
     macro(blur) \
     macro(boundary) \
     macro(cached) \
+    macro(cancel) \
     macro(canplay) \
     macro(canplaythrough) \
     macro(change) \
@@ -141,6 +138,7 @@ namespace WebCore {
     macro(loadend) \
     macro(loading) \
     macro(loadingdone) \
+    macro(loadingerror) \
     macro(loadstart) \
     macro(mark) \
     macro(message) \
@@ -168,6 +166,8 @@ namespace WebCore {
     macro(pageshow) \
     macro(paste) \
     macro(pause) \
+    macro(paymentauthorized) \
+    macro(paymentmethodselected) \
     macro(play) \
     macro(playing) \
     macro(pointerlockchange) \
@@ -182,6 +182,7 @@ namespace WebCore {
     macro(removetrack) \
     macro(reset) \
     macro(resize) \
+    macro(resourcetimingbufferfull) \
     macro(result) \
     macro(resume) \
     macro(scroll) \
@@ -192,8 +193,11 @@ namespace WebCore {
     macro(select) \
     macro(selectionchange) \
     macro(selectstart) \
+    macro(shippingmethodselected) \
+    macro(shippingcontactselected) \
     macro(show) \
     macro(signalingstatechange) \
+    macro(slotchange) \
     macro(soundend) \
     macro(soundstart) \
     macro(sourceclose) \
@@ -215,6 +219,7 @@ namespace WebCore {
     macro(tonechange) \
     macro(touchcancel) \
     macro(touchend) \
+    macro(touchforcechange) \
     macro(touchmove) \
     macro(touchstart) \
     macro(track) \
@@ -226,6 +231,7 @@ namespace WebCore {
     macro(updateready) \
     macro(updatestart) \
     macro(upgradeneeded) \
+    macro(validatemerchant) \
     macro(versionchange) \
     macro(visibilitychange) \
     macro(volumechange) \
@@ -258,7 +264,6 @@ namespace WebCore {
     macro(webkitpresentationmodechanged) \
     macro(webkitregionoversetchange) \
     macro(webkitremovesourcebuffer) \
-    macro(webkitresourcetimingbufferfull) \
     macro(webkitsourceclose) \
     macro(webkitsourceended) \
     macro(webkitsourceopen) \
@@ -305,7 +310,7 @@ public:
     bool isGamepadEventType(const AtomicString& eventType) const;
 #endif
 
-    std::array<std::reference_wrapper<const AtomicString>, 4> touchEventNames() const;
+    std::array<std::reference_wrapper<const AtomicString>, 5> touchEventNames() const;
 
 private:
     EventNames(); // Private to prevent accidental call to EventNames() instead of eventNames().
@@ -331,7 +336,8 @@ inline bool EventNames::isTouchEventType(const AtomicString& eventType) const
     return eventType == touchstartEvent
         || eventType == touchmoveEvent
         || eventType == touchendEvent
-        || eventType == touchcancelEvent;
+        || eventType == touchcancelEvent
+        || eventType == touchforcechangeEvent;
 }
 
 inline bool EventNames::isWheelEventType(const AtomicString& eventType) const
@@ -340,9 +346,9 @@ inline bool EventNames::isWheelEventType(const AtomicString& eventType) const
         || eventType == mousewheelEvent;
 }
 
-inline std::array<std::reference_wrapper<const AtomicString>, 4> EventNames::touchEventNames() const
+inline std::array<std::reference_wrapper<const AtomicString>, 5> EventNames::touchEventNames() const
 {
-    return { { touchstartEvent, touchmoveEvent, touchendEvent, touchcancelEvent } };
+    return { { touchstartEvent, touchmoveEvent, touchendEvent, touchcancelEvent, touchforcechangeEvent } };
 }
 
 #if ENABLE(GAMEPAD)

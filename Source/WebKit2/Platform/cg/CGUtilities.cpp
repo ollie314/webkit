@@ -26,8 +26,6 @@
 #include "config.h"
 #include "CGUtilities.h"
 
-#include <wtf/RetainPtr.h>
-
 namespace WebKit {
 
 void paintImage(CGContextRef context, CGImageRef image, CGFloat scaleFactor, CGPoint destination, CGRect source)
@@ -46,12 +44,6 @@ void paintImage(CGContextRef context, CGImageRef image, CGFloat scaleFactor, CGP
     CGContextDrawImage(context, CGRectMake(destX, destY, imageWidth, imageHeight), image);
 
     CGContextRestoreGState(context);
-}
-
-void paintBitmapContext(CGContextRef context, CGContextRef bitmapContext, CGFloat scaleFactor, CGPoint destination, CGRect source)
-{
-    RetainPtr<CGImageRef> image = adoptCF(CGBitmapContextCreateImage(bitmapContext));
-    paintImage(context, image.get(), scaleFactor, destination, source);
 }
 
 } // namespace WebKit

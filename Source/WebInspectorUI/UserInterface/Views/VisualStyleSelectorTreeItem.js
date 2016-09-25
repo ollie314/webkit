@@ -53,13 +53,17 @@ WebInspector.VisualStyleSelectorTreeItem = class VisualStyleSelectorTreeItem ext
             break;
         }
 
+        let iconClasses = [iconClassName];
+        if (style.ownerRule && style.ownerRule.hasMatchedPseudoElementSelector())
+            iconClasses.push(WebInspector.CSSStyleDeclarationSection.PseudoElementSelectorStyleClassName);
+
         title = title.trim();
 
-        super(["visual-style-selector-item", iconClassName], title, subtitle, style);
+        super(["visual-style-selector-item", ...iconClasses], title, subtitle, style);
 
         this._delegate = delegate;
 
-        this._iconClassName = iconClassName;
+        this._iconClasses = iconClasses;
         this._lastValue = title;
         this._enableEditing = true;
         this._hasInvalidSelector = false;
@@ -69,7 +73,7 @@ WebInspector.VisualStyleSelectorTreeItem = class VisualStyleSelectorTreeItem ext
 
     get iconClassName()
     {
-        return this._iconClassName;
+        return this._iconClasses.join(" ");
     }
 
     get selectorText()
@@ -164,6 +168,8 @@ WebInspector.VisualStyleSelectorTreeItem = class VisualStyleSelectorTreeItem ext
             return;
 
         if (WebInspector.CSSStyleManager.ForceablePseudoClasses.every((className) => !this.representedObject.selectorText.includes(":" + className))) {
+            contextMenu.appendSeparator();
+
             for (let pseudoClass of WebInspector.CSSStyleManager.ForceablePseudoClasses) {
                 if (pseudoClass === "visited" && this.representedObject.node.nodeName() !== "A")
                     continue;
@@ -177,6 +183,8 @@ WebInspector.VisualStyleSelectorTreeItem = class VisualStyleSelectorTreeItem ext
                 });
             }
         }
+
+        contextMenu.appendSeparator();
 
         for (let pseudoElement of WebInspector.CSSStyleManager.PseudoElementNames) {
             let pseudoElementSelector = "::" + pseudoElement;
@@ -268,6 +276,9 @@ WebInspector.VisualStyleSelectorTreeItem = class VisualStyleSelectorTreeItem ext
 
         this._iconElement.title = null;
         this.mainTitleElement.title = null;
+
+        let hasMatchedPseudoElementSelector = this.representedObject.ownerRule && this.representedObject.ownerRule.hasMatchedPseudoElementSelector();
+        this._iconClasses.toggleIncludes(WebInspector.CSSStyleDeclarationSection.PseudoElementSelectorStyleClassName, hasMatchedPseudoElementSelector);
     }
 
     _handleIconElementClicked(event)
