@@ -197,7 +197,7 @@ Page::Page(PageConfiguration&& pageConfiguration)
     , m_pageScaleFactor(1)
     , m_zoomedOutPageScaleFactor(0)
     , m_topContentInset(0)
-#if ENABLE(IOS_TEXT_AUTOSIZING)
+#if ENABLE(TEXT_AUTOSIZING)
     , m_textAutosizingWidth(0)
 #endif
     , m_suppressScrollbarAnimations(false)
@@ -424,7 +424,7 @@ void Page::setViewMode(ViewMode viewMode)
         m_mainFrame->view()->forceLayout();
 
     if (m_mainFrame->document())
-        m_mainFrame->document()->authorStyleSheets().didChange(RecalcStyleImmediately);
+        m_mainFrame->document()->authorStyleSheets().didChangeContentsOrInterpretation();
 }
 #endif // ENABLE(VIEW_MODE_CSS_MEDIA)
 
@@ -502,7 +502,7 @@ void Page::setNeedsRecalcStyleInAllFrames()
 {
     for (Frame* frame = &mainFrame(); frame; frame = frame->tree().traverseNext()) {
         if (Document* document = frame->document())
-            document->authorStyleSheets().didChange(DeferRecalcStyle);
+            document->authorStyleSheets().didChangeContentsOrInterpretation();
     }
 }
 
@@ -1163,7 +1163,7 @@ void Page::invalidateInjectedStyleSheetCacheInAllFrames()
         if (!document)
             continue;
         document->extensionStyleSheets().invalidateInjectedStyleSheetCache();
-        document->authorStyleSheets().didChange(DeferRecalcStyle);
+        document->authorStyleSheets().didChangeContentsOrInterpretation();
     }
 }
 

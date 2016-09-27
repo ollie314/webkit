@@ -80,10 +80,7 @@ public:
     ~Download();
 
     void start();
-
-#if !USE(NETWORK_SESSION)
     void startWithHandle(WebCore::ResourceHandle*, const WebCore::ResourceResponse&);
-#endif
     void resume(const IPC::DataReference& resumeData, const String& path, const SandboxExtension::Handle&);
     void cancel();
 
@@ -100,7 +97,12 @@ public:
     void didReceiveResponse(const WebCore::ResourceResponse&);
     void didReceiveData(uint64_t length);
     bool shouldDecodeSourceDataOfMIMEType(const String& mimeType);
+#if !USE(NETWORK_SESSION)
     String decideDestinationWithSuggestedFilename(const String& filename, bool& allowOverwrite);
+#endif
+    void decideDestinationWithSuggestedFilenameAsync(const String&);
+    void didDecideDownloadDestination(const String& destinationPath, const SandboxExtension::Handle&, bool allowOverwrite);
+    void continueDidReceiveResponse();
     void didCreateDestination(const String& path);
     void didFinish();
     void platformDidFinish();
@@ -114,7 +116,9 @@ private:
 
 #if !USE(NETWORK_SESSION)
     void startNetworkLoad();
+    void startNetworkLoadWithHandle(WebCore::ResourceHandle*, const WebCore::ResourceResponse&);
 #endif
+    void cancelNetworkLoad();
 
     void platformInvalidate();
 

@@ -1,3 +1,193 @@
+2016-09-27  Chris Dumez  <cdumez@apple.com>
+
+        [WK2] Navigating to a Blob URL does not trigger a download
+        https://bugs.webkit.org/show_bug.cgi?id=162574
+
+        Reviewed by Darin Adler.
+
+        Add API that tests navigating to a Blob URL and checks that that the load
+        properly gets converted into a download.
+
+        * TestWebKitAPI/TestWebKitAPI.xcodeproj/project.pbxproj:
+        * TestWebKitAPI/Tests/WebKit2Cocoa/Download.mm:
+        (-[BlobDownloadDelegate _downloadDidStart:]):
+        (-[BlobDownloadDelegate _download:didReceiveResponse:]):
+        (-[BlobDownloadDelegate _download:didReceiveData:]):
+        (-[BlobDownloadDelegate _download:decideDestinationWithSuggestedFilename:allowOverwrite:]):
+        (-[BlobDownloadDelegate _downloadDidFinish:]):
+        (-[DownloadBlobURLNavigationDelegate webView:decidePolicyForNavigationAction:decisionHandler:]):
+        (TEST):
+        * TestWebKitAPI/Tests/WebKit2Cocoa/DownloadRequestBlobURL.html: Added.
+
+2016-09-27  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK] Install binaries to pkglibexecdir rather than bindir
+        https://bugs.webkit.org/show_bug.cgi?id=162602
+
+        Reviewed by Carlos Garcia Campos.
+
+        Install MiniBrowser to LIBEXEC_INSTALL_DIR rather than EXEC_INSTALL_DIR.
+
+        * MiniBrowser/gtk/CMakeLists.txt:
+
+2016-09-27  Gyuyoung Kim  <gyuyoung.kim@webkit.org>
+
+        [EFL] Locate color picker popup to center of window
+        https://bugs.webkit.org/show_bug.cgi?id=162540
+
+        Reviewed by Michael Catanzaro.
+
+        Color picker popup hasn't located in a center of main window, because
+        elm_win_center() function doesn't work correctly. It looks a bug.
+
+        To fix the problem, this patch uses evas_object_geometry_set() instead.
+
+        * MiniBrowser/efl/main.c:
+        (_color_picker_request_cb):
+
+2016-09-27  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK] Disable ACCELERATED_2D_CANVAS when using build-webkit
+        https://bugs.webkit.org/show_bug.cgi?id=162600
+
+        Reviewed by Carlos Garcia Campos.
+
+        * Scripts/webkitperl/FeatureList.pm:
+
+2016-09-27  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        PyGIWarnings printed by webkit-patch
+        https://bugs.webkit.org/show_bug.cgi?id=152470
+
+        Reviewed by Carlos Garcia Campos.
+
+        Update to a newer version of the keyring module, since this bug has been fixed upstream for
+        a while. But be careful not to update to the latest version, since it has some compatibility
+        breaks and requires the SecretService python module on Linux, but I couldn't figure out how
+        to autoinstall it successfully.
+
+        * Scripts/webkitpy/thirdparty/__init__.py:
+        (AutoinstallImportHook._install_keyring):
+
+2016-09-26  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Add Sierra to the flakiness dashboard.
+        https://bugs.webkit.org/show_bug.cgi?id=162509
+
+        Reviewed by Alexey Proskuryakov.
+
+        * TestResultServer/static-dashboards/builders.jsonp:
+
+2016-09-26  Daniel Bates  <dabates@apple.com>
+
+        Rename IOS_TEXT_AUTOSIZING to TEXT_AUTOSIZING
+        https://bugs.webkit.org/show_bug.cgi?id=162365
+
+        Reviewed by Simon Fraser.
+
+        * DumpRenderTree/TestRunner.h:
+        * TestWebKitAPI/Configurations/FeatureDefines.xcconfig:
+
+2016-09-26  Tomas Popela  <tpopela@redhat.com>
+
+        [GTK] TestContextMenu is failing
+        https://bugs.webkit.org/show_bug.cgi?id=162569
+
+        We cannot use the MP3 file in the TestContextMenu, as it will not work
+        by default on most distributions (that don't have an MP3 codecs
+        installed). Change the test to use OGG file instead.
+
+        Reviewed by Michael Catanzaro.
+
+        * TestWebKitAPI/Tests/WebKit2Gtk/TestContextMenu.cpp:
+        (testContextMenuDefaultMenu):
+
+2016-09-26  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Using char16_t instead of wchar_t in TestWebKitAPI URLParser tests
+        https://bugs.webkit.org/show_bug.cgi?id=162537
+
+        Reviewed by Alex Christensen.
+
+        Some build bot (Linux ARM GTK port) fails since we cannot select
+        the specific StringBuilder::append method for wchar_t.
+
+        wchar_t implementation highly depends on platforms. sizeof(wchar_t) == 2
+        in Windows, while sizeof(wchar_t) == 4 in Linux and OS X. So, ICU
+        uses wchar_t for UChar (UTF-16) in Windows while it doesn't in other
+        platforms.
+
+        StringBuilder::append is overloaded for UChar. In Windows, we can pass
+        wchar_t since UChar is wchar_t. However, we cannot do that in other platforms.
+
+        Instead of using wchar_t, we use more platform portable UTF-16 literal for
+        testing. Use char16_t and C++11 UTF-16 literal.
+
+        * TestWebKitAPI/Tests/WebCore/URLParser.cpp:
+        (TestWebKitAPI::utf16String):
+        (TestWebKitAPI::TEST_F):
+        (TestWebKitAPI::wideString): Deleted.
+
+2016-09-25  Gyuyoung Kim  <gyuyoung.kim@webkit.org>
+
+        [EFL] Adjust EFL indentation to EFL MiniBrowser
+        https://bugs.webkit.org/show_bug.cgi?id=162542
+
+        Unreviewed, EFL simple coding style fix.
+
+        Some functions wasn't applied EFL coding style in prefix fix.
+
+        * MiniBrowser/efl/main.c:
+        (_key_down_cb):
+        (view_focus_set):
+        (_mouse_down_cb):
+        (title_set):
+        (_title_changed_cb):
+        (_url_changed_cb):
+        (_back_forward_list_changed_cb):
+        (_progress_cb):
+        (_error_cb):
+        (_download_request_cb):
+        (close_file_picker):
+        (_filepicker_parent_deletion_cb):
+        (_filepicker_deletion_cb):
+        (_fileselector_done_cb):
+        (_file_chooser_request_cb):
+        (_download_finished_cb):
+        (_download_failed_cb):
+        (_color_changed_cb):
+        (_color_item_selected_cb):
+        (_color_picker_ok_clicked_cb):
+        (_color_picker_cancel_clicked_cb):
+        (_color_picker_dismiss_cb):
+        (_color_picker_request_cb):
+        (quit):
+        (has_scheme):
+        (url_from_user_input):
+        (url_load_from_user_input):
+        (_url_bar_activated_cb):
+        (_url_bar_clicked_cb):
+        (_search_field_aborted_cb):
+        (_search_field_activated_cb):
+        (_search_field_clicked_cb):
+        (_back_button_clicked_cb):
+        (_forward_button_clicked_cb):
+        (_search_backward_button_clicked_cb):
+        (_search_forward_button_clicked_cb):
+        (_search_case_option_changed):
+        (_search_word_start_option_changed_cb):
+        (_search_close_button_clicked_cb):
+        (_refresh_button_clicked_cb):
+        (_stop_button_clicked_cb):
+        (list_item_label_get):
+        (_list_item_select_cb):
+        (navigation_button_longpress_process):
+        (_forward_button_longpress_cb):
+        (_back_button_longpress_cb):
+        (quit_event_loop):
+        (_ok_clicked_cb):
+        (_file_entry_dialog_show):
+
 2016-09-24  Chris Dumez  <cdumez@apple.com>
 
         [WK2] anchor.download attribute value is ignored by NETWORK_SESSION code path

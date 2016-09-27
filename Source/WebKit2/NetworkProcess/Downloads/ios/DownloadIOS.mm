@@ -132,7 +132,7 @@ void Download::resume(const IPC::DataReference&, const String&, const SandboxExt
     notImplemented();
 }
 
-void Download::startWithHandle(ResourceHandle* handle, const ResourceResponse& response)
+void Download::startNetworkLoadWithHandle(ResourceHandle* handle, const ResourceResponse& response)
 {
     CFURLDownloadClient client;
     setUpDownloadClient(client, *this);
@@ -142,7 +142,7 @@ void Download::startWithHandle(ResourceHandle* handle, const ResourceResponse& r
 #pragma clang diagnostic pop
 }
 
-void Download::cancel()
+void Download::cancelNetworkLoad()
 {
     notImplemented();
 }

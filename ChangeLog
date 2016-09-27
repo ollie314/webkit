@@ -1,3 +1,53 @@
+2016-09-27  Konstantin Tokarev  <annulen@yandex.ru>
+
+        [cmake] Simplify Clang checks and prepare for compiler ID split
+        https://bugs.webkit.org/show_bug.cgi?id=162609
+
+        Reviewed by Michael Catanzaro.
+
+        CMake 3.x introduces separate compiler id for AppleClang, making condition
+        (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang") inappropriate as check for
+        any clang version. Introduce COMPILER_IS_CLANG instead, which is also
+        shorter that CMAKE_CXX_COMPILER_ID comparison.
+
+        * CMakeLists.txt:
+        * Source/cmake/OptionsCommon.cmake:
+        * Source/cmake/WebKitHelpers.cmake:
+        * Source/cmake/OptionsEfl.cmake: Use CMAKE_COMPILER_IS_GNUCXX instead of
+        !Clang check because this is what was really meant here.
+
+2016-09-27  Konstantin Tokarev  <annulen@yandex.ru>
+
+        [cmake] Added COMPILER_IS_GCC_OR_CLANG variable to simplify conditions.
+        https://bugs.webkit.org/show_bug.cgi?id=162605
+
+        Reviewed by Michael Catanzaro.
+
+        * CMakeLists.txt:
+        * Source/cmake/OptionsCommon.cmake:
+        * Source/cmake/WebKitHelpers.cmake:
+
+2016-09-26  Daniel Bates  <dabates@apple.com>
+
+        Rename IOS_TEXT_AUTOSIZING to TEXT_AUTOSIZING
+        https://bugs.webkit.org/show_bug.cgi?id=162365
+
+        Reviewed by Simon Fraser.
+
+        * Source/cmake/OptionsMac.cmake:
+        * Source/cmake/WebKitFeatures.cmake: Substitute ENABLE_TEXT_AUTOSIZING for ENABLE_IOS_TEXT_AUTOSIZING,
+        update the description of this feature to better describe what it does and re-order the define in the
+        list of defines such that it is in sorted order.
+
+2016-09-26  Konstantin Tokarev  <annulen@yandex.ru>
+
+        [cmake] Added an option to disable thin archives when they are undesirable.
+        https://bugs.webkit.org/show_bug.cgi?id=162561
+
+        Reviewed by Michael Catanzaro.
+
+        * Source/cmake/OptionsCommon.cmake: Added USE_THIN_ARCHIVES option.
+
 2016-09-23  Caitlin Potter  <caitp@igalia.com>
 
         [JSC] Implement parsing of Async Functions

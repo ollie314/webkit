@@ -405,6 +405,7 @@ HTMLMediaElement::HTMLMediaElement(const QualifiedName& tagName, Document& docum
     , m_playbackProgressTimer(*this, &HTMLMediaElement::playbackProgressTimerFired)
     , m_scanTimer(*this, &HTMLMediaElement::scanTimerFired)
     , m_playbackControlsManagerBehaviorRestrictionsTimer(*this, &HTMLMediaElement::playbackControlsManagerBehaviorRestrictionsTimerFired)
+    , m_seekToPlaybackPositionEndedTimer(*this, &HTMLMediaElement::seekToPlaybackPositionEndedTimerFired)
     , m_playedTimeRanges()
     , m_asyncEventQueue(*this)
     , m_requestedPlaybackRate(1)
@@ -467,6 +468,7 @@ HTMLMediaElement::HTMLMediaElement(const QualifiedName& tagName, Document& docum
     , m_mediaControlsDependOnPageScaleFactor(false)
     , m_haveSetUpCaptionContainer(false)
 #endif
+    , m_isScrubbingRemotely(false)
 #if ENABLE(VIDEO_TRACK)
     , m_tracksAreReady(true)
     , m_haveVisibleTextTrack(false)
@@ -4048,8 +4050,7 @@ static JSC::JSValue controllerJSValue(JSC::ExecState& exec, JSDOMGlobalObject& g
     
     JSC::Identifier controlsHost = JSC::Identifier::fromString(&vm, "controlsHost");
     JSC::JSValue controlsHostJSWrapper = mediaJSWrapperObject->get(&exec, controlsHost);
-    if (UNLIKELY(scope.exception()))
-        return JSC::jsNull();
+    RETURN_IF_EXCEPTION(scope, JSC::JSValue());
 
     JSC::JSObject* controlsHostJSWrapperObject = JSC::jsDynamicCast<JSC::JSObject*>(controlsHostJSWrapper);
     if (!controlsHostJSWrapperObject)
@@ -4057,8 +4058,7 @@ static JSC::JSValue controllerJSValue(JSC::ExecState& exec, JSDOMGlobalObject& g
 
     JSC::Identifier controllerID = JSC::Identifier::fromString(&vm, "controller");
     JSC::JSValue controllerJSWrapper = controlsHostJSWrapperObject->get(&exec, controllerID);
-    if (UNLIKELY(scope.exception()))
-        return JSC::jsNull();
+    RETURN_IF_EXCEPTION(scope, JSC::JSValue());
 
     return controllerJSWrapper;
 }
@@ -4573,6 +4573,37 @@ void HTMLMediaElement::addBehaviorRestrictionsOnEndIfNecessary()
     m_mediaSession->addBehaviorRestriction(MediaElementSession::RequireUserGestureToControlControlsManager);
     m_playbackControlsManagerBehaviorRestrictionsTimer.stop();
     m_playbackControlsManagerBehaviorRestrictionsTimer.startOneShot(HideMediaControlsAfterEndedDelay);
+}
+
+void HTMLMediaElement::handleSeekToPlaybackPosition(double position)
+{
+#if PLATFORM(MAC)
+    // FIXME: This should ideally use faskSeek, but this causes MediaRemote's playhead to flicker upon release.
+    // Please see <rdar://problem/28457219> for more details.
+    seek(MediaTime::createWithDouble(position));
+    m_seekToPlaybackPositionEndedTimer.stop();
+    m_seekToPlaybackPositionEndedTimer.startOneShot(0.5);
+
+    if (!m_isScrubbingRemotely) {
+        m_isScrubbingRemotely = true;
+        if (!paused())
+            pauseInternal();
+    }
+#else
+    fastSeek(position);
+#endif
+}
+
+void HTMLMediaElement::seekToPlaybackPositionEndedTimerFired()
+{
+#if PLATFORM(MAC)
+    if (!m_isScrubbingRemotely)
+        return;
+
+    PlatformMediaSessionManager::sharedManager().sessionDidEndRemoteScrubbing(*m_mediaSession);
+    m_isScrubbingRemotely = false;
+    m_seekToPlaybackPositionEndedTimer.stop();
+#endif
 }
 
 void HTMLMediaElement::mediaPlayerVolumeChanged(MediaPlayer*)
@@ -6835,8 +6866,7 @@ void HTMLMediaElement::updateMediaControlsAfterPresentationModeChange()
     JSC::JSValue controllerValue = controllerJSValue(*exec, *globalObject, *this);
     JSC::JSObject* controllerObject = controllerValue.toObject(exec);
 
-    if (UNLIKELY(scope.exception()))
-        return;
+    RETURN_IF_EXCEPTION(scope, void());
 
     JSC::JSValue functionValue = controllerObject->get(exec, JSC::Identifier::fromString(exec, "handlePresentationModeChange"));
     if (UNLIKELY(scope.exception()) || functionValue.isUndefinedOrNull())
@@ -6878,8 +6908,7 @@ String HTMLMediaElement::getCurrentMediaControlsStatus()
     JSC::JSValue controllerValue = controllerJSValue(*exec, *globalObject, *this);
     JSC::JSObject* controllerObject = controllerValue.toObject(exec);
 
-    if (UNLIKELY(scope.exception()))
-        return emptyString();
+    RETURN_IF_EXCEPTION(scope, emptyString());
 
     JSC::JSValue functionValue = controllerObject->get(exec, JSC::Identifier::fromString(exec, "getCurrentControlsStatus"));
     if (UNLIKELY(scope.exception()) || functionValue.isUndefinedOrNull())
@@ -6895,8 +6924,7 @@ String HTMLMediaElement::getCurrentMediaControlsStatus()
 
     JSC::JSValue outputValue = JSC::call(exec, function, callType, callData, controllerObject, argList);
 
-    if (UNLIKELY(scope.exception()))
-        return emptyString();
+    RETURN_IF_EXCEPTION(scope, emptyString());
 
     return outputValue.getString(exec);
 }
@@ -7020,7 +7048,7 @@ void HTMLMediaElement::didReceiveRemoteControlCommand(PlatformMediaSession::Remo
     case PlatformMediaSession::SeekToPlaybackPositionCommand:
         ASSERT(argument);
         if (argument)
-            fastSeek(argument->asDouble);
+            handleSeekToPlaybackPosition(argument->asDouble);
         break;
     default:
         { } // Do nothing

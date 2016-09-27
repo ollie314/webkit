@@ -332,6 +332,7 @@ fast/text/all-small-caps-whitespace.html [ Skip ]
 # This test relies on EventSender.keydown(), which is not supported on iOS
 webkit.org/b/155233 fast/events/max-tabindex-focus.html [ Skip ]
 fast/shadow-dom/shadow-host-removal-crash.html [ Skip ]
+fast/shadow-dom/input-element-in-shadow.html [ Skip ]
 
 # The file-wrapper part of <attachment> is not yet working on iOS
 fast/attachment/attachment-type-attribute.html [ Skip ]
@@ -2659,3 +2660,6 @@ css3/font-variant-small-caps-synthesis.html [ ImageOnlyFailure ]
 webkit.org/b/161949 imported/w3c/web-platform-tests/XMLHttpRequest/response-method.htm [ Failure ]
 
 webkit.org/b/130972 transitions/3d/interrupted-transition.html [ Pass Timeout ]
+
+# Only iOS has implemented lettepress.
+fast/text/letterpress-different.html [ Pass ]

@@ -255,7 +255,11 @@ bool MediaPlayerPrivateGStreamerBase::ensureGstGLContext()
     auto& sharedDisplay = PlatformDisplay::sharedDisplayForCompositing();
     if (!m_glDisplay) {
 #if PLATFORM(X11)
+#if USE(GLX)
         m_glDisplay = GST_GL_DISPLAY(gst_gl_display_x11_new_with_display(downcast<PlatformDisplayX11>(sharedDisplay).native()));
+#elif USE(EGL)
+        m_glDisplay = GST_GL_DISPLAY(gst_gl_display_egl_new_with_egl_display(downcast<PlatformDisplayX11>(sharedDisplay).native()));
+#endif
 #elif PLATFORM(WAYLAND)
         m_glDisplay = GST_GL_DISPLAY(gst_gl_display_egl_new_with_egl_display(downcast<PlatformDisplayWayland>(sharedDisplay).native()));
 #endif
@@ -716,7 +720,7 @@ GLContext* MediaPlayerPrivateGStreamerBase::prepareContextForCairoPaint(GstVideo
 }
 
 // This should be called with the sample mutex locked.
-bool MediaPlayerPrivateGStreamerBase::paintToCairoSurface(cairo_surface_t* outputSurface, cairo_device_t* device, GstVideoInfo& videoInfo, const IntSize& size, const IntSize& rotatedSize)
+bool MediaPlayerPrivateGStreamerBase::paintToCairoSurface(cairo_surface_t* outputSurface, cairo_device_t* device, GstVideoInfo& videoInfo, const IntSize& size, const IntSize& rotatedSize, bool flipY)
 {
     GstBuffer* buffer = gst_sample_get_buffer(m_sample.get());
     GstVideoFrame videoFrame;
@@ -749,6 +753,12 @@ bool MediaPlayerPrivateGStreamerBase::paintToCairoSurface(cairo_surface_t* outpu
         ASSERT_NOT_REACHED();
         break;
     }
+
+    if (flipY) {
+        cairo_scale(cr.get(), 1.0f, -1.0f);
+        cairo_translate(cr.get(), 0.0f, -size.height());
+    }
+
     cairo_set_source_surface(cr.get(), surface.get(), 0, 0);
     cairo_set_operator(cr.get(), CAIRO_OPERATOR_SOURCE);
     cairo_paint(cr.get());
@@ -767,7 +777,7 @@ bool MediaPlayerPrivateGStreamerBase::copyVideoTextureToPlatformTexture(Graphics
     if (m_usingFallbackVideoSink)
         return false;
 
-    if (flipY || premultiplyAlpha)
+    if (premultiplyAlpha)
         return false;
 
     GstVideoInfo videoInfo;
@@ -787,7 +797,7 @@ bool MediaPlayerPrivateGStreamerBase::copyVideoTextureToPlatformTexture(Graphics
     context->getTexParameteriv(outputTarget, GL_TEXTURE_MAG_FILTER, &magFilter);
 
     RefPtr<cairo_surface_t> outputSurface = adoptRef(cairo_gl_surface_create_for_texture(glContext->cairoDevice(), CAIRO_CONTENT_COLOR_ALPHA, outputTexture, rotatedSize.width(), rotatedSize.height()));
-    if (!paintToCairoSurface(outputSurface.get(), glContext->cairoDevice(), videoInfo, size, rotatedSize))
+    if (!paintToCairoSurface(outputSurface.get(), glContext->cairoDevice(), videoInfo, size, rotatedSize, flipY))
         return false;
 
     context->bindTexture(outputTarget, outputTexture);
@@ -811,7 +821,7 @@ NativeImagePtr MediaPlayerPrivateGStreamerBase::nativeImageForCurrentTime()
         return nullptr;
 
     RefPtr<cairo_surface_t> rotatedSurface = adoptRef(cairo_gl_surface_create(context->cairoDevice(), CAIRO_CONTENT_COLOR_ALPHA, rotatedSize.width(), rotatedSize.height()));
-    if (!paintToCairoSurface(rotatedSurface.get(), context->cairoDevice(), videoInfo, size, rotatedSize))
+    if (!paintToCairoSurface(rotatedSurface.get(), context->cairoDevice(), videoInfo, size, rotatedSize, false))
         return nullptr;
 
     return rotatedSurface;

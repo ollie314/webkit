@@ -275,7 +275,7 @@ EncodedJSValue jsTestNondeterministicNondeterministicGetterExceptionAttr(ExecSta
         String memoizedResult = castedThis->wrapped().nondeterministicGetterExceptionAttr(ec);
         cursor.appendInput<MemoizedDOMResult<String>>(bindingName.get().string(), memoizedResult, ec);
         JSValue result = jsStringWithCache(state, memoizedResult);
-        setDOMException(state, ec);
+        setDOMException(state, throwScope, ec);
         return JSValue::encode(result);
     }
 
@@ -284,14 +284,14 @@ EncodedJSValue jsTestNondeterministicNondeterministicGetterExceptionAttr(ExecSta
         MemoizedDOMResultBase* input = cursor.fetchInput<MemoizedDOMResultBase>();
         if (input && input->convertTo<String>(memoizedResult)) {
             JSValue result = jsStringWithCache(state, memoizedResult);
-            setDOMException(state, input->exceptionCode());
+            setDOMException(state, throwScope, input->exceptionCode());
             return JSValue::encode(result);
         }
     }
 #endif
     auto& impl = castedThis->wrapped();
     JSValue result = jsStringWithCache(state, impl.nondeterministicGetterExceptionAttr(ec));
-    setDOMException(state, ec);
+    setDOMException(state, throwScope, ec);
     return JSValue::encode(result);
 }
 
@@ -370,8 +370,7 @@ bool setJSTestNondeterministicNondeterministicWriteableAttr(ExecState* state, En
     }
     auto& impl = castedThis->wrapped();
     auto nativeValue = value.toWTFString(state);
-    if (UNLIKELY(throwScope.exception()))
-        return false;
+    RETURN_IF_EXCEPTION(throwScope, false);
     impl.setNondeterministicWriteableAttr(WTFMove(nativeValue));
     return true;
 }
@@ -390,8 +389,7 @@ bool setJSTestNondeterministicNondeterministicExceptionAttr(ExecState* state, En
     }
     auto& impl = castedThis->wrapped();
     auto nativeValue = value.toWTFString(state);
-    if (UNLIKELY(throwScope.exception()))
-        return false;
+    RETURN_IF_EXCEPTION(throwScope, false);
     impl.setNondeterministicExceptionAttr(WTFMove(nativeValue));
     return true;
 }
@@ -410,8 +408,7 @@ bool setJSTestNondeterministicNondeterministicGetterExceptionAttr(ExecState* sta
     }
     auto& impl = castedThis->wrapped();
     auto nativeValue = value.toWTFString(state);
-    if (UNLIKELY(throwScope.exception()))
-        return false;
+    RETURN_IF_EXCEPTION(throwScope, false);
     impl.setNondeterministicGetterExceptionAttr(WTFMove(nativeValue));
     return true;
 }
@@ -431,10 +428,9 @@ bool setJSTestNondeterministicNondeterministicSetterExceptionAttr(ExecState* sta
     auto& impl = castedThis->wrapped();
     ExceptionCode ec = 0;
     auto nativeValue = value.toWTFString(state);
-    if (UNLIKELY(throwScope.exception()))
-        return false;
+    RETURN_IF_EXCEPTION(throwScope, false);
     impl.setNondeterministicSetterExceptionAttr(WTFMove(nativeValue), ec);
-    setDOMException(state, ec);
+    setDOMException(state, throwScope, ec);
     return true;
 }
 
