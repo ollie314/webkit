@@ -1,5 +1,90 @@
 2016-09-27  Chris Dumez  <cdumez@apple.com>
 
+        It should be possible to dispatch events on documents created using DOMParser
+        https://bugs.webkit.org/show_bug.cgi?id=26147
+
+        Reviewed by Ryosuke Niwa.
+
+        Add layout test coverage.
+
+        * fast/dom/parsed-document-dispatchEvent-expected.txt: Added.
+        * fast/dom/parsed-document-dispatchEvent.html: Added.
+
+2016-09-27  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking fast/scrolling/rtl-scrollbars-alternate-iframe-body-dir-attr-does-not-update-scrollbar-placement.html as flaky on Sierra.
+        https://bugs.webkit.org/show_bug.cgi?id=162638
+
+        Unreviewed test gardening.
+
+        * platform/mac-wk2/TestExpectations:
+
+2016-09-27  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Import w3c shadow DOM tests and fix one assertion
+        https://bugs.webkit.org/show_bug.cgi?id=162629
+
+        Reviewed by Chris Dumez.
+
+        Deleted the duplicated copies of tests in fast/shadow/ since this patch re-imports them via web-platform-tests.
+
+        * fast/shadow-dom/Element-interface-attachShadow-expected.txt: Removed.
+        * fast/shadow-dom/Node-prototype-cloneNode-expected.txt: Removed.
+
+2016-09-27  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking imported/w3c/web-platform-tests/media-source/mediasource-liveseekable.html as flaky on mac.
+        https://bugs.webkit.org/show_bug.cgi?id=162626
+
+        Unreviewed test gardening.
+
+        * platform/mac/TestExpectations:
+
+2016-09-27  Chris Dumez  <cdumez@apple.com>
+
+        Second parameter to MutationObserver.observe() should be optional
+        https://bugs.webkit.org/show_bug.cgi?id=162627
+
+        Reviewed by Ryosuke Niwa.
+
+        Rebaseline existing test now that the exception messages are slightly
+        different.
+
+        * fast/dom/MutationObserver/observe-exceptions-expected.txt:
+
+2016-09-27  Dan Bernstein  <mitz@apple.com>
+
+        [iOS] REGRESSION (r182126): Selection highlight and handles aren’t visible with WKSelectionGranularityCharacter
+        https://bugs.webkit.org/show_bug.cgi?id=162577
+        <rdar://problem/28481984>
+
+        Reviewed by Simon Fraser.
+
+        * TestExpectations:
+        * editing/selection/character-granularity-rect-expected.txt: Added.
+        * editing/selection/character-granularity-rect.html: Added.
+        * platform/ios-simulator-wk2/TestExpectations:
+
+2016-09-27  Jer Noble  <jer.noble@apple.com>
+
+        Remove deprecated ENCRYPTED_MEDIA implementation.
+        https://bugs.webkit.org/show_bug.cgi?id=161010
+
+        Reviewed by Eric Carlson.
+
+        * fast/events/constructors/media-key-event-constructor-expected.txt: Removed.
+        * fast/events/constructors/media-key-event-constructor.html: Removed.
+        * media/encrypted-media/encrypted-media-can-play-type-expected.txt: Removed.
+        * media/encrypted-media/encrypted-media-can-play-type-webm-expected.txt: Removed.
+        * media/encrypted-media/encrypted-media-can-play-type-webm.html: Removed.
+        * media/encrypted-media/encrypted-media-can-play-type.html: Removed.
+        * platform/mac-wk1/js/dom/global-constructors-attributes-expected.txt:
+        * platform/mac-yosemite/js/dom/global-constructors-attributes-expected.txt:
+        * platform/mac/fast/events/constructors/media-key-event-constructor-expected.txt: Removed.
+        * platform/mac/js/dom/global-constructors-attributes-expected.txt:
+
+2016-09-27  Chris Dumez  <cdumez@apple.com>
+
         [WK2] Navigating to a Blob URL does not trigger a download
         https://bugs.webkit.org/show_bug.cgi?id=162574
 

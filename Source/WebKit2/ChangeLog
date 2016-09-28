@@ -1,3 +1,45 @@
+2016-09-20  Anders Carlsson  <andersca@apple.com>
+
+        PlatformEvent::m_modifiers should be an OptionSet
+        https://bugs.webkit.org/show_bug.cgi?id=162326
+
+        Reviewed by Daniel Bates.
+
+        * Shared/WebEventConversion.cpp:
+        (WebKit::WebKit2PlatformMouseEvent::WebKit2PlatformMouseEvent):
+        (WebKit::WebKit2PlatformWheelEvent::WebKit2PlatformWheelEvent):
+        (WebKit::WebKit2PlatformKeyboardEvent::WebKit2PlatformKeyboardEvent):
+        (WebKit::WebKit2PlatformGestureEvent::WebKit2PlatformGestureEvent):
+
+2016-09-27  Dan Bernstein  <mitz@apple.com>
+
+        [iOS] REGRESSION (r182126): Selection highlight and handles aren’t visible with WKSelectionGranularityCharacter
+        https://bugs.webkit.org/show_bug.cgi?id=162577
+        <rdar://problem/28481984>
+
+        Reviewed by Simon Fraser.
+
+        * UIProcess/API/Cocoa/WKWebView.mm:
+        (-[WKWebView _uiTextSelectionRectViews]): Added this method in the WKTesting category, which
+          uses UIKit internals to get the views used for the selection highlight.
+        * UIProcess/API/Cocoa/WKWebViewPrivate.h:
+
+        * UIProcess/ios/WKContentViewInteraction.mm:
+        (-[WKContentView _selectionClipRect]): When selection is not confined to a form control or
+          content-editable element, return the null rect to indicate no clipping, rather than
+          clipping to the empty rect at the origin.
+
+2016-09-27  Jer Noble  <jer.noble@apple.com>
+
+        Remove deprecated ENCRYPTED_MEDIA implementation.
+        https://bugs.webkit.org/show_bug.cgi?id=161010
+
+        Reviewed by Eric Carlson.
+
+        Remove ENABLE_ENCRYPTED_MEDIA.
+
+        * Configurations/FeatureDefines.xcconfig:
+
 2016-09-27  Chris Dumez  <cdumez@apple.com>
 
         [WK2] Navigating to a Blob URL does not trigger a download

@@ -1,3 +1,473 @@
+2016-09-27  Chris Dumez  <cdumez@apple.com>
+
+        It should be possible to dispatch events on documents created using DOMParser
+        https://bugs.webkit.org/show_bug.cgi?id=26147
+
+        Reviewed by Ryosuke Niwa.
+
+        It should be possible to dispatch events on documents created using
+        DOMParser. It did not work because we were not setting the context
+        document on the newly created document in DOMParser::parseFromString().
+
+        Firefox and Chrome both already support this.
+
+        Test: fast/dom/parsed-document-dispatchEvent.html
+
+        * xml/DOMParser.cpp:
+        (WebCore::DOMParser::DOMParser):
+        (WebCore::DOMParser::parseFromString):
+        * xml/DOMParser.h:
+        (WebCore::DOMParser::create):
+        * xml/DOMParser.idl:
+
+2016-09-26  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        [Cocoa] Improve performance of complex text codepath
+        https://bugs.webkit.org/show_bug.cgi?id=161936
+
+        Reviewed by Simon Fraser.
+
+        CoreText exposes a bit on the CTRunStatus which represents whether
+        the run actually uses the glyph origins concept introduced in
+        r205396. If this bit is not set, we can use the (slightly faster)
+        call to CTRunGetAdvances() instead of
+        CTRunGetBaseAdvancesAndOrigins(). In addition, if none of the runs
+        have this bit set, we don't need to allocate storage for the vector
+        of origins at all, thereby using less memory.
+
+        No new tests because there is no behavior change.
+
+        * platform/graphics/mac/ComplexTextController.cpp:
+        (WebCore::ComplexTextController::advance):
+        (WebCore::ComplexTextController::adjustGlyphsAndAdvances):
+        * platform/graphics/mac/ComplexTextController.h:
+        (WebCore::ComplexTextController::ComplexTextRun::glyphOrigins):
+        (WebCore::ComplexTextController::glyphOrigin):
+        * platform/graphics/mac/ComplexTextControllerCoreText.mm:
+        (WebCore::ComplexTextController::ComplexTextRun::ComplexTextRun):
+        * platform/spi/cocoa/CoreTextSPI.h:
+
+2016-09-27  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Import w3c shadow DOM tests and fix one assertion
+        https://bugs.webkit.org/show_bug.cgi?id=162629
+
+        Reviewed by Chris Dumez.
+
+        The assertion failure was caused by RelatedNodeRetargeter's constructor mixing up the ancestor tree scopes
+        for the target and the related target. Fixed the bug by reversing the two.
+
+        Tests: imported/w3c/web-platform-tests/shadow-dom/event-composed-path-with-related-target.html
+
+        * dom/EventPath.cpp:
+        (WebCore::RelatedNodeRetargeter::RelatedNodeRetargeter): i and m_ancestorTreeScopes are for the related target
+        and j and targetTreeScopeAncestors are for the target.
+
+2016-09-27  Chris Dumez  <cdumez@apple.com>
+
+        It should be possible to dispatch events on documents that do not have a browsing context
+        https://bugs.webkit.org/show_bug.cgi?id=162620
+
+        Reviewed by Ryosuke Niwa.
+
+        It should be possible to dispatch events on documents that do not have a browsing
+        context (e.g. Documents created using DOMImplementation.createHTMLDocument()).
+        Gecko and Blink both allow this but WebKit did not.
+
+        The approach chosen to support this is similar to the one in Blink. When constructing
+        a new document (e.g. using DOMImplementation.createHTMLDocument()) we now keep track
+        of the context document. When requesting the scriptExecutionContext(), we now return
+        the context document if the document has one instead of the document itself.
+
+        Test: imported/w3c/web-platform-tests/dom/events/Event-dispatch-other-document.html
+
+        * bindings/js/JSDocumentCustom.cpp:
+        (WebCore::JSDocument::visitAdditionalChildren):
+        * dom/DOMImplementation.cpp:
+        (WebCore::DOMImplementation::createDocument):
+        (WebCore::DOMImplementation::createHTMLDocument):
+        * dom/Document.cpp:
+        (WebCore::Document::create):
+        (WebCore::Document::cloneDataFromDocument):
+        (WebCore::Document::contextDocument):
+        (WebCore::Document::takeDOMWindowFrom): Deleted.
+        * dom/Document.h:
+        (WebCore::Document::setContextDocument):
+        (WebCore::Node::scriptExecutionContext):
+        (WebCore::Node::isDocumentNode): Deleted.
+        * dom/Document.idl:
+        * xml/XMLHttpRequest.cpp:
+        (WebCore::XMLHttpRequest::responseXML):
+
+2016-09-27  Alex Christensen  <achristensen@webkit.org>
+
+        Implement URLParser::syntaxViolation
+        https://bugs.webkit.org/show_bug.cgi?id=162593
+
+        Reviewed by Geoffrey Garen.
+
+        Most of the time when parsing URLs, we just look at the URL, find offsets of the host, path, query, etc., 
+        and the String can be used untouched.  When this happens, we do not want to allocate and copy the String.
+        We want to just add a reference to an existing String.
+
+        Sometimes we need to canonicalize the String because there has been a syntaxViolation,
+        defined as any String that is different than its canonicalized URL String.  In such cases we need to
+        allocate a new String and fill it with the canonicalized URL String.  When a syntaxViolation happens for the
+        first time, we know that everything in the input String up to that point is equal to what it would have been
+        if we had canonicalized the beginning of the URL, copy it into a buffer, and continue parsing in a mode where
+        instead of just looking at the input URL String, we canonicalize each code point into the buffer.
+
+        Changes to behavior involve additional spec compliance with tabs and newlines in different places in URLs,
+        as well as additional spec compliance when parsing empty and null URLs relative to other URLs.
+        Both are covered by new API tests. Existing behavior covered by existing API tests.
+
+        This is about a 15% speed improvement on my URL parsing benchmark.
+
+        * platform/URL.cpp:
+        (WebCore::assertProtocolIsGood):
+        (WebCore::URL::protocolIs):
+        (WebCore::protocolIs):
+        * platform/URL.h:
+        * platform/URLParser.cpp:
+        (WebCore::isTabOrNewline):
+        (WebCore::URLParser::incrementIteratorSkippingTabsAndNewlines):
+        (WebCore::URLParser::isWindowsDriveLetter):
+        (WebCore::URLParser::appendToASCIIBuffer):
+        (WebCore::URLParser::checkWindowsDriveLetter):
+        (WebCore::URLParser::shouldCopyFileURL):
+        (WebCore::URLParser::utf8PercentEncode):
+        (WebCore::URLParser::utf8QueryEncode):
+        (WebCore::URLParser::copyURLPartsUntil):
+        (WebCore::URLParser::syntaxViolation):
+        (WebCore::URLParser::fragmentSyntaxViolation):
+        (WebCore::URLParser::parsedDataView):
+        (WebCore::URLParser::currentPosition):
+        (WebCore::URLParser::URLParser):
+        (WebCore::URLParser::parse):
+        (WebCore::URLParser::parseAuthority):
+        (WebCore::URLParser::parseIPv4Number):
+        (WebCore::URLParser::parseIPv4Host):
+        (WebCore::URLParser::parseIPv6Host):
+        (WebCore::URLParser::parsePort):
+        (WebCore::URLParser::parseHostAndPort):
+        (WebCore::serializeURLEncodedForm):
+        (WebCore::URLParser::allValuesEqual):
+        (WebCore::URLParser::internalValuesConsistent):
+        (WebCore::URLParser::incrementIteratorSkippingTabAndNewLine): Deleted.
+        (WebCore::URLParser::syntaxError): Deleted.
+        (WebCore::parseIPv4Number): Deleted.
+        * platform/URLParser.h:
+        (WebCore::URLParser::incrementIteratorSkippingTabsAndNewlines):
+
+2016-09-27  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        Related videos on YouTube (and YouTube playlists) cause media controls to disappear
+        https://bugs.webkit.org/show_bug.cgi?id=162621
+        <rdar://problem/28484193>
+
+        Reviewed by Jer Noble.
+
+        Tweaks the main content media heuristic for better Now Playing behavior on YouTube by making the following
+        changes:
+        - Remove the strict requirement for audio to be actively playing for the session to be able to show
+          controls for the purpose of Now Playing, making it the same as our policy for the controls manager.
+        - Make playback requirement restrictions apply only for the controls manager. Videos that do not
+          autoplay will still have the correct behavior with respect to Now Playing, since we will bail in the
+          hasEverNotifiedAboutPlaying() check.
+        - Only consider the main content heuristic as preventing media controls from showing up for the purposes
+          of the controls manager. Now Playing should instead account for this by preferring elements large
+          enough for main content after collecting all of the candidate sessions.
+
+        * html/HTMLMediaElement.cpp:
+        (WebCore::mediaElementSessionInfoForSession):
+        (WebCore::preferMediaControlsForCandidateSessionOverOtherCandidateSession):
+        (WebCore::HTMLMediaElement::updatePlayState):
+        * html/MediaElementSession.cpp:
+        (WebCore::MediaElementSession::canShowControlsManager):
+        * platform/audio/mac/MediaSessionManagerMac.mm:
+        (WebCore::MediaSessionManagerMac::sessionWillBeginPlayback):
+
+2016-09-27  Chris Dumez  <cdumez@apple.com>
+
+        Second parameter to MutationObserver.observe() should be optional
+        https://bugs.webkit.org/show_bug.cgi?id=162627
+
+        Reviewed by Ryosuke Niwa.
+
+        Second parameter to MutationObserver.observe() should be optional:
+        - https://dom.spec.whatwg.org/#interface-mutationobserver
+
+        Firefox agrees with the specification. There is no real behavior change
+        except that MutationObserver.prototype.observe.length is now 1 instead
+        of 2. Passing only one parameter will still throw a TypeError because
+        the Dictionary is empty. However, this parameter needs to be marked as
+        optional because Web IDL requires the last parameter to be optional if
+        it is a Dictionary.
+
+        No new tests, rebaselined existing test.
+
+        * dom/MutationObserver.idl:
+
+2016-09-20  Anders Carlsson  <andersca@apple.com>
+
+        PlatformEvent::m_modifiers should be an OptionSet
+        https://bugs.webkit.org/show_bug.cgi?id=162326
+
+        Reviewed by Daniel Bates.
+
+        * page/EventHandler.cpp:
+        (WebCore::EventHandler::handleAccessKey):
+        * page/EventHandler.h:
+        * page/mac/EventHandlerMac.mm:
+        (WebCore::EventHandler::accessKeyModifiers):
+        * platform/PlatformEvent.h:
+        (WebCore::PlatformEvent::shiftKey):
+        (WebCore::PlatformEvent::ctrlKey):
+        (WebCore::PlatformEvent::altKey):
+        (WebCore::PlatformEvent::metaKey):
+        (WebCore::PlatformEvent::modifiers):
+        (WebCore::PlatformEvent::PlatformEvent):
+        * platform/PlatformKeyboardEvent.h:
+        (WebCore::PlatformKeyboardEvent::PlatformKeyboardEvent):
+        * platform/mac/PlatformEventFactoryMac.mm:
+        (WebCore::modifiersForEvent):
+        (WebCore::typeForEvent):
+        * replay/SerializationMethods.cpp:
+        (JSC::EncodingTraits<PlatformKeyboardEvent>::encodeValue):
+        (JSC::EncodingTraits<PlatformKeyboardEvent>::decodeValue):
+        * replay/WebInputs.json:
+
+2016-09-27  Gustavo Noronha Silva  <gustavo.noronha@collabora.co.uk>
+
+        [GTK] Handle Wayland & X11 correctly for GST_GL
+        https://bugs.webkit.org/show_bug.cgi?id=162619
+
+        Reviewed by Carlos Garcia Campos.
+
+        The checks for GST_GL consider X11 and Wayland are exclusive alternatives, but it
+        turns out we can enable both! We need to check them independently and also include
+        a runtime check.
+
+        * platform/graphics/gstreamer/MediaPlayerPrivateGStreamerBase.cpp:
+        (WebCore::MediaPlayerPrivateGStreamerBase::ensureGstGLContext): fix checks for X11 and
+        Wayland to handle the case where both are enabled. Includes a runtime check.
+
+2016-09-27  Eric Carlson  <eric.carlson@apple.com>
+
+        [MediaStream] Restructure MediaConstraints classes
+        https://bugs.webkit.org/show_bug.cgi?id=162571
+
+        Reviewed by Jer Noble.
+
+        No new tests, no functional changes.
+
+        * Modules/mediastream/MediaConstraintsImpl.cpp:
+        (WebCore::MediaConstraintsImpl::initialize): Deleted, no longer used.
+        * Modules/mediastream/MediaConstraintsImpl.h:
+
+        * bindings/js/JSMediaDevicesCustom.cpp:
+        (WebCore::createStringConstraint): Return Optional<> instead of RefPtr<>.
+        (WebCore::createBooleanConstraint): Ditto.
+        (WebCore::createDoubleConstraint): Ditto.
+        (WebCore::createIntConstraint): Ditto.
+        (WebCore::parseMediaTrackConstraintSetForKey): Deal with above change.
+
+        * platform/mediastream/CaptureDeviceManager.cpp:
+        (CaptureDeviceManager::verifyConstraintsForMediaType): Use constraints.mandatoryConstraints.filter
+          instead of direct enumeration.
+        (CaptureDeviceManager::sessionSupportsConstraint): Use downcast<>.
+        (CaptureDeviceManager::isSupportedFrameRate): Ditto.
+
+        * platform/mediastream/MediaConstraints.cpp:
+        (WebCore::StringConstraint::find): Lose the ConstraintType parameter.
+        (WebCore::StringConstraint::merge): Use downcast<>.
+        (WebCore::FlattenedConstraint::set): Use ConstraintHolder.
+        (WebCore::FlattenedConstraint::merge): Ditto.
+        (WebCore::MediaTrackConstraintSetMap::forEach): New.
+        (WebCore::MediaTrackConstraintSetMap::filter): Ditto.
+        (WebCore::MediaTrackConstraintSetMap::isEmpty): Ditto.
+        (WebCore::MediaTrackConstraintSetMap::set): Ditto.
+        (WebCore::MediaConstraint::copy): Deleted.
+        (WebCore::IntConstraint::copy): Deleted.
+        (WebCore::DoubleConstraint::copy): Deleted.
+        (WebCore::BooleanConstraint::copy): Deleted.
+        (WebCore::StringConstraint::copy): Deleted.
+        * platform/mediastream/MediaConstraints.h:
+        (WebCore::MediaConstraint::MediaConstraint):
+        (WebCore::MediaConstraint::isEmpty):
+        (WebCore::MediaConstraint::isMandatory):
+        (WebCore::MediaConstraint::merge):
+        (WebCore::MediaConstraint::isInt):
+        (WebCore::MediaConstraint::isDouble):
+        (WebCore::MediaConstraint::isBoolean):
+        (WebCore::MediaConstraint::isString):
+        (WebCore::MediaConstraint::dataType):
+        (WebCore::MediaConstraint::constraintType):
+        (WebCore::NumericConstraint::getMin):
+        (WebCore::NumericConstraint::getMax):
+        (WebCore::NumericConstraint::getExact):
+        (WebCore::NumericConstraint::getIdeal):
+        (WebCore::NumericConstraint::fitnessDistance):
+        (WebCore::NumericConstraint::validForRange):
+        (WebCore::NumericConstraint::find):
+        (WebCore::NumericConstraint::NumericConstraint):
+        (WebCore::NumericConstraint::innerMerge):
+        (WebCore::FlattenedConstraint::isEmpty):
+        (WebCore::FlattenedConstraint::iterator::iterator):
+        (WebCore::FlattenedConstraint::iterator::operator*):
+        (WebCore::FlattenedConstraint::iterator::operator++):
+        (WebCore::FlattenedConstraint::iterator::operator==):
+        (WebCore::FlattenedConstraint::iterator::operator!=):
+        (WebCore::FlattenedConstraint::begin):
+        (WebCore::FlattenedConstraint::end):
+        (WebCore::FlattenedConstraint::ConstraintHolder::create):
+        (WebCore::FlattenedConstraint::ConstraintHolder::~ConstraintHolder):
+        (WebCore::FlattenedConstraint::ConstraintHolder::constraint):
+        (WebCore::FlattenedConstraint::ConstraintHolder::dataType):
+        (WebCore::FlattenedConstraint::ConstraintHolder::constraintType):
+        (WebCore::FlattenedConstraint::ConstraintHolder::ConstraintHolder):
+        (WebCore::MediaConstraint::getMin): Deleted.
+        (WebCore::MediaConstraint::getMax): Deleted.
+        (WebCore::MediaConstraint::getExact): Deleted.
+        (WebCore::MediaConstraint::getIdeal): Deleted.
+        (WebCore::MediaConstraint::validForRange): Deleted.
+        (WebCore::MediaConstraint::find): Deleted.
+        (WebCore::MediaConstraint::fitnessDistance): Deleted.
+        (WebCore::MediaConstraint::type): Deleted.
+
+        * platform/mediastream/RealtimeMediaSource.cpp:
+        (WebCore::RealtimeMediaSource::fitnessDistance): Use downcast<>.
+        (WebCore::applyNumericConstraint):
+        (WebCore::RealtimeMediaSource::applyConstraint): Ditto.
+        (WebCore::RealtimeMediaSource::selectSettings): Ditto. Use constraints.mandatoryConstraints.filter
+          instead of direct enumeration.
+        (WebCore::RealtimeMediaSource::applyConstraints):
+        (WebCore::RealtimeMediaSource::setSampleRate): Sample rate is an int, not a double.
+        (WebCore::RealtimeMediaSource::setSampleSize): Sample size is also an int.
+        * platform/mediastream/RealtimeMediaSource.h:
+
+        * platform/mediastream/mac/AVCaptureDeviceManager.mm:
+        (WebCore::AVCaptureDeviceManager::sessionSupportsConstraint): Use downcast<>.
+
+        * platform/mock/MediaConstraintsMock.cpp:
+        (WebCore::isIntMediaConstraintSatisfiable): Use downcast<>.
+        (WebCore::isDoubleMediaConstraintSatisfiable): Ditto.
+        (WebCore::isBooleanMediaConstraintSatisfiable): Ditto.
+        (WebCore::isStringMediaConstraintSatisfiable):
+        (WebCore::isSatisfiable):
+        (WebCore::MediaConstraintsMock::verifyConstraints): Use constraints.mandatoryConstraints.filter
+          instead of direct enumeration.
+        * platform/mock/MediaConstraintsMock.h:
+
+        * platform/mock/MockRealtimeAudioSource.h:
+        * platform/mock/MockRealtimeMediaSourceCenter.cpp:
+        (WebCore::MockRealtimeMediaSourceCenter::createMediaStream):
+
+2016-09-27  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        Some Now Playing behavior is broken after r206315
+        https://bugs.webkit.org/show_bug.cgi?id=162625
+        <rdar://problem/28496755>
+
+        Reviewed by Jer Noble.
+
+        Reverts the part of our heuristic that disables Now Playing in active tabs in the main window.
+
+        * html/MediaElementSession.cpp:
+        (WebCore::MediaElementSession::pageAllowsNowPlayingControls):
+        * page/Page.cpp:
+        (WebCore::Page::setViewState):
+
+2016-09-27  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Remove an unneeded assert in InspectorOverlay.cpp
+        https://bugs.webkit.org/show_bug.cgi?id=162581
+
+        Reviewed by Alexey Proskuryakov.
+
+        This assertion was added to catch unknown issues, but it is firing frequently enough on certain Inspector
+        tests that it is causing more harm than good.
+
+        * inspector/InspectorOverlay.cpp:
+        (WebCore::buildQuadObjectForCSSRegionContentClip):
+        (WebCore::evaluateCommandInOverlay):
+
+2016-09-27  Jer Noble  <jer.noble@apple.com>
+
+        Remove deprecated ENCRYPTED_MEDIA implementation.
+        https://bugs.webkit.org/show_bug.cgi?id=161010
+
+        Reviewed by Eric Carlson.
+
+        Remove all references to the deprecated ENABLE_ENCRYPTED_MEDIA (leaving in place
+        the soon-to-be deprecated ENABLE_ENCRYPTED_MEDIA_V2).
+
+        * CMakeLists.txt:
+        * Configurations/FeatureDefines.xcconfig:
+        * DerivedSources.make:
+        * WebCore.xcodeproj/project.pbxproj:
+        * bindings/objc/DOMHTMLMediaElement.h:
+        * bindings/objc/DOMHTMLMediaElement.mm:
+        (-[DOMHTMLMediaElement canPlayType:]):
+        (-[DOMHTMLMediaElement canPlayType:keySystem:]): Deleted.
+        * bindings/js/JSDictionary.cpp:
+        * bindings/js/JSDictionary.h:
+        * dom/Element.idl:
+        * dom/EventNames.in:
+        * html/HTMLMediaElement.cpp:
+        (WebCore::HTMLMediaElement::selectNextSourceChild):
+        (WebCore::exceptionCodeForMediaKeyException): Deleted.
+        (WebCore::HTMLMediaElement::canPlayType): Deleted.
+        (WebCore::HTMLMediaElement::mediaPlayerKeyAdded): Deleted.
+        (WebCore::HTMLMediaElement::mediaPlayerKeyError): Deleted.
+        (WebCore::HTMLMediaElement::mediaPlayerKeyMessage): Deleted.
+        (WebCore::HTMLMediaElement::mediaPlayerKeyNeeded): Deleted.
+        * html/HTMLMediaElement.h:
+        * html/HTMLMediaElement.idl:
+        * html/MediaError.h:
+        * html/MediaError.idl:
+        * html/MediaKeyError.h:
+        * html/MediaKeyError.idl:
+        * html/MediaKeyEvent.cpp: Removed.
+        (WebCore::MediaKeyEvent::MediaKeyEvent): Deleted.
+        (WebCore::MediaKeyEvent::~MediaKeyEvent): Deleted.
+        (WebCore::MediaKeyEvent::eventInterface): Deleted.
+        * html/MediaKeyEvent.h: Removed.
+        * html/MediaKeyEvent.idl: Removed.
+        * platform/graphics/MediaPlayer.cpp:
+        (WebCore::MediaPlayer::nextBestMediaEngine):
+        (WebCore::MediaPlayer::generateKeyRequest): Deleted.
+        (WebCore::MediaPlayer::addKey): Deleted.
+        (WebCore::MediaPlayer::cancelKeyRequest): Deleted.
+        (WebCore::MediaPlayer::keyAdded): Deleted.
+        (WebCore::MediaPlayer::keyError): Deleted.
+        (WebCore::MediaPlayer::keyMessage): Deleted.
+        (WebCore::MediaPlayer::keyNeeded): Deleted.
+        * platform/graphics/MediaPlayer.h:
+        (WebCore::MediaPlayerClient::mediaPlayerKeyAdded): Deleted.
+        (WebCore::MediaPlayerClient::mediaPlayerKeyError): Deleted.
+        (WebCore::MediaPlayerClient::mediaPlayerKeyMessage): Deleted.
+        (WebCore::MediaPlayerClient::mediaPlayerKeyNeeded): Deleted.
+        * platform/graphics/MediaPlayerPrivate.h:
+        (WebCore::MediaPlayerPrivateInterface::addKey): Deleted.
+        (WebCore::MediaPlayerPrivateInterface::generateKeyRequest): Deleted.
+        (WebCore::MediaPlayerPrivateInterface::cancelKeyRequest): Deleted.
+        * platform/graphics/avfoundation/MediaPlayerPrivateAVFoundation.cpp:
+        * platform/graphics/avfoundation/MediaPlayerPrivateAVFoundation.h:
+        * platform/graphics/avfoundation/objc/CDMSessionAVContentKeySession.mm:
+        (WebCore::CDMSessionAVContentKeySession::update):
+        * platform/graphics/avfoundation/objc/MediaPlayerPrivateAVFoundationObjC.h:
+        * platform/graphics/avfoundation/objc/MediaPlayerPrivateAVFoundationObjC.mm:
+        (WebCore::MediaPlayerPrivateAVFoundationObjC::supportsKeySystem):
+        (WebCore::MediaPlayerPrivateAVFoundationObjC::shouldWaitForLoadingOfResource):
+        (WebCore::MediaPlayerPrivateAVFoundationObjC::supportsType): Deleted.
+        (WebCore::MediaPlayerPrivateAVFoundationObjC::generateKeyRequest): Deleted.
+        (WebCore::MediaPlayerPrivateAVFoundationObjC::addKey): Deleted.
+        (WebCore::MediaPlayerPrivateAVFoundationObjC::cancelKeyRequest): Deleted.
+        * platform/graphics/mac/MediaPlayerPrivateQTKit.mm:
+        (WebCore::MediaPlayerPrivateQTKit::supportsType): Deleted.
+        * testing/MockCDM.h:
+
 2016-09-27  Youenn Fablet  <youenn@apple.com>
 
         [Fetch API] Use Ref<const T> in FetchBody::m_data variant
