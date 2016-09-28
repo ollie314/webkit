@@ -19,8 +19,7 @@
  *
  */
 
-#ifndef MarkedBlock_h
-#define MarkedBlock_h
+#pragma once
 
 #include "AllocatorAttributes.h"
 #include "DestructionMode.h"
@@ -29,6 +28,7 @@
 #include "HeapOperation.h"
 #include "IterationStatus.h"
 #include "WeakSet.h"
+#include <wtf/Atomics.h>
 #include <wtf/Bitmap.h>
 #include <wtf/DataLog.h>
 #include <wtf/DoublyLinkedList.h>
@@ -621,5 +621,3 @@ template<> struct DefaultHash<JSC::MarkedBlock*> {
 void printInternal(PrintStream& out, JSC::MarkedBlock::Handle::SweepMode);
 
 } // namespace WTF
-
-#endif // MarkedBlock_h

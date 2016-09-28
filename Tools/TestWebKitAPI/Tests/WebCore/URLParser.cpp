@@ -248,6 +248,8 @@ TEST_F(URLParserTest, Basic)
     checkURL("data:image/png;base64,encoded-data-follows-here", {"data", "", "", "", 0, "image/png;base64,encoded-data-follows-here", "", "", "data:image/png;base64,encoded-data-follows-here"});
     checkURL("data:image/png;base64,encoded/data-with-slash", {"data", "", "", "", 0, "image/png;base64,encoded/data-with-slash", "", "", "data:image/png;base64,encoded/data-with-slash"});
     checkURL("about:~", {"about", "", "", "", 0, "~", "", "", "about:~"});
+    checkURL("https://@test@test@example:800\\path@end", {"", "", "", "", 0, "", "", "", "https://@test@test@example:800\\path@end"});
+    checkURL("http://www.example.com/#a\nb\rc\td", {"http", "", "", "www.example.com", 0, "/", "", "abcd", "http://www.example.com/#abcd"});
 
     // This disagrees with the web platform test for http://:@www.example.com but agrees with Chrome and URL::parse,
     // and Firefox fails the web platform test differently. Maybe the web platform test ought to be changed.
@@ -343,6 +345,7 @@ TEST_F(URLParserTest, ParseRelative)
     checkRelativeURL("foo:/", "http://example.org/foo/bar", {"foo", "", "", "", 0, "/", "", "", "foo:/"});
     checkRelativeURL("://:0/", "http://webkit.org/", {"http", "", "", "webkit.org", 0, "/://:0/", "", "", "http://webkit.org/://:0/"});
     checkRelativeURL(String(), "http://webkit.org/", {"http", "", "", "webkit.org", 0, "/", "", "", "http://webkit.org/"});
+    checkRelativeURL("https://@test@test@example:800\\path@end", "http://doesnotmatter/", {"", "", "", "", 0, "", "", "", "https://@test@test@example:800\\path@end"});
 
     // The checking of slashes in SpecialAuthoritySlashes needed to get this to pass contradicts what is in the spec,
     // but it is included in the web platform tests.
@@ -610,6 +613,15 @@ TEST_F(URLParserTest, ParserDifferences)
     checkRelativeURLDifferences("https://@test@test@example:800/", "http://doesnotmatter/",
         {"https", "@test@test", "", "example", 800, "/", "", "", "https://%40test%40test@example:800/"},
         {"", "", "", "", 0, "", "", "", "https://@test@test@example:800/"});
+    checkRelativeURLDifferences("https://@test@test@example:800/path@end", "http://doesnotmatter/",
+        {"https", "@test@test", "", "example", 800, "/path@end", "", "", "https://%40test%40test@example:800/path@end"},
+        {"", "", "", "", 0, "", "", "", "https://@test@test@example:800/path@end"});
+    checkURLDifferences("notspecial://@test@test@example:800/path@end",
+        {"notspecial", "@test@test", "", "example", 800, "/path@end", "", "", "notspecial://%40test%40test@example:800/path@end"},
+        {"", "", "", "", 0, "", "", "", "notspecial://@test@test@example:800/path@end"});
+    checkURLDifferences("notspecial://@test@test@example:800\\path@end",
+        {"notspecial", "@test@test@example", "800\\path", "end", 0, "/", "", "", "notspecial://%40test%40test%40example:800%5Cpath@end/"},
+        {"", "", "", "", 0, "", "", "", "notspecial://@test@test@example:800\\path@end"});
     checkRelativeURLDifferences("foo://", "http://example.org/foo/bar",
         {"foo", "", "", "", 0, "/", "", "", "foo:///"},
         {"foo", "", "", "", 0, "//", "", "", "foo://"});
@@ -640,6 +652,18 @@ TEST_F(URLParserTest, ParserDifferences)
     checkURLDifferences("A://",
         {"a", "", "", "", 0, "/", "", "", "a:///"},
         {"a", "", "", "", 0, "//", "", "", "a://"});
+    checkRelativeURLDifferences("//C|/foo/bar", "file:///tmp/mock/path",
+        {"file", "", "", "", 0, "/C:/foo/bar", "", "", "file:///C:/foo/bar"},
+        {"", "", "", "", 0, "", "", "", "//C|/foo/bar"});
+    checkRelativeURLDifferences("//C:/foo/bar", "file:///tmp/mock/path",
+        {"file", "", "", "", 0, "/C:/foo/bar", "", "", "file:///C:/foo/bar"},
+        {"file", "", "", "c", 0, "/foo/bar", "", "", "file://c/foo/bar"});
+    checkRelativeURLDifferences("//C|?foo/bar", "file:///tmp/mock/path",
+        {"file", "", "", "", 0, "/C:/", "foo/bar", "", "file:///C:/?foo/bar"},
+        {"", "", "", "", 0, "", "", "", "//C|?foo/bar"});
+    checkRelativeURLDifferences("//C|#foo/bar", "file:///tmp/mock/path",
+        {"file", "", "", "", 0, "/C:/", "", "foo/bar", "file:///C:/#foo/bar"},
+        {"", "", "", "", 0, "", "", "", "//C|#foo/bar"});
 }
 
 TEST_F(URLParserTest, DefaultPort)
@@ -779,6 +803,7 @@ TEST_F(URLParserTest, ParserFailures)
     shouldFail("://:0/", "");
     shouldFail("://:0/", "about:blank");
     shouldFail("about~");
+    shouldFail("//C:asdf/foo/bar", "file:///tmp/mock/path");
 }
 
 // These are in the spec but not in the web platform tests.

@@ -1,3 +1,749 @@
+2016-09-27  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        Adopt MediaRemote SPI to achieve desired Now Playing behavior
+        https://bugs.webkit.org/show_bug.cgi?id=162658
+        <rdar://problem/28499358>
+
+        Reviewed by Jer Noble.
+
+        Restores the changes previously rolled out in r206444, and adopts new MediaRemote SPI to achieve the desired
+        behavior for media in background tabs without breaking other features.
+
+        Introduces 2 new unit tests in NowPlayingControlsTests.
+
+        * html/MediaElementSession.cpp:
+        (WebCore::MediaElementSession::pageAllowsNowPlayingControls):
+        * page/Page.cpp:
+        (WebCore::Page::setViewState):
+        * platform/audio/PlatformMediaSessionManager.h:
+        (WebCore::PlatformMediaSessionManager::hasActiveNowPlayingSession):
+        * platform/audio/mac/MediaSessionManagerMac.h:
+        * platform/audio/mac/MediaSessionManagerMac.mm:
+        (WebCore::MediaSessionManagerMac::updateNowPlayingInfo):
+        * platform/mac/MediaRemoteSoftLink.cpp:
+        * platform/mac/MediaRemoteSoftLink.h:
+        * platform/spi/mac/MediaRemoteSPI.h:
+
+2016-09-28  Said Abou-Hallawa  <sabouhallawa@apple.com>
+
+        REGRESSION(r206481): ASSERTION FAILED: isDecoderAvailable()
+        https://bugs.webkit.org/show_bug.cgi?id=162665
+
+        Reviewed by Simon Fraser.
+
+        Remove a wrong assertion from ImageSource::destroyDecodedData(). Before
+        r206481, the original function BitmapImage::destroyDecodedData() did not
+        have this assertion. Destroying the decoded ImageFrames can happen after
+        releasing the ImageDecoder. And it can happen also if decoding the image
+        fails and BitmapImage::isNull() is true. See CachedImage::finishLoading().
+
+        * platform/graphics/ImageSource.cpp:
+        (WebCore::ImageSource::destroyDecodedData):
+
+2016-09-28  Youenn Fablet  <youenn@apple.com>
+
+        WebCore::ResourceErrorBase::setType is crashing
+        https://bugs.webkit.org/show_bug.cgi?id=162484
+        <rdar://problem/28390828>
+
+        Reviewed by Alex Christensen.
+
+        Test: http/tests/xmlhttprequest/on-network-timeout-error-during-preflight.html
+
+        Behavior is slightly changed as we are no longer casting Timeout preflight errors as AccessControl errors.
+        This is more inline with fetch spec which prescribes to send back any error received by preflight as response error for fetch.
+
+        Ideally, we should not need to change errors received during preflight loads but the error type is important for some clients:
+        - EventSource may try to reconnect if error is not AccessControl
+        - XMLHttpRequest will send abort events in case of Cancellation errors and timeout events in case of Timeout errors
+
+        * loader/CrossOriginPreflightChecker.cpp:
+        (WebCore::CrossOriginPreflightChecker::notifyFinished): Setting error type to AccessControl except in case of Timeout.
+        (WebCore::CrossOriginPreflightChecker::doPreflight): Ditto.
+        * loader/DocumentThreadableLoader.cpp:
+        (WebCore::DocumentThreadableLoader::preflightFailure): Removing ASSERT since Timeout errors may be returned.
+        * platform/network/ResourceErrorBase.h:
+        (WebCore::ResourceErrorBase::isGeneral): New getter.
+
+2016-09-28  Jer Noble  <jer.noble@apple.com>
+
+        PiP shows incorrect state of play button.
+        https://bugs.webkit.org/show_bug.cgi?id=162652
+
+        Reviewed by Eric Carlson.
+
+        After getting a new WebPlaybackSessionModel, the first thing WebVideoFullscreenInterfaceMac
+        should do is query for it's playbackRate() and isPlaying() properties.
+
+        * platform/mac/WebVideoFullscreenInterfaceMac.mm:
+        (WebCore::WebVideoFullscreenInterfaceMac::WebVideoFullscreenInterfaceMac):
+
+2016-09-28  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK] Add Chrome UA quirk
+        https://bugs.webkit.org/show_bug.cgi?id=162617
+
+        Reviewed by Carlos Garcia Campos.
+
+        Add Chrome UA quirk and use it on typekit.net, typekit.com, youtube.com, slack.com, and
+        any domain that begins with "google".
+
+        * platform/gtk/UserAgentGtk.cpp:
+        (WebCore::buildUserAgentString):
+        (WebCore::urlRequiresChromeBrowser):
+        (WebCore::standardUserAgentForURL):
+
+2016-09-28  Jer Noble  <jer.noble@apple.com>
+
+        [MSE][Mac] In SourceBufferPrivateAVFObjC::abort(), support reseting parser to the last appended initialization segment.
+        https://bugs.webkit.org/show_bug.cgi?id=135164
+
+        Reviewed by Eric Carlson.
+
+        Test: media/media-source/media-source-abort-resets-parser.html
+
+        Use the -[AVStreamDataParser appendStreamData:withFlags:] to implement "resetting" the parser. In this case,
+        the parser isn't explicitly reset during resetParserState(), but rather a flag is set so that the next append
+        signals a data discontinuity, and the parser is reset at that point.
+
+        Because a previous append operation may be in-flight during this abort(), care must be taken to invalidate any
+        operations which may have already started on a background thread. So SourceBufferPrivateAVFObjC will use a
+        separate WeakPtrFactory for its append operations, will invalidate any outstanding WeakPtrs during an abort(),
+        and will block until the previous append() operation completes.
+
+        This will require the WebAVStreamDataParserListener object to occasionally have it's WeakPtr pointing back to the
+        SourceBufferPrivateAVFObjC to be reset after an abort(), so make that ivar an @property. Rather than passing a
+        RetainPtr to itself in all the callbacks it handles, the WebAVStreamDataParserListener can just pass in a copy
+        of its own WeakPtr (which may be invalidated during an abort()).
+
+        Break the distinct operations of "abort()" and "resetParserState()" into their own methods in SourceBufferPrivate
+        and all its subclasses.
+
+        * Modules/mediasource/SourceBuffer.cpp:
+        (WebCore::SourceBuffer::resetParserState):
+        (WebCore::SourceBuffer::abortIfUpdating):
+        * platform/graphics/SourceBufferPrivate.h:
+        * platform/graphics/avfoundation/objc/SourceBufferPrivateAVFObjC.h:
+        * platform/graphics/avfoundation/objc/SourceBufferPrivateAVFObjC.mm:
+        (-[WebAVStreamDataParserListener streamDataParser:didParseStreamDataAsAsset:]):
+        (-[WebAVStreamDataParserListener streamDataParser:didParseStreamDataAsAsset:withDiscontinuity:]):
+        (-[WebAVStreamDataParserListener streamDataParser:didFailToParseStreamDataWithError:]):
+        (-[WebAVStreamDataParserListener streamDataParser:didProvideMediaData:forTrackID:mediaType:flags:]):
+        (-[WebAVStreamDataParserListener streamDataParser:didReachEndOfTrackWithTrackID:mediaType:]):
+        (-[WebAVStreamDataParserListener streamDataParserWillProvideContentKeyRequestInitializationData:forTrackID:]):
+        (-[WebAVStreamDataParserListener streamDataParser:didProvideContentKeyRequestInitializationData:forTrackID:]):
+        (WebCore::SourceBufferPrivateAVFObjC::SourceBufferPrivateAVFObjC):
+        (WebCore::SourceBufferPrivateAVFObjC::append):
+        (WebCore::SourceBufferPrivateAVFObjC::abort):
+        (WebCore::SourceBufferPrivateAVFObjC::resetParserState):
+        (-[WebAVStreamDataParserListener initWithParser:parent:]): Deleted.
+        * platform/graphics/gstreamer/SourceBufferPrivateGStreamer.cpp:
+        (WebCore::SourceBufferPrivateGStreamer::resetParserState):
+        * platform/graphics/gstreamer/SourceBufferPrivateGStreamer.h:
+        * platform/mock/mediasource/MockSourceBufferPrivate.cpp:
+        (WebCore::MockSourceBufferPrivate::resetParserState):
+        * platform/mock/mediasource/MockSourceBufferPrivate.h:
+        * platform/spi/mac/AVFoundationSPI.h:
+
+2016-09-28  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK] User agent should always claim to be Intel
+        https://bugs.webkit.org/show_bug.cgi?id=162610
+
+        Reviewed by Carlos Garcia Campos.
+
+        We should always claim to be running on Intel regardless of actual CPU type. See discussion
+        in bug #162548 for details. In particular, we can never advertise ARM because it causes dumb
+        websites to send mobile pages.
+
+        * platform/gtk/UserAgentGtk.cpp:
+        (WebCore::platformVersionForUAString):
+        (WebCore::buildUserAgentString):
+        (WebCore::cpuDescriptionForUAString): Deleted.
+
+2016-09-28  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK] Adjust OS X UA quirks list
+        https://bugs.webkit.org/show_bug.cgi?id=162616
+
+        Reviewed by Carlos Garcia Campos.
+
+        Remove the OS X quirk for yahoo.com as it's no longer needed. Add quirks for taobao.com and
+        whatsapp.com.
+
+        * platform/gtk/UserAgentGtk.cpp:
+        (WebCore::urlRequiresMacintoshPlatform):
+        (WebCore::standardUserAgentForURL):
+
+2016-09-28  Alejandro G. Castro  <alex@igalia.com>
+
+        Add WebIDL special operation support: serializer
+        https://bugs.webkit.org/show_bug.cgi?id=156293
+
+        Reviewed by Youenn Fablet.
+
+        Added support for the serializer special operation for WebIDLs,
+        current implementation adds support for:
+          - just the keyword: serializer; It will return all the
+            attributes of in an object.
+          - map of entries with the attributes: serializer = {attribute1,
+            attribute2, ...}
+
+        It creates a toJSON method that returns the serialized value
+        converted into an ECMAScript value. For more information check the
+        definition of the operation:
+
+        http://heycam.github.io/webidl/#idl-serializers
+
+        We have created a new function in the API of the objects
+        that are marked as serializer.
+
+        Used the support to add new API for RTCIceCandidate and
+        RTCSessionDescription.
+
+        Updated the tests expectations of the bindings.
+
+        Tests: bindings/scripts/test/TestNode.idl
+               bindings/scripts/test/TestObj.idl
+               fast/mediastream/RTCIceCandidate.html
+               fast/mediastream/RTCSessionDescription.html
+
+        * Modules/mediastream/RTCIceCandidate.idl: Added the serializer
+        operation.
+        * Modules/mediastream/RTCSessionDescription.idl: Added the
+        serializer operation.
+        * bindings/scripts/CodeGeneratorJS.pm:
+        (GenerateImplementation): Added the calls to the serializer
+        code generator.
+        (GenerateSerializerFunction): Added, generates the toJSON function
+        adding all the serializable->attributes value to an object as
+        defined in the spec.
+        * bindings/scripts/IDLParser.pm: Modified the serializer parser
+        that was unused to support the WebIDL spec parts. Added a new
+        domSerializable type to store the list of attributes in the
+        possible map.
+        (parseSerializer): Modified the function to follow the
+        semicolon rule in the spec, now the serializer line must have a
+        semicolon like any other line.
+        (parseSerializerRest): The function now has to get the attributes
+        list from the pattern parsing function and add them to the
+        domSerializable item.
+        (parseSerializationPattern): Now this function returns the list of
+        attributes in the serializable map or list if we have one.
+        (parseSerializationAttributes): Added, this function replaces the
+        Map and List functions, the currently supported parts are similar
+        for both situations.
+        (applyMemberList): Added the serializable item to the interface
+        variable and populate the serializable in case there is not a
+        defined map.
+        (parseSerializationPatternMap): Replaced with
+        parseSerializationAttributes.
+        (parseSerializationPatternList): Ditto.
+        * bindings/scripts/test/JS/JSTestNode.cpp: Modified the expected result.
+        (WebCore::jsTestNodePrototypeFunctionToJSON):
+        * bindings/scripts/test/JS/JSTestObj.cpp: Modified the expected result.
+        (WebCore::jsTestObjPrototypeFunctionToJSON):
+        * bindings/scripts/test/TestNode.idl: Added the serializer test.
+        * bindings/scripts/test/TestObj.idl: Added serializer map test.
+
+2016-09-28  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK] Simplify platformForUAString
+        https://bugs.webkit.org/show_bug.cgi?id=162614
+
+        Reviewed by Carlos Garcia Campos.
+
+        Note in particular that the previous PLATFORM(MAC) check was wrong here, as that is never
+        true for GTK; this patch risks changing it to OS(MAC_OS_X), on the hope that advertising Mac
+        when running on Mac might not break anything. If it does, then we should remove it and just
+        always pretend to be on X11.
+
+        * platform/gtk/UserAgentGtk.cpp:
+        (WebCore::platformForUAString):
+
+2016-09-28  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK] Bump fake Safari version in UA
+        https://bugs.webkit.org/show_bug.cgi?id=162615
+
+        Reviewed by Carlos Garcia Campos.
+
+        Pretend to be Safari 10.0 to fix sites that don't work when we pretend to be Safari 8.0.
+
+        * platform/gtk/UserAgentGtk.cpp:
+        (WebCore::buildUserAgentString):
+
+2016-09-28  Khaled Hosny  <khaledhosny@eglug.org>
+
+        Use new woff2 API
+        https://bugs.webkit.org/show_bug.cgi?id=162608
+
+        Reviewed by Michael Catanzaro.
+
+        Test: fast/text/woff2-totalsfntsize.html
+
+        * platform/graphics/WOFFFileFormat.cpp:
+        (WebCore::WOFF2VectorOut::WOFF2VectorOut):
+        (WebCore::WOFF2VectorOut::Write):
+        (WebCore::WOFF2VectorOut::Size):
+        (WebCore::convertWOFFToSfnt):
+
+2016-09-28  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK] Add warning comment in UserAgentGtk.cpp
+        https://bugs.webkit.org/show_bug.cgi?id=162618
+
+        Reviewed by Carlos Garcia Campos.
+
+        * platform/gtk/UserAgentGtk.cpp:
+
+2016-09-28  Romain Bellessort  <romain.bellessort@crf.canon.fr>
+
+        [Streams API] Align cancelReadableStream() with spec
+        https://bugs.webkit.org/show_bug.cgi?id=162556
+
+        Reviewed by Xabier Rodriguez-Calvar.
+
+        Aligned cancelReadableStream() with Streams API. In particular, private cancel() method
+        was added to ReadableStreamDefaultController and function name was replaced by readableStreamCancel().
+        Implementation of cancel() (as well as pull()) is actually made in ReadableStreamInternals.js to
+        avoid creating new function for each controller.
+
+        No change in behaviour.
+
+        * Modules/streams/ReadableStream.js:
+        (cancel): Updated with reference to readableStreamCancel().
+        * Modules/streams/ReadableStreamDefaultReader.js:
+        (cancel): Updated with reference to readableStreamCancel().
+        * Modules/streams/ReadableStreamInternals.js:
+        (privateInitializeReadableStreamDefaultController): Refer to external functions (cancel/pull) to avoid
+        creating new functions.
+        (teeReadableStreamBranch2CancelFunction): Updated with reference to readableStreamCancel().
+        (readableStreamCancel): New name for cancelReadableStream(), behaviour aligned with spec.
+        (readableStreamDefaultControllerCancel): Added to avoid creating new function for each controller.
+        (readableStreamDefaultControllerPull): Added to avoid creating new function for each controller.
+        (readFromReadableStreamDefaultReader): Updated call to pull method to pass controller.
+        * bindings/js/WebCoreBuiltinNames.h: Added "cancel".
+
+2016-09-27  Joonghun Park  <jh718.park@samsung.com>
+
+        [EFL] Fix debug build break since r206481. Unreviewed
+        https://bugs.webkit.org/show_bug.cgi?id=162662
+
+        No new tests, no new behaviours.
+
+        * platform/graphics/BitmapImage.cpp:
+        (WebCore::BitmapImage::draw):
+
+2016-09-27  Nan Wang  <n_wang@apple.com>
+
+        AX: CrashTracer: com.apple.WebKit.WebContent at WebCore::AXObjectCache::localCaretRectForCharacterOffset(WebCore::RenderObject*&, WebCore::CharacterOffset const&) + 116
+        https://bugs.webkit.org/show_bug.cgi?id=162654
+
+        Reviewed by Chris Fleizach.
+
+        rangeForUnorderedCharacterOffsets() can return a null Range but we failed to
+        do a null check in localCaretRectForCharacterOffset() before dereferencing it.
+
+        Test: accessibility/mac/bounds-for-range-crash.html
+
+        * accessibility/AXObjectCache.cpp:
+        (WebCore::AXObjectCache::localCaretRectForCharacterOffset):
+
+2016-09-27  Alex Christensen  <achristensen@webkit.org>
+
+        Inline critical functions in URLParser
+        https://bugs.webkit.org/show_bug.cgi?id=162653
+
+        Reviewed by Myles C. Maxfield.
+
+        This gives me about a 15% speed improvement.
+
+        * platform/URLParser.cpp:
+        (WebCore::CodePointIterator::CodePointIterator):
+        (WebCore::CodePointIterator::operator==):
+        (WebCore::CodePointIterator::operator!=):
+        (WebCore::CodePointIterator::operator=):
+        (WebCore::CodePointIterator::atEnd):
+        (WebCore::CodePointIterator::codeUnitsSince):
+        (WebCore::CodePointIterator<LChar>::operator):
+        (WebCore::CodePointIterator<UChar>::operator):
+        (WebCore::appendCodePoint):
+        (WebCore::isC0Control):
+        (WebCore::isC0ControlOrSpace):
+        (WebCore::isTabOrNewline):
+        (WebCore::isInSimpleEncodeSet):
+        (WebCore::isInDefaultEncodeSet):
+        (WebCore::isInUserInfoEncodeSet):
+        (WebCore::isInvalidDomainCharacter):
+        (WebCore::isPercentOrNonASCII):
+        (WebCore::isSlashQuestionOrHash):
+        (WebCore::isValidSchemeCharacter):
+        (WebCore::URLParser::advance):
+        (WebCore::URLParser::isWindowsDriveLetter):
+        (WebCore::URLParser::appendToASCIIBuffer):
+        (WebCore::percentEncodeByte):
+        (WebCore::URLParser::utf8PercentEncode):
+        (WebCore::URLParser::utf8QueryEncode):
+        (WebCore::isDefaultPort):
+        (WebCore::isSpecialScheme):
+        (WebCore::isPercentEncodedDot):
+        (WebCore::isSingleDotPathSegment):
+        (WebCore::isDoubleDotPathSegment):
+        (WebCore::consumeSingleDotPathSegment):
+        (WebCore::consumeDoubleDotPathSegment):
+        (WebCore::URLParser::popPath):
+        (WebCore::URLParser::parsedDataView):
+        (WebCore::URLParser::currentPosition):
+        (WebCore::zeroSequenceLength):
+        (WebCore::findLongestZeroSequence):
+        (WebCore::pow256):
+        (WebCore::percentDecode):
+        (WebCore::containsOnlyASCII):
+        (WebCore::domainToASCII):
+        (WebCore::hasInvalidDomainCharacter):
+        (WebCore::formURLDecode):
+        (WebCore::serializeURLEncodedForm):
+
+2016-09-27  Zalan Bujtas  <zalan@apple.com>
+
+        REGRESSION (r204552): Yelp carousel animation is not smooth.
+        https://bugs.webkit.org/show_bug.cgi?id=162632
+
+        Reviewed by Simon Fraser.
+
+        For composited state changes when the layers don't need rebuilding, the updateGeometry() traversal
+        is post-order (see webkit.org/162634), so we can't rely on the offsetfromRenderer() value when
+        computing the graphics layer position on the descendants. We need this workaround until after webkit.org/162634
+        gets fixed.
+
+        Tests: compositing/hidpi-composited-container-and-graphics-layer-gap-changes.html
+               compositing/hidpi-negative-composited-bounds-on-device-pixel.html
+
+        * rendering/RenderLayerBacking.cpp:
+        (WebCore::computeOffsetFromAncestorGraphicsLayer):
+        (WebCore::ComputedOffsets::ComputedOffsets):
+        (WebCore::ComputedOffsets::fromAncestorGraphicsLayer):
+        (WebCore::RenderLayerBacking::computeParentGraphicsLayerRect):
+
+2016-09-27  Said Abou-Hallawa  <sabouhallawa@apple.com>
+
+        Move caching the ImageFrame from BitmapImage to ImageSource
+        https://bugs.webkit.org/show_bug.cgi?id=155498
+
+        Reviewed by Simon Fraser.
+
+        BitmapImage has two modes of operation regarding its image decoding state.
+        The first mode happens when a remote image is loaded as encoded data and
+        which requires an ImageDecoder to generate the image metadata and the
+        the ImageFrames. The second mode happens when a BitmapImage is created
+        with a NativeImagePtr. In this case, no ImageDecoder is needed.
+
+        To remove this burden from the BitmapImage the member 'm_frames' is removed
+        from BitmapImage. A new member named 'm_frameCache' of type ImageFrameCache
+        is added to ImageSource. This class handles caching and recaching the image
+        metadata and the ImageFrames if the image needs decoding. When the BitmapImage
+        is initialized with a memory image, the ImageFrameCache initializes its
+        metadata and ImageFrames directly from the NativeImagePtr.
+
+        The plan for ImageFrameCache is to be extended for the asynchronous image
+        decoding and also to be used by the non CG image decoders which cache
+        other copies of the ImageFrames. This double caching should be removed.
+
+        When the BitmapImage is replying to the ImageFrame queries, it will ask the
+        ImageSource which will pass the query the ImageFrameCache. ImageFrameCache
+        will ensure the requested ImageFrame is cached and is valid for the requested
+        SubSamplingLevel before accessing the data members of this ImageFrame.
+
+        * CMakeLists.txt:
+        * WebCore.xcodeproj/project.pbxproj:
+        Add and ImageFrameCache.cpp to the WebCore project.
+
+        * platform/graphics/BitmapImage.cpp:
+        (WebCore::BitmapImage::BitmapImage): Move initializing the image metadata to
+        ImageSource. Add initializers for the remaining members in the class declaration.
+
+        (WebCore::BitmapImage::destroyDecodedData): Move most of the logic of this
+        function to ImageFrameCache::destroyDecodedData(). The only part which can't
+        be moved is the call invalidatePlatformData().
+
+        (WebCore::BitmapImage::destroyDecodedDataIfNecessary): Move the logic of this
+        function to ImageFrameCache::destroyDecodedDataIfNecessary().
+
+        (WebCore::BitmapImage::dataChanged): Move the logic of this function to
+        ImageSource::dataChanged().
+
+        (WebCore::BitmapImage::frameImageAtIndex): Move most of the logic of this
+        function to ImageFrameCache::frameImageAtIndex(). The only part which can't
+        be moved is the call invalidatePlatformData() if the required subsampling
+        level is different from the subsampling level for the cached frame image.
+
+        (WebCore::BitmapImage::draw): Replace the BitmapImage  cached metadata with
+        the corresponding ImageSource cached metadata.
+        (WebCore::BitmapImage::drawPattern): Ditto.
+        (WebCore::BitmapImage::shouldAnimate): Ditto.
+        (WebCore::BitmapImage::startAnimation): Ditto.
+        (WebCore::BitmapImage::internalAdvanceAnimation): Ditto.
+
+        (WebCore::BitmapImage::dump): Call ImageSource::dump() to dump the image
+        cached metadata.
+
+        (WebCore::BitmapImage::haveFrameImageAtIndex): Deleted.
+        (WebCore::BitmapImage::destroyMetadataAndNotify): Deleted.
+        (WebCore::BitmapImage::cacheFrame): Deleted.
+        (WebCore::BitmapImage::didDecodeProperties): Deleted.
+        (WebCore::BitmapImage::updateSize): Deleted.
+        (WebCore::BitmapImage::size): Deleted.
+        (WebCore::BitmapImage::sizeRespectingOrientation): Deleted.
+        (WebCore::BitmapImage::hotSpot): Deleted.
+        (WebCore::BitmapImage::frameCount): Deleted.
+        (WebCore::BitmapImage::isSizeAvailable): Deleted.
+        (WebCore::BitmapImage::ensureFrameAtIndexIsCached): Deleted.
+        (WebCore::BitmapImage::frameIsCompleteAtIndex): Deleted.
+        (WebCore::BitmapImage::frameDurationAtIndex): Deleted.
+        (WebCore::BitmapImage::frameHasAlphaAtIndex): Deleted.
+        (WebCore::BitmapImage::currentFrameKnownToBeOpaque): Deleted.
+        (WebCore::BitmapImage::frameOrientationAtIndex): Deleted.
+        (WebCore::BitmapImage::singlePixelSolidColor): Deleted.
+        (WebCore::BitmapImage::repetitionCount): Deleted.
+        * platform/graphics/BitmapImage.h:
+        Managing the ImageFrames caching is moved to ImageFrameCache. Caching the
+        image metadata is now moved to the ImageSource.
+        
+        * platform/graphics/GeneratedImage.h:
+        * platform/graphics/Image.h:
+        (WebCore::Image::orientationForCurrentFrame):
+        (WebCore::Image::singlePixelSolidColor):
+        Change currentFrameKnownToBeOpaque(), orientationForCurrentFrame() and
+        singlePixelSolidColor() to be const.
+        
+        * platform/graphics/ImageFrame.cpp:
+        (WebCore::ImageFrame::defaultFrame): Returns an empty ImageFrame to get the default ImageFrame metadata.
+        (WebCore::ImageFrame::fillMetadata): Deleted. Moved to ImageFrameCache.
+        (WebCore::ImageFrame::initialize): Deleted. Ditto.
+        
+        * platform/graphics/ImageFrame.h:
+        (WebCore::ImageFrame::setDuration): Change the type of the argument to float instead of unsigned.
+        (WebCore::ImageFrame::hasAlpha): Protect the unset m_hasAlpha by checking hasMetadata() first.
+
+        * platform/graphics/ImageFrameCache.cpp: Added.
+        (WebCore::ImageFrameCache::ImageFrameCache): Two constructors similar to what we do for ImageSource and BitmapImage.
+        (WebCore::ImageFrameCache::destroyDecodedData): Moved from BitmapImage.cpp.
+        (WebCore::ImageFrameCache::destroyDecodedDataIfNecessary): Ditto.
+        (WebCore::ImageFrameCache::destroyIncompleteDecodedData): Ditto.
+        (WebCore::ImageFrameCache::decodedSizeChanged): Ditto.
+        (WebCore::ImageFrameCache::decodedSizeIncremented): Ditto.
+        (WebCore::ImageFrameCache::decodedSizeDecremented): Ditto.
+        (WebCore::ImageFrameCache::decodedSizeReset): Ditto.
+        (WebCore::ImageFrameCache::didDecodeProperties): Ditto.
+        (WebCore::ImageFrameCache::growFrames): Grows the size of m_frames if necessary.
+        (WebCore::ImageFrameCache::setNativeImage): Initializes the ImageFrame metadata directly from the NativeImagePtr. 
+        (WebCore::ImageFrameCache::setFrameNativeImage): Initializes the ImageFrame image and the metadata.
+        (WebCore::ImageFrameCache::setFrameMetadata): Initializes the ImageFrame metadata from the ImageDecoder.
+        (WebCore::ImageFrameCache::frameAtIndex): Returns an ImageFrame given its index. Cache or recache the requested ImageFrame if necessary.
+        (WebCore::ImageFrameCache::clearMetadata): Invalidates the cached image metadata.
+        (WebCore::ImageFrameCache::metadata): A template function which returns an image metadata property.
+        (WebCore::ImageFrameCache::frameMetadataAtIndex): A template function which returns an ImageFrame metadata property.
+        (WebCore::ImageFrameCache::isSizeAvailable): An image metadata property.
+        (WebCore::ImageFrameCache::frameCount): Ditto.
+        (WebCore::ImageFrameCache::repetitionCount): Ditto.
+        (WebCore::ImageFrameCache::filenameExtension): Ditto.
+        (WebCore::ImageFrameCache::hotSpot): Ditto.
+        (WebCore::ImageFrameCache::size): An image metadata property but we get it from the first ImageFrame.
+        (WebCore::ImageFrameCache::sizeRespectingOrientation): Ditto.
+        (WebCore::ImageFrameCache::singlePixelSolidColor): Ditto.
+        (WebCore::ImageFrameCache::frameIsCompleteAtIndex): An ImageFrame metadata property.
+        (WebCore::ImageFrameCache::frameHasAlphaAtIndex): Ditto.
+        (WebCore::ImageFrameCache::frameHasImageAtIndex): Ditto.
+        (WebCore::ImageFrameCache::frameHasInvalidNativeImageAtIndex): Ditto.
+        (WebCore::ImageFrameCache::frameSubsamplingLevelAtIndex): Ditto.
+        (WebCore::ImageFrameCache::frameSizeAtIndex): Ditto.
+        (WebCore::ImageFrameCache::frameBytesAtIndex): Ditto.
+        (WebCore::ImageFrameCache::frameDurationAtIndex): Ditto.
+        (WebCore::ImageFrameCache::frameOrientationAtIndex): Ditto.
+        (WebCore::ImageFrameCache::frameImageAtIndex): Ditto.
+
+        * platform/graphics/ImageFrameCache.h: Added.
+        (WebCore::ImageFrameCache::setDecoder): Sets the current ImageDecoder which is owned by the ImageSource.
+        (WebCore::ImageFrameCache::decodedSize): Returns the size of the cached NativeImages.
+        (WebCore::ImageFrameCache::isDecoderAvailable): Returns whether an ImageDecoder is available.
+
+        * platform/graphics/ImageSource.cpp:
+        (WebCore::ImageSource::ImageSource): Initializes the ImageFrameCache based on the image decoding state.
+        (WebCore::ImageSource::clearFrameBufferCache): Replace initialized() with isDecoderAvailable().
+        (WebCore::ImageSource::clear): Clears the ImageDecoder of the ImageFrameCache.
+        (WebCore::ImageSource::destroyDecodedData): Moved from BitmapImage.cpp.
+        (WebCore::ImageSource::destroyDecodedDataIfNecessary): Ditto.
+        (WebCore::ImageSource::ensureDecoderAvailable): Creates an ImageDecoder if necessary and sets it in ImageFrameCache.
+        (WebCore::ImageSource::setData):
+        (WebCore::ImageSource::dataChanged): Moved from BitmapImage.cpp.
+        (WebCore::ImageSource::isAllDataReceived):
+        (WebCore::ImageSource::maximumSubsamplingLevel): Rename calculateMaximumSubsamplingLevel() to maximumSubsamplingLevel().
+        (WebCore::ImageSource::subsamplingLevelForScale):
+        (WebCore::ImageSource::createFrameImageAtIndex):
+        (WebCore::ImageSource::dump):
+        (WebCore::ImageSource::calculateMaximumSubsamplingLevel): Deleted. Renamed to maximumSubsamplingLevel().
+        (WebCore::ImageSource::updateMetadata): Deleted. Not needed. Caching the image metadata is the responsibility of ImageFrameCache. 
+        (WebCore::ImageSource::bytesDecodedToDetermineProperties): Deleted. Not needed.
+        (WebCore::ImageSource::isSizeAvailable): Deleted. Moved to ImageSource.h. 
+        (WebCore::ImageSource::size): Deleted. Ditto.
+        (WebCore::ImageSource::sizeRespectingOrientation): Deleted. Ditto.
+        (WebCore::ImageSource::frameCount): Deleted. Ditto.
+        (WebCore::ImageSource::repetitionCount): Deleted. Ditto.
+        (WebCore::ImageSource::filenameExtension): Deleted. Ditto.
+        (WebCore::ImageSource::hotSpot): Deleted. Ditto.
+        (WebCore::ImageSource::frameIsCompleteAtIndex): Deleted. Ditto.
+        (WebCore::ImageSource::frameHasAlphaAtIndex): Deleted. Ditto.
+        (WebCore::ImageSource::frameAllowSubsamplingAtIndex): Deleted. Ditto.
+        (WebCore::ImageSource::frameSizeAtIndex): Deleted. Ditto.
+        (WebCore::ImageSource::frameBytesAtIndex): Deleted. Ditto.
+        (WebCore::ImageSource::frameDurationAtIndex): Deleted. Ditto.
+        (WebCore::ImageSource::frameOrientationAtIndex): Deleted. Ditto.
+
+        * platform/graphics/ImageSource.h:
+        (WebCore::ImageSource::isDecoderAvailable): initialized() was renamed to isDecoderAvailable().
+        (WebCore::ImageSource::decodedSize): Send the query to ImageFrameCache.
+        (WebCore::ImageSource::isSizeAvailable): Ditto.
+        (WebCore::ImageSource::frameCount): Ditto.
+        (WebCore::ImageSource::repetitionCount): Ditto.
+        (WebCore::ImageSource::filenameExtension): Ditto.
+        (WebCore::ImageSource::hotSpot): Ditto.
+        (WebCore::ImageSource::size): Ditto.
+        (WebCore::ImageSource::sizeRespectingOrientation): Ditto.
+        (WebCore::ImageSource::singlePixelSolidColor): Ditto.
+        (WebCore::ImageSource::frameIsCompleteAtIndex): Ditto.
+        (WebCore::ImageSource::frameHasAlphaAtIndex): Ditto.
+        (WebCore::ImageSource::frameHasImageAtIndex): Ditto.
+        (WebCore::ImageSource::frameHasInvalidNativeImageAtIndex): Ditto.
+        (WebCore::ImageSource::frameSubsamplingLevelAtIndex): Ditto.
+        (WebCore::ImageSource::frameSizeAtIndex): Ditto.
+        (WebCore::ImageSource::frameBytesAtIndex): Ditto.
+        (WebCore::ImageSource::frameDurationAtIndex): Ditto.
+        (WebCore::ImageSource::frameOrientationAtIndex): Ditto.
+        (WebCore::ImageSource::frameImageAtIndex): Ditto.
+        (WebCore::ImageSource::decoder): Deleted. Not needed.
+        (WebCore::ImageSource::initialized): Deleted. Was renamed to isDecoderAvailable().
+        (WebCore::ImageSource::setNeedsUpdateMetadata): Deleted. Not needed.
+
+        * platform/graphics/cairo/GraphicsContext3DCairo.cpp:
+        (WebCore::GraphicsContext3D::ImageExtractor::extractImage): AlphaOption and GammaAndColorProfileOption are moved out of ImageSource.
+        * platform/graphics/cg/GraphicsContext3DCG.cpp:
+        (WebCore::GraphicsContext3D::ImageExtractor::extractImage): Ditto.
+        
+        * platform/graphics/cg/ImageDecoderCG.cpp:
+        (WebCore::ImageDecoder::ImageDecoder): Make the constructor of ImageDecoder be the same for all ports. 
+        (WebCore::ImageDecoder::setData): Removed unused overloaded function.
+        (WebCore::ImageDecoder::size): Deleted.  Removed unused function.
+
+        * platform/graphics/cg/ImageDecoderCG.h:
+        (WebCore::ImageDecoder::create): Make the constructor of CG ImageDecoder be like the other ports.
+        (WebCore::ImageDecoder::isAllDataReceived): Make this property owned by ImageDecoder.
+
+        * platform/graphics/cg/PDFDocumentImage.h: Change currentFrameKnownToBeOpaque() to be const.
+
+        * platform/graphics/efl/GraphicsContext3DEfl.cpp:
+        (WebCore::GraphicsContext3D::ImageExtractor::extractImage): AlphaOption and GammaAndColorProfileOption are moved out of ImageSource.
+        
+        * platform/graphics/mac/ImageMac.mm:
+        (WebCore::BitmapImage::invalidatePlatformData): m_frames is owned by ImageFrameCache. ImageFrameCache::frameCount() has to 
+        be equal to ImageFrame::m_frames.size().
+
+        * platform/image-decoders/ImageDecoder.cpp:
+        (WebCore::ImageDecoder::create): AlphaOption and GammaAndColorProfileOption are moved out of ImageSource.
+        * platform/image-decoders/ImageDecoder.h:
+        (WebCore::ImageDecoder::ImageDecoder): Ditto.
+        (WebCore::ImageDecoder::frameCount): Make frameCount const so it can be passed to the template function ImageFrameCache::metadata().
+        * platform/image-decoders/bmp/BMPImageDecoder.cpp:
+        (WebCore::BMPImageDecoder::BMPImageDecoder): AlphaOption and GammaAndColorProfileOption are moved out of ImageSource.
+        * platform/image-decoders/bmp/BMPImageDecoder.h:
+        * platform/image-decoders/gif/GIFImageDecoder.cpp:
+        (WebCore::GIFImageDecoder::GIFImageDecoder): AlphaOption and GammaAndColorProfileOption are moved out of ImageSource.
+        (WebCore::GIFImageDecoder::frameCount): Make frameCount const so it can be passed to the template function ImageFrameCache::metadata().
+        * platform/image-decoders/gif/GIFImageDecoder.h:
+        * platform/image-decoders/gif/GIFImageReader.cpp:
+        * platform/image-decoders/gif/GIFImageReader.h:
+        * platform/image-decoders/ico/ICOImageDecoder.cpp:
+        (WebCore::ICOImageDecoder::ICOImageDecoder): 
+        (WebCore::ICOImageDecoder::frameCount): Make frameCount const so it can be passed to the template function ImageFrameCache::metadata().
+        (WebCore::ICOImageDecoder::decode): Move resizing the m_frameBufferCache from ICOImageDecoder::frameCount() to ICOImageDecoder::decode().
+        (WebCore::ICOImageDecoder::decodeAtIndex): AlphaOption and GammaAndColorProfileOption are moved out of ImageSource.
+        * platform/image-decoders/ico/ICOImageDecoder.h:
+        * platform/image-decoders/jpeg/JPEGImageDecoder.cpp:
+        (WebCore::JPEGImageDecoder::JPEGImageDecoder): AlphaOption and GammaAndColorProfileOption are moved out of ImageSource.
+        * platform/image-decoders/jpeg/JPEGImageDecoder.h:
+        * platform/image-decoders/png/PNGImageDecoder.cpp:
+        (WebCore::PNGImageDecoder::PNGImageDecoder): AlphaOption and GammaAndColorProfileOption are moved out of ImageSource.
+        * platform/image-decoders/png/PNGImageDecoder.h:
+        (WebCore::PNGImageDecoder::frameCount): Make frameCount const so it can be passed to the template function ImageFrameCache::metadata().
+        * platform/image-decoders/webp/WEBPImageDecoder.cpp:
+        (WebCore::WEBPImageDecoder::WEBPImageDecoder):
+        * platform/image-decoders/webp/WEBPImageDecoder.h:
+
+        * svg/graphics/SVGImage.h: Make currentFrameKnownToBeOpaque() be const.
+        * svg/graphics/SVGImageForContainer.h: Ditto.
+
+2016-09-27  Alex Christensen  <achristensen@webkit.org>
+
+        Correctly parse URLs with the first tab in the fragment
+        https://bugs.webkit.org/show_bug.cgi?id=162650
+
+        Reviewed by Saam Barati.
+
+        Covered by a new API test.
+
+        * platform/URLParser.cpp:
+        (WebCore::URLParser::fragmentSyntaxViolation):
+
+2016-09-27  Chris Dumez  <cdumez@apple.com>
+
+        <a download> does not honor the same-origin requirement
+        https://bugs.webkit.org/show_bug.cgi?id=156100
+
+        Reviewed by Alex Christensen.
+
+        We now completely ignore the "download" attribute on anchors if the
+        href URL is cross-origin. We therefore navigate to the URL instead
+        of forcefully downloading it in this case and leave it up to the server
+        to give us the right headers if it should be downloaded. This is
+        conservative and matches Firefox.
+
+        Chrome and the HTML specification ignore only the suggested filename
+        if the URL is cross-origin but still download the file.
+
+        No new tests, updated existing test.
+
+        * html/HTMLAnchorElement.cpp:
+        (WebCore::HTMLAnchorElement::handleClick):
+
+2016-09-27  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser: Handle windows drive letters after two slashes in relative URLs according to spec
+        https://bugs.webkit.org/show_bug.cgi?id=162646
+
+        Reviewed by Saam Barati.
+
+        Covered by new API tests.
+
+        * platform/URLParser.cpp:
+        (WebCore::CodePointIterator::codeUnitsSince):
+        (WebCore::URLParser::appendWindowsDriveLetter):
+        (WebCore::URLParser::parse):
+        (WebCore::isWindowsDriveLetter): Deleted.
+        (WebCore::URLParser::checkWindowsDriveLetter): Deleted.
+        * platform/URLParser.h:
+
+2016-09-27  Alex Christensen  <achristensen@webkit.org>
+
+        URLs with @ in the user should only search for the last @ until the end of the authority and host
+        https://bugs.webkit.org/show_bug.cgi?id=162635
+
+        Reviewed by Geoffrey Garen.
+
+        Covered by new API tests.
+
+        * platform/URLParser.cpp:
+        (WebCore::URLParser::parse):
+
 2016-09-27  Chris Dumez  <cdumez@apple.com>
 
         It should be possible to dispatch events on documents created using DOMParser

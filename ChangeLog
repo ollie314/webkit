@@ -1,3 +1,29 @@
+2016-09-28  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK] Remove obsolete comment from OptionsGTK.cmake
+        https://bugs.webkit.org/show_bug.cgi?id=162622
+
+        Reviewed by Alex Christensen.
+
+        * Source/cmake/OptionsGTK.cmake:
+
+2016-09-28  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Unreviewed, build fix for several CMake ports after r206440
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/OptionsMac.cmake:
+        * Source/cmake/WebKitFeatures.cmake:
+
+2016-09-27  Don Olmstead  <don.olmstead@am.sony.com>
+
+        [CMake] Add HAVE_LOCALTIME_R definition
+        https://bugs.webkit.org/show_bug.cgi?id=162636
+
+        Reviewed by Alex Christensen.
+
+        * Source/cmake/OptionsCommon.cmake:
+
 2016-09-27  Don Olmstead  <don.olmstead@am.sony.com>
 
         [CMake] Use CMake to determine HAVE_* defines
