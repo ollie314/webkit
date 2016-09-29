@@ -1,3 +1,374 @@
+2016-09-28  Chris Dumez  <cdumez@apple.com>
+
+        Drop first 'state' parameter to JSDOMWindow::toWrapped() / JSEventTarget::toWrapped()
+        https://bugs.webkit.org/show_bug.cgi?id=162709
+
+        Reviewed by Alex Christensen.
+
+        Drop first 'state' parameter to JSDOMWindow::toWrapped() / JSEventTarget::toWrapped()
+        as it is unused. This is the quickest way to allow DOMWindow / EventTarget members
+        in IDL dictionaries. This is because the generated bindings code relies on
+        convertWrapperType() in JSDOMConvert.h which calls toWrapped() with a single
+        parameter. Right now, the only type that requires an ExecState for its toWrapped()
+        is XPathNSResolver (which should likely be a callback interface rather than a
+        regular interface).
+
+        * bindings/js/JSDOMWindowCustom.cpp:
+        (WebCore::JSDOMWindow::toWrapped):
+        * bindings/js/JSDictionary.cpp:
+        (WebCore::JSDictionary::convertValue):
+        * bindings/js/JSEventTargetCustom.cpp:
+        (WebCore::JSEventTarget::toWrapped):
+        * bindings/js/JSMessageEventCustom.cpp:
+        (WebCore::handleInitMessageEvent):
+        * bindings/scripts/CodeGeneratorJS.pm:
+        (GenerateHeader):
+        (JSValueToNative):
+
+2016-09-28  Chris Dumez  <cdumez@apple.com>
+
+        Log console messages when the anchor download attribute is ignored
+        https://bugs.webkit.org/show_bug.cgi?id=162703
+
+        Reviewed by Alex Christensen.
+
+        Log console messages when the anchor download attribute is ignored so
+        that the developer can better understand what's happening.
+
+        No new tests, rebaselined existing tests.
+
+        * html/HTMLAnchorElement.cpp:
+        (WebCore::HTMLAnchorElement::handleClick):
+
+2016-09-28  Chris Dumez  <cdumez@apple.com>
+
+        Add support for DOMTokenList.supports()
+        https://bugs.webkit.org/show_bug.cgi?id=162659
+
+        Reviewed by Ryosuke Niwa.
+
+        Add support for DOMTokenList.supports():
+        - https://dom.spec.whatwg.org/#dom-domtokenlist-supports
+
+        Firefox and Chrome already recently implemented it (Chrome since
+        version 50 and Firefox since version 49).
+
+        Test: fast/dom/DOMTokenList-supports.html
+
+        * dom/SecurityContext.cpp:
+        (WebCore::SecurityContext::isSupportedSandboxPolicy):
+        (WebCore::SecurityContext::enforceSandboxFlags): Deleted.
+        * dom/SecurityContext.h:
+        * html/DOMTokenList.cpp:
+        (WebCore::DOMTokenList::DOMTokenList):
+        (WebCore::DOMTokenList::supports):
+        (WebCore::DOMTokenList::replace): Deleted.
+        * html/DOMTokenList.h:
+        (WebCore::DOMTokenList::DOMTokenList):
+        * html/DOMTokenList.idl:
+        * html/HTMLAnchorElement.cpp:
+        (WebCore::HTMLAnchorElement::parseAttribute):
+        (WebCore::HTMLAnchorElement::relList):
+        * html/HTMLAnchorElement.idl:
+        * html/HTMLAreaElement.idl:
+        * html/HTMLIFrameElement.cpp:
+        (WebCore::HTMLIFrameElement::sandbox):
+        * html/HTMLLinkElement.cpp:
+        (WebCore::HTMLLinkElement::relList):
+        * html/HTMLTableCellElement.idl:
+        * html/LinkRelAttribute.cpp:
+        (WebCore::LinkRelAttribute::isSupported):
+        (WebCore::LinkRelAttribute::LinkRelAttribute): Deleted.
+        * html/LinkRelAttribute.h:
+
+2016-09-28  Ryosuke Niwa  <rniwa@webkit.org>
+
+        DOMTokenList’s value and stringifier should not return parsed tokens
+        https://bugs.webkit.org/show_bug.cgi?id=161076
+
+        Reviewed by Chris Dumez.
+
+        Updated our implementation of DOMTokenList.prototype.value and its toString function
+        to match the latest DOM specification: https://dom.spec.whatwg.org/#interface-domtokenlist
+
+        "value" attribute, on getting, runs its serialize steps, which simply gets the attribute value.
+        On setting, it sets the attribute value with the given value.
+
+        The stringification behavior returns the same serialize steps as "value" attribute on getting.
+
+        This change simplifies our implementation of DOMTokenList and removes the need for m_cachedValue,
+        which has been removed in this patch.
+
+        No new tests since existing tests cover this.
+
+        * html/DOMTokenList.cpp:
+        (WebCore::DOMTokenList::value): Just call getAttribute.
+        (WebCore::DOMTokenList::setValue): Just call setAttribute.
+        (WebCore::DOMTokenList::updateTokensFromAttributeValue):
+        (WebCore::DOMTokenList::associatedAttributeValueChanged):
+        (WebCore::DOMTokenList::updateAssociatedAttributeFromTokens): Moved the code to update the tokens
+        from from the attribute value. This is the "update steps".
+        * html/DOMTokenList.h:
+
+2016-09-28  Jer Noble  <jer.noble@apple.com>
+
+        CRASH at WebCore::CDMSessionAVStreamSession::update + 950
+        https://bugs.webkit.org/show_bug.cgi?id=162701
+
+        Reviewed by Beth Dakin.
+
+        If the SourceBuffer backing a <video> element is removed before CDMSessionAVStreamSession::update() gets
+        a chance to run, the protectedSourceBuffer will be null. Just bail early and indicate an error.
+
+        * platform/graphics/avfoundation/objc/CDMSessionAVStreamSession.mm:
+        (WebCore::CDMSessionAVStreamSession::update):
+
+2016-09-28  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser should properly handle unexpected periods and overflows in IPv4 addresses
+        https://bugs.webkit.org/show_bug.cgi?id=162655
+
+        Reviewed by Geoffrey Garen.
+
+        Covered by new API tests.
+
+        * platform/URLParser.cpp:
+        (WebCore::URLParser::parseIPv4Number):
+        (WebCore::URLParser::parseIPv4Host):
+        * platform/URLParser.h:
+
+2016-09-28  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        Some media tests are crashing due to soft-linking failures
+        https://bugs.webkit.org/show_bug.cgi?id=162698
+
+        Reviewed by Jer Noble.
+
+        We should be handling soft-linking failures for MRMediaRemoteSetNowPlayingVisibility gracefully. Guards these
+        calls with canLoad_MediaRemote_MRMediaRemoteSetParentApplication and also use the
+        SOFT_LINK_FUNCTION_MAY_FAIL_FOR_HEADER macro when soft linking.
+
+        * platform/audio/mac/MediaSessionManagerMac.mm:
+        (WebCore::MediaSessionManagerMac::updateNowPlayingInfo):
+        * platform/mac/MediaRemoteSoftLink.cpp:
+        * platform/mac/MediaRemoteSoftLink.h:
+
+2016-09-28  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser should ignore tabs in authority
+        https://bugs.webkit.org/show_bug.cgi?id=162694
+
+        Reviewed by Geoffrey Garen.
+
+        Covered by new API tests.
+
+        * platform/URLParser.cpp:
+        (WebCore::URLParser::parseAuthority):
+
+2016-09-28  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser should ignore extra slashes after scheme:// and handle a missing slash after the port
+        https://bugs.webkit.org/show_bug.cgi?id=162690
+
+        Reviewed by Geoffrey Garen.
+
+        Covered by new API tests.
+
+        * platform/URLParser.cpp:
+        (WebCore::URLParser::parse):
+
+2016-09-28  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser should correctly canonicalize uppercase IPv6 addresses
+        https://bugs.webkit.org/show_bug.cgi?id=162680
+
+        Reviewed by Tim Horton.
+
+        Covered by a new API test.
+
+        * platform/URLParser.cpp:
+        (WebCore::URLParser::parseIPv6Host):
+        If there is an uppercase character in the IPv6 address part, then it is a syntax violation
+        because the canonicalized IPv6 address differs from the input String.
+
+2016-09-28  Chris Dumez  <cdumez@apple.com>
+
+        Unreviewed, fix iOS build.
+
+        * bindings/js/ios/TouchConstructors.cpp:
+
+2016-09-28  Chris Dumez  <cdumez@apple.com>
+
+        It should be possible to dispatch events on template documents
+        https://bugs.webkit.org/show_bug.cgi?id=162687
+
+        Reviewed by Ryosuke Niwa.
+
+        It should be possible to dispatch events on template documents. Firefox
+        supports this. Chrome does not but this is likely not intentional as
+        Chrome generally supports dispatching events on frameless documents.
+
+        Test: fast/dom/template-document-dispatchEvent.html
+
+        * dom/Document.cpp:
+        (WebCore::Document::ensureTemplateDocument):
+
+2016-09-27  Dean Jackson  <dino@apple.com>
+
+        Use Color references where possible
+        https://bugs.webkit.org/show_bug.cgi?id=162643
+        <rdar://problem/28506550>
+
+        Reviewed by Simon Fraser.
+
+        There were a bunch of places where we pass or use
+        Colors by value. As the Color class gets a bit more
+        complicated, it would be nice to avoid copying, so
+        use references where possible.
+
+        * css/CSSGradientValue.cpp:
+        (WebCore::interpolate):
+        * css/StyleColor.h:
+        (WebCore::StyleColor::getColor):
+        (WebCore::StyleColor::resolve):
+        * css/StyleResolver.h:
+        (WebCore::StyleResolver::State::backgroundColor):
+        * dom/Document.h:
+        (WebCore::Document::textColor):
+        * editing/FrameSelection.cpp:
+        (WebCore::disappearsIntoBackground):
+        * html/canvas/CanvasRenderingContext2D.cpp:
+        (WebCore::CanvasRenderingContext2D::setShadow):
+        * html/canvas/CanvasRenderingContext2D.h:
+        * html/track/TextTrackCueGeneric.h:
+        * page/PageOverlay.cpp:
+        (WebCore::PageOverlay::setBackgroundColor):
+        * page/PageOverlay.h:
+        * page/animation/CSSPropertyAnimation.cpp:
+        (WebCore::PropertyWrapperColor::PropertyWrapperColor):
+        (WebCore::PropertyWrapperMaybeInvalidColor::PropertyWrapperMaybeInvalidColor):
+        (WebCore::PropertyWrapperVisitedAffectedColor::PropertyWrapperVisitedAffectedColor):
+        * platform/graphics/GraphicsContext.cpp:
+        (WebCore::GraphicsContext::fillRectWithRoundedHole):
+        * platform/graphics/GraphicsContext.h:
+        (WebCore::GraphicsContext::strokeColor):
+        (WebCore::GraphicsContext::fillColor):
+        * platform/graphics/InbandTextTrackPrivateClient.h:
+        (WebCore::GenericCueData::foregroundColor):
+        (WebCore::GenericCueData::setForegroundColor):
+        (WebCore::GenericCueData::backgroundColor):
+        (WebCore::GenericCueData::setBackgroundColor):
+        (WebCore::GenericCueData::highlightColor):
+        (WebCore::GenericCueData::setHighlightColor):
+        * platform/graphics/ca/TileController.h:
+        * platform/graphics/cg/GraphicsContextCG.cpp:
+        (WebCore::GraphicsContext::drawRect):
+        (WebCore::GraphicsContext::fillRect):
+        (WebCore::GraphicsContext::platformFillRoundedRect):
+        (WebCore::GraphicsContext::fillRectWithRoundedHole):
+        * platform/graphics/displaylists/DisplayListItems.h:
+        (WebCore::DisplayList::DrawFocusRingPath::color):
+        (WebCore::DisplayList::DrawFocusRingRects::color):
+        (WebCore::DisplayList::FillRectWithColor::color):
+        (WebCore::DisplayList::FillCompositedRect::color):
+        (WebCore::DisplayList::FillRoundedRect::color):
+        (WebCore::DisplayList::FillRectWithRoundedHole::color):
+        * platform/graphics/filters/FEDiffuseLighting.cpp:
+        (WebCore::FEDiffuseLighting::lightingColor):
+        * platform/graphics/filters/FEDiffuseLighting.h:
+        * platform/graphics/filters/FEDropShadow.h:
+        (WebCore::FEDropShadow::shadowColor):
+        * platform/graphics/filters/FEFlood.cpp:
+        (WebCore::FEFlood::floodColor):
+        (WebCore::FEFlood::platformApplySoftware):
+        * platform/graphics/filters/FEFlood.h:
+        * platform/graphics/filters/FESpecularLighting.cpp:
+        (WebCore::FESpecularLighting::lightingColor):
+        * platform/graphics/filters/FESpecularLighting.h:
+        * platform/graphics/filters/FilterOperation.h:
+        * rendering/BorderEdge.h:
+        (WebCore::BorderEdge::color):
+        * rendering/InlineFlowBox.cpp:
+        (WebCore::InlineFlowBox::paintBoxDecorations):
+        * rendering/InlineTextBox.cpp:
+        (WebCore::InlineTextBox::paintSelection):
+        * rendering/InlineTextBox.h:
+        * rendering/RenderFrameSet.cpp:
+        (WebCore::borderStartEdgeColor):
+        (WebCore::borderEndEdgeColor):
+        (WebCore::borderFillColor):
+        * rendering/RenderInline.cpp:
+        (WebCore::RenderInline::paintOutlineForLine):
+        * rendering/RenderInline.h:
+        * rendering/RenderLayerCompositor.h:
+        * rendering/RenderView.cpp:
+        (WebCore::RenderView::paintBoxDecorations):
+        * rendering/TextDecorationPainter.cpp:
+        (WebCore::TextDecorationPainter::paintTextDecoration):
+        * rendering/TextPainter.cpp:
+        (WebCore::TextPainter::paintTextWithShadows):
+        * rendering/style/BorderValue.h:
+        (WebCore::BorderValue::color):
+        * rendering/style/CollapsedBorderValue.h:
+        (WebCore::CollapsedBorderValue::color):
+        * rendering/style/RenderStyle.cpp:
+        (WebCore::RenderStyle::color):
+        (WebCore::RenderStyle::visitedLinkColor):
+        (WebCore::RenderStyle::setColor):
+        (WebCore::RenderStyle::setVisitedLinkColor):
+        * rendering/style/RenderStyle.h:
+        (WebCore::RenderStyle::borderLeftColor):
+        (WebCore::RenderStyle::borderRightColor):
+        (WebCore::RenderStyle::borderTopColor):
+        (WebCore::RenderStyle::borderBottomColor):
+        (WebCore::RenderStyle::backgroundColor):
+        (WebCore::RenderStyle::columnRuleColor):
+        (WebCore::RenderStyle::outlineColor):
+        (WebCore::RenderStyle::textEmphasisColor):
+        (WebCore::RenderStyle::textFillColor):
+        (WebCore::RenderStyle::textStrokeColor):
+        (WebCore::RenderStyle::visitedLinkBackgroundColor):
+        (WebCore::RenderStyle::visitedLinkBorderLeftColor):
+        (WebCore::RenderStyle::visitedLinkBorderRightColor):
+        (WebCore::RenderStyle::visitedLinkBorderBottomColor):
+        (WebCore::RenderStyle::visitedLinkBorderTopColor):
+        (WebCore::RenderStyle::visitedLinkOutlineColor):
+        (WebCore::RenderStyle::visitedLinkColumnRuleColor):
+        (WebCore::RenderStyle::textDecorationColor):
+        (WebCore::RenderStyle::visitedLinkTextDecorationColor):
+        (WebCore::RenderStyle::visitedLinkTextEmphasisColor):
+        (WebCore::RenderStyle::visitedLinkTextFillColor):
+        (WebCore::RenderStyle::visitedLinkTextStrokeColor):
+        (WebCore::RenderStyle::stopColor):
+        (WebCore::RenderStyle::floodColor):
+        (WebCore::RenderStyle::lightingColor):
+        * svg/SVGFEDiffuseLightingElement.cpp:
+        (WebCore::SVGFEDiffuseLightingElement::build):
+        * svg/SVGFEDropShadowElement.cpp:
+        (WebCore::SVGFEDropShadowElement::build):
+        * svg/SVGFEFloodElement.cpp:
+        (WebCore::SVGFEFloodElement::build):
+        * svg/SVGFESpecularLightingElement.cpp:
+        (WebCore::SVGFESpecularLightingElement::build):
+        * svg/SVGGradientElement.cpp:
+        (WebCore::SVGGradientElement::buildStops):
+
+2016-09-28  Ryosuke Niwa  <rniwa@webkit.org>
+
+        assignedNodes should include fallback contents when flattened option is set
+        https://bugs.webkit.org/show_bug.cgi?id=162656
+
+        Reviewed by Antti Koivisto.
+
+        Fixed the bug by traversing through fallback contents when there are no assigned nodes.
+
+        Tests: imported/w3c/web-platform-tests/shadow-dom/slots.html
+               imported/w3c/web-platform-tests/shadow-dom/slots-fallback.html
+
+        * html/HTMLSlotElement.cpp:
+        (WebCore::flattenAssignedNodes):
+        (WebCore::HTMLSlotElement::assignedNodes):
+
 2016-09-27  Wenson Hsieh  <wenson_hsieh@apple.com>
 
         Adopt MediaRemote SPI to achieve desired Now Playing behavior

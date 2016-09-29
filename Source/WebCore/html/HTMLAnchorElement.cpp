@@ -248,6 +248,7 @@ void HTMLAnchorElement::parseAttribute(const QualifiedName& name, const AtomicSt
     } else if (name == nameAttr || name == titleAttr) {
         // Do nothing.
     } else if (name == relAttr) {
+        // Update HTMLAnchorElement::relList() if more rel attributes values are supported.
         if (SpaceSplitString::spaceSplitStringContainsValue(value, "noreferrer", true))
             m_linkRelations |= RelationNoReferrer;
         if (m_relList)
@@ -302,7 +303,9 @@ bool HTMLAnchorElement::hasRel(uint32_t relation) const
 DOMTokenList& HTMLAnchorElement::relList()
 {
     if (!m_relList) 
-        m_relList = std::make_unique<DOMTokenList>(*this, HTMLNames::relAttr);
+        m_relList = std::make_unique<DOMTokenList>(*this, HTMLNames::relAttr, [](const String& token) {
+            return equalIgnoringASCIICase(token, "noreferrer");
+        });
     return *m_relList;
 }
 
@@ -372,11 +375,16 @@ void HTMLAnchorElement::handleClick(Event& event)
         bool isSameOrigin = completedURL.protocolIsData() || document().securityOrigin()->canRequest(completedURL);
         if (isSameOrigin)
             downloadAttribute = attributeWithoutSynchronization(downloadAttr);
+        else if (hasAttributeWithoutSynchronization(downloadAttr))
+            document().addConsoleMessage(MessageSource::Security, MessageLevel::Warning, "The download attribute on anchor was ignored because its href URL has a different security origin.");
         // If the a element has a download attribute and the algorithm is not triggered by user activation
         // then abort these steps.
         // https://html.spec.whatwg.org/#the-a-element:triggered-by-user-activation
-        if (!downloadAttribute.isNull() && !event.isTrusted())
+        if (!downloadAttribute.isNull() && !event.isTrusted()) {
+            // The specification says to throw an InvalidAccessError but other browsers do not.
+            document().addConsoleMessage(MessageSource::Security, MessageLevel::Warning, "Synthetic clicks on anchors that have a download attribute are ignored.");
             return;
+        }
     }
 #endif
 

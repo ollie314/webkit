@@ -109,6 +109,12 @@ TEST_F(URLParserTest, Basic)
     checkURL("http://user:pass@webkit.org:123/", {"http", "user", "pass", "webkit.org", 123, "/", "", "", "http://user:pass@webkit.org:123/"});
     checkURL("http://user:pass@webkit.org:123", {"http", "user", "pass", "webkit.org", 123, "/", "", "", "http://user:pass@webkit.org:123/"});
     checkURL("http://user:pass@webkit.org", {"http", "user", "pass", "webkit.org", 0, "/", "", "", "http://user:pass@webkit.org/"});
+    checkURL("http://user:\t\t\tpass@webkit.org", {"http", "user", "pass", "webkit.org", 0, "/", "", "", "http://user:pass@webkit.org/"});
+    checkURL("http://us\ter:pass@webkit.org", {"http", "user", "pass", "webkit.org", 0, "/", "", "", "http://user:pass@webkit.org/"});
+    checkURL("http://user:pa\tss@webkit.org", {"http", "user", "pass", "webkit.org", 0, "/", "", "", "http://user:pass@webkit.org/"});
+    checkURL("http://user:pass\t@webkit.org", {"http", "user", "pass", "webkit.org", 0, "/", "", "", "http://user:pass@webkit.org/"});
+    checkURL("http://\tuser:pass@webkit.org", {"http", "user", "pass", "webkit.org", 0, "/", "", "", "http://user:pass@webkit.org/"});
+    checkURL("http://user\t:pass@webkit.org", {"http", "user", "pass", "webkit.org", 0, "/", "", "", "http://user:pass@webkit.org/"});
     checkURL("http://webkit.org", {"http", "", "", "webkit.org", 0, "/", "", "", "http://webkit.org/"});
     checkURL("http://127.0.0.1", {"http", "", "", "127.0.0.1", 0, "/", "", "", "http://127.0.0.1/"});
     checkURL("http://webkit.org/", {"http", "", "", "webkit.org", 0, "/", "", "", "http://webkit.org/"});
@@ -201,6 +207,7 @@ TEST_F(URLParserTest, Basic)
     checkURL("http://host?q=@ <>!#fragment", {"http", "", "", "host", 0, "/", "q=@%20%3C%3E!", "fragment", "http://host/?q=@%20%3C%3E!#fragment"});
     checkURL("http://user:@host", {"http", "user", "", "host", 0, "/", "", "", "http://user@host/"});
     checkURL("http://user:@\thost", {"http", "user", "", "host", 0, "/", "", "", "http://user@host/"});
+    checkURL("http://user:\t@host", {"http", "user", "", "host", 0, "/", "", "", "http://user@host/"});
     checkURL("http://user\t:@host", {"http", "user", "", "host", 0, "/", "", "", "http://user@host/"});
     checkURL("http://use\tr:@host", {"http", "user", "", "host", 0, "/", "", "", "http://user@host/"});
     checkURL("http://127.0.0.1:10100/path", {"http", "", "", "127.0.0.1", 10100, "/path", "", "", "http://127.0.0.1:10100/path"});
@@ -237,9 +244,15 @@ TEST_F(URLParserTest, Basic)
     checkURL("notspecial:/a", {"notspecial", "", "", "", 0, "/a", "", "", "notspecial:/a"});
     checkURL("notspecial:", {"notspecial", "", "", "", 0, "", "", "", "notspecial:"});
     checkURL("http:/a", {"http", "", "", "a", 0, "/", "", "", "http://a/"});
-    checkURL("http://256/", {"http", "", "", "256", 0, "/", "", "", "http://256/"});
-    checkURL("http://256./", {"http", "", "", "256.", 0, "/", "", "", "http://256./"});
-    checkURL("http://123.256/", {"http", "", "", "123.256", 0, "/", "", "", "http://123.256/"});
+    checkURL("http://256../", {"http", "", "", "256..", 0, "/", "", "", "http://256../"});
+    checkURL("http://256..", {"http", "", "", "256..", 0, "/", "", "", "http://256../"});
+    checkURL("http://127..1/", {"http", "", "", "127..1", 0, "/", "", "", "http://127..1/"});
+    checkURL("http://127.a.0.1/", {"http", "", "", "127.a.0.1", 0, "/", "", "", "http://127.a.0.1/"});
+    checkURL("http://127.0.0.1/", {"http", "", "", "127.0.0.1", 0, "/", "", "", "http://127.0.0.1/"});
+    checkURL("http://12\t7.0.0.1/", {"http", "", "", "127.0.0.1", 0, "/", "", "", "http://127.0.0.1/"});
+    checkURL("http://127.\t0.0.1/", {"http", "", "", "127.0.0.1", 0, "/", "", "", "http://127.0.0.1/"});
+    checkURL("http://./", {"http", "", "", ".", 0, "/", "", "", "http://./"});
+    checkURL("http://.", {"http", "", "", ".", 0, "/", "", "", "http://./"});
     checkURL("http://123\t.256/", {"http", "", "", "123.256", 0, "/", "", "", "http://123.256/"});
     checkURL("http://123.\t256/", {"http", "", "", "123.256", 0, "/", "", "", "http://123.256/"});
     checkURL("notspecial:/a", {"notspecial", "", "", "", 0, "/a", "", "", "notspecial:/a"});
@@ -250,6 +263,12 @@ TEST_F(URLParserTest, Basic)
     checkURL("about:~", {"about", "", "", "", 0, "~", "", "", "about:~"});
     checkURL("https://@test@test@example:800\\path@end", {"", "", "", "", 0, "", "", "", "https://@test@test@example:800\\path@end"});
     checkURL("http://www.example.com/#a\nb\rc\td", {"http", "", "", "www.example.com", 0, "/", "", "abcd", "http://www.example.com/#abcd"});
+    checkURL("http://[A:b:c:DE:fF:0:1:aC]/", {"http", "", "", "[a:b:c:de:ff:0:1:ac]", 0, "/", "", "", "http://[a:b:c:de:ff:0:1:ac]/"});
+    checkURL("http:////////user:@webkit.org:99?foo", {"http", "user", "", "webkit.org", 99, "/", "foo", "", "http://user@webkit.org:99/?foo"});
+    checkURL("http:////////user:@webkit.org:99#foo", {"http", "user", "", "webkit.org", 99, "/", "", "foo", "http://user@webkit.org:99/#foo"});
+    checkURL("http:////\t////user:@webkit.org:99?foo", {"http", "user", "", "webkit.org", 99, "/", "foo", "", "http://user@webkit.org:99/?foo"});
+    checkURL("http://\t//\\///user:@webkit.org:99?foo", {"http", "user", "", "webkit.org", 99, "/", "foo", "", "http://user@webkit.org:99/?foo"});
+    checkURL("http:/\\user:@webkit.org:99?foo", {"http", "user", "", "webkit.org", 99, "/", "foo", "", "http://user@webkit.org:99/?foo"});
 
     // This disagrees with the web platform test for http://:@www.example.com but agrees with Chrome and URL::parse,
     // and Firefox fails the web platform test differently. Maybe the web platform test ought to be changed.
@@ -664,6 +683,27 @@ TEST_F(URLParserTest, ParserDifferences)
     checkRelativeURLDifferences("//C|#foo/bar", "file:///tmp/mock/path",
         {"file", "", "", "", 0, "/C:/", "", "foo/bar", "file:///C:/#foo/bar"},
         {"", "", "", "", 0, "", "", "", "//C|#foo/bar"});
+    checkURLDifferences("http://0xFFFFFfFF/",
+        {"http", "", "", "255.255.255.255", 0, "/", "", "", "http://255.255.255.255/"},
+        {"http", "", "", "0xffffffff", 0, "/", "", "", "http://0xffffffff/"});
+    checkURLDifferences("http://0000000000000000037777777777/",
+        {"http", "", "", "255.255.255.255", 0, "/", "", "", "http://255.255.255.255/"},
+        {"http", "", "", "0000000000000000037777777777", 0, "/", "", "", "http://0000000000000000037777777777/"});
+    checkURLDifferences("http://4294967295/",
+        {"http", "", "", "255.255.255.255", 0, "/", "", "", "http://255.255.255.255/"},
+        {"http", "", "", "4294967295", 0, "/", "", "", "http://4294967295/"});
+    checkURLDifferences("http://256/",
+        {"http", "", "", "0.0.1.0", 0, "/", "", "", "http://0.0.1.0/"},
+        {"http", "", "", "256", 0, "/", "", "", "http://256/"});
+    checkURLDifferences("http://256./",
+        {"http", "", "", "0.0.1.0", 0, "/", "", "", "http://0.0.1.0/"},
+        {"http", "", "", "256.", 0, "/", "", "", "http://256./"});
+    checkURLDifferences("http://123.256/",
+        {"http", "", "", "123.0.1.0", 0, "/", "", "", "http://123.0.1.0/"},
+        {"http", "", "", "123.256", 0, "/", "", "", "http://123.256/"});
+    checkURLDifferences("http://127.%.0.1/",
+        {"", "", "", "", 0, "", "", "", "http://127.%.0.1/"},
+        {"http", "", "", "127.%.0.1", 0, "/", "", "", "http://127.%.0.1/"});
 }
 
 TEST_F(URLParserTest, DefaultPort)

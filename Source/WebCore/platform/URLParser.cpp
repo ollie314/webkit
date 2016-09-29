@@ -1290,12 +1290,13 @@ void URLParser::parse(const CharacterType* input, const unsigned length, const U
         case State::SpecialAuthorityIgnoreSlashes:
             LOG_STATE("SpecialAuthorityIgnoreSlashes");
             if (*c == '/' || *c == '\\') {
-                appendToASCIIBuffer('/');
+                syntaxViolation(c);
                 ++c;
+            } else {
+                m_url.m_userStart = currentPosition(c);
+                state = State::AuthorityOrHost;
+                authorityOrHostBegin = c;
             }
-            m_url.m_userStart = currentPosition(c);
-            state = State::AuthorityOrHost;
-            authorityOrHostBegin = c;
             break;
         case State::AuthorityOrHost:
             do {
@@ -1346,6 +1347,11 @@ void URLParser::parse(const CharacterType* input, const unsigned length, const U
                 if (!parseHostAndPort(CodePointIterator<CharacterType>(authorityOrHostBegin, c))) {
                     failure();
                     return;
+                }
+                if (*c == '?' || *c == '#') {
+                    syntaxViolation(c);
+                    appendToASCIIBuffer('/');
+                    m_url.m_pathAfterLastSlash = currentPosition(c);
                 }
                 state = State::Path;
                 break;
@@ -1841,12 +1847,16 @@ void URLParser::parseAuthority(CodePointIterator<CharacterType> iterator)
         m_url.m_passwordEnd = m_url.m_userEnd;
         return;
     }
-    auto authorityOrHostBegin = iterator;
     for (; !iterator.atEnd(); advance(iterator)) {
         if (*iterator == ':') {
             m_url.m_userEnd = currentPosition(iterator);
             auto iteratorAtColon = iterator;
-            advance(iterator, authorityOrHostBegin);
+            ++iterator;
+            bool tabOrNewlineAfterColon = false;
+            while (UNLIKELY(!iterator.atEnd() && isTabOrNewline(*iterator))) {
+                tabOrNewlineAfterColon = true;
+                ++iterator;
+            }
             if (UNLIKELY(iterator.atEnd())) {
                 syntaxViolation(iteratorAtColon);
                 m_url.m_passwordEnd = m_url.m_userEnd;
@@ -1854,6 +1864,8 @@ void URLParser::parseAuthority(CodePointIterator<CharacterType> iterator)
                     appendToASCIIBuffer('@');
                 return;
             }
+            if (tabOrNewlineAfterColon)
+                syntaxViolation(iteratorAtColon);
             appendToASCIIBuffer(':');
             break;
         }
@@ -1962,7 +1974,6 @@ void URLParser::serializeIPv6(URLParser::IPv6Address address)
 template<typename CharacterType>
 Optional<uint32_t> URLParser::parseIPv4Number(CodePointIterator<CharacterType>& iterator, const CodePointIterator<CharacterType>& iteratorForSyntaxViolationPosition)
 {
-    // FIXME: Check for overflow.
     enum class State : uint8_t {
         UnknownBase,
         Decimal,
@@ -1971,11 +1982,15 @@ Optional<uint32_t> URLParser::parseIPv4Number(CodePointIterator<CharacterType>& 
         Hex,
     };
     State state = State::UnknownBase;
-    uint32_t value = 0;
+    Checked<uint32_t, RecordOverflow> value = 0;
+    if (!iterator.atEnd() && *iterator == '.')
+        return Nullopt;
+    bool didSeeSyntaxViolation = false;
     while (!iterator.atEnd()) {
         if (*iterator == '.') {
             ++iterator;
-            return value;
+            ASSERT(!value.hasOverflowed());
+            return value.unsafeGet();
         }
         switch (state) {
         case State::UnknownBase:
@@ -1987,7 +2002,7 @@ Optional<uint32_t> URLParser::parseIPv4Number(CodePointIterator<CharacterType>& 
             state = State::Decimal;
             break;
         case State::OctalOrHex:
-            syntaxViolation(iteratorForSyntaxViolationPosition);
+            didSeeSyntaxViolation = true;
             if (*iterator == 'x' || *iterator == 'X') {
                 ++iterator;
                 state = State::Hex;
@@ -2000,27 +2015,36 @@ Optional<uint32_t> URLParser::parseIPv4Number(CodePointIterator<CharacterType>& 
                 return Nullopt;
             value *= 10;
             value += *iterator - '0';
+            if (UNLIKELY(value.hasOverflowed()))
+                return Nullopt;
             ++iterator;
             break;
         case State::Octal:
-            ASSERT(m_didSeeSyntaxViolation);
+            ASSERT(didSeeSyntaxViolation);
             if (*iterator < '0' || *iterator > '7')
                 return Nullopt;
             value *= 8;
             value += *iterator - '0';
+            if (UNLIKELY(value.hasOverflowed()))
+                return Nullopt;
             ++iterator;
             break;
         case State::Hex:
-            ASSERT(m_didSeeSyntaxViolation);
+            ASSERT(didSeeSyntaxViolation);
             if (!isASCIIHexDigit(*iterator))
                 return Nullopt;
             value *= 16;
             value += toASCIIHexValue(*iterator);
+            if (UNLIKELY(value.hasOverflowed()))
+                return Nullopt;
             ++iterator;
             break;
         }
     }
-    return value;
+    if (didSeeSyntaxViolation)
+        syntaxViolation(iteratorForSyntaxViolationPosition);
+    ASSERT(!value.hasOverflowed());
+    return value.unsafeGet();
 }
 
 ALWAYS_INLINE static uint64_t pow256(size_t exponent)
@@ -2057,7 +2081,7 @@ Optional<URLParser::IPv4Address> URLParser::parseIPv4Host(CodePointIterator<Char
         return Nullopt;
     for (auto item : items) {
         if (item > 255)
-            return Nullopt;
+            syntaxViolation(hostBegin);
     }
 
     if (UNLIKELY(items.size() != 4))
@@ -2111,6 +2135,8 @@ Optional<URLParser::IPv6Address> URLParser::parseIPv6Host(CodePointIterator<Char
                 break;
             if (!isASCIIHexDigit(*c))
                 break;
+            if (isASCIIUpper(*c))
+                syntaxViolation(hostBegin);
             value = value * 0x10 + toASCIIHexValue(*c);
             advance(c, hostBegin);
         }
