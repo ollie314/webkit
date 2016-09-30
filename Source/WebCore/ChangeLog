@@ -1,3 +1,166 @@
+2016-09-30  Antti Koivisto  <antti@apple.com>
+
+        Remove "rem" unit optimization for document element font size changes
+        https://bugs.webkit.org/show_bug.cgi?id=162778
+
+        Reviewed by Alex Christensen.
+
+        We awkwardly track from the parser level if any stylesheet in a document uses any rem units. This is only used to minimally
+        optimize a case where document element's (<html>) font size changes dynamically.
+
+        In practice such changes are rare. Browsing around I couldn't find a single case where this optimization got used.
+        Even if it was used it would be of low value as a full style resolution is likely to happen anyway (as font inherits)
+        and the only thing really saved is that we don't need to invalidate the matched properties cache.
+
+        * css/CSSGrammar.y.in:
+        * css/StyleSheetContents.cpp:
+        (WebCore::StyleSheetContents::StyleSheetContents):
+        * css/StyleSheetContents.h:
+        * dom/AuthorStyleSheets.cpp:
+        (WebCore::AuthorStyleSheets::updateActiveStyleSheets):
+        * dom/AuthorStyleSheets.h:
+        (WebCore::AuthorStyleSheets::usesRemUnits): Deleted.
+        (WebCore::AuthorStyleSheets::setUsesRemUnit): Deleted.
+        * dom/Document.cpp:
+        (WebCore::Document::recalcStyle):
+        (WebCore::Document::updateBaseURL):
+        * style/StyleTreeResolver.cpp:
+        (WebCore::Style::TreeResolver::resolveElement):
+
+2016-09-30  Zalan Bujtas  <zalan@apple.com>
+
+        RenderLayer::clipRects may return nullptr.
+        https://bugs.webkit.org/show_bug.cgi?id=162729
+
+        Reviewed by Chris Dumez.
+
+        This patch refactors RenderLayer::updateClipRects(), parentClipRects() and backgroundClipRect()
+        so that we don't have to rely on this seemingly unsafe line: clipRects = *parent()->clipRects(clipRectsContext);
+        Now updateClipRects() returns the computed/cached clip rects as opposed to update and refetch them.
+        While this patch makes the code look more readable/safer, it also eliminates cached item tripple retrievals.  
+
+        No change in functionality.
+
+        * rendering/RenderLayer.cpp:
+        (WebCore::ClipRectsCache::getClipRects):
+        (WebCore::ClipRectsCache::setClipRects):
+        (WebCore::RenderLayer::updateClipRects):
+        (WebCore::RenderLayer::clipRects):
+        (WebCore::RenderLayer::calculateClipRects):
+        * rendering/RenderLayer.h:
+
+2016-09-30  Youenn Fablet  <youenn@apple.com>
+
+        Add a way to go from a RefPtr<T> to Ref<const T>
+        https://bugs.webkit.org/show_bug.cgi?id=162683
+
+        Reviewed by Alex Christensen.
+
+        No change of behavior.
+
+        * Modules/fetch/FetchBody.cpp:
+        (WebCore::FetchBody::extract):
+
+2016-09-30  Said Abou-Hallawa  <sabouhallawa@apple.com>
+
+        Unreviewed, fix 32-bit build.
+
+        * loader/cache/CachedImage.cpp:
+        (WebCore::CachedImage::decodedSizeChanged):
+
+2016-09-30  Youenn Fablet  <youenn@apple.com>
+
+        FetchBody should use UTF8Encoding to encode text data
+        https://bugs.webkit.org/show_bug.cgi?id=162775
+
+        Reviewed by Sam Weinig.
+
+        Covered by added tests.
+
+        Removing unnecesary vector allocation when extracting UTF8 bytes from a Request/Response text/URLSearchParams body.
+        Making use of UTF8Encoding for consistency with  the upload code path.
+
+        * Modules/fetch/FetchBody.cpp:
+        (WebCore::FetchBody::consumeAsStream):
+        (WebCore::FetchBody::consumeText):
+        (WebCore::extractBytesFromText): Deleted.
+
+2016-09-30  Said Abou-Hallawa  <sabouhallawa@apple.com>
+
+        Change the MemoryCache and CachedResource adjustSize functions to take a long argument
+        https://bugs.webkit.org/show_bug.cgi?id=162708
+        <rdar://problem/28555702>
+
+        Reviewed by Brent Fulgham.
+
+        Because the MemoryCache stores the size of the cached memory in unsigned,
+        two problems my happen when reporting a change in the size of the memory:
+        
+        1. Signed integer overflow -- which can happen because MemoryCache::adjustSize()
+           takes a signed integer argument. If the allocated or the freed memory size is
+           larger than the maximum of a signed integer, an overflow will happen.
+           For the image caching code, this can be seen where the unsigned decodedSize
+           is casted to an integer before passing it to ImageObserver::decodedSizeChanged().
+
+        2. Unsigned integer overflow -- which can happen if the new allocated memory
+           size plus the currentSize exceeds the maximum of unsigned.
+           This can be seen in MemoryCache::adjustSize() where we add delta to m_liveSize
+           or m_deadSize without checking whether this addition will overflow or not. We
+           do not assert for overflow although we assert for underflow.
+           
+        The fix for these two problems can be the following:
+        
+        1. Make all the adjustSize functions all the way till MemoryCache::adjustSize()
+           take a signed long integer argument.
+           
+        2. Do not create a NativeImagePtr for an ImageFrame if its frameBytes plus the
+           ImageFrameCache::decodedSize() will exceed the maximum of an unsigned integer.
+
+        * loader/cache/CachedImage.cpp:
+        (WebCore::CachedImage::decodedSizeChanged): Change the argument to be long. No overflow will happen when casting the argument from unsigned to long.
+        * loader/cache/CachedImage.h:
+        * loader/cache/CachedResource.cpp: 
+        (WebCore::CachedResource::setDecodedSize): Use long integer casting when calling MemoryCache::adjustSize().
+        (WebCore::CachedResource::setEncodedSize): Ditto.
+        * loader/cache/MemoryCache.cpp:
+        (WebCore::MemoryCache::MemoryCache): Add as static assert to ensure sizeof(long long) can hold any unsigned or its negation.
+        (WebCore::MemoryCache::revalidationSucceeded): Use long integer casting when calling MemoryCache::adjustSize().
+        (WebCore::MemoryCache::remove): Ditto.
+        (WebCore::MemoryCache::adjustSize): Change the function argument to long integer. No overflow will happen when casting the argument from unsigned to long.
+        * loader/cache/MemoryCache.h:
+        * platform/graphics/ImageFrameCache.cpp:
+        (WebCore::ImageFrameCache::destroyIncompleteDecodedData): Call a function with its new name.
+        (WebCore::ImageFrameCache::decodedSizeChanged): Change the function argument to long integer. No overflow will happen when casting the argument from unsigned to long.
+        (WebCore::ImageFrameCache::decodedSizeIncreased): Use long integer casting when calling decodedSizeChanged().
+        (WebCore::ImageFrameCache::decodedSizeDecreased): Ditto.
+        (WebCore::ImageFrameCache::decodedSizeReset): Ditto.
+        (WebCore::ImageFrameCache::didDecodeProperties): Ditto.
+        (WebCore::ImageFrameCache::frameAtIndex): Do not create the NativeImage if adding its frameByes to the MemoryCache will cause numerical overflow.
+        (WebCore::ImageFrameCache::decodedSizeIncremented): Deleted. This function is renamed decodedSizeIncreased().
+        (WebCore::ImageFrameCache::decodedSizeDecremented): Deleted. This function is renamed decodedSizeDecreased().
+        * platform/graphics/ImageFrameCache.h:
+        * platform/graphics/ImageObserver.h:
+        * platform/graphics/IntSize.h:
+        (WebCore::IntSize::unclampedArea): Returns the area of an IntSize in size_t.
+        * platform/graphics/cg/PDFDocumentImage.cpp:
+        (WebCore::PDFDocumentImage::decodedSizeChanged): Use long integer casting when calling ImageObserver::decodedSizeChanged().
+
+2016-09-30  Chris Dumez  <cdumez@apple.com>
+
+        Add support for ImageData.data attribute
+        https://bugs.webkit.org/show_bug.cgi?id=162767
+
+        Reviewed by Sam Weinig.
+
+        Add support for ImageData.data attribute:
+        - https://html.spec.whatwg.org/#imagedata
+
+        Firefox already supports it.
+
+        No new tests, updated existing tests.
+
+        * html/ImageData.idl:
+
 2016-09-30  Youenn Fablet  <youenn@apple.com>
 
         DumpRenderTree crashed in com.apple.WebCore: WTF::Optional<WebCore::FetchBodyOwner::BlobLoader>::operator bool const + 12
