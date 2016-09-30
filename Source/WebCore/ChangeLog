@@ -1,3 +1,500 @@
+2016-09-30  Youenn Fablet  <youenn@apple.com>
+
+        DumpRenderTree crashed in com.apple.WebCore: WTF::Optional<WebCore::FetchBodyOwner::BlobLoader>::operator bool const + 12
+        https://bugs.webkit.org/show_bug.cgi?id=162483
+
+        Reviewed by Alex Christensen.
+
+        Test: fetch/closing-while-fetching-blob.html
+        No change of behavior.
+
+        * Modules/fetch/FetchBodyOwner.cpp:
+        (WebCore::FetchBodyOwner::stop): Asserting m_blobLoader is null (meaning that unsetPendingActivity was done)
+        only in case FetchBodyOwner has no risk being destroyed.
+
+2016-09-30  Youenn Fablet  <youennf@gmail.com>
+
+        [Fetch API] Add support for URLSearchParams body
+        https://bugs.webkit.org/show_bug.cgi?id=162667
+
+        Reviewed by Alex Christensen.
+
+        Tests: imported/w3c/web-platform-tests/fetch/api/basic/request-upload-worker.html
+               imported/w3c/web-platform-tests/fetch/api/basic/request-upload.html
+
+        * Modules/fetch/FetchBody.cpp:
+        (WebCore::extractBytesFromText): Moving to a static function that should be moved to a String method.
+        (WebCore::FetchBody::FetchBody): Adding constructor for URLSearchParams.
+        (WebCore::FetchBody::extract): Adding URLSearchParams body initialization.
+        (WebCore::FetchBody::consume): Consuming URLSearchParams bodies.
+        (WebCore::FetchBody::consumeAsStream): Ditto.
+        (WebCore::FetchBody::consumeText): Updated to take a parameter to handle both text and URLSearchParams bodies.
+        (WebCore::FetchBody::bodyForInternalRequest): Add URLSearchParams body upload.
+        (WebCore::FetchBody::clone): Add URLSearchParams body cloning
+        * Modules/fetch/FetchBody.h:
+        (WebCore::FetchBody::urlSearchParamsBody):
+        * html/URLSearchParams.cpp:
+        (WebCore::URLSearchParams::toString):
+        * html/URLSearchParams.h:
+
+2016-09-29  Simon Fraser  <simon.fraser@apple.com>
+
+        Re-order the arguments to drawPattern() functions
+        https://bugs.webkit.org/show_bug.cgi?id=162772
+
+        Reviewed by Zalan Bujtas.
+        
+        Re-order the arguments to have the destination rect come near the front,
+        leaving CompositeOperator and BlendMode hanging out at the back like
+        other drawing functions.
+
+        No behavior change.
+
+        * platform/graphics/BitmapImage.cpp:
+        (WebCore::BitmapImage::drawPattern):
+        * platform/graphics/BitmapImage.h:
+        * platform/graphics/CrossfadeGeneratedImage.cpp:
+        (WebCore::CrossfadeGeneratedImage::drawPattern):
+        * platform/graphics/CrossfadeGeneratedImage.h:
+        * platform/graphics/GeneratedImage.h:
+        * platform/graphics/GradientImage.cpp:
+        (WebCore::GradientImage::drawPattern):
+        * platform/graphics/GradientImage.h:
+        * platform/graphics/GraphicsContext.h:
+        * platform/graphics/Image.cpp:
+        (WebCore::Image::drawTiled):
+        * platform/graphics/Image.h:
+        * platform/graphics/ImageBuffer.h:
+        * platform/graphics/NamedImageGeneratedImage.cpp:
+        (WebCore::NamedImageGeneratedImage::drawPattern):
+        * platform/graphics/NamedImageGeneratedImage.h:
+        * platform/graphics/cairo/GraphicsContextCairo.cpp:
+        (WebCore::GraphicsContext::drawPattern):
+        * platform/graphics/cairo/ImageBufferCairo.cpp:
+        (WebCore::ImageBuffer::drawPattern):
+        * platform/graphics/cairo/ImageCairo.cpp:
+        (WebCore::Image::drawPattern):
+        * platform/graphics/cg/GraphicsContextCG.cpp:
+        (WebCore::GraphicsContext::drawPattern):
+        * platform/graphics/cg/ImageBufferCG.cpp:
+        (WebCore::ImageBuffer::drawPattern):
+        * platform/graphics/cg/ImageCG.cpp: This file can probably be removed and the code moved, since the
+        code is almost the same as the cairo code, and not platform-specific.
+        (WebCore::Image::drawPattern):
+        * platform/graphics/displaylists/DisplayListItems.cpp:
+        (WebCore::DisplayList::DrawPattern::DrawPattern):
+        (WebCore::DisplayList::DrawPattern::apply):
+        * platform/graphics/displaylists/DisplayListItems.h:
+        (WebCore::DisplayList::DrawPattern::create):
+        * platform/graphics/displaylists/DisplayListRecorder.cpp:
+        (WebCore::DisplayList::Recorder::drawPattern):
+        * platform/graphics/displaylists/DisplayListRecorder.h:
+        * svg/graphics/SVGImage.cpp:
+        (WebCore::SVGImage::drawPatternForContainer):
+        * svg/graphics/SVGImageForContainer.cpp:
+        (WebCore::SVGImageForContainer::drawPattern):
+        * svg/graphics/SVGImageForContainer.h:
+
+2016-09-29  Chris Dumez  <cdumez@apple.com>
+
+        Add support for download attribute on area elements
+        https://bugs.webkit.org/show_bug.cgi?id=162765
+
+        Reviewed by Brent Fulgham.
+
+        Add support for download attribute on area elements:
+        - https://html.spec.whatwg.org/#htmlanchorelement
+
+        Because HTMLAreaElement inherits from HTMLAnchorElement on native side,
+        and because HTMLAnchorElement already supports the download attribute,
+        all that was needed was to add the download attribute to
+        HTMLAreaElement.idl file.
+
+        Test: http/tests/download/area-download.html
+
+        * html/HTMLAreaElement.idl:
+
+2016-09-29  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Editor::findStringAndScrollToVisible is unused
+        https://bugs.webkit.org/show_bug.cgi?id=162762
+
+        Reviewed by Simon Fraser.
+
+        Deleted the unused function.
+
+        * editing/Editor.cpp:
+        (WebCore::Editor::findStringAndScrollToVisible): Deleted.
+        * editing/Editor.h:
+
+2016-09-29  Jiewen Tan  <jiewen_tan@apple.com>
+
+        Expose CryptoKey to web workers
+        https://bugs.webkit.org/show_bug.cgi?id=162640
+        <rdar://problem/28182204>
+
+        Reviewed by Brent Fulgham.
+
+        Tests: crypto/workers/aes-postMessage-worker.html
+               crypto/workers/hmac-postMessage-worker.html
+               crypto/workers/hrsa-postMessage-worker.html
+               crypto/workers/multiple-postMessage-worker.html
+               crypto/workers/rsa-postMessage-worker.html
+
+        * crypto/CryptoKey.idl:
+        * crypto/SerializedCryptoKeyWrap.h:
+        * crypto/mac/SerializedCryptoKeyWrapMac.mm:
+        (WebCore::deleteDefaultWebCryptoMasterKey):
+        Add a way to delete the default web crypto master key such that we can test
+        these APIs and cleanup.
+        * workers/WorkerGlobalScope.cpp:
+        (WebCore::WorkerGlobalScope::wrapCryptoKey):
+        (WebCore::WorkerGlobalScope::unwrapCryptoKey):
+        * workers/WorkerGlobalScope.h:
+
+2016-09-29  Nan Wang  <n_wang@apple.com>
+
+        AX: iOS: Tapping <input> in Safari zooms in a bit when page has max scale = 1
+        https://bugs.webkit.org/show_bug.cgi?id=162471
+
+        Reviewed by Simon Fraser.
+
+        If the author has defined a maximum scale, we should honor that when keyboard focus moves
+        to a text field, instead of using the forceAlwaysUserScalableMaximumScale.
+
+        Tests: fast/forms/ios/user-scalable-does-not-scale-for-keyboard-focus-with-author-defined-scale.html
+               fast/forms/ios/user-scalable-does-not-scale-for-keyboard-focus-with-user-scalable-no.html
+               fast/forms/ios/user-scalable-scales-for-keyboard-focus-with-no-author-defined-scale.html
+
+        * page/ViewportConfiguration.cpp:
+        (WebCore::ViewportConfiguration::allowsUserScaling):
+        (WebCore::ViewportConfiguration::allowsUserScalingIgnoringAlwaysScalable):
+        (WebCore::ViewportConfiguration::allowsUserScalingIgnoringForceAlwaysScaling): Deleted.
+        * page/ViewportConfiguration.h:
+        (WebCore::ViewportConfiguration::maximumScaleIgnoringAlwaysScalable):
+        (WebCore::ViewportConfiguration::maximumScale): Deleted.
+
+2016-09-29  Alex Christensen  <achristensen@webkit.org>
+
+        Fix syntax violation handling in IPv4 address parsing
+        https://bugs.webkit.org/show_bug.cgi?id=162756
+
+        Reviewed by Tim Horton.
+
+        When we are parsing the up to 4 numbers in an IPv4 address, if we find a syntax violation 
+        (the canonicalized address would be different than the input string) then wait to report
+        it until we have determined that this is a valid IPv4 address that will be canonicalized.
+        If it is not a valid IPv4 address, then we will just treat the characters as the host, and
+        that could be no syntax violation.
+
+        Covered by a new API test and existing API tests.
+
+        * platform/URLParser.cpp:
+        (WebCore::URLParser::URLParser):
+        (WebCore::URLParser::parseIPv4Number):
+        (WebCore::URLParser::parseIPv4Host):
+        * platform/URLParser.h:
+
+2016-09-29  Chris Dumez  <cdumez@apple.com>
+
+        Fix post-landing nits after r206561.
+        https://bugs.webkit.org/show_bug.cgi?id=162659
+
+        Reviewed by Alex Christensen.
+
+        Uses more StringViews and constness.
+
+        * dom/SecurityContext.cpp:
+        (WebCore::SecurityContext::isSupportedSandboxPolicy):
+        * dom/SecurityContext.h:
+        * html/DOMTokenList.cpp:
+        (WebCore::DOMTokenList::DOMTokenList):
+        (WebCore::DOMTokenList::supports):
+        * html/DOMTokenList.h:
+        (WebCore::DOMTokenList::DOMTokenList):
+        * html/HTMLAnchorElement.cpp:
+        (WebCore::HTMLAnchorElement::relList):
+        * html/HTMLIFrameElement.cpp:
+        (WebCore::HTMLIFrameElement::sandbox):
+        * html/HTMLLinkElement.cpp:
+        (WebCore::HTMLLinkElement::relList):
+        * html/LinkRelAttribute.cpp:
+        (WebCore::LinkRelAttribute::isSupported):
+        * html/LinkRelAttribute.h:
+
+2016-09-29  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser should correctly parse ports with leading 0's
+        https://bugs.webkit.org/show_bug.cgi?id=162752
+
+        * platform/URLParser.cpp:
+        (WebCore::URLParser::parsePort):
+        Followup.  Remove branches based on Geoffrey's feedback.
+
+2016-09-29  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser should correctly parse ports with leading 0's
+        https://bugs.webkit.org/show_bug.cgi?id=162752
+
+        Reviewed by Tim Horton.
+
+        Covered by new API tests.
+
+        * platform/URLParser.cpp:
+        (WebCore::URLParser::parsePort):
+
+2016-09-29  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r206483.
+        https://bugs.webkit.org/show_bug.cgi?id=162750
+
+        May have caused iOS perf regression (Requested by smfr on
+        #webkit).
+
+        Reverted changeset:
+
+        "REGRESSION (r204552): Yelp carousel animation is not smooth."
+        https://bugs.webkit.org/show_bug.cgi?id=162632
+        http://trac.webkit.org/changeset/206483
+
+2016-09-29  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser: make parsing invalid IPv4 addresses more robust and correct
+        https://bugs.webkit.org/show_bug.cgi?id=162746
+
+        Reviewed by Tim Horton.
+
+        If parsing an IPv4 address fails, the characters are just treated as a regular domain.
+
+        Covered by new API tests.
+
+        * platform/URLParser.cpp:
+        (WebCore::URLParser::parseIPv4Number):
+        (WebCore::URLParser::parseIPv4Host):
+
+2016-09-29  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser: IPv6 addresses followed by a colon are invalid
+        https://bugs.webkit.org/show_bug.cgi?id=162747
+
+        Reviewed by Tim Horton.
+
+        Covered by new API tests.
+
+        * platform/URLParser.cpp:
+        (WebCore::URLParser::parseIPv6Host):
+
+2016-09-29  Antoine Quint  <graouts@apple.com>
+
+        [Modern Media Controls] scheduler for layout nodes
+        https://bugs.webkit.org/show_bug.cgi?id=162726
+        <rdar://problem/28543043>
+
+        Reviewed by Dean Jackson.
+
+        For the work on the modern media controls we will be using a tree of LayoutNode objects that will
+        commit to the DOM in coordinated `requestAnimationFrame()` calls to ensure all layouts are done
+        in an efficient and coordinated manner. As a preamble, we introduce a `scheduler` singleton which
+        provides a single public method `scheduleLayout(callback)` to queue callbacks to be fired in the
+        next `requestAnimationFrame()` callback.
+
+        Tests: media/modern-media-controls/scheduler/not-reentrant.html
+               media/modern-media-controls/scheduler/single-callback-when-registered-multiple-times.html
+
+        * Modules/modern-media-controls/controls/scheduler.js: Added.
+        (const.scheduler.new.prototype.scheduleLayout):
+        (const.scheduler.new.prototype._requestFrameIfNeeded):
+        (const.scheduler.new.prototype._frameDidFire):
+        (const.scheduler.new.prototype._layout):
+
+2016-09-28  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Text nodes assigned to a linked slot are not clickable
+        https://bugs.webkit.org/show_bug.cgi?id=162091
+        <rdar://problem/28383300>
+
+        Reviewed by Antti Koivisto.
+
+        The bug was caused by updateMouseEventTargetNode adjusting the target to its parent element when
+        the original target was a text node. Fixed the bug by using the parent element in the composed tree.
+
+        Also fixed the bug that the hit testing was not finding the anchor element and keeping the cursor
+        in I-beam by traversing the composed tree instead.
+
+        Test: fast/shadow-dom/click-text-inside-linked-slot.html
+
+        * dom/Node.cpp:
+        (WebCore::Node::enclosingLinkEventParentOrSelf): Fixed the cursor problem.
+        * page/EventHandler.cpp:
+        (WebCore::EventHandler::updateMouseEventTargetNode): Fixed the activation problem.
+
+2016-09-29  Sam Weinig  <sam@webkit.org>
+
+        Allow overriding some NSURLSessionConfiguration properties on a per-NetworkProcess basis
+        <rdar://problem/27648683>
+        https://bugs.webkit.org/show_bug.cgi?id=162735
+
+        Reviewed by Dan Bernstein.
+
+        * platform/spi/cf/CFNetworkSPI.h:
+        Forward declare _sourceApplicationSecondaryIdentifier and _CTDataConnectionServiceType
+
+2016-09-29  Antti Koivisto  <antti@apple.com>
+
+        Remove addSubresourceStyleURLs functions
+        https://bugs.webkit.org/show_bug.cgi?id=162731
+
+        Reviewed by Ryosuke Niwa.
+
+        Use the generic std::function taking traverseSubresources instead. This prevents bugs caused by the code paths
+        not being in sync.
+
+        These functions are only used by the legacy webarchive code to gather URLs to locate CachedResources from the memory cache.
+        This can be improved further by returning the cached resources themselves instead of the URLs.
+
+        * css/CSSFontFaceSrcValue.cpp:
+        (WebCore::CSSFontFaceSrcValue::addSubresourceStyleURLs): Deleted.
+        * css/CSSFontFaceSrcValue.h:
+        * css/CSSPrimitiveValue.cpp:
+        (WebCore::CSSPrimitiveValue::addSubresourceStyleURLs): Deleted.
+        * css/CSSPrimitiveValue.h:
+        * css/CSSReflectValue.cpp:
+        (WebCore::CSSReflectValue::addSubresourceStyleURLs): Deleted.
+        * css/CSSReflectValue.h:
+        * css/CSSValue.cpp:
+        (WebCore::CSSValue::addSubresourceStyleURLs): Deleted.
+        * css/CSSValue.h:
+        * css/CSSValueList.cpp:
+        (WebCore::CSSValueList::addSubresourceStyleURLs): Deleted.
+        * css/CSSValueList.h:
+        * css/StyleProperties.cpp:
+        (WebCore::StyleProperties::addSubresourceStyleURLs): Deleted.
+        * css/StyleProperties.h:
+        * css/StyleRuleImport.h:
+        * css/StyleSheetContents.cpp:
+        (WebCore::StyleSheetContents::traverseSubresources):
+
+            Fix a bug where this would miss @import rules in @imported stylesheets.
+            Include the CachedResource for the imported stylesheet itself.
+
+            Tested by the test cases under LayoutTests/webarchive
+
+        (WebCore::StyleSheetContents::addSubresourceStyleURLs): Deleted.
+        * css/StyleSheetContents.h:
+        * dom/StyledElement.cpp:
+        (WebCore::StyledElement::addSubresourceAttributeURLs):
+        * html/HTMLLinkElement.cpp:
+        (WebCore::HTMLLinkElement::addSubresourceAttributeURLs):
+        * html/HTMLStyleElement.cpp:
+        (WebCore::HTMLStyleElement::addSubresourceAttributeURLs):
+
+2016-09-29  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win][Direct2D] Add D2D Font handling code
+        https://bugs.webkit.org/show_bug.cgi?id=162712
+
+        Reviewed by Brent Fulgham.
+
+        This patch lands a set of new files that implement 
+
+        No new tests until complete backend lands.
+
+        * platform/graphics/Font.h:
+        * platform/graphics/FontCascade.h:
+        (WebCore::FontCascade::syntheticObliqueAngle): Added helper function.
+        * platform/graphics/FontPlatformData.h:
+        (WebCore::FontPlatformData::dwFont): Added.
+        (WebCore::FontPlatformData::dwFontFace): Ditto.
+        * platform/graphics/GlyphBuffer.h:
+        * platform/graphics/cocoa/FontCascadeCocoa.mm:
+        (WebCore::FontCascade::drawGlyphs): Use helper function.
+        * platform/graphics/win/FontCGWin.cpp:
+        (WebCore::FontCascade::drawGlyphs): Ditto.
+        * platform/graphics/win/FontCacheWin.cpp:
+        (WebCore::FontCache::createFontPlatformData): Add case for Direct2D.
+        * platform/graphics/win/FontCascadeDirect2D.cpp: Added.
+        * platform/graphics/win/FontCustomPlatformData.cpp:
+        (WebCore::FontCustomPlatformData::~FontCustomPlatformData): Fix whitespace.
+        (WebCore::FontCustomPlatformData::fontPlatformData): Add Direct2D case.
+        * platform/graphics/win/FontPlatformDataCGWin.cpp:
+        (WebCore::FontPlatformData::FontPlatformData): Clean up C++ initializers.
+        * platform/graphics/win/FontPlatformDataCairoWin.cpp:
+        (WebCore::FontPlatformData::FontPlatformData): Ditto.
+        * platform/graphics/win/FontPlatformDataDirect2D.cpp: Added.
+        * platform/graphics/win/FontPlatformDataWin.cpp:
+        (WebCore::FontPlatformData::FontPlatformData): Clean up C++ initializers.
+        * platform/graphics/win/GlyphPageTreeNodeDirect2D.cpp: Added.
+        * platform/graphics/win/SimpleFontDataDirect2D.cpp: Added.
+        * platform/graphics/win/TextAnalyzerHelper.cpp: Added.
+        * platform/graphics/win/TextAnalyzerHelper.h: Added.
+
+2016-09-29  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser should fail to parse unclosed IPv6 addresses
+        https://bugs.webkit.org/show_bug.cgi?id=162715
+
+        Reviewed by Tim Horton.
+
+        Covered by new API tests.
+
+        * platform/URLParser.cpp:
+        (WebCore::URLParser::parseHostAndPort):
+
+2016-09-29  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser should ignore tabs at all possible locations
+        https://bugs.webkit.org/show_bug.cgi?id=162711
+
+        Reviewed by Tim Horton.
+
+        The URL spec says to remove all tabs and newlines before parsing a URL.
+        To reduce passes on the URL and copies of data, I chose to just ignore them every time I increment the iterator.
+        This is fragile, but faster.  It can be completely tested, though.  That is what this patch does.
+
+        Covered by an addition to the API tests that tries inserting one tab at each location of each test.
+
+        * platform/URLParser.cpp:
+        (WebCore::URLParser::advance):
+        (WebCore::URLParser::isWindowsDriveLetter):
+        (WebCore::URLParser::appendWindowsDriveLetter):
+        (WebCore::URLParser::isPercentEncodedDot):
+        (WebCore::URLParser::isSingleDotPathSegment):
+        (WebCore::URLParser::isDoubleDotPathSegment):
+        (WebCore::URLParser::consumeSingleDotPathSegment):
+        (WebCore::URLParser::consumeDoubleDotPathSegment):
+        (WebCore::URLParser::checkLocalhostCodePoint):
+        (WebCore::URLParser::isAtLocalhost):
+        (WebCore::URLParser::isLocalhost):
+        (WebCore::URLParser::URLParser):
+        (WebCore::URLParser::parse):
+        (WebCore::isPercentEncodedDot): Deleted.
+        (WebCore::isSingleDotPathSegment): Deleted.
+        (WebCore::isDoubleDotPathSegment): Deleted.
+        (WebCore::consumeSingleDotPathSegment): Deleted.
+        (WebCore::consumeDoubleDotPathSegment): Deleted.
+        * platform/URLParser.h:
+        (WebCore::URLParser::advance):
+
+2016-09-29  Simon Fraser  <simon.fraser@apple.com>
+
+        Fix hit testing on display:block <svg> elements
+        https://bugs.webkit.org/show_bug.cgi?id=162717
+        rdar://problem/23261130
+
+        Reviewed by Zalan Bujtas.
+
+        RenderSVGRoot::nodeAtPoint() needs to test for both the HitTestBlockBackground and
+        HitTestChildBlockBackground phases, since we only get the HitTestChildBlockBackground
+        phase when the <svg> is a block. This is similar to code in RenderTable::nodeAtPoint(),
+        and matches Blink code.
+        
+        This fixes the point dragging on http://anthonydugois.com/svg-path-builder/.
+
+        Test: svg/hittest/block-svg.html
+
+        * rendering/svg/RenderSVGRoot.cpp:
+        (WebCore::RenderSVGRoot::nodeAtPoint):
+
 2016-09-29  Chris Dumez  <cdumez@apple.com>
 
         Assigning non-numeric to input.minlength should set minlength to 0

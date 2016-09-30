@@ -1,3 +1,275 @@
+2016-09-30  Youenn Fablet  <youenn@apple.com>
+
+        DumpRenderTree crashed in com.apple.WebCore: WTF::Optional<WebCore::FetchBodyOwner::BlobLoader>::operator bool const + 12
+        https://bugs.webkit.org/show_bug.cgi?id=162483
+
+        Reviewed by Alex Christensen.
+
+        * fetch/closing-while-fetching-blob-expected.txt: Added.
+        * fetch/closing-while-fetching-blob.html: Added.
+
+2016-09-29  Chris Dumez  <cdumez@apple.com>
+
+        Add support for download attribute on area elements
+        https://bugs.webkit.org/show_bug.cgi?id=162765
+
+        Reviewed by Brent Fulgham.
+
+        Add layout test coverage.
+
+        * http/tests/download/area-download-expected.txt: Added.
+        * http/tests/download/area-download.html: Added.
+        * http/tests/download/resources/FAIL-notify-done.html: Added.
+
+2016-09-29  Jiewen Tan  <jiewen_tan@apple.com>
+
+        Expose CryptoKey to web workers
+        https://bugs.webkit.org/show_bug.cgi?id=162640
+        <rdar://problem/28182204>
+
+        Reviewed by Brent Fulgham.
+
+        * crypto/resources/common.js: Renamed from LayoutTests/crypto/subtle/resources/common.js.
+        * crypto/subtle/aes-cbc-192-encrypt-decrypt.html:
+        * crypto/subtle/aes-cbc-256-encrypt-decrypt.html:
+        * crypto/subtle/aes-cbc-encrypt-decrypt-with-padding.html:
+        * crypto/subtle/aes-cbc-encrypt-decrypt.html:
+        * crypto/subtle/aes-cbc-generate-key.html:
+        * crypto/subtle/aes-cbc-import-jwk.html:
+        * crypto/subtle/aes-cbc-invalid-length.html:
+        * crypto/subtle/aes-cbc-unwrap-failure.html:
+        * crypto/subtle/aes-cbc-unwrap-rsa.html:
+        * crypto/subtle/aes-cbc-wrap-rsa-non-extractable.html:
+        * crypto/subtle/aes-cbc-wrap-rsa.html:
+        * crypto/subtle/aes-cbc-wrong-key-class.html:
+        * crypto/subtle/aes-export-key.html:
+        * crypto/subtle/aes-kw-key-manipulation.html:
+        * crypto/subtle/aes-kw-wrap-unwrap-aes.html:
+        * crypto/subtle/aes-postMessage-expected.txt:
+        * crypto/subtle/aes-postMessage.html:
+        * crypto/subtle/argument-conversion.html:
+        * crypto/subtle/array-buffer-view-offset.html:
+        * crypto/subtle/crypto-key-algorithm-gc.html:
+        * crypto/subtle/crypto-key-usages-gc.html:
+        * crypto/subtle/hmac-check-algorithm.html:
+        * crypto/subtle/hmac-export-key.html:
+        * crypto/subtle/hmac-generate-key.html:
+        * crypto/subtle/hmac-import-jwk.html:
+        * crypto/subtle/hmac-postMessage-expected.txt:
+        * crypto/subtle/hmac-postMessage.html:
+        * crypto/subtle/hmac-sign-verify-empty-key.html:
+        * crypto/subtle/hmac-sign-verify.html:
+        * crypto/subtle/import-jwk.html:
+        * crypto/subtle/jwk-export-use-values.html:
+        * crypto/subtle/jwk-import-use-values.html:
+        * crypto/subtle/postMessage-worker-expected.txt: Removed.
+        * crypto/subtle/rsa-export-generated-keys.html:
+        * crypto/subtle/rsa-export-key.html:
+        * crypto/subtle/rsa-export-private-key.html:
+        * crypto/subtle/rsa-indexeddb-non-exportable-private.html:
+        * crypto/subtle/rsa-indexeddb-non-exportable.html:
+        * crypto/subtle/rsa-indexeddb-private.html:
+        * crypto/subtle/rsa-indexeddb.html:
+        * crypto/subtle/rsa-oaep-generate-non-extractable-key.html:
+        * crypto/subtle/rsa-oaep-key-manipulation.html:
+        * crypto/subtle/rsa-oaep-plaintext-length.html:
+        * crypto/subtle/rsa-oaep-wrap-unwrap-aes.html:
+        * crypto/subtle/rsa-postMessage.html:
+        * crypto/subtle/rsaes-pkcs1-v1_5-decrypt.html:
+        * crypto/subtle/rsaes-pkcs1-v1_5-wrap-unwrap-aes.html:
+        * crypto/subtle/rsassa-pkcs1-v1_5-generate-key-with-leading-zeroes-in-exponent.html:
+        * crypto/subtle/rsassa-pkcs1-v1_5-generate-key.html:
+        * crypto/subtle/rsassa-pkcs1-v1_5-import-jwk-small-key.html:
+        * crypto/subtle/rsassa-pkcs1-v1_5-import-jwk.html:
+        * crypto/subtle/rsassa-pkcs1-v1_5-sign-verify.html:
+        * crypto/subtle/sha-1.html:
+        * crypto/subtle/sha-224.html:
+        * crypto/subtle/sha-256.html:
+        * crypto/subtle/sha-384.html:
+        * crypto/subtle/sha-512.html:
+        * crypto/subtle/unimplemented-unwrap-crash.html:
+        * crypto/subtle/unwrapKey-check-usage.html:
+        * crypto/subtle/wrapKey-check-usage.html:
+        * crypto/workers/aes-postMessage-worker-expected.txt: Added.
+        * crypto/workers/aes-postMessage-worker.html: Added.
+        * crypto/workers/hmac-postMessage-worker-expected.txt: Added.
+        * crypto/workers/hmac-postMessage-worker.html: Renamed from LayoutTests/crypto/subtle/postMessage-worker.html.
+        * crypto/workers/hrsa-postMessage-worker-expected.txt: Added.
+        * crypto/workers/hrsa-postMessage-worker.html: Added.
+        * crypto/workers/multiple-postMessage-worker-expected.txt: Added.
+        * crypto/workers/multiple-postMessage-worker.html: Added.
+        * crypto/workers/resources/aes-postMessage-worker.js: Added.
+        * crypto/workers/resources/hmac-postMessage-worker.js: Renamed from LayoutTests/crypto/subtle/resources/postMessage-worker.js.
+        * crypto/workers/resources/hrsa-postMessage-worker.js: Added.
+        * crypto/workers/resources/rsa-postMessage-worker.js: Added.
+        * crypto/workers/rsa-postMessage-worker-expected.txt: Added.
+        * crypto/workers/rsa-postMessage-worker.html: Added.
+        * js/dom/global-constructors-attributes-dedicated-worker-expected.txt:
+
+2016-09-29  Nan Wang  <n_wang@apple.com>
+
+        AX: iOS: Tapping <input> in Safari zooms in a bit when page has max scale = 1
+        https://bugs.webkit.org/show_bug.cgi?id=162471
+
+        Reviewed by Simon Fraser.
+
+        Moved focus input related tests to the right place.
+
+        * fast/forms/ios/user-scalable-does-not-scale-for-keyboard-focus-with-author-defined-scale-expected.txt: Added.
+        * fast/forms/ios/user-scalable-does-not-scale-for-keyboard-focus-with-author-defined-scale.html: Added.
+        * fast/forms/ios/user-scalable-does-not-scale-for-keyboard-focus-with-user-scalable-no-expected.txt: Added.
+        * fast/forms/ios/user-scalable-does-not-scale-for-keyboard-focus-with-user-scalable-no.html: Added.
+        * fast/forms/ios/user-scalable-scales-for-keyboard-focus-with-no-author-defined-scale-expected.txt: Added.
+        * fast/forms/ios/user-scalable-scales-for-keyboard-focus-with-no-author-defined-scale.html: Added.
+        * fast/viewport/ios/user-scalable-does-not-scale-for-keyboard-focus-with-author-defined-scale-expected.txt: Removed.
+        * fast/viewport/ios/user-scalable-does-not-scale-for-keyboard-focus-with-author-defined-scale.html: Removed.
+        * fast/viewport/ios/user-scalable-scales-for-keyboard-focus-with-no-author-defined-scale-expected.txt: Removed.
+        * fast/viewport/ios/user-scalable-scales-for-keyboard-focus-with-no-author-defined-scale.html: Removed.
+
+2016-09-29  Chris Dumez  <cdumez@apple.com>
+
+        [iOS] Update Touch constructor test to cover clientX / clientY attributes
+        https://bugs.webkit.org/show_bug.cgi?id=162757
+
+        Reviewed by Sam Weinig.
+
+        Update Touch constructor test to cover clientX / clientY attributes.
+
+        * fast/events/touch/touch-constructor.html:
+
+2016-09-29  Chris Dumez  <cdumez@apple.com>
+
+        [iOS] Add test for Touch constructor
+        https://bugs.webkit.org/show_bug.cgi?id=162736
+        <rdar://problem/28520007>
+
+        Reviewed by Ryosuke Niwa.
+
+        Add test for Touch constructor. There are no expected results because
+        the test (folder) is skipped in the open source.
+
+        * fast/events/touch/touch-constructor.html: Added.
+
+2016-09-28  Ada Chan  <adachan@apple.com>
+
+        Fix flaky test media/click-placeholder-not-pausing.html
+        https://bugs.webkit.org/show_bug.cgi?id=162661
+
+        Reviewed by Eric Carlson.
+
+        This test became flaky after r201474 when we started to delay showing
+        the inline placeholder until we are sure the video layer has been moved
+        into the video fullscreen layer. This means we can't guarantee that the
+        placeholder is visible right away after the video's presentation mode
+        changes to "picture-in-picture".
+
+        To fix this, wait for the placeholder to become visible before clicking it.
+
+        * media/click-placeholder-not-pausing.html:
+        * platform/mac-wk2/TestExpectations:
+
+2016-09-29  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r206483.
+        https://bugs.webkit.org/show_bug.cgi?id=162750
+
+        May have caused iOS perf regression (Requested by smfr on
+        #webkit).
+
+        Reverted changeset:
+
+        "REGRESSION (r204552): Yelp carousel animation is not smooth."
+        https://bugs.webkit.org/show_bug.cgi?id=162632
+        http://trac.webkit.org/changeset/206483
+
+2016-09-29  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Removing El Capitan modifier from flaky test media/restore-from-page-cache.html.
+        https://bugs.webkit.org/show_bug.cgi?id=158747
+
+        Unreviewed test gardening.
+
+        * platform/mac/TestExpectations:
+
+2016-09-29  Antoine Quint  <graouts@apple.com>
+
+        [Modern Media Controls] scheduler for layout nodes
+        https://bugs.webkit.org/show_bug.cgi?id=162726
+        <rdar://problem/28543043>
+
+        Reviewed by Dean Jackson.
+
+        Testing the basic functionality for the LayoutNode scheduler.
+
+        * media/modern-media-controls/scheduler/not-reentrant-expected.txt: Added.
+        * media/modern-media-controls/scheduler/not-reentrant.html: Added.
+        * media/modern-media-controls/scheduler/single-callback-when-registered-multiple-times-expected.txt: Added.
+        * media/modern-media-controls/scheduler/single-callback-when-registered-multiple-times.html: Added.
+
+2016-09-28  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Text nodes assigned to a linked slot are not clickable
+        https://bugs.webkit.org/show_bug.cgi?id=162091
+        <rdar://problem/28383300>
+
+        Reviewed by Antti Koivisto.
+
+        Added a regression test for clicking inside a text node assigned to a slot inside a hyperlink.
+
+        Unfortunately, there is not a way to make this a W3C style test until the web platform tests
+        start supporting WebDriver.
+
+        * fast/shadow-dom/click-text-inside-linked-slot-expected.txt: Added.
+        * fast/shadow-dom/click-text-inside-linked-slot.html: Added.
+        * platform/ios-simulator-wk2/TestExpectations:
+
+2016-09-29  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking fast/images/load-img-with-empty-src.html as crashing.
+        https://bugs.webkit.org/show_bug.cgi?id=162696
+
+        Unreviewed test gardening.
+
+        * TestExpectations:
+
+2016-09-29  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking fast/images/pdf-as-image-with-annotations.html as crashing.
+        https://bugs.webkit.org/show_bug.cgi?id=162696
+
+        Unreviewed test gardening.
+
+        * TestExpectations:
+
+2016-09-29  Saam Barati  <sbarati@apple.com>
+
+        parser-syntax-check should display the output of syntax errors
+        https://bugs.webkit.org/show_bug.cgi?id=162738
+
+        Reviewed by Joseph Pecoraro.
+
+        It's good to have this test display the syntax error messages
+        when we're expecting a syntax error because it will both allow
+        us to track changes in error messages and verify that we get
+        the expected error message when writing new tests.
+
+        * js/parser-syntax-check-expected.txt:
+        * js/script-tests/parser-syntax-check.js:
+        (runTest):
+
+2016-09-29  Simon Fraser  <simon.fraser@apple.com>
+
+        Fix hit testing on display:block <svg> elements
+        https://bugs.webkit.org/show_bug.cgi?id=162717
+        rdar://problem/23261130
+
+        Reviewed by Zalan Bujtas.
+        
+        Test hit testing on inline and block <svg> elements.
+
+        * svg/hittest/block-svg-expected.txt: Added.
+        * svg/hittest/block-svg.html: Added.
+
 2016-09-29  Saam Barati  <sbarati@apple.com>
 
         We don't properly propagate non-simple-parameter-list when parsing a setter
