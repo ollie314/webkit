@@ -1,3 +1,357 @@
+2016-09-30  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Stepping to a line with an autoContinue breakpoint should still pause
+        https://bugs.webkit.org/show_bug.cgi?id=161712
+        <rdar://problem/28193970>
+
+        Reviewed by Brian Burg.
+
+        * inspector/debugger/stepping/stepping-through-autoContinue-breakpoint-expected.txt: Added.
+        * inspector/debugger/stepping/stepping-through-autoContinue-breakpoint.html: Added.
+
+2016-09-30  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Stepping over/out of a function sometimes resumes instead of taking you to caller
+        https://bugs.webkit.org/show_bug.cgi?id=162802
+        <rdar://problem/28569982>
+
+        Reviewed by Mark Lam.
+
+        * inspector/debugger/resources/log-pause-location.js:
+        (TestPage.registerInitializer.createLocation):
+        (TestPage.registerInitializer.window.setBreakpointsOnLinesWithBreakpointComment):
+        Helper to set breakpoints everywhere in a file that has a BREAKPOINT comment.
+
+        * inspector/debugger/stepping/stepping-pause-in-inner-step-to-parent-expected.txt: Added.
+        * inspector/debugger/stepping/stepping-pause-in-inner-step-to-parent.html: Added.
+        Test that stepping out and over end up in the parent. Before this change
+        we would never have made it back into entry and the test failed.
+
+2016-09-30  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Implement rendering of font-variation-settings
+        https://bugs.webkit.org/show_bug.cgi?id=162782
+
+        Reviewed by Zalan Bujtas.
+
+        * fast/text/variations/duplicate-expected.html: Added.
+        * fast/text/variations/duplicate.html: Added.
+        * fast/text/variations/exist-expected-mismatch.html: Added.
+        * fast/text/variations/exist.html: Added.
+        * fast/text/variations/getComputedStyle.html:
+        * fast/text/variations/inheritance-expected.html: Added.
+        * fast/text/variations/inheritance.html: Added.
+        * fast/text/variations/order-expected.html: Added.
+        * fast/text/variations/order.html: Added.
+        * fast/text/variations/outofbounds-expected.html: Added.
+        * fast/text/variations/outofbounds.html: Added.
+
+2016-09-30  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Implement animation of font-variation-settings
+        https://bugs.webkit.org/show_bug.cgi?id=162783
+
+        Reviewed by Simon Fraser.
+
+        Animation tests need a little infrastructure to be able to tell if two computed
+        values for font-variation-settings are equivalent.
+
+        * animations/font-variation-settings-expected.html: Added.
+        * animations/font-variation-settings-order-expected.html: Added.
+        * animations/font-variation-settings-order.html: Added.
+        * animations/font-variation-settings-unlike-expected.html: Added.
+        * animations/font-variation-settings-unlike.html: Added.
+        * animations/font-variation-settings.html: Added.
+        * animations/resources/animation-test-helpers.js:
+        (compareFontVariationSettings):
+        (getPropertyValue):
+        (comparePropertyValue):
+
+2016-09-30  Antoine Quint  <graouts@apple.com>
+
+        [Modern Media Controls] layout nodes
+        https://bugs.webkit.org/show_bug.cgi?id=162799
+        <rdar://problem/28569301>
+
+        Reviewed by Dean Jackson.
+
+        Testing all public properties and methods of the LayoutNode class.
+
+        * media/modern-media-controls/layout-node/addChild-expected.txt: Added.
+        * media/modern-media-controls/layout-node/addChild.html: Added.
+        * media/modern-media-controls/layout-node/children-expected.txt: Added.
+        * media/modern-media-controls/layout-node/children.html: Added.
+        * media/modern-media-controls/layout-node/constructor-expected.txt: Added.
+        * media/modern-media-controls/layout-node/constructor.html: Added.
+        * media/modern-media-controls/layout-node/height-expected.txt: Added.
+        * media/modern-media-controls/layout-node/height.html: Added.
+        * media/modern-media-controls/layout-node/insertAfter-expected.txt: Added.
+        * media/modern-media-controls/layout-node/insertAfter.html: Added.
+        * media/modern-media-controls/layout-node/insertBefore-expected.txt: Added.
+        * media/modern-media-controls/layout-node/insertBefore.html: Added.
+        * media/modern-media-controls/layout-node/parent-expected.txt: Added.
+        * media/modern-media-controls/layout-node/parent.html: Added.
+        * media/modern-media-controls/layout-node/remove-expected.txt: Added.
+        * media/modern-media-controls/layout-node/remove.html: Added.
+        * media/modern-media-controls/layout-node/removeChild-expected.txt: Added.
+        * media/modern-media-controls/layout-node/removeChild.html: Added.
+        * media/modern-media-controls/layout-node/subclassing-expected.txt: Added.
+        * media/modern-media-controls/layout-node/subclassing.html: Added.
+        * media/modern-media-controls/layout-node/visible-expected.txt: Added.
+        * media/modern-media-controls/layout-node/visible.html: Added.
+        * media/modern-media-controls/layout-node/width-expected.txt: Added.
+        * media/modern-media-controls/layout-node/width.html: Added.
+        * media/modern-media-controls/layout-node/x-expected.txt: Added.
+        * media/modern-media-controls/layout-node/x.html: Added.
+        * media/modern-media-controls/layout-node/y-expected.txt: Added.
+        * media/modern-media-controls/layout-node/y.html: Added.
+
+2016-09-30  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking http/tests/media/hls/hls-video-resize.html as flaky on mac-wk1.
+        https://bugs.webkit.org/show_bug.cgi?id=162507
+
+        Unreviewed test gardening.
+
+        * platform/mac-wk1/TestExpectations:
+
+2016-09-30  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Parse font-variation-settings
+        https://bugs.webkit.org/show_bug.cgi?id=162781
+
+        Reviewed by Simon Fraser.
+
+        * fast/text/variations/getComputedStyle-expected.txt: Added.
+        * fast/text/variations/getComputedStyle.html: Added.
+
+2016-09-30  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Mark inspector/debugger/breakpoints tests as slow on release, skipped on debug.
+
+        Unreviewed test gardening.
+
+        * TestExpectations:
+
+2016-09-30  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Rebaseline results after r206654.
+
+        Better location for unary expressions.
+
+        * js/stack-trace-expected.txt:
+
+2016-09-30  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Fix fast/text/trak-optimizeLegibility.html
+        https://bugs.webkit.org/show_bug.cgi?id=162779
+
+        Reviewed by Simon Fraser.
+
+        * fast/text/trak-optimizeLegibility.html:
+        * platform/ios-simulator/fast/text/trak-optimizeLegibility-expected.txt:
+        * platform/mac-elcapitan/fast/text/trak-optimizeLegibility-expected.txt: Removed.
+        * platform/mac/fast/text/trak-optimizeLegibility-expected.txt:
+
+2016-09-30  Zalan Bujtas  <zalan@apple.com>
+
+        Unreviewed, rolling out r206611.
+
+        Scroll perf did not recover.
+
+        Reverted changeset:
+
+        "Unreviewed, rolling out r206483."
+        https://bugs.webkit.org/show_bug.cgi?id=162750
+        http://trac.webkit.org/changeset/206611
+
+2016-09-30  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Rebaseline js/dom/stack-trace.html after r206654.
+
+        Unreviewed test gardening.
+
+        * js/dom/stack-trace-expected.txt:
+
+2016-09-30  Chris Dumez  <cdumez@apple.com>
+
+        FileSaver.js does not work in WebKit
+        https://bugs.webkit.org/show_bug.cgi?id=162788
+
+        Reviewed by Sam Weinig.
+
+        Add layout test coverage.
+
+        * fast/dom/HTMLAnchorElement/anchor-download-synthetic-click-expected.txt:
+        * fast/dom/HTMLAnchorElement/anchor-download-user-triggered-synthetic-click-expected.txt: Added.
+        * fast/dom/HTMLAnchorElement/anchor-download-user-triggered-synthetic-click.html: Added.
+
+2016-09-30  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking fast/images/gif-loop-count.html as flaky on ios-simulator.
+        https://bugs.webkit.org/show_bug.cgi?id=162739
+
+        Unreviewed test gardening.
+
+        * platform/ios-simulator-wk1/TestExpectations:
+        * platform/ios-simulator/TestExpectations:
+
+2016-09-30  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking http/tests/security/cached-cross-origin-preloading-css-stylesheet.html as flaky on mac-wk1.
+        https://bugs.webkit.org/show_bug.cgi?id=162791
+
+        Unreviewed test gardening.
+
+        * platform/mac-wk1/TestExpectations:
+
+2016-09-28  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Stepping through `a(); b(); c();` it is unclear where we are and what is about to execute
+        https://bugs.webkit.org/show_bug.cgi?id=161658
+        <rdar://problem/28181254>
+
+        Reviewed by Geoffrey Garen.
+
+        * inspector/debugger/stepping/stepping-loops-expected.txt:
+        * inspector/debugger/stepping/stepping-misc-expected.txt:
+        Updated pause location for unary expressions.
+
+2016-09-30  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Breakpoints on blank lines or comments don't break
+        https://bugs.webkit.org/show_bug.cgi?id=9885
+        <rdar://problem/6134406>
+
+        Reviewed by Mark Lam.
+
+        * inspector/debugger/breakpoints/resolved-dump-all-pause-locations-expected.txt: Added.
+        * inspector/debugger/breakpoints/resolved-dump-all-pause-locations.html: Added.
+        * inspector/debugger/breakpoints/resolved-dump-each-line-expected.txt: Added.
+        * inspector/debugger/breakpoints/resolved-dump-each-line.html: Added.
+        * inspector/debugger/breakpoints/resources/dump-functions.js: Added.
+        * inspector/debugger/breakpoints/resources/dump-general.js: Added.
+        Test for resolved breakpoint locations in all kinds of different source code.
+
+        * inspector/debugger/breakpoints/resources/dump.js: Added.
+        (TestPage.registerInitializer):
+        (TestPage.registerInitializer.window.addDumpAllPauseLocationsTestCase):
+        (TestPage.registerInitializer.window.addDumpEachLinePauseLocationTestCase):
+        Shared code to run different generalized tests for logging all resolved
+        breakpoint locations or the resolved breakpoint location if a breakpoint
+        is set on each individual line.
+
+        * inspector/debugger/resources/log-pause-location.js:
+        (TestPage.registerInitializer.insertCaretIntoStringAtIndex):
+        (TestPage.registerInitializer.window.findScript):
+        (TestPage.registerInitializer.window.loadLinesFromSourceCode):
+        (TestPage.registerInitializer.window.loadMainPageContent):
+        (TestPage.registerInitializer.window.logResolvedBreakpointLinesWithContext):
+        (TestPage.registerInitializer.window.logLinesWithContext):
+        Make some more code shared and provide a way to log two locations,
+        used to see where a breakpoint was set and where it resolved to.
+
+        * inspector/debugger/setBreakpoint-expected.txt:
+        Update error message. Should not include a period.
+
+2016-09-30  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Stepping out of a function finishes the line that called it.
+        https://bugs.webkit.org/show_bug.cgi?id=155325
+        <rdar://problem/25094578>
+
+        Reviewed by Mark Lam.
+
+        * inspector/debugger/break-on-exception-throw-in-promise.html:
+        Drive-by remove debug only code that shouldn't have been checked in.
+
+        * inspector/debugger/resources/log-pause-location.js: Added.
+        (TestPage.registerInitializer.String.prototype.myPadStart):
+        (TestPage.registerInitializer.insertCaretIntoStringAtIndex):
+        (TestPage.registerInitializer.logLinesWithContext):
+        (TestPage.registerInitializer.window.logPauseLocation):
+        (TestPage.registerInitializer.window.step):
+        (TestPage.registerInitializer.window.initializeSteppingTestSuite):
+        (TestPage.registerInitializer.window.addSteppingTestCase):
+        (TestPage.registerInitializer.window.loadMainPageContent):
+        Shared code for stepping tests that runs in the inspected page.
+
+        (global):
+        When the test page is loaded outside of the test runner,
+        create buttons for each of the different entry test functions.
+        This makes it very easy to inspect the test page and run
+        through an individual test.
+
+        * inspector/debugger/stepping/stepInto-expected.txt: Added.
+        * inspector/debugger/stepping/stepInto.html: Added.
+        * inspector/debugger/stepping/stepOut-expected.txt: Added.
+        * inspector/debugger/stepping/stepOut.html: Added.
+        * inspector/debugger/stepping/stepOver-expected.txt: Added.
+        * inspector/debugger/stepping/stepOver.html: Added.
+        * inspector/debugger/stepping/stepping-arrow-functions-expected.txt: Added.
+        * inspector/debugger/stepping/stepping-arrow-functions.html: Added.
+        * inspector/debugger/stepping/stepping-classes-expected.txt: Added.
+        * inspector/debugger/stepping/stepping-classes.html: Added.
+        * inspector/debugger/stepping/stepping-control-flow-expected.txt: Added.
+        * inspector/debugger/stepping/stepping-control-flow.html: Added.
+        * inspector/debugger/stepping/stepping-function-calls-expected.txt: Added.
+        * inspector/debugger/stepping/stepping-function-calls.html: Added.
+        * inspector/debugger/stepping/stepping-function-default-parameters-expected.txt: Added.
+        * inspector/debugger/stepping/stepping-function-default-parameters.html: Added.
+        * inspector/debugger/stepping/stepping-literal-construction-expected.txt: Added.
+        * inspector/debugger/stepping/stepping-literal-construction.html: Added.
+        * inspector/debugger/stepping/stepping-loops-expected.txt: Added.
+        * inspector/debugger/stepping/stepping-loops.html: Added.
+        * inspector/debugger/stepping/stepping-misc-expected.txt: Added.
+        * inspector/debugger/stepping/stepping-misc.html: Added.
+        * inspector/debugger/stepping/stepping-switch-expected.txt: Added.
+        * inspector/debugger/stepping/stepping-switch.html: Added.
+        * inspector/debugger/stepping/stepping-template-string-expected.txt: Added.
+        * inspector/debugger/stepping/stepping-template-string.html: Added.
+        * inspector/debugger/stepping/stepping-try-catch-finally-expected.txt: Added.
+        * inspector/debugger/stepping/stepping-try-catch-finally.html: Added.
+        Test stepping in different common scenarios.
+
+        * inspector/debugger/regress-133182.html:
+        * inspector/debugger/regress-133182-expected.txt:
+        * inspector/debugger/tail-deleted-frames-from-vm-entry-expected.txt:
+        * inspector/debugger/tail-deleted-frames-from-vm-entry.html:
+        Rebaseline. No need for a double step. And the second pause doesn't make any sense
+        in the tail deleted frames test.
+
+2016-09-30  Chris Dumez  <cdumez@apple.com>
+
+        [WK2][iOS] Add radiusX / radiusY / rotationAngle to WebPlatformTouchPoint
+        https://bugs.webkit.org/show_bug.cgi?id=162787
+        <rdar://problem/28554292>
+
+        Reviewed by Benjamin Poulain.
+
+        Extend Touch constructor test coverage to cover radiusX / radiusY / rotationAngle
+        attributes.
+
+        * fast/events/touch/touch-constructor.html:
+
+2016-09-30  Saam Barati  <sbarati@apple.com>
+
+        Arrow functions should not allow duplicate parameter names
+        https://bugs.webkit.org/show_bug.cgi?id=162741
+
+        Reviewed by Filip Pizlo.
+
+        * js/parser-syntax-check-expected.txt:
+        * js/script-tests/parser-syntax-check.js:
+
+2016-09-30  Megan Gardner  <megan_gardner@apple.com>
+
+        Make it possible to test web-related user-interface features
+        https://bugs.webkit.org/show_bug.cgi?id=162657
+
+        Reviewed by Simon Fraser.
+
+        * fast/events/touch/ios/long-press-on-image-expected.txt: Added.
+        * fast/events/touch/ios/long-press-on-image.html: Added.
+
 2016-09-30  Said Abou-Hallawa  <sabouhallawa@apple.com>
 
         Change the MemoryCache and CachedResource adjustSize functions to take a long argument

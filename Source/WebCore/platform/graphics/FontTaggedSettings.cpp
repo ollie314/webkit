@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,53 +25,55 @@
  */
 
 #include "config.h"
-#include "FontFeatureSettings.h"
+#include "FontTaggedSettings.h"
+
+#include "TextStream.h"
 
 #include <wtf/text/AtomicStringHash.h>
 
 namespace WebCore {
 
-FontFeature::FontFeature(const FontFeatureTag& tag, int value)
-    : m_tag(tag)
-    , m_value(value)
-{
-}
-
-FontFeature::FontFeature(FontFeatureTag&& tag, int value)
-    : m_tag(WTFMove(tag))
-    , m_value(value)
-{
-}
-
-bool FontFeature::operator==(const FontFeature& other) const
-{
-    return m_tag == other.m_tag && m_value == other.m_value;
-}
-
-bool FontFeature::operator<(const FontFeature& other) const
-{
-    return (m_tag < other.m_tag) || (m_tag == other.m_tag && m_value < other.m_value);
-}
-
-void FontFeatureSettings::insert(FontFeature&& feature)
-{
-    // This vector will almost always have 0 or 1 items in it. Don't bother with the overhead of a binary search or a hash set.
-    size_t i;
-    for (i = 0; i < m_list.size(); ++i) {
-        if (feature < m_list[i])
-            break;
-    }
-    m_list.insert(i, WTFMove(feature));
-}
-
+template <>
 unsigned FontFeatureSettings::hash() const
 {
     IntegerHasher hasher;
     for (auto& feature : m_list) {
-        hasher.add(FontFeatureTagHash::hash(feature.tag()));
+        hasher.add(FourCharacterTagHash::hash(feature.tag()));
         hasher.add(feature.value());
     }
     return hasher.hash();
+}
+
+template <>
+unsigned FontVariationSettings::hash() const
+{
+    static_assert(sizeof(float) == sizeof(int), "IntegerHasher needs to accept floats too");
+    union {
+        float f;
+        int i;
+    } floatToInt;
+
+    IntegerHasher hasher;
+    for (auto& variation : m_list) {
+        hasher.add(FourCharacterTagHash::hash(variation.tag()));
+        floatToInt.f = variation.value();
+        hasher.add(floatToInt.i);
+    }
+    return hasher.hash();
+}
+
+TextStream& operator<<(TextStream& ts, const FontVariationSettings& item)
+{
+    for (unsigned i = 0; i < item.size(); ++i) {
+        auto& variation = item.at(i);
+        StringBuilder s;
+        s.append(variation.tag()[0]);
+        s.append(variation.tag()[1]);
+        s.append(variation.tag()[2]);
+        s.append(variation.tag()[3]);
+        ts.dumpProperty(s.toString(), item.at(i).value());
+    }
+    return ts;
 }
 
 }

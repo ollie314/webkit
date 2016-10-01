@@ -1,3 +1,745 @@
+2016-10-01  Youenn Fablet  <youenn@apple.com>
+
+        removing FetchBoyd::m_type
+
+        Remove FetchBody::m_type
+        https://bugs.webkit.org/show_bug.cgi?id=162841
+
+        Reviewed by Sam Weinig.
+
+        No change of behavior.
+
+        Removing FetchBody::m_type and using m_data in lieu.
+        Introducing temporarily FetchBody::m_isEmpty to handle the case of null bodies.
+        Null body handling should be moved to FetchBodyOwner in a follow-up patch.
+
+        * Modules/fetch/FetchBody.cpp:
+        (WebCore::FetchBody::FetchBody):
+        (WebCore::FetchBody::extract):
+        (WebCore::FetchBody::arrayBuffer):
+        (WebCore::FetchBody::blob):
+        (WebCore::FetchBody::json):
+        (WebCore::FetchBody::text):
+        (WebCore::FetchBody::consumeOnceLoadingFinished):
+        (WebCore::FetchBody::consume):
+        (WebCore::FetchBody::consumeAsStream):
+        (WebCore::FetchBody::loadingSucceeded):
+        (WebCore::FetchBody::bodyForInternalRequest):
+        (WebCore::FetchBody::clone):
+        (WebCore::FetchBody::consumeText): Deleted.
+        (WebCore::FetchBody::consumeBlob): Deleted.
+        * Modules/fetch/FetchBody.h:
+        (WebCore::FetchBody::isEmpty):
+        (WebCore::FetchBody::isBlob):
+        (WebCore::FetchBody::isFormData):
+        (WebCore::FetchBody::isArrayBuffer):
+        (WebCore::FetchBody::isArrayBufferView):
+        (WebCore::FetchBody::isURLSearchParams):
+        (WebCore::FetchBody::isText):
+        (WebCore::FetchBody::FetchBody):
+        (WebCore::FetchBody::setContentType): Deleted.
+        (WebCore::FetchBody::urlSearchParamsBody): Deleted.
+        * Modules/fetch/FetchBodyOwner.cpp:
+        (WebCore::FetchBodyOwner::consumeOnceLoadingFinished):
+        (WebCore::FetchBodyOwner::blobLoadingSucceeded):
+        (WebCore::FetchBodyOwner::finishBlobLoading): Deleted.
+        * Modules/fetch/FetchBodyOwner.h:
+        (WebCore::FetchBodyOwner::body): Deleted.
+        * Modules/fetch/FetchRequest.cpp:
+        (WebCore::FetchRequest::setBody):
+        * Modules/fetch/FetchResponse.cpp:
+        (WebCore::FetchResponse::fetch):
+        (WebCore::FetchResponse::BodyLoader::didSucceed):
+        (WebCore::FetchResponse::consume):
+        (WebCore::FetchResponse::consumeBodyAsStream):
+        (WebCore::FetchResponse::createReadableStreamSource):
+        (WebCore::FetchResponse::finishConsumingStream): Deleted.
+        * Modules/fetch/FetchResponse.h:
+
+2016-09-30  David Kilzer  <ddkilzer@apple.com>
+
+        REGRESSION (r203424): WebCore::ImageBuffer::createCompatibleBuffer() in ImageBufferCG.cpp over-releases CGColorSpaceRef objects
+        <https://webkit.org/b/162823>
+        <rdar://problem/27723268>
+
+        Reviewed by Joseph Pecoraro.
+
+        Code is covered by existing tests, but no crashes have been
+        observed in practice.  May require running one test multiple
+        times to reproduce.
+
+        * platform/graphics/cg/ImageBufferCG.cpp:
+        (WebCore::ImageBuffer::createCompatibleBuffer): Don't use
+        adoptCF() when the function doesn't return a +1 retained
+        CGColorSpaceRef.
+
+2016-09-30  Joonghun Park  <jh718.park@samsung.com>
+
+        [EFL] Fix build break since r206661. Unreviewed
+        https://bugs.webkit.org/show_bug.cgi?id=162825
+
+        No new tests, no new behaviours.
+
+        * rendering/RenderLayer.cpp:
+        (WebCore::ClipRects::ClipRects):
+
+2016-09-30  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Declare that our variation fonts work is in progress
+        https://bugs.webkit.org/show_bug.cgi?id=162816
+
+        Reviewed by Simon Fraser.
+
+        * features.json:
+
+2016-09-30  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Turn variation fonts on by default
+        https://bugs.webkit.org/show_bug.cgi?id=162818
+
+        Reviewed by Simon Fraser.
+
+        No new tests because there is no behavior change.
+
+        * page/Settings.in:
+        * testing/InternalSettings.cpp:
+        (WebCore::InternalSettings::variationFontsEnabled):
+
+2016-09-30  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Implement rendering of font-variation-settings
+        https://bugs.webkit.org/show_bug.cgi?id=162782
+
+        Reviewed by Zalan Bujtas.
+
+        Because the heavy lifting for font-variation-settings is done by CoreText,
+        this patch is fairly minimal. It simply hooks up the CSS property to CoreText.
+
+        There is an existing bug in CoreText where variations inside fonts do not
+        survive the addition of a cascade list. Therefore, FontPlatformData::ctFont()
+        needs to work around this (conditionally) by resupplying the variation at
+        the same time as the cascade list. The CoreText bug is <rdar://problem/28449441>.
+
+        Tests: fast/text/variations/duplicate.html
+               fast/text/variations/exist.html
+               fast/text/variations/inheritance.html
+               fast/text/variations/order.html
+               fast/text/variations/outofbounds.html
+
+        * platform/graphics/FontCache.h:
+        * platform/graphics/cocoa/FontCacheCoreText.cpp:
+        (WebCore::preparePlatformFont):
+        (WebCore::fontWithFamily):
+        (WebCore::FontCache::createFontPlatformData):
+        (WebCore::FontCache::systemFallbackForCharacters):
+        * platform/graphics/cocoa/FontPlatformDataCocoa.mm:
+        (WebCore::cascadeToLastResortAttributesDictionary):
+        (WebCore::cascadeToLastResortAndVariationsFontDescriptor):
+        (WebCore::FontPlatformData::ctFont):
+        (WebCore::cascadeToLastResortFontDescriptor): Deleted.
+        * platform/graphics/mac/FontCustomPlatformData.cpp:
+        (WebCore::FontCustomPlatformData::fontPlatformData):
+        * rendering/RenderThemeIOS.mm:
+        (WebCore::RenderThemeIOS::updateCachedSystemFontDescription):
+
+2016-09-29  Sam Weinig  <sam@webkit.org>
+
+        Add initial support for IDL union conversion
+        https://bugs.webkit.org/show_bug.cgi?id=161576
+
+        Reviewed by Chris Dumez.
+
+        * WebCore.xcodeproj/project.pbxproj:
+        Add IDLTypes.h
+
+        * bindings/generic/IDLTypes.h: Added.
+        Add a basic type hierarchy for types defined by WebIDL and their corresponding
+        WebCore implementation types.
+
+        * bindings/js/JSDOMConvert.h:
+        (WebCore::Converter<IDLDOMString>::convert):
+        (WebCore::Converter<IDLUSVString>::convert):
+        Add Converters for IDLDOMString and IDLUSVString.
+
+        (WebCore::ConditionalConverter<typename ReturnType, typename T, bool enabled>)
+        Add a struct to allow conditional conversion of types based on a compile boolean
+        value. This allows the union code to work, by ensuring that code for types that don't
+        exist doesn't get compiled.
+
+        (WebCore::Converter<IDLUnion>::convert):
+        Add template meta programming based version of the WebIDL conversion algorithm. It uses
+        introspection of the typelist to conditionally execute the parts of the algorithm that
+        apply and relies on the compiler eliminate the dead code it produces. This initial cut
+        doesn't implement the full algorithm, just a subset needed to see if this method will work
+        out.
+
+        * bindings/js/JSDOMWrapper.h:
+        (WebCore::isJSDOMWrapperType):
+        Add JSDOMWrapperType to the list of well known types to allow quick checking of wrappers
+        by the union code.
+
+        * bindings/js/JSNodeOrString.cpp:
+        (WebCore::toNodeOrStringVector):
+        Switch to new IDLUnion based converter.
+
+2016-09-30  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Implement animation of font-variation-settings
+        https://bugs.webkit.org/show_bug.cgi?id=162783
+
+        Reviewed by Simon Fraser.
+
+        Modify CSSPropertyAnimation to understand FontVariationSettings objects and how
+        to interpolate them.
+
+        If two FontVariationSettings objects are unlike (meaning they specify different
+        variation axes), for now the interpolation simply returns an empty object. This
+        might change in the future, but for now, this is a reasonable place to start.
+
+        Because CSSPropertyAnimation interacts with RenderStyles instead of
+        FontDescriptions, this patch adds a transparent accessor from the RenderStyle
+        to the inner FontDescription.
+
+        Tests: animations/font-variation-settings-order.html
+               animations/font-variation-settings-unlike.html
+               animations/font-variation-settings.html
+
+        * page/animation/CSSPropertyAnimation.cpp:
+        (WebCore::blendFunc):
+        (WebCore::PropertyWrapperFontVariationSettings::PropertyWrapperFontVariationSettings):
+        (WebCore::CSSPropertyAnimationWrapperMap::CSSPropertyAnimationWrapperMap):
+        * rendering/style/RenderStyle.cpp:
+        (WebCore::RenderStyle::setFontVariationSettings):
+        * rendering/style/RenderStyle.h:
+        (WebCore::RenderStyle::fontVariationSettings):
+
+2016-09-30  Antoine Quint  <graouts@apple.com>
+
+        [Modern Media Controls] layout nodes
+        https://bugs.webkit.org/show_bug.cgi?id=162799
+        <rdar://problem/28569301>
+
+        Reviewed by Dean Jackson.
+
+        Modern media controls will be using a tree of LayoutNode objects that commit to the DOM
+        in coordinated `requestAnimationFrame()` calls to ensure all layouts are done in an efficient
+        and coordinated manner. As a preamble, we introduced the `scheduler` singleton in
+        https://webkit.org/b/162726 which is in charge of scheduling callbacks.
+
+        A LayoutNode is created by providing an Element to its constructor, or an HTML string. Not
+        providing a parameter creates a simple <div>.
+
+        When we set a property on a LayoutNode, we call `markDirtyProperty(propertyName)` which keeps
+        track of dirty properties in the `_dirtyProperties` set. When this set is non-empty, the node
+        is marked as dirty and registered in the global `dirtyNodes` map, asking the shared scheduler
+        that a layout is needed. When the layout is performed, all nodes in the `dirtyNodes` map are
+        processed such that `commitProperty(propertyName)` is called to commit dirty properties for
+        a given node to the DOM, and `layout()` is called to allow subclasses of LayoutNode to conduct
+        custom layout logic that goes beyond committing a given property.
+
+        Another reason why a node may be marked as dirty is when a DOM hierarchy change is needed. A
+        host of DOM-like methods are exposed to allow flexible manipulations of nodes, with an extra
+        `children` property which allows wholesale change of a node's subtree with a single array
+        property assignment. Changes to the DOM hierarchy are performed in the same scheduler callback
+        as style properties.
+
+        Nodes can be marked for layout explicitly with by setting the `needsLayout` property.
+
+        Tests: media/modern-media-controls/layout-node/addChild.html
+               media/modern-media-controls/layout-node/children.html
+               media/modern-media-controls/layout-node/constructor.html
+               media/modern-media-controls/layout-node/height.html
+               media/modern-media-controls/layout-node/insertAfter.html
+               media/modern-media-controls/layout-node/insertBefore.html
+               media/modern-media-controls/layout-node/parent.html
+               media/modern-media-controls/layout-node/remove.html
+               media/modern-media-controls/layout-node/removeChild.html
+               media/modern-media-controls/layout-node/subclassing.html
+               media/modern-media-controls/layout-node/visible.html
+               media/modern-media-controls/layout-node/width.html
+               media/modern-media-controls/layout-node/x.html
+               media/modern-media-controls/layout-node/y.html
+
+        * Modules/modern-media-controls/controls/layout-node.js: Added.
+        (LayoutNode):
+        (LayoutNode.prototype.get x):
+        (LayoutNode.prototype.set x):
+        (LayoutNode.prototype.get y):
+        (LayoutNode.prototype.set y):
+        (LayoutNode.prototype.get width):
+        (LayoutNode.prototype.set width):
+        (LayoutNode.prototype.get height):
+        (LayoutNode.prototype.set height):
+        (LayoutNode.prototype.get visible):
+        (LayoutNode.prototype.set visible):
+        (LayoutNode.prototype.get needsLayout):
+        (LayoutNode.prototype.set needsLayout):
+        (LayoutNode.prototype.get parent):
+        (LayoutNode.prototype.get children):
+        (LayoutNode.prototype.set children):
+        (LayoutNode.prototype.addChild):
+        (LayoutNode.prototype.insertBefore):
+        (LayoutNode.prototype.insertAfter):
+        (LayoutNode.prototype.removeChild):
+        (LayoutNode.prototype.remove):
+        (LayoutNode.prototype.markDirtyProperty):
+        (LayoutNode.prototype.commitProperty):
+        (LayoutNode.prototype.layout):
+        (LayoutNode.prototype._markNodeManipulation):
+        (LayoutNode.prototype._updateDirtyState):
+        (LayoutNode.prototype._updateChildren):
+        (performScheduledLayout):
+        (elementFromString):
+
+2016-09-30  Said Abou-Hallawa  <sabouhallawa@apple.com>
+
+        The dragged image should be the current frame only of the animated image
+        https://bugs.webkit.org/show_bug.cgi?id=162109
+
+        Reviewed by Tim Horton.
+
+        Instead of creating an NSImage with all the frames for the dragImage,
+        create an NSImage with the current frame only.
+
+        * dom/DataTransferMac.mm:
+        (WebCore::DataTransfer::createDragImage): Call currentFrameNSImage() to create the dragImage.
+        * editing/cocoa/HTMLConverter.mm:
+        (fileWrapperForElement):  Call the Image function with its new name.
+        * platform/graphics/BitmapImage.h:
+        * platform/graphics/Image.h:
+        (WebCore::Image::nsImage): Rename getNSImage() to nsImage().
+        (WebCore::Image::currentFrameNSImage): Returns the NSImage of the current frame.
+        (WebCore::Image::tiffRepresentation): Rename getTIFFRepresentation() to tiffRepresentation().
+        (WebCore::Image::getNSImage): Deleted.
+        (WebCore::Image::getTIFFRepresentation): Deleted.
+        * platform/graphics/mac/ImageMac.mm:
+        (WebCore::BitmapImage::tiffRepresentation): Rename getTIFFRepresentation() to tiffRepresentation().
+        (WebCore::BitmapImage::nsImage): Rename getNSImage() to nsImage().
+        (WebCore::BitmapImage::currentFrameNSImage): Returns the NSImage of the current frame.
+        (WebCore::BitmapImage::getTIFFRepresentation): Deleted.
+        (WebCore::BitmapImage::getNSImage): Deleted.
+        * platform/mac/CursorMac.mm:
+        (WebCore::createCustomCursor): Call currentFrameNSImage() since the cursor does not animate anyway.
+        * platform/mac/DragImageMac.mm:
+        (WebCore::createDragImageFromImage): Use currentFrameNSImage() for the dragImage.
+        * platform/mac/PasteboardMac.mm:
+        (WebCore::Pasteboard::write): Call the Image function with its new name.
+
+2016-09-30  Chris Dumez  <cdumez@apple.com>
+
+        [iOS] Allow sequence<Touch> input in TouchEvent constructor
+        https://bugs.webkit.org/show_bug.cgi?id=162806
+        <rdar://problem/28566429>
+
+        Reviewed by Ryosuke Niwa.
+
+        Allow sequence<Touch> input in TouchEvent constructor in addition to
+        TouchList objects. It is convenient for developers to pass arrays of
+        Touch objects.
+
+        No new tests, already covered by:
+        imported/w3c/web-platform-tests/touch-events/touch-touchevent-constructor.html
+
+        * bindings/js/JSDOMBinding.h:
+        (WebCore::toRefNativeArray):
+        (WebCore::toRefPtrNativeArray):
+        * bindings/js/JSDictionary.cpp:
+        (WebCore::JSDictionary::convertValue):
+
+2016-09-30  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Parse font-variation-settings
+        https://bugs.webkit.org/show_bug.cgi?id=162781
+
+        Reviewed by Simon Fraser.
+
+        CSS Fonts level 4 [1] details the font-variation-settings property which allows variations
+        to be applied to fonts which accept it. The property accepts a list of key/value
+        pairs where the keys are four-character Ascii codes and the values are floating
+        point values. The implementation uses font-feature-settings as a model, but with one
+        big difference: font-variation-settings can be animated. The set of variation points
+        are animated individually.
+
+        This font variations work is being done behind a run-time switch, which is settable from
+        the Safari Develop menu.
+
+        Now that FontDescription is growing, I'd like to do an investigation into the possibility of
+        moving some of the rare pieces of it into their own class to reduce memory. However, upon
+        advice, this investigation will be fairly involved and should be done in its own bug.
+
+        Test: fast/text/variations/getComputedStyle.html
+
+        * CMakeLists.txt:
+        * WebCore.xcodeproj/project.pbxproj:
+        * css/CSSAllInOne.cpp:
+        * css/CSSComputedStyleDeclaration.cpp:
+        (WebCore::ComputedStyleExtractor::propertyValue):
+        * css/CSSFontVariationValue.cpp: Copied from Source/WebCore/platform/graphics/FontTaggedSettings.cpp.
+        (WebCore::CSSFontVariationValue::CSSFontVariationValue):
+        (WebCore::CSSFontVariationValue::customCSSText):
+        (WebCore::CSSFontVariationValue::equals):
+        * css/CSSFontVariationValue.h: Copied from Source/WebCore/platform/graphics/FontTaggedSettings.cpp.
+        * css/CSSPropertyNames.in:
+        * css/CSSValue.cpp:
+        (WebCore::CSSValue::equals):
+        (WebCore::CSSValue::cssText):
+        (WebCore::CSSValue::destroy):
+        * css/CSSValue.h:
+        (WebCore::CSSValue::isFontVariationValue):
+        (WebCore::CSSValue::isFontFeatureValue): Deleted.
+        * css/StyleBuilderConverter.h:
+        (WebCore::StyleBuilderConverter::convertFontVariationSettings):
+        * css/StyleBuilderCustom.h:
+        (WebCore::StyleBuilderCustom::applyInitialFontVariationSettings):
+        (WebCore::StyleBuilderCustom::applyInheritFontVariationSettings):
+        (WebCore::StyleBuilderCustom::applyInheritFontFeatureSettings): Deleted.
+        * css/parser/CSSParser.cpp:
+        (WebCore::CSSParserContext::CSSParserContext):
+        (WebCore::operator==):
+        (WebCore::CSSParser::parseValue):
+        (WebCore::CSSParser::parseFontFeatureSettings):
+        (WebCore::CSSParser::parseFontVariationTag):
+        (WebCore::CSSParser::parseFontVariationSettings):
+        * css/parser/CSSParser.h:
+        * css/parser/CSSParserMode.h:
+        * platform/graphics/FontCache.h:
+        (WebCore::FontDescriptionKey::FontDescriptionKey):
+        (WebCore::FontDescriptionKey::operator==):
+        (WebCore::FontDescriptionKey::computeHash):
+        * platform/graphics/FontDescription.cpp:
+        * platform/graphics/FontDescription.h:
+        (WebCore::FontDescription::variationSettings):
+        (WebCore::FontDescription::setVariationSettings):
+        (WebCore::FontDescription::operator==):
+        (WebCore::FontDescription::featureSettings): Deleted.
+        (WebCore::FontDescription::setFeatureSettings): Deleted.
+        * platform/graphics/FontTaggedSettings.cpp:
+        (WebCore::FontVariationSettings::hash):
+        (WebCore::operator<<):
+        * platform/graphics/FontTaggedSettings.h:
+
+2016-09-30  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Followup patch to r206664
+        https://bugs.webkit.org/show_bug.cgi?id=162774
+
+        Unreviewed.
+
+        No new tests because there is no behavior change.
+
+        * platform/graphics/FontTaggedSettings.h:
+        (WebCore::FourCharacterTagHashTraits::isDeletedValue): Deleted.
+
+2016-09-30  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Fix fast/text/trak-optimizeLegibility.html
+        https://bugs.webkit.org/show_bug.cgi?id=162779
+
+        Reviewed by Simon Fraser.
+
+        I accidentally created this test to allow an unnecessary delta
+        in the width comparison. This covered the fact that the fonts
+        were not being selected correctly in our testing code. Update the
+        font selection code to work with system fonts correctly and
+        update the test to not use a delta when performing width
+        comparisons.
+
+        Test: fast/text/trak-optimizeLegibility.html
+
+        * platform/graphics/cocoa/FontCacheCoreText.cpp:
+        (WebCore::isSystemFont):
+        (WebCore::platformFontLookupWithFamily):
+
+2016-09-30  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Create runtime flag for variation font work
+        https://bugs.webkit.org/show_bug.cgi?id=162780
+
+        Reviewed by Alex Christensen.
+
+        No new tests because there is no behavior change.
+
+        Variation font work should be behind a runtime flag.
+
+        * page/Settings.in:
+        * testing/InternalSettings.cpp:
+        (WebCore::InternalSettings::Backup::Backup):
+        (WebCore::InternalSettings::Backup::restoreTo):
+        (WebCore::InternalSettings::variationFontsEnabled):
+        (WebCore::InternalSettings::setVariationFontsEnabled):
+        * testing/InternalSettings.h:
+        * testing/InternalSettings.idl:
+
+2016-09-30  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Templatize internal FontFeatureSettings class for variation font support
+        https://bugs.webkit.org/show_bug.cgi?id=162774
+
+        Reviewed by Alex Christensen.
+
+        Font features and font variations are similar in that they are identified
+        by four-character tags and an associated value. However, the value is an
+        int for font features and is a float for font variations. In order to
+        simplify code, we can use the same class for both, and use a template
+        argument to distinguish between the two. Then, typedefs can be used to
+        name them.
+
+        No new tests because there is no behavior change.
+
+        * WebCore.xcodeproj/project.pbxproj: Rename FontFeatureSettings.{cpp,h}
+        to FontTaggedSettings.{cpp,h}
+        * css/CSSComputedStyleDeclaration.cpp:
+        (WebCore::ComputedStyleExtractor::propertyValue):
+        * css/CSSFontFace.h:
+        * css/CSSFontFaceSource.h:
+        * css/CSSFontFeatureValue.cpp:
+        (WebCore::CSSFontFeatureValue::CSSFontFeatureValue):
+        * css/CSSFontFeatureValue.h:
+        * css/FontFace.cpp:
+        (WebCore::FontFace::featureSettings):
+        * css/parser/CSSParser.cpp:
+        (WebCore::CSSParser::parseFontFeatureTag):
+        * loader/cache/CachedFont.h:
+        * platform/graphics/FontDescription.h:
+        * platform/graphics/FontFeatureSettings.cpp:
+        (WebCore::FontFeature::FontFeature): Deleted.
+        (WebCore::FontFeature::operator==): Deleted.
+        (WebCore::FontFeature::operator<): Deleted.
+        (WebCore::FontFeatureSettings::insert): Deleted.
+        (WebCore::FontFeatureSettings::hash): Deleted.
+        * platform/graphics/FontFeatureSettings.h: Removed.
+        (WebCore::fontFeatureTag): Deleted.
+        (WebCore::FontFeatureTagHash::hash): Deleted.
+        (WebCore::FontFeatureTagHash::equal): Deleted.
+        (WebCore::FontFeatureTagHashTraits::constructDeletedValue): Deleted.
+        (WebCore::FontFeatureTagHashTraits::isDeletedValue): Deleted.
+        (WebCore::FontFeature::operator!=): Deleted.
+        (WebCore::FontFeature::tag): Deleted.
+        (WebCore::FontFeature::value): Deleted.
+        (WebCore::FontFeature::enabled): Deleted.
+        (WebCore::FontFeatureSettings::operator==): Deleted.
+        (WebCore::FontFeatureSettings::operator!=): Deleted.
+        (WebCore::FontFeatureSettings::size): Deleted.
+        (WebCore::FontFeatureSettings::operator[]): Deleted.
+        (WebCore::FontFeatureSettings::at): Deleted.
+        (WebCore::FontFeatureSettings::begin): Deleted.
+        (WebCore::FontFeatureSettings::end): Deleted.
+        * platform/graphics/FontTaggedSettings.cpp: Renamed from Source/WebCore/platform/graphics/FontFeatureSettings.cpp.
+        (WebCore::FontFeatureSettings::hash):
+        * platform/graphics/FontTaggedSettings.h: Added.
+        (WebCore::fontFeatureTag):
+        (WebCore::FourCharacterTagHash::hash):
+        (WebCore::FourCharacterTagHash::equal):
+        (WebCore::FourCharacterTagHashTraits::constructDeletedValue):
+        (WebCore::FourCharacterTagHashTraits::isDeletedValue):
+        (WebCore::FontTaggedSetting::operator!=):
+        (WebCore::FontTaggedSetting::tag):
+        (WebCore::FontTaggedSetting::value):
+        (WebCore::FontTaggedSetting::enabled):
+        (WebCore::FontTaggedSetting<T>::FontTaggedSetting):
+        (WebCore::=):
+        (WebCore::FontTaggedSetting<T>::operator<):
+        (WebCore::FontTaggedSettings::operator==):
+        (WebCore::FontTaggedSettings::operator!=):
+        (WebCore::FontTaggedSettings::isEmpty):
+        (WebCore::FontTaggedSettings::size):
+        (WebCore::FontTaggedSettings::operator[]):
+        (WebCore::FontTaggedSettings::at):
+        (WebCore::FontTaggedSettings::begin):
+        (WebCore::FontTaggedSettings::end):
+        (WebCore::FontTaggedSettings<T>::insert):
+        * platform/graphics/cocoa/FontCacheCoreText.cpp:
+        (WebCore::tagEquals):
+        (WebCore::appendOpenTypeFeature):
+        * platform/graphics/mac/FontCustomPlatformData.h:
+
+2016-09-30  Chris Dumez  <cdumez@apple.com>
+
+        Fragment serialization should always use 'xml:' prefix for attributes in XML namespace
+        https://bugs.webkit.org/show_bug.cgi?id=162803
+
+        Reviewed by Sam Weinig.
+
+        Fragment serialization should always use 'xml:' prefix for attributes in XML namespace:
+        - https://html.spec.whatwg.org/#serialising-html-fragments
+        """
+        If the attribute is in the XML namespace
+        -> The attribute's serialized name is the string "xml:" followed by the attribute's local name.
+        """
+
+        - https://www.w3.org/TR/DOM-Parsing/#dfn-concept-xml-serialization-algorithm
+        """
+        If ns is the XML namespace, then let qualified name be the concatenation of the string "xml:"
+        and the value of node's localName.
+        """
+
+        Firefox complies with the specification.
+
+        No new tests, rebaselined existing test.
+
+        * editing/MarkupAccumulator.cpp:
+        (WebCore::MarkupAccumulator::appendAttribute):
+
+2016-09-30  Zalan Bujtas  <zalan@apple.com>
+
+        Unreviewed, rolling out r206611.
+
+        Scroll perf did not recover.
+
+        Reverted changeset:
+
+        "Unreviewed, rolling out r206483."
+        https://bugs.webkit.org/show_bug.cgi?id=162750
+        http://trac.webkit.org/changeset/206611
+
+2016-09-30  Zalan Bujtas  <zalan@apple.com>
+
+        Remove ClipRects's custom refcounting.
+        https://bugs.webkit.org/show_bug.cgi?id=162798
+
+        Reviewed by Simon Fraser.
+
+        It's safer to use RefCounted<>. 
+
+        No change in functionality.
+
+        * rendering/RenderLayer.cpp:
+        (WebCore::ClipRects::ClipRects):
+        (WebCore::ClipRectsCache::getClipRects):
+        (WebCore::ClipRectsCache::setClipRects):
+        (WebCore::ClipRectsCache::getIndex):
+        (WebCore::RenderLayer::updateClipRects):
+        (WebCore::ClipRects::ref): Deleted.
+        (WebCore::ClipRects::deref): Deleted.
+
+2016-09-30  Chris Dumez  <cdumez@apple.com>
+
+        FileSaver.js does not work in WebKit
+        https://bugs.webkit.org/show_bug.cgi?id=162788
+
+        Reviewed by Sam Weinig.
+
+        FileSaver.js does not work in WebKit:
+        - https://eligrey.com/demos/FileSaver.js/
+
+        It works in Firefox and Chrome, but in WebKit, we were getting a
+        "Synthetic clicks on anchors that have a download attribute are
+        ignored." warning. We were too strict in restricting synthetic clicks.
+        We now allow synthetic clicks as long as they are triggered by a user
+        gesture.
+
+        Test: fast/dom/HTMLAnchorElement/anchor-download-user-triggered-synthetic-click.html
+
+        * html/HTMLAnchorElement.cpp:
+        (WebCore::HTMLAnchorElement::handleClick):
+
+2016-09-30  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Breakpoints on blank lines or comments don't break
+        https://bugs.webkit.org/show_bug.cgi?id=9885
+        <rdar://problem/6134406>
+
+        Reviewed by Mark Lam.
+
+        Tests: inspector/debugger/breakpoints/resolved-dump-all-pause-locations.html
+               inspector/debugger/breakpoints/resolved-dump-each-line.html
+
+        * bindings/js/CachedScriptSourceProvider.h:
+        (WebCore::CachedScriptSourceProvider::CachedScriptSourceProvider):
+
+2016-09-30  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Stepping out of a function finishes the line that called it.
+        https://bugs.webkit.org/show_bug.cgi?id=155325
+        <rdar://problem/25094578>
+
+        Reviewed by Mark Lam.
+
+        Tests: inspector/debugger/stepping/stepInto.html
+               inspector/debugger/stepping/stepOut.html
+               inspector/debugger/stepping/stepOver.html
+               inspector/debugger/stepping/stepping-arrow-functions.html
+               inspector/debugger/stepping/stepping-classes.html
+               inspector/debugger/stepping/stepping-control-flow.html
+               inspector/debugger/stepping/stepping-function-calls.html
+               inspector/debugger/stepping/stepping-function-default-parameters.html
+               inspector/debugger/stepping/stepping-literal-construction.html
+               inspector/debugger/stepping/stepping-loops.html
+               inspector/debugger/stepping/stepping-misc.html
+               inspector/debugger/stepping/stepping-switch.html
+               inspector/debugger/stepping/stepping-template-string.html
+               inspector/debugger/stepping/stepping-try-catch-finally.html
+
+        * inspector/InspectorDOMDebuggerAgent.h:
+        * inspector/InspectorDOMDebuggerAgent.cpp:
+        (WebCore::InspectorDOMDebuggerAgent::stepInto): Deleted.
+        Setting this state in step-into does not make sense since we do not
+        know when the debugger resumes and won't know when to clear it.
+
+2016-09-30  Alex Christensen  <achristensen@webkit.org>
+
+        Fix off-by-one error in URLParser::parseIPv4Host
+        https://bugs.webkit.org/show_bug.cgi?id=162789
+
+        Reviewed by Tim Horton.
+
+        The spec says "If any but the last item in numbers is greater than 255, return failure."
+        This means check up to size - 1, not size - 2.
+
+        Covered by a new API test.
+
+        * platform/URLParser.cpp:
+        (WebCore::URLParser::parseIPv4Host):
+
+2016-09-30  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser: parsing a URL with an empty host and a colon should fail
+        https://bugs.webkit.org/show_bug.cgi?id=162795
+
+        Reviewed by Tim Horton.
+
+        Covered by new API tests.
+
+        * platform/URLParser.cpp:
+        (WebCore::URLParser::parseHostAndPort):
+
+2016-09-30  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser: handle syntax violations in non-UTF-8 encoded queries
+        https://bugs.webkit.org/show_bug.cgi?id=162770
+
+        Reviewed by Tim Horton.
+
+        There is a fast path for queries of URLs that use UTF-8 encoding, which are quite common.
+        For non-UTF-8 encoded queries, which are less common, we put the code points in a Vector<UChar>
+        and encode them all at once.  If there is a syntax violation in the query, we need to copy the
+        syntax-violation-free string up to the beginning of the query, then encode the query.
+
+        Covered by new API tests.
+
+        * platform/URLParser.cpp:
+        (WebCore::URLParser::percentEncodeByte):
+        (WebCore::URLParser::encodeQuery):
+        (WebCore::URLParser::parse):
+        * platform/URLParser.h:
+
+2016-09-27  Anders Carlsson  <andersca@apple.com>
+
+        Remove a couple of unused members from PlatformKeyboardEvent
+        https://bugs.webkit.org/show_bug.cgi?id=162641
+
+        Reviewed by Tim Horton.
+
+        * platform/PlatformKeyboardEvent.h:
+        (WebCore::PlatformKeyboardEvent::PlatformKeyboardEvent):
+        (WebCore::PlatformKeyboardEvent::nativeVirtualKeyCode): Deleted.
+        (WebCore::PlatformKeyboardEvent::macCharCode): Deleted.
+        * platform/mac/PlatformEventFactoryMac.mm:
+        (WebCore::PlatformKeyboardEventBuilder::PlatformKeyboardEventBuilder):
+        * replay/SerializationMethods.cpp:
+        (JSC::EncodingTraits<PlatformKeyboardEvent>::encodeValue):
+        (JSC::EncodingTraits<PlatformKeyboardEvent>::decodeValue):
+
 2016-09-30  Antti Koivisto  <antti@apple.com>
 
         Remove "rem" unit optimization for document element font size changes

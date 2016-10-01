@@ -1,3 +1,172 @@
+2016-09-30  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Follow-up patch after r206701
+        https://bugs.webkit.org/show_bug.cgi?id=162818
+
+        Unreviewed.
+
+        I missed one place required to enable an experimental feature by default.
+
+        * UIProcess/Cocoa/WebProcessPoolCocoa.mm:
+        (WebKit::registerUserDefaultsIfNeeded):
+
+2016-09-30  Dan Bernstein  <mitz@apple.com>
+
+        [iOS] Editing menu omits the Share command if the selected text is longer than 200 characters
+        https://bugs.webkit.org/show_bug.cgi?id=162821
+        <rdar://problem/28409828>
+
+        Reviewed by Tim Horton.
+
+        * UIProcess/ios/WKContentViewInteraction.mm:
+        (-[WKContentView canPerformAction:withSender:]): Changed to return YES for the _share:
+          action even if the selection is longer than 200 characters. While Define should not have
+          been available for longer selections, Share does not have such a limitation.
+
+2016-09-30  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Turn variation fonts on by default
+        https://bugs.webkit.org/show_bug.cgi?id=162818
+
+        Reviewed by Simon Fraser.
+
+        * Shared/WebPreferencesDefinitions.h:
+
+2016-09-30  Brady Eidson  <beidson@apple.com>
+
+        REGRESSION (Safari 10 combined with WK changes): Unable to store WebCrypto keys in IndexedDB database.
+        <rdar://problem/28334440> and https://bugs.webkit.org/show_bug.cgi?id=162554
+
+        Reviewed by Alexey Proskuryakov.
+
+        Safari 10 has a WKPageNavigation client but does not implement the "copyWebCryptoMasterKey" callback.
+
+        WebKit just fails in this case, instead of falling back to "getDefaultWebCryptoMasterKey".
+        It should fall back.
+
+        Additionally there's a WKContextClient callback to get the crypto key, also, but it is completely unused.
+        So it should be pulled.
+
+        * UIProcess/API/APILoaderClient.h:
+        (API::LoaderClient::webCryptoMasterKey): Deleted.
+        * UIProcess/API/C/WKContext.h:
+
+        * UIProcess/API/C/WKPage.cpp:
+        (WKPageSetPageLoaderClient):
+        (WKPageSetPageNavigationClient): If the client doesn't implement this method, fallback to getDefaultWebCryptoMasterKey.
+
+        * UIProcess/Cocoa/NavigationState.mm:
+        (WebKit::NavigationState::NavigationClient::webCryptoMasterKey): If the client doesn't implement this method,
+          fallback to getDefaultWebCryptoMasterKey.
+
+        * UIProcess/WebContextClient.cpp:
+        (WebKit::WebContextClient::copyWebCryptoMasterKey): Deleted.
+        * UIProcess/WebContextClient.h:
+
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::wrapCryptoKey): Only ask the NavigationClient before falling back. Don't ask the loader client.
+        (WebKit::WebPageProxy::unwrapCryptoKey): Ditto.
+
+2016-09-30  Said Abou-Hallawa  <sabouhallawa@apple.com>
+
+        The dragged image should be the current frame only of the animated image
+        https://bugs.webkit.org/show_bug.cgi?id=162109
+
+        Reviewed by Tim Horton.
+
+        * UIProcess/Cocoa/WebViewImpl.mm:
+        (WebKit::WebViewImpl::provideDataForPasteboard): Call the Image function with its new name.
+
+2016-09-30  Anders Carlsson  <andersca@apple.com>
+
+        Second time going into fullscreen using silverlight, will hide the menu bar and dock for Safari
+        https://bugs.webkit.org/show_bug.cgi?id=162805
+        rdar://problem/28208495
+
+        Reviewed by Dan Bernstein.
+
+        Turns out that the WindowRef wrappers for full screen NSWindows can end up in the m_windows HashSet,
+        and never go away. 
+        
+        Fix this by storing the canonical CGWindowIDs in the hash map instead.
+
+        * PluginProcess/mac/PluginProcessMac.mm:
+        (WebKit::cgWindowID):
+        (WebKit::windowCoversAnyScreen):
+        (WebKit::FullscreenWindowTracker::windowShown):
+        (WebKit::FullscreenWindowTracker::windowHidden):
+
+2016-09-30  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Create runtime flag for variation font work
+        https://bugs.webkit.org/show_bug.cgi?id=162780
+
+        Reviewed by Alex Christensen.
+
+        * Shared/WebPreferencesDefinitions.h:
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::updatePreferences):
+
+2016-09-30  Chris Dumez  <cdumez@apple.com>
+
+        [WK2][iOS] Add radiusX / radiusY / rotationAngle to WebPlatformTouchPoint
+        https://bugs.webkit.org/show_bug.cgi?id=162787
+        <rdar://problem/28554292>
+
+        Reviewed by Benjamin Poulain.
+
+        Add radiusX / radiusY / rotationAngle to WebPlatformTouchPoint.
+
+        * Platform/spi/ios/UIKitSPI.h:
+        * Shared/WebEvent.h:
+        (WebKit::WebPlatformTouchPoint::setRadiusX):
+        (WebKit::WebPlatformTouchPoint::radiusX):
+        (WebKit::WebPlatformTouchPoint::setRadiusY):
+        (WebKit::WebPlatformTouchPoint::radiusY):
+        (WebKit::WebPlatformTouchPoint::setRotationAngle):
+        (WebKit::WebPlatformTouchPoint::rotationAngle):
+        * Shared/WebEventConversion.cpp:
+        (WebKit::WebKit2PlatformTouchPoint::WebKit2PlatformTouchPoint):
+        * Shared/ios/NativeWebTouchEventIOS.mm:
+        (WebKit::NativeWebTouchEvent::extractWebTouchPoint):
+        * Shared/ios/WebPlatformTouchPointIOS.cpp:
+        (WebKit::WebPlatformTouchPoint::encode):
+        (WebKit::WebPlatformTouchPoint::decode):
+
+2016-09-30  Megan Gardner  <megan_gardner@apple.com>
+
+        Make it possible to test web-related user-interface features
+        https://bugs.webkit.org/show_bug.cgi?id=162657
+
+        Reviewed by Simon Fraser.
+
+        Added the ability to pull the strings from an Action Sheet and pass them to
+        test scripts to make sure we are giving the correct available actions for
+        the item we are interacting with.
+        Added a test for long press on an image, and used the sheet scraping functionality
+        to make sure that the correct actions were being displayed.
+        Test for previous patch, Changeset 205915; Bug 161761
+
+        * UIProcess/API/Cocoa/WKWebView.mm:
+        (-[WKWebView _contentsOfUserInterfaceItem:]):
+        * UIProcess/API/Cocoa/WKWebViewPrivate.h:
+        * UIProcess/ios/WKActionSheetAssistant.h:
+        * UIProcess/ios/WKActionSheetAssistant.mm:
+        (-[WKActionSheetAssistant currentAvailableActionStrings]):
+        * UIProcess/ios/WKContentViewInteraction.h:
+        * UIProcess/ios/WKContentViewInteraction.mm:
+        (-[WKContentView _contentsOfUserInterfaceItem:]):
+
+2016-09-27  Anders Carlsson  <andersca@apple.com>
+
+        Remove a couple of unused members from PlatformKeyboardEvent
+        https://bugs.webkit.org/show_bug.cgi?id=162641
+
+        Reviewed by Tim Horton.
+
+        * Shared/WebEventConversion.cpp:
+        (WebKit::WebKit2PlatformKeyboardEvent::WebKit2PlatformKeyboardEvent):
+
 2016-09-29  Nan Wang  <n_wang@apple.com>
 
         AX: iOS: Tapping <input> in Safari zooms in a bit when page has max scale = 1

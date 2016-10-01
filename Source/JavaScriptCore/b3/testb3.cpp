@@ -42,6 +42,7 @@
 #include "B3LowerToAir.h"
 #include "B3MathExtras.h"
 #include "B3MemoryValue.h"
+#include "B3MoveConstants.h"
 #include "B3Procedure.h"
 #include "B3ReduceStrength.h"
 #include "B3SlotBaseValue.h"
@@ -49,6 +50,7 @@
 #include "B3StackmapGenerationParams.h"
 #include "B3SwitchValue.h"
 #include "B3UpsilonValue.h"
+#include "B3UseCounts.h"
 #include "B3Validate.h"
 #include "B3ValueInlines.h"
 #include "B3VariableValue.h"
@@ -13106,6 +13108,180 @@ void testLoadFence()
     checkDoesNotUseInstruction(*code, "dmb    ishst");
 }
 
+void testTrappingLoad()
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    int x = 42;
+    root->appendNew<Value>(
+        proc, Return, Origin(),
+        root->appendNew<MemoryValue>(
+            proc, trapping(Load), Int32, Origin(),
+            root->appendNew<ConstPtrValue>(proc, Origin(), &x)));
+    CHECK_EQ(compileAndRun<int>(proc), 42);
+    unsigned trapsCount = 0;
+    for (Air::BasicBlock* block : proc.code()) {
+        for (Air::Inst& inst : *block) {
+            if (inst.kind.traps)
+                trapsCount++;
+        }
+    }
+    CHECK_EQ(trapsCount, 1u);
+}
+
+void testTrappingStore()
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    int x = 42;
+    root->appendNew<MemoryValue>(
+        proc, trapping(Store), Origin(),
+        root->appendNew<Const32Value>(proc, Origin(), 111),
+        root->appendNew<ConstPtrValue>(proc, Origin(), &x));
+    root->appendNew<Value>(proc, Return, Origin());
+    compileAndRun<int>(proc);
+    CHECK_EQ(x, 111);
+    unsigned trapsCount = 0;
+    for (Air::BasicBlock* block : proc.code()) {
+        for (Air::Inst& inst : *block) {
+            if (inst.kind.traps)
+                trapsCount++;
+        }
+    }
+    CHECK_EQ(trapsCount, 1u);
+}
+
+void testTrappingLoadAddStore()
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    int x = 42;
+    ConstPtrValue* ptr = root->appendNew<ConstPtrValue>(proc, Origin(), &x);
+    root->appendNew<MemoryValue>(
+        proc, trapping(Store), Origin(),
+        root->appendNew<Value>(
+            proc, Add, Origin(),
+            root->appendNew<MemoryValue>(proc, trapping(Load), Int32, Origin(), ptr),
+            root->appendNew<Const32Value>(proc, Origin(), 3)),
+        ptr);
+    root->appendNew<Value>(proc, Return, Origin());
+    compileAndRun<int>(proc);
+    CHECK_EQ(x, 45);
+    bool traps = false;
+    for (Air::BasicBlock* block : proc.code()) {
+        for (Air::Inst& inst : *block) {
+            if (inst.kind.traps)
+                traps = true;
+        }
+    }
+    CHECK(traps);
+}
+
+void testTrappingLoadDCE()
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    int x = 42;
+    root->appendNew<MemoryValue>(
+        proc, trapping(Load), Int32, Origin(),
+        root->appendNew<ConstPtrValue>(proc, Origin(), &x));
+    root->appendNew<Value>(proc, Return, Origin());
+    compileAndRun<int>(proc);
+    unsigned trapsCount = 0;
+    for (Air::BasicBlock* block : proc.code()) {
+        for (Air::Inst& inst : *block) {
+            if (inst.kind.traps)
+                trapsCount++;
+        }
+    }
+    CHECK_EQ(trapsCount, 1u);
+}
+
+void testTrappingStoreElimination()
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    int x = 42;
+    Value* ptr = root->appendNew<ConstPtrValue>(proc, Origin(), &x);
+    root->appendNew<MemoryValue>(
+        proc, trapping(Store), Origin(),
+        root->appendNew<Const32Value>(proc, Origin(), 43),
+        ptr);
+    root->appendNew<MemoryValue>(
+        proc, trapping(Store), Origin(),
+        root->appendNew<Const32Value>(proc, Origin(), 44),
+        ptr);
+    root->appendNew<Value>(proc, Return, Origin());
+    compileAndRun<int>(proc);
+    unsigned storeCount = 0;
+    for (Value* value : proc.values()) {
+        if (MemoryValue::isStore(value->opcode()))
+            storeCount++;
+    }
+    CHECK_EQ(storeCount, 2u);
+}
+
+void testMoveConstants()
+{
+    auto check = [] (Procedure& proc) {
+        proc.resetReachability();
+        
+        if (shouldBeVerbose()) {
+            dataLog("IR before:\n");
+            dataLog(proc);
+        }
+        
+        moveConstants(proc);
+        
+        if (shouldBeVerbose()) {
+            dataLog("IR after:\n");
+            dataLog(proc);
+        }
+        
+        UseCounts useCounts(proc);
+        unsigned count = 0;
+        for (Value* value : proc.values()) {
+            if (useCounts.numUses(value) && value->hasInt64())
+                count++;
+        }
+        
+        if (count == 1)
+            return;
+        
+        crashLock.lock();
+        dataLog("Fail in testMoveConstants: got more than one Const64:\n");
+        dataLog(proc);
+        CRASH();
+    };
+
+    {
+        Procedure proc;
+        BasicBlock* root = proc.addBlock();
+        Value* a = root->appendNew<MemoryValue>(
+            proc, Load, Int32, Origin(), 
+            root->appendNew<ConstPtrValue>(proc, Origin(), 0x123412341234));
+        Value* b = root->appendNew<MemoryValue>(
+            proc, Load, Int32, Origin(),
+            root->appendNew<ConstPtrValue>(proc, Origin(), 0x123412341334));
+        root->appendNew<CCallValue>(proc, Void, Origin(), a, b);
+        root->appendNew<Value>(proc, Return, Origin());
+        check(proc);
+    }
+    
+    {
+        Procedure proc;
+        BasicBlock* root = proc.addBlock();
+        Value* x = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
+        Value* a = root->appendNew<Value>(
+            proc, Add, Origin(), x, root->appendNew<ConstPtrValue>(proc, Origin(), 0x123412341234));
+        Value* b = root->appendNew<Value>(
+            proc, Add, Origin(), x, root->appendNew<ConstPtrValue>(proc, Origin(), -0x123412341234));
+        root->appendNew<CCallValue>(proc, Void, Origin(), a, b);
+        root->appendNew<Value>(proc, Return, Origin());
+        check(proc);
+    }
+}
+
 // Make sure the compiler does not try to optimize anything out.
 NEVER_INLINE double zero()
 {
@@ -14546,6 +14722,12 @@ void run(const char* filter)
     RUN(testMemoryFence());
     RUN(testStoreFence());
     RUN(testLoadFence());
+    RUN(testTrappingLoad());
+    RUN(testTrappingStore());
+    RUN(testTrappingLoadAddStore());
+    RUN(testTrappingLoadDCE());
+    RUN(testTrappingStoreElimination());
+    RUN(testMoveConstants());
     
     if (tasks.isEmpty())
         usage();

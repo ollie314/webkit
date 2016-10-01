@@ -612,6 +612,11 @@ public:
         return isObjectLiteral(node) || isArrayLiteral(node);
     }
 
+    bool shouldSkipPauseLocation(StatementNode* statement) const
+    {
+        return !statement || statement->isLabel();
+    }
+
     StatementNode* createEmptyStatement(const JSTokenLocation& location) { return new (m_parserArena) EmptyStatementNode(location); }
 
     StatementNode* createDeclarationStatement(const JSTokenLocation& location, ExpressionNode* expr, int start, int end)
@@ -747,11 +752,21 @@ public:
 
     StatementNode* createExportDefaultDeclaration(const JSTokenLocation& location, StatementNode* declaration, const Identifier& localName)
     {
+        // We need to mark the inner statement as needing a debug hook (so that when the statement is generated we don't
+        // assert when generating an op_debug for it) without recording a breakpoint location because the export statement
+        // itself will get the breakpoint location. This will be eliminated by:
+        // <https://webkit.org/b/162809> Emit DebugHooks uniformly with pause locations instead of having separate pause locations and op_debug emits
+        declaration->setNeedsDebugHook();
         return new (m_parserArena) ExportDefaultDeclarationNode(location, declaration, localName);
     }
 
     StatementNode* createExportLocalDeclaration(const JSTokenLocation& location, StatementNode* declaration)
     {
+        // We need to mark the inner statement as needing a debug hook (so that when the statement is generated we don't
+        // assert when generating an op_debug for it) without recording a breakpoint location because the export statement
+        // itself will get the breakpoint location. This will be eliminated by:
+        // <https://webkit.org/b/162809> Emit DebugHooks uniformly with pause locations instead of having separate pause locations and op_debug emits
+        declaration->setNeedsDebugHook();
         return new (m_parserArena) ExportLocalDeclarationNode(location, declaration);
     }
 
@@ -968,6 +983,17 @@ public:
         node->setStartOffset(offset);
     }
 
+    JSTextPosition breakpointLocation(StatementNode* statement)
+    {
+        statement->setNeedsDebugHook();
+        return statement->position();
+    }
+
+    JSTextPosition breakpointLocation(ExpressionNode* expr)
+    {
+        expr->setNeedsDebugHook();
+        return expr->position();
+    }
 
     void propagateArgumentsUse() { usesArguments(); }
     

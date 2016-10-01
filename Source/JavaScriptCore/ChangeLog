@@ -1,3 +1,710 @@
+2016-10-01  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Rename DebugHookID to DebugHookType
+        https://bugs.webkit.org/show_bug.cgi?id=162820
+
+        Reviewed by Alex Christensen.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::debugHookName):
+        (JSC::CodeBlock::dumpBytecode):
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::emitDebugHook):
+        * bytecompiler/BytecodeGenerator.h:
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::debug):
+        * interpreter/Interpreter.h:
+        * jit/JITOperations.cpp:
+        * llint/LLIntSlowPaths.cpp:
+        (JSC::LLInt::LLINT_SLOW_PATH_DECL):
+
+2016-09-30  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Stepping to a line with an autoContinue breakpoint should still pause
+        https://bugs.webkit.org/show_bug.cgi?id=161712
+        <rdar://problem/28193970>
+
+        Reviewed by Brian Burg.
+
+        * debugger/Debugger.cpp:
+        (JSC::Debugger::pauseIfNeeded):
+        If we stepped to an auto-continue breakpoint we should continue
+        stepping, not just continue.
+
+2016-09-30  Filip Pizlo  <fpizlo@apple.com>
+
+        B3 should support trapping memory accesses
+        https://bugs.webkit.org/show_bug.cgi?id=162689
+
+        Reviewed by Geoffrey Garen.
+        
+        This adds a traps flag to B3::Kind. It also makes B3::Kind work more like Air::Kind, in the
+        sense that it's a bag of distinct bits - it doesn't need to be a union unless we get enough
+        things that it would make a difference.
+        
+        The only analysis that needs to know about traps is effects. It now knows that traps implies
+        sideExits, which means that this turns off DCE. The only optimization that needs to know
+        about traps is eliminateCommonSubexpressions(), which needs to pessimize its store
+        elimination if the store traps.
+        
+        The hard part of this change is teaching the instruction selector to faithfully carry the
+        traps flag down to Air. I got this to work by making ArgPromise a non-copyable object that
+        knows whether you've used it in an instruction. It knows when you call consume(). If you do
+        this then ArgPromise cannot be destructed without first passing your inst through it. This,
+        along with a few other hacks, means that all of the load-op and load-op-store fusions
+        correctly carry the trap bit: if any of the B3 loads or stores involved traps then you get
+        traps in Air.
+        
+        This framework also sets us up to do bug 162688, since the ArgPromise::inst() hook is
+        powerful enough to allow wrapping the instruction with a Patch.
+        
+        I added some tests to testb3 that verify that optimizations are appropriately inhibited and
+        that the traps flag survives until the bitter end of Air.
+
+        * b3/B3EliminateCommonSubexpressions.cpp:
+        * b3/B3Kind.cpp:
+        (JSC::B3::Kind::dump):
+        * b3/B3Kind.h:
+        (JSC::B3::Kind::Kind):
+        (JSC::B3::Kind::hasExtraBits):
+        (JSC::B3::Kind::isChill):
+        (JSC::B3::Kind::setIsChill):
+        (JSC::B3::Kind::hasTraps):
+        (JSC::B3::Kind::traps):
+        (JSC::B3::Kind::setTraps):
+        (JSC::B3::Kind::operator==):
+        (JSC::B3::Kind::hash):
+        (JSC::B3::trapping):
+        * b3/B3LowerToAir.cpp:
+        (JSC::B3::Air::LowerToAir::ArgPromise::swap):
+        (JSC::B3::Air::LowerToAir::ArgPromise::ArgPromise):
+        (JSC::B3::Air::LowerToAir::ArgPromise::operator=):
+        (JSC::B3::Air::LowerToAir::ArgPromise::~ArgPromise):
+        (JSC::B3::Air::LowerToAir::ArgPromise::setTraps):
+        (JSC::B3::Air::LowerToAir::ArgPromise::consume):
+        (JSC::B3::Air::LowerToAir::ArgPromise::inst):
+        (JSC::B3::Air::LowerToAir::trappingInst):
+        (JSC::B3::Air::LowerToAir::loadPromiseAnyOpcode):
+        (JSC::B3::Air::LowerToAir::appendUnOp):
+        (JSC::B3::Air::LowerToAir::appendBinOp):
+        (JSC::B3::Air::LowerToAir::tryAppendStoreUnOp):
+        (JSC::B3::Air::LowerToAir::tryAppendStoreBinOp):
+        (JSC::B3::Air::LowerToAir::appendStore):
+        (JSC::B3::Air::LowerToAir::append):
+        (JSC::B3::Air::LowerToAir::createGenericCompare):
+        (JSC::B3::Air::LowerToAir::createBranch):
+        (JSC::B3::Air::LowerToAir::createCompare):
+        (JSC::B3::Air::LowerToAir::createSelect):
+        (JSC::B3::Air::LowerToAir::lower):
+        * b3/B3Validate.cpp:
+        * b3/B3Value.cpp:
+        (JSC::B3::Value::effects):
+        * b3/B3Value.h:
+        * b3/air/AirCode.h:
+        * b3/testb3.cpp:
+        (JSC::B3::testTrappingLoad):
+        (JSC::B3::testTrappingStore):
+        (JSC::B3::testTrappingLoadAddStore):
+        (JSC::B3::testTrappingLoadDCE):
+        (JSC::B3::testTrappingStoreElimination):
+        (JSC::B3::run):
+
+2016-09-30  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Stepping over/out of a function sometimes resumes instead of taking you to caller
+        https://bugs.webkit.org/show_bug.cgi?id=162802
+        <rdar://problem/28569982>
+
+        Reviewed by Mark Lam.
+
+        * debugger/Debugger.cpp:
+        (JSC::Debugger::stepOverStatement):
+        (JSC::Debugger::stepOutOfFunction):
+        Enable stepping mode when we start stepping.
+
+2016-09-30  Filip Pizlo  <fpizlo@apple.com>
+
+        B3::moveConstants should be able to edit code to minimize the number of constants
+        https://bugs.webkit.org/show_bug.cgi?id=162764
+
+        Reviewed by Saam Barati.
+        
+        There are some interesting cases where we can reduce the number of constant materializations if
+        we teach moveConstants() how to edit code. The two examples that this patch supports are:
+        
+            - Loads and stores from a constant pointer. Since loads and stores get an offset for free
+              and the instruction selector is really good at handling it, and since we can query Air to
+              see what kinds of offsets are legal, we can sometimes avoid using a constant pointer that
+              is specific to the absolute address of that load and instead pick some other constant
+              that is within offset distance of ours.
+            
+            - Add and Sub by a constant (x + c, x - c). Since x + c = x - -c and x - c = x + -c, we can
+              flip Add to Sub or vice versa if the negated constant is available.
+        
+        This change makes moveConstants() pick the most dominant constant that works for an value. In
+        the case of memory accesses, it uses Air::Arg::isValidAddrForm() to work out what other
+        constants would work. In the case of Add/Sub, it simply looks for the negated constant. This
+        should result in something like a minimal number of constants since these rules always pick the
+        most dominant constant that works - so if an Add's constant is already most dominant then
+        nothing changes, but if the negated one is more dominant then it becomes a Sub.
+        
+        This is a 0.5% speed-up on LongSpider and neutral elsewhere. It's a speed-up because the
+        absolute address thing reduces the number of address materializations that we have to do, while
+        the add/sub thing prevents us from having to materialize 0x1000000000000 to box doubles.
+        However, this may introduce a pathology, which I've filed a bug for: bug 162796.
+
+        * b3/B3MoveConstants.cpp:
+        * b3/B3MoveConstants.h:
+        * b3/B3UseCounts.h:
+        * b3/air/AirFixObviousSpills.cpp:
+        * b3/testb3.cpp:
+        (JSC::B3::testMoveConstants):
+        (JSC::B3::run):
+
+2016-09-30  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Fix modules tests after r206653 handle breakpoint locations in import/export statements
+        https://bugs.webkit.org/show_bug.cgi?id=162807
+
+        Reviewed by Mark Lam.
+
+        * parser/ASTBuilder.h:
+        (JSC::ASTBuilder::createExportDefaultDeclaration):
+        (JSC::ASTBuilder::createExportLocalDeclaration):
+        Don't record an extra breakpoint location for the statement
+        within an export statement.
+
+        * parser/Parser.cpp:
+        (JSC::Parser<LexerType>::parseModuleSourceElements):
+        Record a pause location for import/export statements.
+
+2016-09-30  Mark Lam  <mark.lam@apple.com>
+
+        Remove the dumping of the stack back trace in VM::verifyExceptionCheckNeedIsSatisfied().
+        https://bugs.webkit.org/show_bug.cgi?id=162797
+
+        Reviewed by Geoffrey Garen.
+
+        This is because the RELEASE_ASSERT() that follows immediately after will also
+        dump the stack back trace.  Hence, the first dump will be redundant.
+
+        Also removed an extra space in the dataLog output.
+
+        * runtime/VM.cpp:
+        (JSC::VM::verifyExceptionCheckNeedIsSatisfied):
+
+2016-09-30  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Stepping through `a(); b(); c();` it is unclear where we are and what is about to execute
+        https://bugs.webkit.org/show_bug.cgi?id=161658
+        <rdar://problem/28181254>
+
+        Reviewed by Geoffrey Garen.
+
+        * parser/Parser.cpp:
+        (JSC::Parser<LexerType>::parseAssignmentExpression):
+        Updated pause location for unary expressions.
+
+2016-09-30  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Breakpoints on blank lines or comments don't break
+        https://bugs.webkit.org/show_bug.cgi?id=9885
+        <rdar://problem/6134406>
+
+        Reviewed by Mark Lam.
+
+        This change introduces a way to perform a Debugger Parse of a script.
+        This debugger parse gathers a list of breakpoint locations, which
+        the backend uses to resolve breakpoint locations that came from the
+        Inspector frontend to the exact location we would actually pause.
+        We gather this information from the parser so that we can eagerly
+        get this information without requiring the code to have executed (the
+        real op_debugs are generated during bytecode generation when code
+        is actually evaluated).
+
+        If an input location was on a line with whitespace or a comment, the
+        resolved breakpoint location would be before the next statement that
+        will be executed. That may be the next line, or even later. We also
+        update our policy when setting breakpoints on and around function
+        statements to better match user expectations.
+
+        For example, when resolving breakpoints in:
+
+            1.  // Comment
+            2.  before;
+            3.
+            4.  function foo() {
+            5.      inside;
+            6.  }
+            7.
+            8.  after;
+
+        A breakpoint on line 1, a comment, resolves to line 2 the next
+        statement that will execute.
+
+        A breakpoint on line 3 or 7, empty lines, resolves to line 8 the next
+        statement that will execute. This skips past the definition of foo,
+        just like stepping would have done. The creation of foo would have
+        been hoisted, which would have happened before execution of the
+        other statements.
+
+        A breakpoint on line 4, a function signature, resolves to line 5,
+        inside the function. Users would expect to pause inside of a function
+        when setting a breakpoint on that function's name or opening brace.
+
+        A breakpoint on line 6, a function's closing brace, resolves to
+        line 6. The debugger will pause whenever execution leaves foo due to
+        a return and not an exception. This matches stepping behavior. An
+        explicit or implicit return (the implicit return undefined) will
+        pause on the closing brace as we leave the function, giving users
+        an opportunity to inspect the final state before leaving.
+
+        --
+
+        At this point, op_debug's are still emitted at custom locations during
+        bytecode generation of other statements / expressions. In order to
+        ensure the generated op_debugs correspond to locations the Parser
+        determined were breakpoint locations, the Parser sets a "needs debug
+        hook" flag on the nodes it will use for breakpoint locations, and
+        we assert during bytecode generation that op_debugs are only emitted
+        for nodes that were marked as needing debug hooks.
+
+        This still leaves open the possibility that the Parser will mark
+        some nodes that get missed during bytecode generation, so we might
+        fail to emit some op_debugs. The next step will be eliminating the
+        custom emitDebugHooks spread across StatementNode and ExpressionNode
+        subclasses, and instead always generating op_debugs whenever we
+        emit a flagged node.
+
+        --
+
+        * CMakeLists.txt:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        New DebuggerParseData files.
+
+        * API/JSScriptRef.cpp:
+        (OpaqueJSScript::OpaqueJSScript):
+        * jsc.cpp:
+        (functionCheckModuleSyntax):
+        * parser/SourceCode.h:
+        (JSC::makeSource):
+        * parser/SourceProvider.cpp:
+        (JSC::SourceProvider::SourceProvider):
+        * parser/SourceProvider.h:
+        (JSC::SourceProvider::sourceType):
+        (JSC::StringSourceProvider::create):
+        (JSC::StringSourceProvider::StringSourceProvider):
+        (JSC::WebAssemblySourceProvider::WebAssemblySourceProvider):
+        (JSC::SourceProvider::startPosition): Deleted.
+        Add a new type on SourceProvider to distinguish if its script was
+        intended to be a Script, Module, or WebAssembly. This information
+        will be needed to know how to best parse this file when the
+        debugger decides to lazily parse.
+
+        * runtime/Executable.cpp:
+        (JSC::EvalExecutable::EvalExecutable):
+        (JSC::ProgramExecutable::ProgramExecutable):
+        (JSC::ModuleProgramExecutable::ModuleProgramExecutable):
+        (JSC::WebAssemblyExecutable::WebAssemblyExecutable):
+        * runtime/ModuleLoaderPrototype.cpp:
+        (JSC::moduleLoaderPrototypeParseModule):
+        ASSERT the SourceProvider type matches the executable type we are
+        creating for it.
+
+        * parser/ASTBuilder.h:
+        (JSC::ASTBuilder::breakpointLocation):
+        * parser/SyntaxChecker.h:
+        (JSC::SyntaxChecker::operatorStackPop):
+        When gathering breakpoint positions, get the position from the
+        current node. In the SyntaxChecker, return an invalid position.
+
+        * parser/Nodes.h:
+        (JSC::ExpressionNode::needsDebugHook):
+        (JSC::ExpressionNode::setNeedsDebugHook):
+        (JSC::StatementNode::needsDebugHook):
+        (JSC::StatementNode::setNeedsDebugHook):
+        When gathering breakpoint positions, mark the node as needing
+        a debug hook. For now we assert op_debugs generated must come
+        from these nodes. Later we should just generate op_debugs for
+        these nodes.
+
+        * parser/Parser.cpp:
+        (JSC::Parser<LexerType>::Parser):
+        (JSC::Parser<LexerType>::parseStatementListItem):
+        (JSC::Parser<LexerType>::parseDoWhileStatement):
+        (JSC::Parser<LexerType>::parseWhileStatement):
+        (JSC::Parser<LexerType>::parseArrowFunctionSingleExpressionBodySourceElements):
+        (JSC::Parser<LexerType>::parseForStatement):
+        (JSC::Parser<LexerType>::parseWithStatement):
+        (JSC::Parser<LexerType>::parseSwitchStatement):
+        (JSC::Parser<LexerType>::parseStatement):
+        (JSC::Parser<LexerType>::parseFunctionBody):
+        (JSC::Parser<LexerType>::parseFunctionInfo):
+        (JSC::Parser<LexerType>::parseIfStatement):
+        (JSC::Parser<LexerType>::parseAssignmentExpression):
+        * parser/Parser.h:
+        (JSC::parse):
+        Add an optional DebuggerParseData struct to the Parser. When available
+        the Parser will gather debugger data, and parse all functions with the
+        ASTBuilder instead of SyntaxChecking inner functions.
+
+        * debugger/DebuggerParseData.cpp: Added.
+        (JSC::DebuggerPausePositions::breakpointLocationForLineColumn):
+        (JSC::DebuggerPausePositions::sort):
+        (JSC::gatherDebuggerParseData):
+        (JSC::gatherDebuggerParseDataForSource):
+        * debugger/DebuggerParseData.h: Copied from Source/JavaScriptCore/debugger/DebuggerPrimitives.h.
+        (JSC::DebuggerPausePositions::DebuggerPausePositions):
+        (JSC::DebuggerPausePositions::appendPause):
+        (JSC::DebuggerPausePositions::appendEntry):
+        (JSC::DebuggerPausePositions::appendLeave):
+        The DebuggerParseData struct currently only contains a list of pause positions.
+        Once populated it can resolve an input location to a pause position.
+
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::emitCall):
+        (JSC::BytecodeGenerator::emitCallVarargs):
+        (JSC::BytecodeGenerator::emitDebugHook):
+        (JSC::BytecodeGenerator::emitEnumeration):
+        * bytecompiler/BytecodeGenerator.h:
+        * bytecompiler/NodesCodegen.cpp:
+        (JSC::EmptyStatementNode::emitBytecode):
+        (JSC::DebuggerStatementNode::emitBytecode):
+        (JSC::ExprStatementNode::emitBytecode):
+        (JSC::DeclarationStatement::emitBytecode):
+        (JSC::IfElseNode::emitBytecode):
+        (JSC::DoWhileNode::emitBytecode):
+        (JSC::WhileNode::emitBytecode):
+        (JSC::ForNode::emitBytecode):
+        (JSC::ForInNode::emitBytecode):
+        (JSC::ContinueNode::emitBytecode):
+        (JSC::BreakNode::emitBytecode):
+        (JSC::ReturnNode::emitBytecode):
+        (JSC::WithNode::emitBytecode):
+        (JSC::SwitchNode::emitBytecode):
+        (JSC::ThrowNode::emitBytecode):
+        Emit op_debugs for the nodes themselves. Assert when we do that the
+        Parser had marked them as needing a debug hook.
+
+        * debugger/Breakpoint.h:
+        (JSC::Breakpoint::Breakpoint):
+        A breakpoint may be resolved or unresolved. Debugger::resolveBreakpoint
+        must be used to resolve the breakpoint. Most methods now require a
+        resolved breakpoint.
+
+        * debugger/Debugger.h:
+        * debugger/Debugger.cpp:
+        (JSC::Debugger::detach):
+        (JSC::Debugger::toggleBreakpoint):
+        (JSC::Debugger::debuggerParseData):
+        (JSC::Debugger::resolveBreakpoint):
+        (JSC::Debugger::setBreakpoint):
+        (JSC::Debugger::clearParsedData):
+        Provide a public method to resolve a breakpoint location in a script.
+        This will gather debugger parse data for the script if none is available.
+        Ensure clients have resolved a breakpoint before attempting to set it.
+        Currently we allow only a single breakpoint at a location. This may
+        need to change if multiple breakpoints resolve to the same location
+        but have different actions.
+
+        * inspector/ScriptDebugListener.h:
+        ScriptDebugServer::Script is effectively duplicating most of the data from
+        a SourceProvider. We should eliminate this and just use SourceProvider.
+
+        * inspector/ScriptDebugServer.cpp:
+        (Inspector::ScriptDebugServer::setBreakpointActions):
+        (Inspector::ScriptDebugServer::removeBreakpointActions):
+        (Inspector::ScriptDebugServer::getActionsForBreakpoint):
+        (Inspector::ScriptDebugServer::clearBreakpointActions):
+        (Inspector::ScriptDebugServer::evaluateBreakpointAction):
+        (Inspector::ScriptDebugServer::dispatchDidParseSource):
+        (Inspector::ScriptDebugServer::handleBreakpointHit):
+        (Inspector::ScriptDebugServer::setBreakpoint): Deleted.
+        (Inspector::ScriptDebugServer::removeBreakpoint): Deleted.
+        (Inspector::ScriptDebugServer::clearBreakpoints): Deleted.
+        * inspector/ScriptDebugServer.h:
+        Reduce ScriptDebugServer's involvement in breakpoints to just handling
+        breakpoint actions. Eventually we should eliminate it alltogether and
+        fold breakpoint logic into Debugger or DebugAgent.
+
+        * inspector/agents/InspectorDebuggerAgent.h:
+        * inspector/agents/InspectorDebuggerAgent.cpp:
+        (Inspector::buildDebuggerLocation):
+        (Inspector::parseLocation):
+        (Inspector::InspectorDebuggerAgent::setBreakpointByUrl):
+        (Inspector::InspectorDebuggerAgent::setBreakpoint):
+        (Inspector::InspectorDebuggerAgent::didSetBreakpoint):
+        (Inspector::InspectorDebuggerAgent::resolveBreakpoint):
+        (Inspector::InspectorDebuggerAgent::removeBreakpoint):
+        (Inspector::InspectorDebuggerAgent::continueToLocation):
+        (Inspector::InspectorDebuggerAgent::didParseSource):
+        (Inspector::InspectorDebuggerAgent::clearDebuggerBreakpointState):
+        The Inspector can set breakpoints in multiple ways.
+        Ensure that once we have the Script that we always
+        resolve the breakpoint location before setting the
+        breakpoint. The different paths are:
+        
+        - setBreakpoint(scriptId, location)
+          - Here we know the SourceProvider by its SourceID
+            - resolve and set
+        
+        - setBreakpointByURL(url, location)
+          - Search for existing Scripts that match the URL
+            - resolve in each and set
+          - When new Scripts are parsed that match the URL
+            - resolve and set
+            
+
+2016-09-30  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Stepping out of a function finishes the line that called it.
+        https://bugs.webkit.org/show_bug.cgi?id=155325
+        <rdar://problem/25094578>
+
+        Reviewed by Mark Lam.
+
+        Also addresses:
+        <https://webkit.org/b/161721> Web Inspector: Stepping all the way through program should not cause a pause on the next program that executes
+        <https://webkit.org/b/161716> Web Inspector: Stepping into a function / program should not require stepping to the first statement
+
+        This change introduces a new op_debug hook: WillExecuteExpression.
+        Currently this new hook is only used for pausing at function calls.
+        We may decide to add it to other places later where pausing with
+        finer granularity then statements (or lines) if useful.
+
+        This updates the location and behavior of some of the existing debug
+        hooks, to be more consistent and useful if the exact location of the
+        pause is displayed. For example, in control flow statements like
+        `if` and `while`, the pause location is the expression itself that
+        will be evaluated, not the location of the `if` or `while` keyword.
+        For example:
+
+            if (|condition)
+            while (|condition)
+
+        Finally, this change gets rid of some unnecessary / useless pause
+        locations such as on entering a function and on entering a program.
+        These pauses are not needed because if there is a statement, we
+        would pause before the statement and it is equivalent. We continue
+        to pause when leaving a function via stepping by uniformly jumping
+        to the closing brace of the function. This gives users a chance
+        to observe state before leaving the function.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::debugHookName):
+        * bytecode/UnlinkedCodeBlock.cpp:
+        (JSC::dumpLineColumnEntry):
+        Logging strings for the new debug hook.
+
+        * bytecompiler/BytecodeGenerator.h:
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::emitCallInTailPosition):
+        (JSC::BytecodeGenerator::emitCallEval):
+        (JSC::BytecodeGenerator::emitCallVarargsInTailPosition):
+        (JSC::BytecodeGenerator::emitConstructVarargs):
+        (JSC::BytecodeGenerator::emitCallForwardArgumentsInTailPosition):
+        (JSC::BytecodeGenerator::emitCallDefineProperty):
+        (JSC::BytecodeGenerator::emitConstruct):
+        (JSC::BytecodeGenerator::emitGetTemplateObject):
+        (JSC::BytecodeGenerator::emitIteratorNext):
+        (JSC::BytecodeGenerator::emitIteratorNextWithValue):
+        (JSC::BytecodeGenerator::emitIteratorClose):
+        (JSC::BytecodeGenerator::emitDelegateYield):
+        All emitCall variants now take an enum to decide whether or not to
+        emit the WillExecuteExpression debug hook.
+
+        (JSC::BytecodeGenerator::emitCall):
+        (JSC::BytecodeGenerator::emitCallVarargs):
+        In the two real implementations, actually decide to emit the debug
+        hook or not based on the parameter.
+
+        (JSC::BytecodeGenerator::emitEnumeration):
+        This is shared looping code used by for..of iteration of iterables.
+        When used by ForOfNode, we want to emit a pause location during
+        iteration.
+
+        (JSC::BytecodeGenerator::emitWillLeaveCallFrameDebugHook):
+        This is shared call frame leave code to emit a consistent pause
+        location when leaving a function.
+
+        * bytecompiler/NodesCodegen.cpp:
+        (JSC::EvalFunctionCallNode::emitBytecode):
+        (JSC::FunctionCallValueNode::emitBytecode):
+        (JSC::FunctionCallResolveNode::emitBytecode):
+        (JSC::BytecodeIntrinsicNode::emit_intrinsic_tailCallForwardArguments):
+        (JSC::FunctionCallBracketNode::emitBytecode):
+        (JSC::FunctionCallDotNode::emitBytecode):
+        (JSC::CallFunctionCallDotNode::emitBytecode):
+        (JSC::ApplyFunctionCallDotNode::emitBytecode):
+        (JSC::TaggedTemplateNode::emitBytecode):
+        (JSC::ArrayPatternNode::bindValue):
+        All tail position calls are the function calls that we want to emit
+        debug hooks for. All non-tail call calls appear to be internal
+        implementation details, and these should not have the debug hook.
+
+        (JSC::IfElseNode::emitBytecode):
+        (JSC::WhileNode::emitBytecode):
+        (JSC::WithNode::emitBytecode):
+        (JSC::SwitchNode::emitBytecode):
+        Make the pause location consistent at the expression.
+
+        (JSC::DoWhileNode::emitBytecode):
+        Make the pause location consistent at the expression.
+        Remove the errant pause at the do's '}' when entering the do block.
+
+        (JSC::ForNode::emitBytecode):
+        (JSC::ForInNode::emitMultiLoopBytecode):
+        (JSC::ForOfNode::emitBytecode):
+        Make the pause location consistent at expressions.
+        Also allow stepping to the traditional for loop's
+        update expression, which was previously not possible.
+
+        (JSC::ReturnNode::emitBytecode):
+        (JSC::FunctionNode::emitBytecode):
+        Make the pause location when leaving a function consistently be the
+        function's closing brace. The two cases are stepping through a return
+        statement, or the implicit return undefined at the end of a function.
+
+        (JSC::LabelNode::emitBytecode):
+        (JSC::TryNode::emitBytecode):
+        Remove unnecessary pauses that add no value, as they contain a
+        statement and we will then pause at that statement.
+
+        * parser/Nodes.h:
+        (JSC::StatementNode::isFunctionNode):
+        (JSC::StatementNode::isForOfNode):
+        (JSC::EnumerationNode::lexpr):
+        (JSC::ForOfNode::isForOfNode):
+        New virtual methods to distinguish different nodes.
+
+        * debugger/Debugger.h:
+        Rename m_pauseAtNextStatement to m_pauseAtNextOpportunity.
+        This is the finest granularity of stepping, and it can be
+        pausing at a location that is not a statement.
+        Introduce state to properly handle step out and stepping
+        when there are multiple expressions in a statement.
+
+        * debugger/Debugger.cpp:
+        (JSC::Debugger::Debugger):
+        (JSC::Debugger::setPauseOnNextStatement):
+        (JSC::Debugger::breakProgram):
+        (JSC::Debugger::continueProgram):
+        (JSC::Debugger::stepIntoStatement):
+        (JSC::Debugger::exception):
+        (JSC::Debugger::didReachBreakpoint):
+        
+        Use new variable names, and clarify if we should attempt
+        to pause or not.
+
+        (JSC::Debugger::stepOutOfFunction):
+        Set a new state to indicate a step out action.
+
+        (JSC::Debugger::updateCallFrame):
+        (JSC::Debugger::updateCallFrameAndPauseIfNeeded): Deleted.
+        (JSC::Debugger::updateCallFrameInternal):
+        (JSC::Debugger::pauseIfNeeded):
+        Allow updateCallFrame to either attempt a pause or not.
+        
+        (JSC::Debugger::atStatement):
+        Attempt pause and reset the at first expression flag.
+
+        (JSC::Debugger::atExpression):
+        Attempt a pause when not stepping over. Also skip
+        the first expression pause, since that would be
+        equivalent to when we paused for the expression.
+
+        (JSC::Debugger::callEvent):
+        Do not pause when entering a function.
+
+        (JSC::Debugger::returnEvent):
+        Attempt pause when leaving a function.
+        If the user did a step-over and is leaving the
+        function, then behave like step-out.
+        
+        (JSC::Debugger::unwindEvent):
+        Behave like return except don't change any
+        pausing states. If we needed to pause the
+        Debugger::exception will have handled it.
+
+        (JSC::Debugger::willExecuteProgram):
+        Do not pause when entering a program.
+
+        (JSC::Debugger::didExecuteProgram):
+        Attempt pause when leaving a program that has a caller.
+        This can be useful for exiting an eval(...) program.
+        Otherwise treat this like return, and step-over out
+        of the program should behave like step-out. We use
+        pause at next opportunity because there may be extra
+        callframes we do not know about.
+        When the program doesn't have a parent, clear all
+        our state so we don't errantly pause on the next
+        JavaScript microtask that gets executed.
+        
+        (JSC::Debugger::clearNextPauseState):
+        Helper to clear all of the pause states now that
+        it happens in a couple places.
+
+        * interpreter/Interpreter.cpp:
+        (JSC::notifyDebuggerOfUnwinding):
+        Treat unwinding slightly differently from returning.
+        We will not want to pause when unwinding callframes.
+
+        (JSC::Interpreter::debug):
+        * interpreter/Interpreter.h:
+        New debug hook.
+
+        * inspector/agents/InspectorDebuggerAgent.cpp:
+        (Inspector::InspectorDebuggerAgent::stepInto):
+        (Inspector::InspectorDebuggerAgent::didPause):
+        * inspector/agents/InspectorDebuggerAgent.h:
+        Remove unnecessary stepInto code notification for listeners.
+        The listeners are never notified if the debugger resumes,
+        so whatever state they were setting by this is going to
+        get out of date.
+
+2016-09-30  Saam Barati  <sbarati@apple.com>
+
+        Arrow functions should not allow duplicate parameter names
+        https://bugs.webkit.org/show_bug.cgi?id=162741
+
+        Reviewed by Filip Pizlo.
+
+        This patch makes parsing arrow function parameters throw
+        a syntax error when there are duplicate parameter names.
+        It also starts to make some syntax errors for arrow functions
+        better, however, this is trickier than it seems since we need
+        to choose between two parsing productions when we decide to
+        throw a syntax error. I'm going to work on this problem
+        in another patch specifically devoted to making the error
+        messages better for parsing arrow functions:
+        https://bugs.webkit.org/show_bug.cgi?id=162794
+
+        * parser/Parser.cpp:
+        (JSC::Parser<LexerType>::isArrowFunctionParameters):
+        (JSC::Parser<LexerType>::parseFormalParameters):
+        (JSC::Parser<LexerType>::parseFunctionParameters):
+        (JSC::Parser<LexerType>::parseAssignmentExpression):
+        * parser/Parser.h:
+
+2016-09-30  Mark Lam  <mark.lam@apple.com>
+
+        Use topVMEntryFrame to determine whether to skip the re-throw of a simulated throw.
+        https://bugs.webkit.org/show_bug.cgi?id=162793
+
+        Reviewed by Saam Barati.
+
+        Change the ThrowScope destructor to use topVMEntryFrame (instead of topCallFrame)
+        in the determination of whether to skip the re-throw of a simulated throw.  This
+        is needed because the topCallFrame is not updated in operationConstructArityCheck()
+        (and does not need to be), whereas topVMEntryFrame is always updated properly.
+        Hence, we should just switch to using the more reliable topVMEntryFrame instead.
+
+        This issue was discovered by existing JSC tests when exception check validation
+        is enabled.
+
+        * runtime/ThrowScope.cpp:
+        (JSC::ThrowScope::~ThrowScope):
+
 2016-09-30  Filip Pizlo  <fpizlo@apple.com>
 
         64-bit LLInt needs to have a concurrency-aware barrier
