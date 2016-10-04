@@ -1,3 +1,959 @@
+2016-10-03  Zalan Bujtas  <zalan@apple.com>
+
+        [ListItems] Render tree should be all clean by the end of FrameView::layout().
+        https://bugs.webkit.org/show_bug.cgi?id=162832
+
+        Reviewed by Simon Fraser.
+
+        List item markers are inserted into the tree during layout, right before laying out
+        the list item (that's a big FIXME). At this point we already know what part of the tree
+        needs to be laid out. Inserting a list item marker does not expand this dirty area.
+        However whenever we insert a new renderer into the tree, we call setNeedsLayout on the contining block chain.
+        In certain cases (floating renderers), it could potentially trigger some unintentional markings
+        and we return from FrameView::layout() with a dirty subtree.
+
+        This patch preemptively marks the list item and its marker dirty so that
+        when the marker is getting inserted into the tree, we stop the marking at the parent.
+
+        Not testable.
+
+        * rendering/RenderListItem.cpp:
+        (WebCore::RenderListItem::insertOrMoveMarkerRendererIfNeeded):
+
+2016-10-03  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Implement rendering of font-variation-settings
+        https://bugs.webkit.org/show_bug.cgi?id=162782
+
+        Reviewed by Zalan Bujtas.
+
+        (Re-landing after fixing tests.)
+
+        Because the heavy lifting for font-variation-settings is done by CoreText, 
+        this patch is fairly minimal. It simply hooks up the CSS property to CoreText. 
+
+        There is an existing bug in CoreText where variations inside fonts do not 
+        survive the addition of a cascade list. Therefore, FontPlatformData::ctFont() 
+        needs to work around this (conditionally) by resupplying the variation at 
+        the same time as the cascade list. The CoreText bug is <rdar://problem/28449441>. 
+
+        Tests: fast/text/variations/duplicate.html
+               fast/text/variations/exist.html
+               fast/text/variations/inheritance.html
+               fast/text/variations/order.html
+               fast/text/variations/outofbounds.html
+
+        * platform/graphics/FontCache.h:
+        * platform/graphics/cocoa/FontCacheCoreText.cpp:
+        (WebCore::preparePlatformFont):
+        (WebCore::fontWithFamily):
+        (WebCore::FontCache::createFontPlatformData):
+        (WebCore::FontCache::systemFallbackForCharacters):
+        * platform/graphics/cocoa/FontPlatformDataCocoa.mm:
+        (WebCore::cascadeToLastResortAttributesDictionary):
+        (WebCore::cascadeToLastResortAndVariationsFontDescriptor):
+        (WebCore::FontPlatformData::ctFont):
+        (WebCore::cascadeToLastResortFontDescriptor): Deleted.
+        * platform/graphics/mac/FontCustomPlatformData.cpp:
+        (WebCore::FontCustomPlatformData::fontPlatformData):
+        * rendering/RenderThemeIOS.mm:
+        (WebCore::RenderThemeIOS::updateCachedSystemFontDescription):
+
+2016-10-03  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser should strip tabs at all locations
+        https://bugs.webkit.org/show_bug.cgi?id=162836
+
+        Reviewed by Geoffrey Garen.
+
+        Covered by adding tabs to each location of each API test
+        except tests that test the encoding of surrogate pairs,
+        because inserting a tab between the pairs changes the encoding.
+
+        * platform/URLParser.cpp:
+        (WebCore::URLParser::takesTwoAdvancesUntilEnd):
+        (WebCore::URLParser::parse):
+        (WebCore::URLParser::parseIPv4Number):
+        (WebCore::URLParser::parseIPv4Host):
+        * platform/URLParser.h:
+
+2016-10-03  Antti Koivisto  <antti@apple.com>
+
+        Remove Document::elementSheet()
+        https://bugs.webkit.org/show_bug.cgi?id=162876
+
+        Reviewed by Andreas Kling.
+
+        This is a Document owned stylesheet that exists as a context for parsing element inline style.
+        It never contains any rules and is generally confusing.
+
+        This patch removes the requirement for a stylesheet to be present for CSSParser to operate in
+        the correct context. Inline style is now parsed without stylesheet and a context object is
+        passed instead.
+
+        * bindings/js/JSCSSStyleDeclarationCustom.cpp:
+        (WebCore::root):
+        * bindings/js/JSCSSStyleDeclarationCustom.h:
+        (WebCore::root): Deleted.
+        * css/PropertySetCSSStyleDeclaration.cpp:
+        (WebCore::PropertySetCSSStyleDeclaration::setCssText):
+        (WebCore::PropertySetCSSStyleDeclaration::setProperty):
+        (WebCore::PropertySetCSSStyleDeclaration::setPropertyInternal):
+        (WebCore::PropertySetCSSStyleDeclaration::cssParserContext):
+        (WebCore::StyleRuleCSSStyleDeclaration::parentStyleSheet):
+        (WebCore::StyleRuleCSSStyleDeclaration::cssParserContext):
+        (WebCore::InlineCSSStyleDeclaration::parentStyleSheet):
+        (WebCore::InlineCSSStyleDeclaration::cssParserContext):
+        * css/PropertySetCSSStyleDeclaration.h:
+        (WebCore::PropertySetCSSStyleDeclaration::didMutate): Deleted.
+        * css/StyleProperties.cpp:
+        (WebCore::MutableStyleProperties::setProperty):
+        (WebCore::MutableStyleProperties::setCustomProperty):
+        (WebCore::MutableStyleProperties::parseDeclaration):
+        * css/parser/CSSParser.cpp:
+        (WebCore::CSSParser::parseValue):
+        (WebCore::CSSParser::parseCustomPropertyValue):
+        (WebCore::CSSParser::parseInlineStyleDeclaration):
+        * css/parser/CSSParser.h:
+        * css/parser/CSSParserImpl.cpp:
+        (WebCore::CSSParserImpl::parseInlineStyleDeclaration):
+        * dom/Document.cpp:
+        (WebCore::Document::~Document):
+        (WebCore::Document::updateBaseURL):
+        (WebCore::Document::usesStyleBasedEditability):
+        (WebCore::Document::setHasElementUsingStyleBasedEditability):
+        (WebCore::Document::elementSheet): Deleted.
+        * dom/Document.h:
+        * dom/StyledElement.cpp:
+        (WebCore::StyledElement::setInlineStyleFromString):
+        (WebCore::StyledElement::invalidateStyleAttribute):
+
+            The usesStyleBasedEditability bit used to be set via the elementSheet. Instead check for it after inline style mutations.
+
+        (WebCore::StyledElement::setInlineStyleProperty):
+        (WebCore::StyledElement::addPropertyToPresentationAttributeStyle):
+        * dom/StyledElement.h:
+        (WebCore::StyledElement::invalidateStyleAttribute): Deleted.
+        * inspector/InspectorStyleSheet.cpp:
+        (WebCore::InspectorStyleSheetForInlineStyle::getStyleAttributeRanges):
+        * svg/SVGAnimateElementBase.cpp:
+        (WebCore::applyCSSPropertyToTarget):
+
+2016-10-03  Brent Fulgham  <bfulgham@apple.com>
+
+        Avoid null dereference when changing focus in design mode.
+        https://bugs.webkit.org/show_bug.cgi?id=162877
+        <rdar://problem/28061261>
+
+        Reviewed by Chris Dumez.
+
+        The bare m_frame pointer in DOMWindow can be cleared when setting focus to a new element. Check
+        that the m_frame pointer is non-null before using it after calling a routine that could
+        clear the pointer value.
+
+        Test: fast/frames/iframe-focus-crash.html
+
+        * page/DOMWindow.cpp:
+        (WebCore::DOMWindow::focus): Check that the pointer is still non-null after setting the
+        current focused element to nullptr.
+
+2016-10-03  Chris Dumez  <cdumez@apple.com>
+
+        Add support for KeyboardEvent.key attribute
+        https://bugs.webkit.org/show_bug.cgi?id=36267
+
+        Reviewed by Darin Adler.
+
+        Add support for KeyboardEvent.key attribute:
+        - https://w3c.github.io/uievents/#dom-keyboardevent-key
+
+        This is behind a compile time flag that is only enabled on Mac and
+        iOS and the implementation is still missing for other platforms.
+
+        Test: fast/events/keyboardevent-key.html
+
+        * dom/KeyboardEvent.cpp:
+        (WebCore::KeyboardEvent::KeyboardEvent):
+        * dom/KeyboardEvent.h:
+        * dom/KeyboardEvent.idl:
+        * platform/PlatformKeyboardEvent.h:
+        (WebCore::PlatformKeyboardEvent::PlatformKeyboardEvent):
+        (WebCore::PlatformKeyboardEvent::key):
+        * platform/cocoa/KeyEventCocoa.h:
+        * platform/cocoa/KeyEventCocoa.mm:
+        (WebCore::keyForCharCode):
+        * platform/ios/PlatformEventFactoryIOS.h:
+        * platform/ios/PlatformEventFactoryIOS.mm:
+        (WebCore::keyForKeyEvent):
+        (WebCore::PlatformKeyboardEventBuilder::PlatformKeyboardEventBuilder):
+        * platform/mac/PlatformEventFactoryMac.h:
+        * platform/mac/PlatformEventFactoryMac.mm:
+        (WebCore::keyForKeyEvent):
+        (WebCore::PlatformKeyboardEventBuilder::PlatformKeyboardEventBuilder):
+        (WebCore::PlatformWheelEventBuilder::PlatformWheelEventBuilder): Deleted.
+        * replay/SerializationMethods.cpp:
+        (JSC::EncodingTraits<PlatformKeyboardEvent>::encodeValue):
+        (JSC::EncodingTraits<PlatformKeyboardEvent>::decodeValue):
+
+2016-10-03  Chris Dumez  <cdumez@apple.com>
+
+        Add support for KeyboardEvent.key attribute
+        https://bugs.webkit.org/show_bug.cgi?id=36267
+
+        Reviewed by Darin Adler.
+
+        Add support for KeyboardEvent.key attribute:
+        - https://w3c.github.io/uievents/#dom-keyboardevent-key
+
+        This is behind a compile time flag that is only enabled on Mac and
+        iOS and the implementation is still missing for other platforms.
+
+        Test: fast/events/keyboardevent-key.html
+
+        * dom/KeyboardEvent.cpp:
+        (WebCore::KeyboardEvent::KeyboardEvent):
+        * dom/KeyboardEvent.h:
+        * dom/KeyboardEvent.idl:
+        * platform/PlatformKeyboardEvent.h:
+        (WebCore::PlatformKeyboardEvent::PlatformKeyboardEvent):
+        (WebCore::PlatformKeyboardEvent::key):
+        * platform/cocoa/KeyEventCocoa.h:
+        * platform/cocoa/KeyEventCocoa.mm:
+        (WebCore::keyForCharCode):
+        * platform/ios/PlatformEventFactoryIOS.h:
+        * platform/ios/PlatformEventFactoryIOS.mm:
+        (WebCore::keyForKeyEvent):
+        (WebCore::PlatformKeyboardEventBuilder::PlatformKeyboardEventBuilder):
+        * platform/mac/PlatformEventFactoryMac.h:
+        * platform/mac/PlatformEventFactoryMac.mm:
+        (WebCore::keyForKeyEvent):
+        (WebCore::PlatformKeyboardEventBuilder::PlatformKeyboardEventBuilder):
+        (WebCore::PlatformWheelEventBuilder::PlatformWheelEventBuilder): Deleted.
+        * replay/SerializationMethods.cpp:
+        (JSC::EncodingTraits<PlatformKeyboardEvent>::encodeValue):
+        (JSC::EncodingTraits<PlatformKeyboardEvent>::decodeValue):
+
+2016-10-03  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser: fragment-only URLs relative to file URLs should just add a fragment
+        https://bugs.webkit.org/show_bug.cgi?id=162871
+
+        Reviewed by Geoffrey Garen.
+
+        Covered by new API tests.
+
+        * platform/URLParser.cpp:
+        (WebCore::URLParser::parse):
+        Instead of adding ///# after copying the base URL to the query, just add an #.
+
+2016-10-03  Antoine Quint  <graouts@apple.com>
+
+        [Modern Media Controls] LayoutItem and Button classes
+        https://bugs.webkit.org/show_bug.cgi?id=162868
+        <rdar://problem/28590166>
+
+        Reviewed by Dean Jackson.
+
+        We introduce the new Button class and its parent class LayoutItem. We will subclass Button
+        a lot in coming patches, as it provides a way to create a button and provide a delegate to
+        respond to UI events via the `uiDelegate` property. A Button extends a LayoutItem, another
+        class that we'll subclass heavily in coming patches, which is simply a LayoutNode with a
+        `layoutDelegate` which allows to set the node's `layoutTraits`, a bit-mask allowing to
+        specify layout attributes such as the platform and playback styles. 
+
+        Tests: media/modern-media-controls/button/button.html
+               media/modern-media-controls/layout-item/layout-item.html
+
+        * Modules/modern-media-controls/controls/button.css: Added.
+        (button):
+        * Modules/modern-media-controls/controls/button.js: Added.
+        (Button):
+        (Button.prototype.get enabled):
+        (Button.prototype.set enabled):
+        (Button.prototype.handleEvent):
+        (Button.prototype._handleUIEvent):
+        * Modules/modern-media-controls/controls/layout-item.js: Added.
+        (LayoutItem.prototype.get layoutTraits):
+        (LayoutItem):
+
+2016-10-03  Andy Estes  <aestes@apple.com>
+
+        ASSERTION FAILED: url.containsOnlyASCII() in WebCore::checkEncodedString() when parsing an invalid CSS cursor URL
+        https://bugs.webkit.org/show_bug.cgi?id=162763
+        <rdar://problem/28572758>
+
+        Reviewed by Youenn Fablet.
+
+        CSSCursorImageValue copies the URL of its underlying CSSImageValue by using the
+        ParsedURLString URL constructor on the String returned by CSSImageValue::url(). While
+        CSSImageValues were always being constructed from a URL implicitly converted to a String,
+        nothing ensured that the URL was valid. For invalid URLs, URL::string() returns the string
+        it was constructed with, which might still represent a relative URL or contain non-ASCII
+        characters, violating the preconditions of the ParsedURLString URL constructor and causing
+        an assertion to fail in Debug builds.
+
+        Fix this by having CSSImageValue store its image URL using a WebCore::URL rather than a
+        String. CSSCursorImageValue can then copy this URL instead of attempting to re-parse a
+        possibly-invalid URL string.
+
+        Test: fast/css/cursor-with-invalid-url.html
+
+        * css/CSSCursorImageValue.cpp:
+        (WebCore::CSSCursorImageValue::CSSCursorImageValue): Copied m_imageValue.url() into
+        m_originalURL instead of using the ParsedURLString URL constructor, since
+        CSSImageValue::url() now returns a WebCore::URL.
+        (WebCore::CSSCursorImageValue::loadImage): Created a URL from cursorElement->href() by
+        calling Document::completeURL().
+        * css/CSSImageValue.cpp:
+        (WebCore::CSSImageValue::CSSImageValue): Changed to take a URL&& instead of a const String&.
+        (WebCore::CSSImageValue::loadImage): Stopped calling Document::completeURL(), since m_url is
+        now a WebCore::URL.
+        * css/CSSImageValue.h: Changed url() to return a const URL&, and changed m_url to be a URL.
+        * html/HTMLBodyElement.cpp:
+        (WebCore::HTMLBodyElement::collectStyleForPresentationAttribute): Removed a call to
+        URL::string().
+        * html/HTMLTableElement.cpp:
+        (WebCore::HTMLTableElement::collectStyleForPresentationAttribute): Ditto.
+        * html/HTMLTablePartElement.cpp:
+        (WebCore::HTMLTablePartElement::collectStyleForPresentationAttribute): Ditto.
+
+2016-10-03  Zalan Bujtas  <zalan@apple.com>
+
+        Log an error to stderr when FrameView::layout() fails to clean all the renderers.
+        https://bugs.webkit.org/show_bug.cgi?id=162835
+
+        Reviewed by Simon Fraser.
+
+        We've come across multiple layout/painting bugs caused by renderers left dirty
+        after FrameView::layout(). This patch helps catching such issues early.
+        Once all the blocking bugs are fixed (webkit.org/b/162835), logging should be replaced with ASSERT(). 
+
+        Not testable.
+
+        * page/FrameView.cpp:
+        (WebCore::RenderTreeNeedsLayoutChecker::~RenderTreeNeedsLayoutChecker):
+        (WebCore::FrameView::layout):
+
+2016-10-03  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win][Direct2D] Add D2D Bitmap Image handling code
+        https://bugs.webkit.org/show_bug.cgi?id=162761
+
+        Reviewed by Dean Jackson.
+
+        This patch lands a set of new files that implement
+        Image and BitmapImage features on Windows using
+        Direct2D.
+
+        The desired ID2D1RenderTarget handle is needed by the
+        image decoder so that it can load the resulting bitmap
+        into the GPU.
+
+        No new tests until complete backend lands.
+
+        * platform/graphics/BitmapImage.cpp:
+        (WebCore::BitmapImage::draw): Tell the Direct2D image decoder
+        which render target to use.
+        * platform/graphics/BitmapImage.h:
+        * platform/graphics/ImageBuffer.cpp:
+        * platform/graphics/ImageBuffer.h:
+        * platform/graphics/ImageBufferData.h:
+        * platform/graphics/ImageFrameCache.cpp:
+        (WebCore::ImageFrameCache::setRenderTarget): Added.
+        * platform/graphics/ImageFrameCache.h:
+        (WebCore::ImageFrameCache::decoder): Added.
+        * platform/graphics/ImageSource.cpp:
+        * platform/graphics/ImageSource.h:
+        (WebCore::ImageSource::setRenderTarget):
+        * platform/graphics/win/ImageBufferDataDirect2D.cpp: Added.
+        * platform/graphics/win/ImageBufferDataDirect2D.h: Added.
+        * platform/graphics/win/ImageBufferDirect2D.cpp: Added.
+        * platform/graphics/win/ImageCGWin.cpp:
+        * platform/graphics/win/ImageDecoderDirect2D.cpp: Added.
+        * platform/graphics/win/ImageDecoderDirect2D.h: Added.
+        * platform/graphics/win/ImageDirect2D.cpp: Added.
+        * platform/graphics/win/NativeImageDirect2D.cpp: Added.
+
+2016-10-03  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [SOUP] Remove unused methods toSoupMessage from ResourceRequest/Response
+        https://bugs.webkit.org/show_bug.cgi?id=162867
+
+        Reviewed by Sergio Villar Senin.
+
+        * platform/network/soup/ResourceRequest.h:
+        * platform/network/soup/ResourceRequestSoup.cpp:
+        (WebCore::ResourceRequest::updateSoupMessage):
+        (WebCore::ResourceRequest::updateFromSoupMessage): Deleted.
+        * platform/network/soup/ResourceResponse.h:
+        * platform/network/soup/ResourceResponseSoup.cpp:
+        (WebCore::ResourceResponse::updateFromSoupMessage): Deleted.
+
+2016-10-03  Youenn Fablet  <youenn@apple.com>
+
+        Remove FetchBody::m_isEmpty
+        https://bugs.webkit.org/show_bug.cgi?id=162857
+
+        Reviewed by Alex Christensen.
+
+        No change of behavior.
+
+        Moving handling of null bodies in FetchBodyOwner, by having an Optional<FetchBody> in FetchBodyOwner.
+        Moving storage of m_contentType in FetchBodyOwner.
+
+        Moving header storage from FetchResponse/FetchRequest to FetchBodyOwner, as it helps updating m_contentType.
+
+        * Modules/fetch/FetchBody.cpp: removing m_isEmpty and m_contentType.
+        (WebCore::FetchBody::extract): Computes the default content-type which is stored in FetchBodyOwner.
+        (WebCore::FetchBody::blob):
+        (WebCore::FetchBody::consume):
+        (WebCore::FetchBody::consumeAsStream):
+        (WebCore::FetchBody::loadingSucceeded):
+        (WebCore::FetchBody::bodyForInternalRequest):
+        (WebCore::FetchBody::clone):
+        * Modules/fetch/FetchBody.h:
+        (WebCore::FetchBody::loadingBody):
+        (WebCore::FetchBody::FetchBody):
+        * Modules/fetch/FetchBodyOwner.cpp:
+        (WebCore::FetchBodyOwner::FetchBodyOwner):
+        (WebCore::FetchBodyOwner::stop):
+        (WebCore::FetchBodyOwner::arrayBuffer):
+        (WebCore::FetchBodyOwner::blob):
+        (WebCore::FetchBodyOwner::cloneBody): Needs to clone m_contentType as well.
+        (WebCore::FetchBodyOwner::extractBody):
+        (WebCore::FetchBodyOwner::updateContentType):
+        (WebCore::FetchBodyOwner::consumeOnceLoadingFinished):
+        (WebCore::FetchBodyOwner::formData):
+        (WebCore::FetchBodyOwner::json):
+        (WebCore::FetchBodyOwner::text):
+        (WebCore::FetchBodyOwner::loadBlob):
+        (WebCore::FetchBodyOwner::blobLoadingSucceeded):
+        (WebCore::FetchBodyOwner::blobLoadingFailed):
+        (WebCore::FetchBodyOwner::finishBlobLoading):
+        * Modules/fetch/FetchBodyOwner.h:
+        (WebCore::FetchBodyOwner::body):
+        (WebCore::FetchBodyOwner::isBodyNull):
+        * Modules/fetch/FetchRequest.cpp:
+        (WebCore::FetchRequest::setBody):
+        (WebCore::FetchRequest::internalRequest):
+        (WebCore::FetchRequest::clone):
+        * Modules/fetch/FetchRequest.h:
+        (WebCore::FetchRequest::FetchRequest):
+        * Modules/fetch/FetchResponse.cpp:
+        (WebCore::FetchResponse::initializeWith):
+        (WebCore::FetchResponse::FetchResponse):
+        (WebCore::FetchResponse::cloneForJS):
+        (WebCore::FetchResponse::fetch):
+        (WebCore::FetchResponse::BodyLoader::didSucceed):
+        (WebCore::FetchResponse::BodyLoader::didReceiveResponse):
+        (WebCore::FetchResponse::BodyLoader::start):
+        (WebCore::FetchResponse::createReadableStreamSource):
+        * Modules/fetch/FetchResponse.h:
+
+2016-10-03  Andy Estes  <aestes@apple.com>
+
+        ASSERTION FAILED: result in WebCore::CSSParser::parseURI
+        https://bugs.webkit.org/show_bug.cgi?id=141638
+        <rdar://problem/27709952>
+
+        Reviewed by Andreas Kling.
+
+        CSSParser::parseURIInternal() failed to parse unquoted URLs with Unicode escape sequences
+        greater than 0xFF, even when the destination character type was multi-byte. Fixed by
+        checking the size of DestCharacterType instead of SrcCharacterType.
+
+        Updated fast/css/url-with-multi-byte-unicode-escape.html to test for an unquoted URL.
+
+        * css/parser/CSSParser.cpp:
+        (WebCore::CSSParser::parseURIInternal): For code points greater than 0xFF, only returned
+        false if sizeof(DestCharacterType) == 1.
+
+2016-10-03  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser: empty relative URLs should not copy fragment from the base URL
+        https://bugs.webkit.org/show_bug.cgi?id=162864
+
+        Reviewed by Chris Dumez.
+
+        Covered by new API tests.
+
+        * platform/URL.cpp:
+        (WebCore::URL::removeFragmentIdentifier):
+        Optimize removing fragments, now that it happens more often. We don't need to reparse, 
+        because the result will always be equal to just a substring when removing the fragment at the end.
+        * platform/URLParser.cpp:
+        (WebCore::URLParser::copyASCIIStringUntil):
+        (WebCore::URLParser::copyURLPartsUntil):
+        (WebCore::containsOnlyC0ControlOrSpace):
+        (WebCore::URLParser::URLParser):
+        (WebCore::URLParser::parse):
+        * platform/URLParser.h:
+        Because we are not copying the fragment, we can simplify and remove some unreachable code.
+
+2016-10-03  Chris Dumez  <cdumez@apple.com>
+
+        td.scope should only return known values
+        https://bugs.webkit.org/show_bug.cgi?id=162755
+
+        Reviewed by Sam Weinig.
+
+        td.scope should only return known values:
+        - https://html.spec.whatwg.org/#dom-th-scope
+
+        Firefox conforms to the specification.
+
+        No new tests, rebaselined existing test.
+
+        * html/HTMLTableCellElement.cpp:
+        (WebCore::HTMLTableCellElement::scope):
+
+2016-10-03  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [SOUP] Simplify AuthenticationChallenge
+        https://bugs.webkit.org/show_bug.cgi?id=162784
+
+        Reviewed by Alex Christensen.
+
+        We don't really need to keep references to the SoupSession and SoupMessage in AuthenticationChallenge, the
+        SoupNetworkSession callback already forwards the challenge to the right ResourceHandle.
+
+        * platform/network/soup/AuthenticationChallenge.h:
+        (WebCore::AuthenticationChallenge::authenticationClient):
+        (WebCore::AuthenticationChallenge::soupSession): Deleted.
+        (WebCore::AuthenticationChallenge::soupMessage): Deleted.
+        * platform/network/soup/AuthenticationChallengeSoup.cpp:
+        (WebCore::AuthenticationChallenge::AuthenticationChallenge):
+        (WebCore::AuthenticationChallenge::platformCompare):
+        * platform/network/soup/ResourceHandleSoup.cpp:
+        (WebCore::ResourceHandle::continueDidReceiveAuthenticationChallenge):
+        (WebCore::ResourceHandle::didReceiveAuthenticationChallenge):
+        (WebCore::ResourceHandle::receivedRequestToContinueWithoutCredential):
+        (WebCore::ResourceHandle::receivedCredential):
+        (WebCore::ResourceHandle::receivedCancellation):
+        * platform/network/soup/SoupNetworkSession.cpp:
+        (WebCore::authenticateCallback):
+
+2016-10-03  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [SOUP] Cleanup persistent credential storage code
+        https://bugs.webkit.org/show_bug.cgi?id=162777
+
+        Reviewed by Alex Christensen.
+
+        We have this feature behind ENABLE_CREDENTIAL_STORAGE flag, which is confusing, because we use credential
+        storage unconditionally and this is only about persistent storage. Also the flag assumes libsecret is available,
+        and since it's only used by GTK sometimes we use GTK ifdefs instead of CREDENTIAL_STORAGE. So, I think we should
+        use USE(LIBSECRET) instead, and reduce a bit the ifdefs in common soup code. Another problem is that current
+        implementation is always used, while it should depend on the current network storage session and never used in
+        ephemeral sessions. This patch moves the code from CredentialBackingStore to NetworkStorageSessionSoup and
+        modernizes a bit.
+
+        * PlatformGTK.cmake: Remove CredentialBackingStore.cpp.
+        * platform/gtk/GRefPtrGtk.cpp: Use USE(LIBSECRET)
+        * platform/gtk/GRefPtrGtk.h:
+        * platform/network/NetworkStorageSession.h:
+        * platform/network/ResourceHandleInternal.h:
+        * platform/network/gtk/CredentialBackingStore.cpp: Removed.
+        * platform/network/gtk/CredentialBackingStore.h: Removed.
+        * platform/network/soup/NetworkStorageSessionSoup.cpp:
+        (WebCore::NetworkStorageSession::~NetworkStorageSession):
+        (WebCore::schemeFromProtectionSpaceServerType):
+        (WebCore::authTypeFromProtectionSpaceAuthenticationScheme):
+        (WebCore::NetworkStorageSession::getCredentialFromPersistentStorage):
+        (WebCore::NetworkStorageSession::saveCredentialToPersistentStorage):
+        (WebCore::NetworkStorageSession::ensurePrivateBrowsingSession): Deleted.
+        (WebCore::NetworkStorageSession::switchToNewTestingSession): Deleted.
+        * platform/network/soup/ResourceHandleSoup.cpp:
+        (WebCore::gotHeadersCallback):
+        (WebCore::ResourceHandle::didReceiveAuthenticationChallenge):
+        (WebCore::ResourceHandle::receivedCredential):
+        (WebCore::ResourceHandle::continueDidReceiveAuthenticationChallenge): Deleted.
+        (WebCore::ResourceHandle::receivedRequestToContinueWithoutCredential): Deleted.
+        (WebCore::ResourceHandle::receivedCancellation): Deleted.
+
+2016-10-03  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Fix the build with coordinated graphics enabled after r206712.
+
+        * page/scrolling/ScrollingStateTree.cpp:
+        (WebCore::ScrollingStateTree::attachNode):
+
+2016-10-02  Chris Dumez  <cdumez@apple.com>
+
+        Add support for KeyboardEvent.getModifierState() operation
+        https://bugs.webkit.org/show_bug.cgi?id=162855
+
+        Reviewed by Darin Adler.
+
+        Add support for KeyboardEvent.getModifierState() operation:
+        - https://w3c.github.io/uievents/#dom-keyboardevent-getmodifierstate
+
+        Test: fast/events/constructors/keyboard-event-getModifierState.html
+
+        * dom/KeyboardEvent.cpp:
+        (WebCore::KeyboardEvent::getModifierState):
+        * dom/KeyboardEvent.idl:
+
+2016-10-02  Chris Dumez  <cdumez@apple.com>
+
+        Add support for KeyboardEvent.repeat attribute
+        https://bugs.webkit.org/show_bug.cgi?id=162854
+
+        Reviewed by Darin Adler.
+
+        Add support for KeyboardEvent.repeat attribute:
+        - https://w3c.github.io/uievents/#dom-keyboardevent-repeat
+
+        No new tests, extended existing test.
+
+        * dom/KeyboardEvent.cpp:
+        (WebCore::KeyboardEvent::KeyboardEvent):
+        * dom/KeyboardEvent.h:
+        * dom/KeyboardEvent.idl:
+
+2016-10-02  Darin Adler  <darin@apple.com>
+
+        Rename ExceptionCode-based exception handling to "legacy"
+        https://bugs.webkit.org/show_bug.cgi?id=162859
+
+        Reviewed by Chris Dumez.
+
+        RaisesException is now MayThrowLegacyException.
+
+        A follow-up patch soon will add MayThrowException for the new style,
+        where we use ExceptionOr<> as the return type instead of an ExceptionCode
+        out argument.
+
+        * bindings/scripts/CodeGeneratorJS.pm:
+        Removed the quotation marks from the syntax object->{PropertyName} so the
+        renaming script could handle it. Tweaked various comments and logic for clarity.
+        Changed to use the perl "x if y" syntax for brevity in many places.
+        Renamed with the script and by hand. Added code to skip including the same header
+        in both the implementation file and the header, just to make generated bindings
+        slightly smaller and faster to compile. Used "using" instead of "typedef".
+
+        * bindings/scripts/IDLAttributes.txt: Updated from old names to new ones.
+
+        * Modules/applepay/ApplePaySession.idl:
+        * Modules/encryptedmedia/MediaKeySession.idl:
+        * Modules/encryptedmedia/MediaKeys.idl:
+        * Modules/fetch/FetchHeaders.idl:
+        * Modules/fetch/FetchRequest.idl:
+        * Modules/fetch/FetchResponse.idl:
+        * Modules/indexeddb/IDBCursor.idl:
+        * Modules/indexeddb/IDBDatabase.idl:
+        * Modules/indexeddb/IDBFactory.idl:
+        * Modules/indexeddb/IDBIndex.idl:
+        * Modules/indexeddb/IDBKeyRange.idl:
+        * Modules/indexeddb/IDBObjectStore.idl:
+        * Modules/indexeddb/IDBRequest.idl:
+        * Modules/indexeddb/IDBTransaction.idl:
+        * Modules/mediasource/MediaSource.idl:
+        * Modules/mediasource/SourceBuffer.idl:
+        * Modules/mediastream/MediaDevices.idl:
+        * Modules/mediastream/RTCDTMFSender.idl:
+        * Modules/mediastream/RTCDataChannel.idl:
+        * Modules/mediastream/RTCIceCandidate.idl:
+        * Modules/mediastream/RTCPeerConnection.idl:
+        * Modules/mediastream/RTCRtpSender.idl:
+        * Modules/mediastream/RTCSessionDescription.idl:
+        * Modules/navigatorcontentutils/NavigatorContentUtils.idl:
+        * Modules/notifications/NotificationCenter.idl:
+        * Modules/webaudio/AnalyserNode.idl:
+        * Modules/webaudio/AudioBuffer.idl:
+        * Modules/webaudio/AudioBufferSourceNode.idl:
+        * Modules/webaudio/AudioContext.idl:
+        * Modules/webaudio/AudioNode.idl:
+        * Modules/webaudio/ConvolverNode.idl:
+        * Modules/webaudio/OfflineAudioContext.idl:
+        * Modules/webaudio/OscillatorNode.idl:
+        * Modules/webdatabase/DOMWindowWebDatabase.idl:
+        * Modules/webdatabase/SQLResultSet.idl:
+        * Modules/websockets/WebSocket.idl:
+        * bindings/scripts/test/TestImplements.idl:
+        * bindings/scripts/test/TestInterface.idl:
+        * bindings/scripts/test/TestNamedConstructor.idl:
+        * bindings/scripts/test/TestNondeterministic.idl:
+        * bindings/scripts/test/TestObj.idl:
+        * bindings/scripts/test/TestSupplemental.idl:
+        * bindings/scripts/test/TestTypedefs.idl:
+        * css/CSSCharsetRule.idl:
+        * css/CSSMediaRule.idl:
+        * css/CSSPrimitiveValue.idl:
+        * css/CSSRule.idl:
+        * css/CSSStyleDeclaration.idl:
+        * css/CSSStyleSheet.idl:
+        * css/CSSSupportsRule.idl:
+        * css/CSSValue.idl:
+        * css/FontFace.idl:
+        * css/FontFaceSet.idl:
+        * css/MediaList.idl:
+        * css/WebKitCSSMatrix.idl:
+        * dom/CharacterData.idl:
+        * dom/ChildNode.idl:
+        * dom/CustomElementRegistry.idl:
+        * dom/DataTransferItemList.idl:
+        * dom/Document.idl:
+        * dom/Element.idl:
+        * dom/EventTarget.idl:
+        * dom/MessagePort.idl:
+        * dom/MutationObserver.idl:
+        * dom/NamedNodeMap.idl:
+        * dom/Node.idl:
+        * dom/ParentNode.idl:
+        * dom/Range.idl:
+        * dom/ShadowRoot.idl:
+        * dom/Text.idl:
+        * fileapi/FileReader.idl:
+        * fileapi/FileReaderSync.idl:
+        * html/DOMTokenList.idl:
+        * html/DOMURL.idl:
+        * html/HTMLCanvasElement.idl:
+        * html/HTMLElement.idl:
+        * html/HTMLEmbedElement.idl:
+        * html/HTMLFrameElement.idl:
+        * html/HTMLIFrameElement.idl:
+        * html/HTMLInputElement.idl:
+        * html/HTMLMarqueeElement.idl:
+        * html/HTMLMediaElement.idl:
+        * html/HTMLObjectElement.idl:
+        * html/HTMLOptionElement.idl:
+        * html/HTMLOptionsCollection.idl:
+        * html/HTMLProgressElement.idl:
+        * html/HTMLSelectElement.idl:
+        * html/HTMLTableElement.idl:
+        * html/HTMLTableRowElement.idl:
+        * html/HTMLTableSectionElement.idl:
+        * html/HTMLTextAreaElement.idl:
+        * html/HTMLVideoElement.idl:
+        * html/ImageData.idl:
+        * html/MediaController.idl:
+        * html/TimeRanges.idl:
+        * html/URLUtils.idl:
+        * html/canvas/CanvasGradient.idl:
+        * html/canvas/CanvasPath.idl:
+        * html/canvas/CanvasRenderingContext2D.idl:
+        * html/canvas/OESVertexArrayObject.idl:
+        * html/canvas/WebGLRenderingContextBase.idl:
+        * html/track/DataCue.idl:
+        * html/track/TextTrack.idl:
+        * html/track/TextTrackCue.idl:
+        * html/track/VTTCue.idl:
+        * html/track/VTTRegion.idl:
+        * loader/appcache/DOMApplicationCache.idl:
+        * page/Crypto.idl:
+        * page/DOMSelection.idl:
+        * page/DOMWindow.idl:
+        * page/EventSource.idl:
+        * page/History.idl:
+        * page/Location.idl:
+        * page/Performance.idl:
+        * page/UserMessageHandler.idl:
+        * page/WindowOrWorkerGlobalScope.idl:
+        * storage/Storage.idl:
+        * svg/SVGAltGlyphElement.idl:
+        * svg/SVGAngle.idl:
+        * svg/SVGAnimatedBoolean.idl:
+        * svg/SVGAnimatedEnumeration.idl:
+        * svg/SVGAnimatedInteger.idl:
+        * svg/SVGAnimatedNumber.idl:
+        * svg/SVGAnimatedString.idl:
+        * svg/SVGAnimationElement.idl:
+        * svg/SVGColor.idl:
+        * svg/SVGGlyphRefElement.idl:
+        * svg/SVGGraphicsElement.idl:
+        * svg/SVGLength.idl:
+        * svg/SVGLengthList.idl:
+        * svg/SVGMatrix.idl:
+        * svg/SVGNumberList.idl:
+        * svg/SVGPaint.idl:
+        * svg/SVGPathSegList.idl:
+        * svg/SVGPointList.idl:
+        * svg/SVGPreserveAspectRatio.idl:
+        * svg/SVGStringList.idl:
+        * svg/SVGStyleElement.idl:
+        * svg/SVGTextContentElement.idl:
+        * svg/SVGTransformList.idl:
+        * svg/SVGViewSpec.idl:
+        * testing/InternalSettings.idl:
+        * testing/Internals.idl:
+        * workers/DedicatedWorkerGlobalScope.idl:
+        * workers/Worker.idl:
+        * xml/DOMParser.idl:
+        * xml/XMLHttpRequest.idl:
+        * xml/XPathEvaluator.idl:
+        * xml/XPathExpression.idl:
+        * xml/XPathResult.idl:
+        Allowed the rename script to rename the exception-related extended attributes.
+
+        * bindings/scripts/test/JS/JSInterfaceName.cpp:
+        * bindings/scripts/test/JS/JSInterfaceName.h:
+        * bindings/scripts/test/JS/JSTestActiveDOMObject.cpp:
+        * bindings/scripts/test/JS/JSTestActiveDOMObject.h:
+        * bindings/scripts/test/JS/JSTestCallback.cpp:
+        * bindings/scripts/test/JS/JSTestClassWithJSBuiltinConstructor.cpp:
+        * bindings/scripts/test/JS/JSTestClassWithJSBuiltinConstructor.h:
+        * bindings/scripts/test/JS/JSTestCustomConstructorWithNoInterfaceObject.cpp:
+        * bindings/scripts/test/JS/JSTestCustomConstructorWithNoInterfaceObject.h:
+        * bindings/scripts/test/JS/JSTestCustomNamedGetter.cpp:
+        * bindings/scripts/test/JS/JSTestCustomNamedGetter.h:
+        * bindings/scripts/test/JS/JSTestEventConstructor.cpp:
+        * bindings/scripts/test/JS/JSTestEventConstructor.h:
+        * bindings/scripts/test/JS/JSTestEventTarget.cpp:
+        * bindings/scripts/test/JS/JSTestEventTarget.h:
+        * bindings/scripts/test/JS/JSTestException.cpp:
+        * bindings/scripts/test/JS/JSTestException.h:
+        * bindings/scripts/test/JS/JSTestGenerateIsReachable.cpp:
+        * bindings/scripts/test/JS/JSTestGenerateIsReachable.h:
+        * bindings/scripts/test/JS/JSTestGlobalObject.cpp:
+        * bindings/scripts/test/JS/JSTestGlobalObject.h:
+        * bindings/scripts/test/JS/JSTestInterface.cpp:
+        * bindings/scripts/test/JS/JSTestInterface.h:
+        * bindings/scripts/test/JS/JSTestIterable.cpp:
+        * bindings/scripts/test/JS/JSTestIterable.h:
+        * bindings/scripts/test/JS/JSTestJSBuiltinConstructor.cpp:
+        * bindings/scripts/test/JS/JSTestJSBuiltinConstructor.h:
+        * bindings/scripts/test/JS/JSTestMediaQueryListListener.cpp:
+        * bindings/scripts/test/JS/JSTestMediaQueryListListener.h:
+        * bindings/scripts/test/JS/JSTestNamedConstructor.cpp:
+        * bindings/scripts/test/JS/JSTestNamedConstructor.h:
+        * bindings/scripts/test/JS/JSTestNode.cpp:
+        * bindings/scripts/test/JS/JSTestNode.h:
+        * bindings/scripts/test/JS/JSTestNondeterministic.cpp:
+        * bindings/scripts/test/JS/JSTestNondeterministic.h:
+        * bindings/scripts/test/JS/JSTestObj.cpp:
+        * bindings/scripts/test/JS/JSTestObj.h:
+        * bindings/scripts/test/JS/JSTestOverloadedConstructors.cpp:
+        * bindings/scripts/test/JS/JSTestOverloadedConstructors.h:
+        * bindings/scripts/test/JS/JSTestOverloadedConstructorsWithSequence.cpp:
+        * bindings/scripts/test/JS/JSTestOverloadedConstructorsWithSequence.h:
+        * bindings/scripts/test/JS/JSTestOverrideBuiltins.cpp:
+        * bindings/scripts/test/JS/JSTestOverrideBuiltins.h:
+        * bindings/scripts/test/JS/JSTestSerializedScriptValueInterface.cpp:
+        * bindings/scripts/test/JS/JSTestSerializedScriptValueInterface.h:
+        * bindings/scripts/test/JS/JSTestTypedefs.cpp:
+        * bindings/scripts/test/JS/JSTestTypedefs.h:
+        * bindings/scripts/test/JS/JSattribute.cpp:
+        * bindings/scripts/test/JS/JSattribute.h:
+        * bindings/scripts/test/JS/JSreadonly.cpp:
+        * bindings/scripts/test/JS/JSreadonly.h:
+        Regenerated.
+
+
+2016-10-02  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        Media controls for Soundcloud easily falls out of sync with what's actually playing
+        https://bugs.webkit.org/show_bug.cgi?id=162843
+        <rdar://problem/28176874>
+
+        Reviewed by Beth Dakin.
+
+        Currently, audio elements are subject to the same main content restrictions as video elements. This is
+        problematic on sites where audio elements are really the main content, such as soundcloud. We need a different
+        heuristic for determining whether audio elements such as these should be allowed to show playback controls.
+
+        Furthermore, we currently forbid autoplaying audio from showing controls if it has user gesture restrictions
+        (i.e. it started playing via script). This is, again, problematic on sites where audio elements are played one
+        after another (such as on soundcloud). Even though a subsequent audio element may have been triggered via
+        script, we might want still want to show controls for it if the user has explicitly triggered other elements on
+        the page to begin playing. However, if the user has not gestured on any media in the page, we still should not
+        show controls for audio elements that begin playing via script.
+
+        Adds two new unit tests to TestWebKitAPI simulating audio playback behavior on soundcloud.
+
+        * html/MediaElementSession.cpp:
+        (WebCore::MediaElementSession::removeBehaviorRestriction):
+        (WebCore::MediaElementSession::canShowControlsManager):
+        (WebCore::MediaElementSession::allowsPlaybackControlsForAutoplayingAudio):
+        * html/MediaElementSession.h:
+        * page/Page.h:
+        (WebCore::Page::allowsPlaybackControlsForAutoplayingAudio):
+        (WebCore::Page::setAllowsPlaybackControlsForAutoplayingAudio):
+
+2016-10-02  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Unreviewed, rolling out r206683.
+
+        This change caused API test WebKit2.FindMatches to fail on
+        Mac.
+
+        Reverted changeset:
+
+        "The dragged image should be the current frame only of the
+        animated image"
+        https://bugs.webkit.org/show_bug.cgi?id=162109
+        http://trac.webkit.org/changeset/206683
+
+2016-10-02  Chris Dumez  <cdumez@apple.com>
+
+        Unreviewed, rolling out r206692 and r206718.
+
+        Seems to have caused >200 failures on Sierra
+
+        Reverted changesets:
+
+        "Implement rendering of font-variation-settings"
+        https://bugs.webkit.org/show_bug.cgi?id=162782
+        http://trac.webkit.org/changeset/206692
+
+        "Tried to fix the build after r206692."
+        http://trac.webkit.org/changeset/206718
+
+2016-10-02  Dan Bernstein  <mitz@apple.com>
+
+        Tried to fix the build after r206692.
+
+        * platform/graphics/cocoa/FontPlatformDataCocoa.mm:
+        (WebCore::cascadeToLastResortAndVariationsFontDescriptor):
+
+2016-10-02  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r206716.
+        https://bugs.webkit.org/show_bug.cgi?id=162858
+
+        It is breaking Mac CMake Debug build (Requested by youenn on
+        #webkit).
+
+        Reverted changeset:
+
+        "[Fetch API] Forbid redirection to non-HTTP(s) URL in non-
+        navigation mode."
+        https://bugs.webkit.org/show_bug.cgi?id=162785
+        http://trac.webkit.org/changeset/206716
+
+2016-10-02  Youenn Fablet  <youenn@apple.com>
+
+        [Fetch API] Forbid redirection to non-HTTP(s) URL in non-navigation mode.
+        https://bugs.webkit.org/show_bug.cgi?id=162785
+
+        Reviewed by Alex Christensen.
+
+        Covered by rebased and existing tests.
+
+        Ensuring non-HTTP redirection URLs are not followed at DocumentThreadableLoader level for fetch API only.
+        This should be applied to all clients at some point, but there is still some uncertainty for data URLs.
+
+        Did some refactoring to better separate the case of security checks in case of regular request or redirected request.
+        This allows in particular to handle more clearly the case of data URLs which are allowed in all modes for regular requests.
+        But they are not allowed for same-origin redirected requests.
+
+        * WebCore.xcodeproj/project.pbxproj:
+        * loader/DocumentThreadableLoader.cpp:
+        (WebCore::reportRedirectionWithBadScheme): Reporting bad scheme redirection error.
+        (WebCore::DocumentThreadableLoader::redirectReceived): Checking that redirection URLs are HTTP(s) in case of Fetch API.
+        * loader/SubresourceLoader.cpp:
+        (WebCore::SubresourceLoader::willSendRequestInternal):
+        * loader/cache/CachedResourceLoader.cpp:
+        (WebCore::CachedResourceLoader::requestImage):
+        (WebCore::CachedResourceLoader::checkInsecureContent):
+        (WebCore::CachedResourceLoader::allowedByContentSecurityPolicy):
+        (WebCore::isSameOriginDataURL):
+        (WebCore::CachedResourceLoader::canRequest):
+        (WebCore::CachedResourceLoader::canRequestAfterRedirection):
+        (WebCore::CachedResourceLoader::canRequestInContentDispositionAttachmentSandbox):
+        (WebCore::CachedResourceLoader::requestResource):
+        * loader/cache/CachedResourceLoader.h:
+
 2016-10-01  Simon Fraser  <simon.fraser@apple.com>
 
         Support transitions/animations of background-position with right/bottom-relative values

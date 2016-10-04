@@ -1,3 +1,93 @@
+2016-10-03  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser should ignore tabs at all locations
+        https://bugs.webkit.org/show_bug.cgi?id=162836
+
+        Reviewed by Geoffrey Garen.
+
+        * TestWebKitAPI/Tests/WebCore/URLParser.cpp:
+        (TestWebKitAPI::checkURL):
+        (TestWebKitAPI::checkRelativeURL):
+        (TestWebKitAPI::checkURLDifferences):
+        (TestWebKitAPI::checkRelativeURLDifferences):
+        (TestWebKitAPI::TEST_F):
+
+2016-10-03  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser: fragment-only URLs relative to file URLs should just add a fragment
+        https://bugs.webkit.org/show_bug.cgi?id=162871
+
+        Reviewed by Geoffrey Garen.
+
+        * TestWebKitAPI/Tests/WebCore/URLParser.cpp:
+        (TestWebKitAPI::TEST_F):
+
+2016-10-03  Per Arne Vollan  <pvollan@apple.com>
+
+        [Win] DRT temp folder is not used.
+        https://bugs.webkit.org/show_bug.cgi?id=162863
+
+        Reviewed by Alex Christensen.
+
+        Convert DRT temp folder to DOS path, which DRT can use.
+
+        * Scripts/webkitpy/port/driver.py:
+        (Driver._setup_environ_for_driver):
+
+2016-10-03  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser: empty relative URLs should not copy fragment from the base URL
+        https://bugs.webkit.org/show_bug.cgi?id=162864
+
+        Reviewed by Chris Dumez.
+
+        * TestWebKitAPI/Tests/WebCore/URLParser.cpp:
+        (TestWebKitAPI::TEST_F):
+
+2016-10-03  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [SOUP] Cleanup persistent credential storage code
+        https://bugs.webkit.org/show_bug.cgi?id=162777
+
+        Reviewed by Alex Christensen.
+
+        Use USE(LIBSECRET) instead of ENABLE(CREDENTIAL_STORAGE).
+
+        * TestWebKitAPI/Tests/WebKit2Gtk/TestAuthentication.cpp:
+        (testWebViewAuthenticationStorage):
+
+2016-10-02  Darin Adler  <darin@apple.com>
+
+        Rename ExceptionCode-based exception handling to "legacy"
+        https://bugs.webkit.org/show_bug.cgi?id=162859
+
+        Reviewed by Chris Dumez.
+
+        * Scripts/do-webcore-rename: Updated script to do this round of renames.
+
+2016-10-02  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        Media controls for Soundcloud easily falls out of sync with what's actually playing
+        https://bugs.webkit.org/show_bug.cgi?id=162843
+        <rdar://problem/28176874>
+
+        Reviewed by Beth Dakin.
+
+        Adds two new tests simulating audio playback behavior on soundcloud. Also tweaks some of the WKWebView test
+        message handling logic to support having multiple message-handler mappings.
+
+        * TestWebKitAPI/TestWebKitAPI.xcodeproj/project.pbxproj:
+        * TestWebKitAPI/Tests/WebKit2Cocoa/VideoControlsManager.mm:
+        (TestWebKitAPI::TEST):
+        * TestWebKitAPI/Tests/WebKit2Cocoa/play-audio-on-click.html: Added.
+        * TestWebKitAPI/mac/TestWKWebViewMac.h:
+        * TestWebKitAPI/mac/TestWKWebViewMac.mm:
+        (-[TestMessageHandler addMessage:withHandler:]):
+        (-[TestMessageHandler userContentController:didReceiveScriptMessage:]):
+        (-[TestWKWebView performAfterReceivingMessage:action:]):
+        (-[TestWKWebView performAfterLoading:]):
+        (-[TestMessageHandler initWithMessage:handler:]): Deleted.
+
 2016-09-30  Alex Christensen  <achristensen@webkit.org>
 
         Fix off-by-one error in URLParser::parseIPv4Host

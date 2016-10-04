@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Igalia S.L.
+ * Copyright (C) 2016 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,7 +10,7 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY IGALIA S.L. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
@@ -23,31 +23,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef CredentialBackingStore_h
-#define CredentialBackingStore_h
-
-#include "Credential.h"
-
-namespace WebCore {
-
-class AuthenticationChallenge;
-
-class CredentialBackingStore {
-WTF_MAKE_NONCOPYABLE(CredentialBackingStore);
-public:
-    friend CredentialBackingStore& credentialBackingStore();
-    virtual ~CredentialBackingStore() { }
-
-    typedef void (*CredentialForChallengeCallback)(const Credential&, void* data);
-
-    void credentialForChallenge(const AuthenticationChallenge&, CredentialForChallengeCallback, void* data);
-    void storeCredentialsForChallenge(const AuthenticationChallenge&, const Credential&);
-private:
-    CredentialBackingStore() { }
-};
-
-CredentialBackingStore& credentialBackingStore();
-
-} // namespace WebCore
-
-#endif // CredentialBackingStore_h
+button {
+    position: absolute;
+    border: 0;
+    -webkit-appearance: none;
+}

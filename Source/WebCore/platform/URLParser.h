@@ -71,6 +71,7 @@ private:
     void advance(CodePointIterator<CharacterType>& iterator) { advance<CharacterType, reportSyntaxViolation>(iterator, iterator); }
     template<typename CharacterType, ReportSyntaxViolation = ReportSyntaxViolation::Yes>
     void advance(CodePointIterator<CharacterType>&, const CodePointIterator<CharacterType>& iteratorForSyntaxViolationPosition);
+    template<typename CharacterType> bool takesTwoAdvancesUntilEnd(CodePointIterator<CharacterType>);
     template<typename CharacterType> void syntaxViolation(const CodePointIterator<CharacterType>&);
     template<typename CharacterType> void fragmentSyntaxViolation(const CodePointIterator<CharacterType>&);
     template<typename CharacterType> bool isPercentEncodedDot(CodePointIterator<CharacterType>);
@@ -93,7 +94,7 @@ private:
     void appendToASCIIBuffer(const char*, size_t);
     void appendToASCIIBuffer(const LChar* characters, size_t size) { appendToASCIIBuffer(reinterpret_cast<const char*>(characters), size); }
     template<typename CharacterType> void encodeQuery(const Vector<UChar>& source, const TextEncoding&, CodePointIterator<CharacterType>);
-    void copyASCIIStringUntil(const String&, size_t lengthIf8Bit, size_t lengthIf16Bit);
+    void copyASCIIStringUntil(const String&, size_t length);
     StringView parsedDataView(size_t start, size_t length);
 
     using IPv4Address = uint32_t;

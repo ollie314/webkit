@@ -1,3 +1,132 @@
+2016-10-03  Keith Rollin  <krollin@apple.com>
+
+        More logging to diagnose "WebKit encountered an internal error" messages
+        https://bugs.webkit.org/show_bug.cgi?id=162754
+
+        Reviewed by Antti Koivisto.
+
+        Add more logging around calls to internalError, as well as some
+        low-level logging around SharedMemory, and mach_vm_map in particular.
+
+        * NetworkProcess/NetworkResourceLoader.cpp:
+        (WebKit::NetworkResourceLoader::startNetworkLoad):
+        * Platform/Logging.h:
+        * Platform/mac/SharedMemoryMac.cpp:
+        (WebKit::SharedMemory::allocate):
+        (WebKit::makeMemoryEntry):
+        (WebKit::SharedMemory::map):
+        (WebKit::SharedMemory::~SharedMemory):
+        * WebProcess/Network/WebLoaderStrategy.cpp:
+        (WebKit::WebLoaderStrategy::networkProcessCrashed):
+        (WebKit::WebLoaderStrategy::loadResourceSynchronously):
+        * WebProcess/Network/WebResourceLoader.cpp:
+        (WebKit::WebResourceLoader::didReceiveResource):
+
+2016-10-03  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Unreviewed, rolling out r206754.
+
+        This change broke the El Capitan and Yosemite debug builds.
+
+        Reverted changeset:
+
+        "More logging to diagnose "WebKit encountered an internal
+        error" messages"
+        https://bugs.webkit.org/show_bug.cgi?id=162754
+        http://trac.webkit.org/changeset/206754
+
+2016-10-03  Keith Rollin  <krollin@apple.com>
+
+        More logging to diagnose "WebKit encountered an internal error" messages
+        https://bugs.webkit.org/show_bug.cgi?id=162754
+
+        Reviewed by Antti Koivisto.
+
+        Add more logging around calls to internalError, as well as some
+        low-level logging around SharedMemory, and mach_vm_map in particular.
+
+        * NetworkProcess/NetworkResourceLoader.cpp:
+        (WebKit::NetworkResourceLoader::startNetworkLoad):
+        * Platform/Logging.h:
+        * Platform/mac/SharedMemoryMac.cpp:
+        (WebKit::SharedMemory::allocate):
+        (WebKit::makeMemoryEntry):
+        (WebKit::SharedMemory::map):
+        (WebKit::SharedMemory::~SharedMemory):
+        * WebProcess/Network/WebLoaderStrategy.cpp:
+        (WebKit::WebLoaderStrategy::networkProcessCrashed):
+        (WebKit::WebLoaderStrategy::loadResourceSynchronously):
+        * WebProcess/Network/WebResourceLoader.cpp:
+        (WebKit::WebResourceLoader::didReceiveResource):
+
+2016-10-03  Chris Dumez  <cdumez@apple.com>
+
+        Add support for KeyboardEvent.key attribute
+        https://bugs.webkit.org/show_bug.cgi?id=36267
+
+        Reviewed by Darin Adler.
+
+        Add support for KeyboardEvent.key attribute.
+
+        * Shared/WebEvent.h:
+        (WebKit::WebKeyboardEvent::key):
+        (WebKit::WebKeyboardEvent::unmodifiedText): Deleted.
+        * Shared/WebEventConversion.cpp:
+        (WebKit::WebKit2PlatformKeyboardEvent::WebKit2PlatformKeyboardEvent):
+        * Shared/WebKeyboardEvent.cpp:
+        (WebKit::WebKeyboardEvent::WebKeyboardEvent):
+        (WebKit::WebKeyboardEvent::encode):
+        (WebKit::WebKeyboardEvent::decode):
+        * Shared/mac/WebEventFactory.mm:
+        (WebKit::WebEventFactory::createWebKeyboardEvent):
+
+2016-10-03  Chris Dumez  <cdumez@apple.com>
+
+        Add support for KeyboardEvent.key attribute
+        https://bugs.webkit.org/show_bug.cgi?id=36267
+
+        Reviewed by Darin Adler.
+
+        Add support for KeyboardEvent.key attribute.
+
+        * Shared/WebEvent.h:
+        (WebKit::WebKeyboardEvent::key):
+        (WebKit::WebKeyboardEvent::unmodifiedText): Deleted.
+        * Shared/WebEventConversion.cpp:
+        (WebKit::WebKit2PlatformKeyboardEvent::WebKit2PlatformKeyboardEvent):
+        * Shared/WebKeyboardEvent.cpp:
+        (WebKit::WebKeyboardEvent::WebKeyboardEvent):
+        (WebKit::WebKeyboardEvent::encode):
+        (WebKit::WebKeyboardEvent::decode):
+        * Shared/mac/WebEventFactory.mm:
+        (WebKit::WebEventFactory::createWebKeyboardEvent):
+
+2016-10-03  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [SOUP] Cleanup persistent credential storage code
+        https://bugs.webkit.org/show_bug.cgi?id=162777
+
+        Reviewed by Alex Christensen.
+
+        Use USE(LIBSECRET) instead of ENABLE(CREDENTIAL_STORAGE).
+
+        * UIProcess/API/gtk/WebKitAuthenticationRequest.cpp:
+        (webkit_authentication_request_can_save_credentials):
+
+2016-10-02  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Unreviewed, rolling out r206683.
+
+        This change caused API test WebKit2.FindMatches to fail on
+        Mac.
+
+        Reverted changeset:
+
+        "The dragged image should be the current frame only of the
+        animated image"
+        https://bugs.webkit.org/show_bug.cgi?id=162109
+        http://trac.webkit.org/changeset/206683
+
 2016-09-30  Myles C. Maxfield  <mmaxfield@apple.com>
 
         Follow-up patch after r206701

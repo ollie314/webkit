@@ -1,3 +1,43 @@
+2016-10-03  JF Bastien  <jfbastien@apple.com>
+
+        Auto-generate WASMOps.h, share with testing JSON file
+        https://bugs.webkit.org/show_bug.cgi?id=162870
+
+        Reviewed by Keith Miller.
+
+        * stress/wasm/to-c++.js: Added. Generates WASMOps.h, siilar to the current one but with more data.
+        (const.opcode_iterator):
+        (opcode_macroizer):
+        * stress/wasm/wasm.json: Added. Data from 0xC binary format version.
+
+2016-10-03  Saam Barati  <sbarati@apple.com>
+
+        MapHash should speculate on the type of its child node
+        https://bugs.webkit.org/show_bug.cgi?id=161922
+
+        Reviewed by Filip Pizlo.
+
+        * microbenchmarks/map-key-well-typed.js: Added.
+        (assert):
+        (intKey):
+        (doubleKey):
+        (objectKey):
+        (stringKey):
+        (booleanKey):
+        (symbolKey):
+        (cellKey):
+        (assert.doubleKey):
+        (assert.booleanKey):
+
+2016-10-03  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [ES6] GeneratorFunction (a.k.a. GeneratorWrapperFunction)'s prototype object does not have constructor property
+        https://bugs.webkit.org/show_bug.cgi?id=162849
+
+        Reviewed by Geoffrey Garen.
+
+        * test262.yaml:
+
 2016-10-01  Yusuke Suzuki  <utatane.tea@gmail.com>
 
         [ES6] Align attributes of Generator related properties to spec

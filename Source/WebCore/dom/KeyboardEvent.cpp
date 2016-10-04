@@ -104,8 +104,12 @@ KeyboardEvent::KeyboardEvent(const PlatformKeyboardEvent& key, DOMWindow* view)
     : UIEventWithKeyState(eventTypeForKeyboardEventType(key.type()),
                           true, true, key.timestamp(), view, 0, key.ctrlKey(), key.altKey(), key.shiftKey(), key.metaKey())
     , m_keyEvent(std::make_unique<PlatformKeyboardEvent>(key))
+#if ENABLE(KEYBOARD_KEY_ATTRIBUTE)
+    , m_key(key.key())
+#endif
     , m_keyIdentifier(key.keyIdentifier())
     , m_location(keyLocationCode(key))
+    , m_repeat(key.isAutoRepeat())
     , m_altGraphKey(false)
 #if PLATFORM(COCOA)
 #if USE(APPKIT)
@@ -126,8 +130,12 @@ KeyboardEvent::KeyboardEvent(WTF::HashTableDeletedValueType)
 
 KeyboardEvent::KeyboardEvent(const AtomicString& eventType, const KeyboardEventInit& initializer)
     : UIEventWithKeyState(eventType, initializer)
+#if ENABLE(KEYBOARD_KEY_ATTRIBUTE)
+    , m_key(initializer.key)
+#endif
     , m_keyIdentifier(initializer.keyIdentifier)
     , m_location(initializer.location)
+    , m_repeat(initializer.repeat)
     , m_altGraphKey(false)
 #if PLATFORM(COCOA)
     , m_handledByInputMethod(false)
@@ -167,6 +175,9 @@ bool KeyboardEvent::getModifierState(const String& keyIdentifier) const
         return altKey();
     if (keyIdentifier == "Meta")
         return metaKey();
+    if (keyIdentifier == "AltGraph")
+        return altGraphKey();
+    // FIXME: We should support CapsLock, Fn, FnLock, Hyper, NumLock, Super, ScrollLock, Symbol, SymbolLock.
     return false;
 }
 

@@ -1,3 +1,201 @@
+2016-10-03  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Implement rendering of font-variation-settings
+        https://bugs.webkit.org/show_bug.cgi?id=162782
+
+        Reviewed by Zalan Bujtas.
+
+        * fast/text/variations/duplicate-expected.html: Added.
+        * fast/text/variations/duplicate.html: Added.
+        * fast/text/variations/exist-expected-mismatch.html: Added.
+        * fast/text/variations/exist.html: Added.
+        * fast/text/variations/getComputedStyle.html:
+        * fast/text/variations/inheritance-expected.html: Added.
+        * fast/text/variations/inheritance.html: Added.
+        * fast/text/variations/order-expected.html: Added.
+        * fast/text/variations/order.html: Added.
+        * fast/text/variations/outofbounds-expected.html: Added.
+        * fast/text/variations/outofbounds.html: Added.
+
+2016-10-03  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking svg/custom/animate-initial-pause-unpause.html as flaky on mac and ios-simulator-wk2 debug.
+        https://bugs.webkit.org/show_bug.cgi?id=127116
+
+        Unreviewed test gardening.
+
+        * platform/ios-simulator-wk2/TestExpectations:
+        * platform/mac/TestExpectations:
+
+2016-10-03  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking fast/events/tabindex-focus-blur-all.html as a flaky timeout on mac-debug.
+        https://bugs.webkit.org/show_bug.cgi?id=162830
+
+        Unreviewed test gardening.
+
+        * platform/mac/TestExpectations:
+
+2016-10-03  Brent Fulgham  <bfulgham@apple.com>
+
+        Avoid null dereference when changing focus in design mode.
+        https://bugs.webkit.org/show_bug.cgi?id=162877
+        <rdar://problem/28061261>
+
+        Reviewed by Chris Dumez.
+
+        * fast/frames/iframe-focus-crash-expected.txt: Added.
+        * fast/frames/iframe-focus-crash.html: Added.
+        * fast/frames/resources/iframe-focus-crash.html: Added.
+
+2016-10-03  Chris Dumez  <cdumez@apple.com>
+
+        Add support for KeyboardEvent.key attribute
+        https://bugs.webkit.org/show_bug.cgi?id=36267
+
+        Reviewed by Darin Adler.
+
+        Extend layout test coverage.
+
+        * fast/events/constructors/keyboard-event-constructor-expected.txt:
+        * fast/events/constructors/keyboard-event-constructor.html:
+        * fast/events/key-events-in-input-button-expected.txt:
+        * fast/events/key-events-in-input-button.html:
+        * fast/events/key-events-in-input-text-expected.txt:
+        * fast/events/key-events-in-input-text.html:
+        * fast/events/keyboardevent-key-expected.txt: Added.
+        * fast/events/keyboardevent-key.html: Added.
+        * fast/events/special-key-events-in-input-text-expected.txt:
+        * fast/events/special-key-events-in-input-text.html:
+        * platform/ios-simulator/TestExpectations:
+
+2016-10-03  Chris Dumez  <cdumez@apple.com>
+
+        Add support for KeyboardEvent.key attribute
+        https://bugs.webkit.org/show_bug.cgi?id=36267
+
+        Reviewed by Darin Adler.
+
+        Extend layout test coverage.
+
+        * fast/events/constructors/keyboard-event-constructor-expected.txt:
+        * fast/events/constructors/keyboard-event-constructor.html:
+        * fast/events/key-events-in-input-button-expected.txt:
+        * fast/events/key-events-in-input-button.html:
+        * fast/events/key-events-in-input-text-expected.txt:
+        * fast/events/key-events-in-input-text.html:
+        * fast/events/keyboardevent-key-expected.txt: Added.
+        * fast/events/keyboardevent-key.html: Added.
+        * fast/events/special-key-events-in-input-text-expected.txt:
+        * fast/events/special-key-events-in-input-text.html:
+        * platform/ios-simulator/TestExpectations:
+
+2016-10-03  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking storage/indexeddb/index-cursor.html as flaky on mac-wk2.
+        https://bugs.webkit.org/show_bug.cgi?id=161926
+
+        Unreviewed test gardening.
+
+        * platform/mac-wk2/TestExpectations:
+
+2016-10-03  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking http/tests/security/anchor-download-allow-data.html as flaky on mac-wk2.
+        https://bugs.webkit.org/show_bug.cgi?id=161745
+
+        Unreviewed test gardening.
+
+        * platform/mac-wk2/TestExpectations:
+
+2016-10-03  Antoine Quint  <graouts@apple.com>
+
+        [Modern Media Controls] LayoutItem and Button classes
+        https://bugs.webkit.org/show_bug.cgi?id=162868
+        <rdar://problem/28590166>
+
+        Reviewed by Dean Jackson.
+
+        Testing all public properties and methods of the LayoutItem and Button classes.
+
+        * media/modern-media-controls/button/button-expected.txt: Added.
+        * media/modern-media-controls/button/button.html: Added.
+        * media/modern-media-controls/layout-item/layout-item-expected.txt: Added.
+        * media/modern-media-controls/layout-item/layout-item.html: Added.
+
+2016-10-03  Andy Estes  <aestes@apple.com>
+
+        ASSERTION FAILED: url.containsOnlyASCII() in WebCore::checkEncodedString() when parsing an invalid CSS cursor URL
+        https://bugs.webkit.org/show_bug.cgi?id=162763
+        <rdar://problem/28572758>
+
+        Reviewed by Youenn Fablet.
+
+        * fast/css/cursor-with-invalid-url.html: Added.
+        * fast/css/cursor-with-invalid-url-expected.txt: Added.
+
+2016-10-03  Andy Estes  <aestes@apple.com>
+
+        ASSERTION FAILED: result in WebCore::CSSParser::parseURI
+        https://bugs.webkit.org/show_bug.cgi?id=141638
+        <rdar://problem/27709952>
+
+        Reviewed by Andreas Kling.
+
+        * fast/css/url-with-multi-byte-unicode-escape-expected.txt: Added a test for an unquoted URL.
+        * fast/css/url-with-multi-byte-unicode-escape.html:
+
+2016-10-03  Chris Dumez  <cdumez@apple.com>
+
+        td.scope should only return known values
+        https://bugs.webkit.org/show_bug.cgi?id=162755
+
+        Reviewed by Sam Weinig.
+
+        Update existing test to reflect behavior change.
+
+        * fast/dom/element-attribute-js-null-expected.txt:
+        * fast/dom/element-attribute-js-null.html:
+
+2016-10-02  Chris Dumez  <cdumez@apple.com>
+
+        Add support for KeyboardEvent.getModifierState() operation
+        https://bugs.webkit.org/show_bug.cgi?id=162855
+
+        Reviewed by Darin Adler.
+
+        Add layout test coverage.
+
+        * fast/events/constructors/keyboard-event-getModifierState-expected.txt: Added.
+        * fast/events/constructors/keyboard-event-getModifierState.html: Added.
+
+2016-10-02  Chris Dumez  <cdumez@apple.com>
+
+        Add support for KeyboardEvent.repeat attribute
+        https://bugs.webkit.org/show_bug.cgi?id=162854
+
+        Reviewed by Darin Adler.
+
+        Extend layout test coverage.
+
+        * fast/events/constructors/keyboard-event-constructor-expected.txt:
+        * fast/events/constructors/keyboard-event-constructor.html:
+
+2016-10-02  Chris Dumez  <cdumez@apple.com>
+
+        Unreviewed, rolling out r206692 and r206718.
+
+        Seems to have caused >200 failures on Sierra
+
+        Reverted changesets:
+
+        "Implement rendering of font-variation-settings"
+        https://bugs.webkit.org/show_bug.cgi?id=162782
+        http://trac.webkit.org/changeset/206692
+
+        "Tried to fix the build after r206692."
+        http://trac.webkit.org/changeset/206718
+
 2016-10-01  Simon Fraser  <simon.fraser@apple.com>
 
         Support transitions/animations of background-position with right/bottom-relative values

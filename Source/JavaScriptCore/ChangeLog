@@ -1,3 +1,138 @@
+2016-10-03  Saam Barati  <sbarati@apple.com>
+
+        GetMapBucket node should speculate on the type of its 'key' child
+        https://bugs.webkit.org/show_bug.cgi?id=161638
+
+        Reviewed by Filip Pizlo.
+
+        This eliminates type-check branches when we've already
+        proven the type of the incoming key. Also, it reduces
+        the branches we emit when type checking the bucket's key.
+
+        This is a 2-3% speedup on ES6SampleBench/Basic.
+
+        * dfg/DFGFixupPhase.cpp:
+        (JSC::DFG::FixupPhase::fixupNode):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * ftl/FTLLowerDFGToB3.cpp:
+        (JSC::FTL::DFG::LowerDFGToB3::compileGetMapBucket):
+
+2016-10-03  Christopher Reid  <Christopher.Reid@am.sony.com>
+
+        Offline asm should not output masm assembly when using a x86_64 asm backend
+        https://bugs.webkit.org/show_bug.cgi?id=162705
+
+        When cross compiling on windows to Clang, masm was being generated simply because
+        the os was windows. This change adds a command line parameter --assembler=MASM
+        to set the output assembly to masm.
+        The functions isGCC and isCompilingToWindows were removed as they are no longer called.
+
+        Reviewed by Mark Lam.
+
+        * CMakeLists.txt:
+        * offlineasm/asm.rb:
+        * offlineasm/x86.rb:
+
+2016-10-03  JF Bastien  <jfbastien@apple.com>
+
+        Auto-generate WASMOps.h, share with testing JSON file
+        https://bugs.webkit.org/show_bug.cgi?id=162870
+
+        Reviewed by Keith Miller.
+
+        Add a few new opcodes, but keep this mostly as-is for now. I want
+        to generate smarter code but will do so in a later update to
+        reduce disruption.
+
+        * wasm/WASMOps.h: auto-generated from ./JSTests/stress/wasm/to-c++.js
+
+2016-10-03  Michael Saboff  <msaboff@apple.com>
+
+        Creating pcToOriginMap in FTL shouldn't insert unnecessary NOPs
+        https://bugs.webkit.org/show_bug.cgi?id=162879
+
+        Reviewed by Filip Pizlo.
+
+        If there is a recent watchpoint label, using MacroAssembler::label() will pad
+        the instruction stream with NOPs to provide space for a jump.  This changes
+        Air::generate() to use labelIgnoringWatchpoints() to create pcToOriginMap
+        entries to eliminate unneccesary NOPs.
+        
+        * b3/air/AirGenerate.cpp:
+        (JSC::B3::Air::generate):
+        * b3/testb3.cpp:
+        (JSC::B3::testPCOriginMapDoesntInsertNops): New test.
+        (JSC::B3::run):
+
+2016-10-03  Saam Barati  <sbarati@apple.com>
+
+        MapHash should speculate on the type of its child node
+        https://bugs.webkit.org/show_bug.cgi?id=161922
+
+        Reviewed by Filip Pizlo.
+
+        This allows us to remove runtime type checks when we've already
+        proven the type of the incoming value.
+
+        This is a 2-3% speedup on ES6SampleBench/Basic.
+
+        * dfg/DFGFixupPhase.cpp:
+        (JSC::DFG::FixupPhase::fixupNode):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * ftl/FTLLowerDFGToB3.cpp:
+        (JSC::FTL::DFG::LowerDFGToB3::wangsInt64Hash):
+        (JSC::FTL::DFG::LowerDFGToB3::mapHashString):
+        (JSC::FTL::DFG::LowerDFGToB3::compileMapHash):
+
+2016-10-03  Filip Pizlo  <fpizlo@apple.com>
+
+        B3 trapping memory accesses should be documented
+        https://bugs.webkit.org/show_bug.cgi?id=162845
+
+        Reviewed by Geoffrey Garen.
+        
+        While writing some documentation, I found some small holes in the code.
+
+        * b3/B3Effects.cpp:
+        (JSC::B3::Effects::operator==): Need this to write tests.
+        (JSC::B3::Effects::operator!=): Need this to write tests.
+        * b3/B3Effects.h:
+        * b3/B3HeapRange.h:
+        * b3/B3MemoryValue.cpp:
+        (JSC::B3::MemoryValue::dumpMeta): Sometimes the heap range dump won't show you the memory value's actual range. This makes the dump show you the actual range in that case.
+        * b3/B3Value.cpp:
+        (JSC::B3::Value::effects): While documenting this, I remembered that trapping also has to imply reading top. I fixed this.
+        * b3/testb3.cpp:
+        (JSC::B3::testTrappingLoad): Added checks for the effects of trapping loads.
+        (JSC::B3::testTrappingStore): Added checks for the effects of trapping stores.
+        (JSC::B3::testMoveConstants): Made this not crash with validation.
+
+2016-10-03  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [ES6] GeneratorFunction (a.k.a. GeneratorWrapperFunction)'s prototype object does not have constructor property
+        https://bugs.webkit.org/show_bug.cgi?id=162849
+
+        Reviewed by Geoffrey Garen.
+
+        Since GeneratorFunction is not constructible, GeneratorFunction.prototype does not have "constructor" property.
+
+            function* generatorFunction() { }
+            generatorFunction.prototype.constructor // undefined
+
+        * runtime/JSFunction.cpp:
+        (JSC::JSFunction::getOwnPropertySlot):
+
+2016-10-03  Nicolas Breidinger  <Nicolas.Breidinger@sony.com>
+
+        JSStringRef should define JSChar without platform checks
+        https://bugs.webkit.org/show_bug.cgi?id=162808
+
+        Reviewed by Mark Lam.
+
+        * API/JSStringRef.h:
+
 2016-10-01  Yusuke Suzuki  <utatane.tea@gmail.com>
 
         [ES6] Align attributes of Generator related properties to spec
