@@ -691,6 +691,12 @@ private:
         case PutByValWithThis:
             compilePutByValWithThis();
             break;
+        case DefineDataProperty:
+            compileDefineDataProperty();
+            break;
+        case DefineAccessorProperty:
+            compileDefineAccessorProperty();
+            break;
         case ArrayPush:
             compileArrayPush();
             break;
@@ -1036,6 +1042,9 @@ private:
             break;
         case Unreachable:
             compileUnreachable();
+            break;
+        case ToLowerCase:
+            compileToLowerCase();
             break;
 
         case PhantomLocal:
@@ -2762,6 +2771,71 @@ private:
 
         vmCall(Void, m_out.operation(m_graph.isStrictModeFor(m_node->origin.semantic) ? operationPutByValWithThisStrict : operationPutByValWithThis),
             m_callFrame, base, thisValue, property, value);
+    }
+
+    void compileDefineDataProperty()
+    {
+        LValue base = lowCell(m_graph.varArgChild(m_node, 0));
+        LValue value  = lowJSValue(m_graph.varArgChild(m_node, 2));
+        LValue attributes = lowInt32(m_graph.varArgChild(m_node, 3));
+        Edge& propertyEdge = m_graph.varArgChild(m_node, 1);
+        switch (propertyEdge.useKind()) {
+        case StringUse: {
+            LValue property = lowString(propertyEdge);
+            vmCall(Void, m_out.operation(operationDefineDataPropertyString), m_callFrame, base, property, value, attributes);
+            break;
+        }
+        case StringIdentUse: {
+            LValue property = lowStringIdent(propertyEdge);
+            vmCall(Void, m_out.operation(operationDefineDataPropertyStringIdent), m_callFrame, base, property, value, attributes);
+            break;
+        }
+        case SymbolUse: {
+            LValue property = lowSymbol(propertyEdge);
+            vmCall(Void, m_out.operation(operationDefineDataPropertySymbol), m_callFrame, base, property, value, attributes);
+            break;
+        }
+        case UntypedUse: {
+            LValue property = lowJSValue(propertyEdge);
+            vmCall(Void, m_out.operation(operationDefineDataProperty), m_callFrame, base, property, value, attributes);
+            break;
+        }
+        default:
+            RELEASE_ASSERT_NOT_REACHED();
+        }
+    }
+
+    void compileDefineAccessorProperty()
+    {
+        LValue base = lowCell(m_graph.varArgChild(m_node, 0));
+        LValue getter = lowCell(m_graph.varArgChild(m_node, 2));
+        LValue setter = lowCell(m_graph.varArgChild(m_node, 3));
+        LValue attributes = lowInt32(m_graph.varArgChild(m_node, 4));
+        Edge& propertyEdge = m_graph.varArgChild(m_node, 1);
+        switch (propertyEdge.useKind()) {
+        case StringUse: {
+            LValue property = lowString(propertyEdge);
+            vmCall(Void, m_out.operation(operationDefineAccessorPropertyString), m_callFrame, base, property, getter, setter, attributes);
+            break;
+        }
+        case StringIdentUse: {
+            LValue property = lowStringIdent(propertyEdge);
+            vmCall(Void, m_out.operation(operationDefineAccessorPropertyStringIdent), m_callFrame, base, property, getter, setter, attributes);
+            break;
+        }
+        case SymbolUse: {
+            LValue property = lowSymbol(propertyEdge);
+            vmCall(Void, m_out.operation(operationDefineAccessorPropertySymbol), m_callFrame, base, property, getter, setter, attributes);
+            break;
+        }
+        case UntypedUse: {
+            LValue property = lowJSValue(propertyEdge);
+            vmCall(Void, m_out.operation(operationDefineAccessorProperty), m_callFrame, base, property, getter, setter, attributes);
+            break;
+        }
+        default:
+            RELEASE_ASSERT_NOT_REACHED();
+        }
     }
     
     void compilePutById()
@@ -8550,6 +8624,60 @@ private:
 
         DFG_ASSERT(m_graph, m_node, m_node->isBinaryUseKind(UntypedUse));
         nonSpeculativeCompare(intFunctor, fallbackFunction);
+    }
+
+    void compileToLowerCase()
+    {
+        LBasicBlock notRope = m_out.newBlock();
+        LBasicBlock is8Bit = m_out.newBlock();
+        LBasicBlock loopTop = m_out.newBlock();
+        LBasicBlock loopBody = m_out.newBlock();
+        LBasicBlock slowPath = m_out.newBlock();
+        LBasicBlock continuation = m_out.newBlock();
+
+        LValue string = lowString(m_node->child1());
+        ValueFromBlock startIndex = m_out.anchor(m_out.constInt32(0));
+        ValueFromBlock startIndexForCall = m_out.anchor(m_out.constInt32(0));
+        LValue impl = m_out.loadPtr(string, m_heaps.JSString_value);
+        m_out.branch(m_out.isZero64(impl),
+            unsure(slowPath), unsure(notRope));
+
+        LBasicBlock lastNext = m_out.appendTo(notRope, is8Bit);
+
+        m_out.branch(
+            m_out.testIsZero32(
+                m_out.load32(impl, m_heaps.StringImpl_hashAndFlags),
+                m_out.constInt32(StringImpl::flagIs8Bit())),
+            unsure(slowPath), unsure(is8Bit));
+
+        m_out.appendTo(is8Bit, loopTop);
+        LValue length = m_out.load32(impl, m_heaps.StringImpl_length);
+        LValue buffer = m_out.loadPtr(impl, m_heaps.StringImpl_data);
+        ValueFromBlock fastResult = m_out.anchor(string);
+        m_out.jump(loopTop);
+
+        m_out.appendTo(loopTop, loopBody);
+        LValue index = m_out.phi(Int32, startIndex);
+        ValueFromBlock indexFromBlock = m_out.anchor(index);
+        m_out.branch(m_out.below(index, length),
+            unsure(loopBody), unsure(continuation));
+
+        m_out.appendTo(loopBody, slowPath);
+
+        LValue byte = m_out.load8ZeroExt32(m_out.baseIndex(m_heaps.characters8, buffer, m_out.zeroExtPtr(index)));
+        LValue isInvalidAsciiRange = m_out.bitAnd(byte, m_out.constInt32(~0x7F));
+        LValue isUpperCase = m_out.belowOrEqual(m_out.sub(byte, m_out.constInt32('A')), m_out.constInt32('Z' - 'A'));
+        LValue isBadCharacter = m_out.bitOr(isInvalidAsciiRange, isUpperCase);
+        m_out.addIncomingToPhi(index, m_out.anchor(m_out.add(index, m_out.int32One)));
+        m_out.branch(isBadCharacter, unsure(slowPath), unsure(loopTop));
+
+        m_out.appendTo(slowPath, continuation);
+        LValue slowPathIndex = m_out.phi(Int32, startIndexForCall, indexFromBlock);
+        ValueFromBlock slowResult = m_out.anchor(vmCall(pointerType(), m_out.operation(operationToLowerCase), m_callFrame, string, slowPathIndex));
+        m_out.jump(continuation);
+
+        m_out.appendTo(continuation, lastNext);
+        setJSValue(m_out.phi(pointerType(), fastResult, slowResult));
     }
 
     void compileResolveScope()

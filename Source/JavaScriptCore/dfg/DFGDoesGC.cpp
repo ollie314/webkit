@@ -111,6 +111,8 @@ bool doesGC(Graph& graph, Node* node)
     case PutGetterSetterById:
     case PutGetterByVal:
     case PutSetterByVal:
+    case DefineDataProperty:
+    case DefineAccessorProperty:
     case DeleteById:
     case DeleteByVal:
     case CheckStructure:
@@ -290,6 +292,7 @@ bool doesGC(Graph& graph, Node* node)
     case StringReplace:
     case StringReplaceRegExp:
     case CreateRest:
+    case ToLowerCase:
         return true;
         
     case MultiPutByOffset:

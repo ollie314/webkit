@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003, 2006, 2007, 2008, 2009, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2003-2016 Apple Inc. All rights reserved.
  * Copyright (C) 2008-2009 Torch Mobile, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,6 +38,11 @@
 
 #if USE(CG)
 typedef struct CGContext PlatformGraphicsContext;
+#elif USE(DIRECT2D)
+interface ID2D1DCRenderTarget;
+interface ID2D1RenderTarget;
+interface ID2D1Factory;
+typedef ID2D1RenderTarget PlatformGraphicsContext;
 #elif USE(CAIRO)
 namespace WebCore {
 class PlatformContextCairo;
@@ -300,11 +305,11 @@ public:
 
     const GraphicsContextState& state() const { return m_state; }
 
-#if USE(CG) || USE(CAIRO)
+#if USE(CG) || USE(DIRECT2D) || USE(CAIRO)
     WEBCORE_EXPORT void drawNativeImage(const NativeImagePtr&, const FloatSize& selfSize, const FloatRect& destRect, const FloatRect& srcRect, CompositeOperator = CompositeSourceOver, BlendMode = BlendModeNormal, ImageOrientation = ImageOrientation());
 #endif
 
-#if USE(CG)
+#if USE(CG) || USE(DIRECT2D)
     void applyStrokePattern();
     void applyFillPattern();
     void drawPath(const Path&);
@@ -540,6 +545,19 @@ public:
     // The bitmap should be non-premultiplied.
     void drawWindowsBitmap(WindowsBitmap*, const IntPoint&);
 #endif
+#if USE(DIRECT2D)
+    GraphicsContext(HDC, ID2D1DCRenderTarget**, RECT, bool hasAlpha = false); // FIXME: To be removed.
+
+    WEBCORE_EXPORT static ID2D1Factory* systemFactory();
+    WEBCORE_EXPORT static ID2D1RenderTarget* defaultRenderTarget();
+
+    WEBCORE_EXPORT void setDidBeginDraw(bool);
+    WEBCORE_EXPORT bool didBeginDraw() const;
+    D2D1_COLOR_F colorWithGlobalAlpha(const Color&) const;
+
+    ID2D1SolidColorBrush* solidStrokeBrush();
+    ID2D1SolidColorBrush* solidFillBrush();
+#endif
 #else // PLATFORM(WIN)
     bool shouldIncludeChildWindows() const { return false; }
 #endif // PLATFORM(WIN)
@@ -557,6 +575,13 @@ private:
 
 #if PLATFORM(WIN) && !USE(WINGDI)
     void platformInit(HDC, bool hasAlpha = false);
+#endif
+
+#if USE(DIRECT2D)
+    void platformInit(HDC, ID2D1RenderTarget**, RECT, bool hasAlpha = false);
+    void platformInit(ID2D1RenderTarget*);
+    void drawWithoutShadow(const FloatRect& boundingRect, const std::function<void(ID2D1RenderTarget*)>&);
+    void drawWithShadow(const FloatRect& boundingRect, const std::function<void(ID2D1RenderTarget*)>&);
 #endif
 
     void savePlatformState();

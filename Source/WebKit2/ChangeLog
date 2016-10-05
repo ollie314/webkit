@@ -1,3 +1,231 @@
+2016-10-05  Zan Dobersek  <zdobersek@igalia.com>
+
+        Rename ENABLE_ENCRYPTED_MEDIA_V2 to ENABLE_LEGACY_ENCRYPTED_MEDIA
+        https://bugs.webkit.org/show_bug.cgi?id=162903
+
+        Reviewed by Alex Christensen.
+
+        Rename build guards for the remaining implementation of the legacy EME API
+        to ENABLE_LEGACY_ENCRYPTED_MEDIA. This will allow for the future implementation
+        of the near-finished API to be guarded with the simple ENABLE_ENCRYPTED_MEDIA guards.
+
+        * Configurations/FeatureDefines.xcconfig:
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::m_userInterfaceLayoutDirection):
+        * WebProcess/WebProcess.cpp:
+        (WebKit::m_resourceLoadStatisticsStorage):
+
+2016-10-05  Daniel Bates  <dabates@apple.com>
+
+        [WK2][NetworkSession] Ping requests should follow redirects if applicable
+        https://bugs.webkit.org/show_bug.cgi?id=162580
+        <rdar://problem/28631274>
+
+        Reviewed by Alex Christensen.
+
+        Implement support for following redirects, if applicable, of a ping request when using the
+        Network Session (ENABLE(NETWORK_SESSION)) code path in WebKit2. For ping requests that are
+        in response to hyperlink auditing (e.g. <a ping>) we should follow redirect responses.
+        For Content Security Policy and XSS Auditor violation reports we should not follow redirect
+        responses.
+
+        Currently we always ignore redirects for ping requests that are sent using the Network Session
+        code path in WebKit2. This behavior disagrees with the behavior described in section
+        "Hyperlink auditing" of the HTML standard, <https://html.spec.whatwg.org/multipage/semantics.html#hyperlink-auditing> (27 September 2016),
+        as well as the behavior in Legacy WebKit and WebKit2 with Network Session disabled. We should
+        follow redirects for ping requests initiated as part of hyperlink auditing to more closely
+        conform to the HTML standard and match the behavior in Legacy WebKit and WebKit2 with Network
+        Session disabled.
+
+        * NetworkProcess/PingLoad.h:
+
+2016-10-05  Daniel Bates  <dabates@apple.com>
+
+        Do not follow redirects when sending violation report
+        https://bugs.webkit.org/show_bug.cgi?id=162520
+        <rdar://problem/27957639>
+
+        Reviewed by Alex Christensen.
+
+        Update the non-Network Session WebKit2 implementation to follow redirect responses for a ping
+        request, if applicable. I did not update the Network Session implementation at this time. I
+        will fix it in <https://bugs.webkit.org/show_bug.cgi?id=162580>.
+
+        * NetworkProcess/NetworkConnectionToWebProcess.cpp:
+        (WebKit::NetworkConnectionToWebProcess::loadPing): Tell PingHandle whether to follow redirects.
+        * NetworkProcess/NetworkLoadParameters.h:
+        * NetworkProcess/NetworkResourceLoadParameters.cpp:
+        (WebKit::NetworkResourceLoadParameters::encode): Encode NetworkResourceLoadParameters::shouldFollowRedirects.
+        (WebKit::NetworkResourceLoadParameters::decode): Decode NetworkResourceLoadParameters::shouldFollowRedirects.
+        * NetworkProcess/PingLoad.h: Added FIXME comment to implement support for following redirects,
+        if applicable (for hyperlink auditing). See <https://bugs.webkit.org/show_bug.cgi?id=162580>
+        for more details.
+        * WebProcess/Network/WebLoaderStrategy.cpp:
+        (WebKit::WebLoaderStrategy::createPingHandle): Modified to take a boolean whether to follow
+        redirects responses and set NetworkResourceLoadParameters::shouldFollowRedirects as appropriate.
+        * WebProcess/Network/WebLoaderStrategy.h:
+
+2016-10-05  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [SOUP] Move global TLS errors handling from ResourceHandle to SoupNetworkSession
+        https://bugs.webkit.org/show_bug.cgi?id=162910
+
+        Reviewed by Alex Christensen.
+
+        Use SoupNetworkSession instead of ResourceHandle.
+
+        * NetworkProcess/soup/NetworkProcessSoup.cpp:
+        (WebKit::NetworkProcess::setIgnoreTLSErrors):
+        (WebKit::NetworkProcess::allowSpecificHTTPSCertificateForHost):
+
+2016-10-05  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Fix GTK+ build with USE_REDIRECTED_XCOMPOSITE_WINDOW disabled.
+
+        * UIProcess/AcceleratedDrawingAreaProxy.cpp:
+        (WebKit::AcceleratedDrawingAreaProxy::setNativeSurfaceHandleForCompositing):
+
+2016-10-04  Chris Dumez  <cdumez@apple.com>
+
+        Implement KeyboardEvent.code from the UI Event spec
+        https://bugs.webkit.org/show_bug.cgi?id=149584
+
+        Reviewed by Darin Adler.
+
+        Add support for Keyboard.code attribute:
+        - https://w3c.github.io/uievents/#dom-keyboardevent-code
+        - https://w3c.github.io/uievents-code/
+
+        * Shared/WebEvent.h:
+        (WebKit::WebKeyboardEvent::code):
+        * Shared/WebEventConversion.cpp:
+        (WebKit::WebKit2PlatformKeyboardEvent::WebKit2PlatformKeyboardEvent):
+        * Shared/WebKeyboardEvent.cpp:
+        (WebKit::WebKeyboardEvent::WebKeyboardEvent):
+        (WebKit::WebKeyboardEvent::encode):
+        (WebKit::WebKeyboardEvent::decode):
+        * Shared/mac/WebEventFactory.mm:
+        (WebKit::WebEventFactory::createWebKeyboardEvent):
+
+2016-10-04  Said Abou-Hallawa  <sabouhallawa@apple.com>
+
+        The dragged image should be the current frame only of the animated image
+        https://bugs.webkit.org/show_bug.cgi?id=162109
+
+        Reviewed by Tim Horton.
+
+        * UIProcess/Cocoa/WebViewImpl.mm:
+        (WebKit::WebViewImpl::provideDataForPasteboard): Call the Image function with its new name.
+
+2016-10-04  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Revert a change erroneously committed in r206795.
+
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::updatePreferences):
+
+2016-10-04  Anders Carlsson  <andersca@apple.com>
+
+        Properly kill web processes in the launching state
+        https://bugs.webkit.org/show_bug.cgi?id=162938
+
+        Reviewed by Tim Horton.
+
+        * UIProcess/Launcher/ProcessLauncher.h:
+        Add m_xpcConnection member.
+
+        * UIProcess/Launcher/mac/ProcessLauncherMac.mm:
+        (WebKit::ProcessLauncher::launchProcess):
+        Store the XPC connection in the m_xpcConnection member variable.
+        In the reply handler, handle m_xpcConnection being null.
+
+        (WebKit::ProcessLauncher::platformInvalidate):
+        Cancel and kill the connection.
+
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::terminateProcess):
+        Get rid of an assertion.
+
+        * UIProcess/WebProcessProxy.cpp:
+        (WebKit::WebProcessProxy::requestTermination):
+        Handle the launching state.
+
+2016-10-04  Tim Horton  <timothy_horton@apple.com>
+
+        Fix the build.
+
+        * Shared/WebBackForwardListItem.cpp:
+        (WebKit::WebBackForwardListItem::WebBackForwardListItem):
+        (WebKit::WebBackForwardListItem::highestUsedItemID):
+
+2016-10-04  Tim Horton  <timothy_horton@apple.com>
+
+        Fix a typo in WebBackForwardListItem (highed->highest)
+        https://bugs.webkit.org/show_bug.cgi?id=162935
+
+        Reviewed by Anders Carlsson.
+
+        * Shared/WebBackForwardListItem.cpp:
+        (WebKit::WebBackForwardListItem::highestUsedItemID):
+        (WebKit::WebBackForwardListItem::highedUsedItemID): Deleted.
+        * Shared/WebBackForwardListItem.h:
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::creationParameters):
+
+2016-10-04  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [DOMJIT] Introduce DOMJIT::GetterSetter to tell JIT information
+        https://bugs.webkit.org/show_bug.cgi?id=162916
+
+        Reviewed by Filip Pizlo.
+
+        * CMakeLists.txt:
+
+2016-10-04  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [SOUP] Remove SSLPolicyFlags from SoupNetworkSession
+        https://bugs.webkit.org/show_bug.cgi?id=162906
+
+        Reviewed by Michael Catanzaro.
+
+        * NetworkProcess/soup/NetworkProcessMainSoup.cpp:
+        (WebKit::NetworkProcessMainUnix):
+
+2016-10-04  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        Media controls are displayed in the incorrect state momentarily after switching between tabs playing media
+        https://bugs.webkit.org/show_bug.cgi?id=162766
+        <rdar://problem/28533523>
+
+        Reviewed by Jer Noble.
+
+        Plumbs some more Now Playing information from the web process to the UI process for testing purposes. See
+        WebCore ChangeLog for more details.
+
+        * UIProcess/API/Cocoa/WKWebView.mm:
+        (-[WKWebView _handleActiveNowPlayingSessionInfoResponse:title:duration:elapsedTime:]):
+        (-[WKWebView _handleActiveNowPlayingSessionInfoResponse:]): Deleted.
+        * UIProcess/API/Cocoa/WKWebViewPrivate.h:
+        * UIProcess/PageClient.h:
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::handleActiveNowPlayingSessionInfoResponse):
+        * UIProcess/WebPageProxy.h:
+        * UIProcess/WebPageProxy.messages.in:
+        * UIProcess/mac/PageClientImpl.h:
+        * UIProcess/mac/PageClientImpl.mm:
+        (WebKit::PageClientImpl::handleActiveNowPlayingSessionInfoResponse):
+        * WebProcess/WebPage/mac/WebPageMac.mm:
+        (WebKit::WebPage::requestActiveNowPlayingSessionInfo):
+
+2016-10-04  Zan Dobersek  <zdobersek@igalia.com>
+
+        Unreviewed GTK+ build fix.
+
+        * UIProcess/API/C/WKPage.cpp:
+        (WKPageSetPageNavigationClient): Guard the call to getDefaultWebCryptoMasterKey()
+        with ENABLE(SUBTLE_CRYPTO), since the same guard is used for the definition. Fixes
+        GTK+ production builds where the feature is disabled.
+
 2016-10-03  Keith Rollin  <krollin@apple.com>
 
         More logging to diagnose "WebKit encountered an internal error" messages

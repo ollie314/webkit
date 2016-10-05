@@ -37,9 +37,13 @@ struct KeyboardEventInit : public UIEventWithKeyStateInit {
 #if ENABLE(KEYBOARD_KEY_ATTRIBUTE)
     String key;
 #endif
+#if ENABLE(KEYBOARD_CODE_ATTRIBUTE)
+    String code;
+#endif
     String keyIdentifier;
     unsigned location { 0 };
     bool repeat { false };
+    bool isComposing { false };
 };
 
 class KeyboardEvent final : public UIEventWithKeyState {
@@ -82,6 +86,9 @@ public:
 #if ENABLE(KEYBOARD_KEY_ATTRIBUTE)
     const String& key() const { return m_key; }
 #endif
+#if ENABLE(KEYBOARD_CODE_ATTRIBUTE)
+    const String& code() const { return m_code; }
+#endif
 
     const String& keyIdentifier() const { return m_keyIdentifier; }
     unsigned location() const { return m_location; }
@@ -99,6 +106,8 @@ public:
     EventInterface eventInterface() const final;
     bool isKeyboardEvent() const final;
     int which() const final;
+
+    bool isComposing() const { return m_isComposing; }
 
 #if PLATFORM(COCOA)
     bool handledByInputMethod() const { return m_handledByInputMethod; }
@@ -120,14 +129,18 @@ private:
 #if ENABLE(KEYBOARD_KEY_ATTRIBUTE)
     String m_key;
 #endif
+#if ENABLE(KEYBOARD_CODE_ATTRIBUTE)
+    String m_code;
+#endif
     String m_keyIdentifier;
-    unsigned m_location;
-    bool m_repeat : 1;
-    bool m_altGraphKey : 1;
+    unsigned m_location { DOM_KEY_LOCATION_STANDARD };
+    bool m_repeat { false };
+    bool m_altGraphKey { false };
+    bool m_isComposing { false };
 
 #if PLATFORM(COCOA)
     // Commands that were sent by AppKit when interpreting the event. Doesn't include input method commands.
-    bool m_handledByInputMethod;
+    bool m_handledByInputMethod { false };
     Vector<KeypressCommand> m_keypressCommands;
 #endif
 };

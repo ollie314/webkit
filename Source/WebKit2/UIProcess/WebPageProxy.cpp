@@ -2351,11 +2351,6 @@ void WebPageProxy::setCustomTextEncodingName(const String& encodingName)
 
 void WebPageProxy::terminateProcess()
 {
-    // requestTermination() is a no-op for launching processes, so we get into an inconsistent state by calling resetStateAfterProcessExited().
-    // FIXME: A client can terminate the page at any time, so we should do something more meaningful than assert and fall apart in release builds.
-    // See also <https://bugs.webkit.org/show_bug.cgi?id=136012>.
-    ASSERT(m_process->state() != WebProcessProxy::State::Launching);
-
     // NOTE: This uses a check of m_isValid rather than calling isValid() since
     // we want this to run even for pages being closed or that already closed.
     if (!m_isValid)
@@ -5463,7 +5458,7 @@ WebPageCreationParameters WebPageProxy::creationParameters()
     parameters.userAgent = userAgent();
     parameters.itemStates = m_backForwardList->itemStates();
     parameters.sessionID = m_sessionID;
-    parameters.highestUsedBackForwardItemID = WebBackForwardListItem::highedUsedItemID();
+    parameters.highestUsedBackForwardItemID = WebBackForwardListItem::highestUsedItemID();
     parameters.userContentControllerID = m_userContentController->identifier();
     parameters.visitedLinkTableID = m_visitedLinkStore->identifier();
     parameters.websiteDataStoreID = m_websiteDataStore->identifier();
@@ -6387,9 +6382,9 @@ void WebPageProxy::requestActiveNowPlayingSessionInfo()
     m_process->send(Messages::WebPage::RequestActiveNowPlayingSessionInfo(), m_pageID);
 }
 
-void WebPageProxy::handleActiveNowPlayingSessionInfoResponse(bool hasActiveSession) const
+void WebPageProxy::handleActiveNowPlayingSessionInfoResponse(bool hasActiveSession, const String& title, double duration, double elapsedTime) const
 {
-    m_pageClient.handleActiveNowPlayingSessionInfoResponse(hasActiveSession);
+    m_pageClient.handleActiveNowPlayingSessionInfoResponse(hasActiveSession, title, duration, elapsedTime);
 }
 
 void WebPageProxy::handleControlledElementIDResponse(const String& identifier) const

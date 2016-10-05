@@ -58,51 +58,12 @@
 #include <unistd.h>
 #endif
 #include <wtf/CurrentTime.h>
-#include <wtf/SHA1.h>
 #include <wtf/glib/GRefPtr.h>
-#include <wtf/text/Base64.h>
 #include <wtf/text/CString.h>
-
-#include "BlobData.h"
-#include "BlobRegistryImpl.h"
 
 namespace WebCore {
 
 static const size_t gDefaultReadBufferSize = 8192;
-
-class HostTLSCertificateSet {
-public:
-    void add(GTlsCertificate* certificate)
-    {
-        String certificateHash = computeCertificateHash(certificate);
-        if (!certificateHash.isEmpty())
-            m_certificates.add(certificateHash);
-    }
-
-    bool contains(GTlsCertificate* certificate)
-    {
-        return m_certificates.contains(computeCertificateHash(certificate));
-    }
-
-private:
-    static String computeCertificateHash(GTlsCertificate* certificate)
-    {
-        GRefPtr<GByteArray> certificateData;
-        g_object_get(G_OBJECT(certificate), "certificate", &certificateData.outPtr(), NULL);
-        if (!certificateData)
-            return String();
-
-        SHA1 sha1;
-        sha1.addBytes(certificateData->data, certificateData->len);
-
-        SHA1::Digest digest;
-        sha1.computeHash(digest);
-
-        return base64Encode(reinterpret_cast<const char*>(digest.data()), SHA1::hashSize);
-    }
-
-    HashSet<String> m_certificates;
-};
 
 static bool createSoupRequestAndMessageForHandle(ResourceHandle*, const ResourceRequest&);
 static void cleanupSoupRequestOperation(ResourceHandle*, bool isDestroying = false);
@@ -112,22 +73,6 @@ static void readCallback(GObject*, GAsyncResult*, gpointer);
 static double milisecondsSinceRequest(double requestTime);
 #endif
 static void continueAfterDidReceiveResponse(ResourceHandle*);
-
-static bool gIgnoreSSLErrors = false;
-
-typedef HashSet<String, ASCIICaseInsensitiveHash> HostsSet;
-static HostsSet& allowsAnyHTTPSCertificateHosts()
-{
-    DEPRECATED_DEFINE_STATIC_LOCAL(HostsSet, hosts, ());
-    return hosts;
-}
-
-typedef HashMap<String, HostTLSCertificateSet, ASCIICaseInsensitiveHash> CertificatesMap;
-static CertificatesMap& clientCertificates()
-{
-    DEPRECATED_DEFINE_STATIC_LOCAL(CertificatesMap, certificates, ());
-    return certificates;
-}
 
 ResourceHandleInternal::~ResourceHandleInternal()
 {
@@ -183,39 +128,19 @@ static bool isAuthenticationFailureStatusCode(int httpStatusCode)
     return httpStatusCode == SOUP_STATUS_PROXY_AUTHENTICATION_REQUIRED || httpStatusCode == SOUP_STATUS_UNAUTHORIZED;
 }
 
-static bool handleUnignoredTLSErrors(ResourceHandle* handle, SoupMessage* message)
-{
-    if (gIgnoreSSLErrors)
-        return false;
-
-    GTlsCertificate* certificate = nullptr;
-    GTlsCertificateFlags tlsErrors = static_cast<GTlsCertificateFlags>(0);
-    soup_message_get_https_status(message, &certificate, &tlsErrors);
-    if (!tlsErrors)
-        return false;
-
-    String host = handle->firstRequest().url().host();
-    if (allowsAnyHTTPSCertificateHosts().contains(host))
-        return false;
-
-    // We aren't ignoring errors globally, but the user may have already decided to accept this certificate.
-    auto it = clientCertificates().find(host);
-    if (it != clientCertificates().end() && it->value.contains(certificate))
-        return false;
-
-    ResourceHandleInternal* d = handle->getInternal();
-    handle->client()->didFail(handle, ResourceError::tlsError(d->m_soupRequest.get(), tlsErrors, certificate));
-    return true;
-}
-
 static void tlsErrorsChangedCallback(SoupMessage* message, GParamSpec*, gpointer data)
 {
     RefPtr<ResourceHandle> handle = static_cast<ResourceHandle*>(data);
     if (!handle || handle->cancelledOrClientless())
         return;
 
-    if (handleUnignoredTLSErrors(handle.get(), message))
+    SoupNetworkSession::checkTLSErrors(handle->getInternal()->m_soupRequest.get(), message, [handle] (const ResourceError& error) {
+        if (error.isNull())
+            return;
+
+        handle->client()->didFail(handle.get(), error);
         handle->cancel();
+    });
 }
 
 static void gotHeadersCallback(SoupMessage* message, gpointer data)
@@ -614,96 +539,6 @@ static void continueAfterDidReceiveResponse(ResourceHandle* handle)
         G_PRIORITY_DEFAULT, d->m_cancellable.get(), readCallback, handle);
 }
 
-static bool addFileToSoupMessageBody(SoupMessage* message, const String& fileNameString, size_t offset, size_t lengthToSend, unsigned long& totalBodySize)
-{
-    GUniqueOutPtr<GError> error;
-    CString fileName = fileSystemRepresentation(fileNameString);
-    GMappedFile* fileMapping = g_mapped_file_new(fileName.data(), false, &error.outPtr());
-    if (error)
-        return false;
-
-    gsize bufferLength = lengthToSend;
-    if (!lengthToSend)
-        bufferLength = g_mapped_file_get_length(fileMapping);
-    totalBodySize += bufferLength;
-
-    SoupBuffer* soupBuffer = soup_buffer_new_with_owner(g_mapped_file_get_contents(fileMapping) + offset,
-                                                        bufferLength,
-                                                        fileMapping,
-                                                        reinterpret_cast<GDestroyNotify>(g_mapped_file_unref));
-    soup_message_body_append_buffer(message->request_body, soupBuffer);
-    soup_buffer_free(soupBuffer);
-    return true;
-}
-
-static bool blobIsOutOfDate(const BlobDataItem& blobItem)
-{
-    ASSERT(blobItem.type() == BlobDataItem::Type::File);
-    if (!isValidFileTime(blobItem.file()->expectedModificationTime()))
-        return false;
-
-    time_t fileModificationTime;
-    if (!getFileModificationTime(blobItem.file()->path(), fileModificationTime))
-        return true;
-
-    return fileModificationTime != static_cast<time_t>(blobItem.file()->expectedModificationTime());
-}
-
-static void addEncodedBlobItemToSoupMessageBody(SoupMessage* message, const BlobDataItem& blobItem, unsigned long& totalBodySize)
-{
-    if (blobItem.type() == BlobDataItem::Type::Data) {
-        totalBodySize += blobItem.length();
-        soup_message_body_append(message->request_body, SOUP_MEMORY_TEMPORARY, blobItem.data().data()->data() + blobItem.offset(), blobItem.length());
-        return;
-    }
-
-    ASSERT(blobItem.type() == BlobDataItem::Type::File);
-    if (blobIsOutOfDate(blobItem))
-        return;
-
-    addFileToSoupMessageBody(message, blobItem.file()->path(), blobItem.offset(), blobItem.length() == BlobDataItem::toEndOfFile ? 0 : blobItem.length(),  totalBodySize);
-}
-
-static void addEncodedBlobToSoupMessageBody(SoupMessage* message, const FormDataElement& element, unsigned long& totalBodySize)
-{
-    RefPtr<BlobData> blobData = static_cast<BlobRegistryImpl&>(blobRegistry()).getBlobDataFromURL(URL(ParsedURLString, element.m_url));
-    if (!blobData)
-        return;
-
-    for (size_t i = 0; i < blobData->items().size(); ++i)
-        addEncodedBlobItemToSoupMessageBody(message, blobData->items()[i], totalBodySize);
-}
-
-static bool addFormElementsToSoupMessage(SoupMessage* message, const char*, FormData* httpBody, unsigned long& totalBodySize)
-{
-    soup_message_body_set_accumulate(message->request_body, FALSE);
-    size_t numElements = httpBody->elements().size();
-    for (size_t i = 0; i < numElements; i++) {
-        const FormDataElement& element = httpBody->elements()[i];
-
-        if (element.m_type == FormDataElement::Type::Data) {
-            totalBodySize += element.m_data.size();
-            soup_message_body_append(message->request_body, SOUP_MEMORY_TEMPORARY,
-                                     element.m_data.data(), element.m_data.size());
-            continue;
-        }
-
-        if (element.m_type == FormDataElement::Type::EncodedFile) {
-            if (!addFileToSoupMessageBody(message ,
-                                         element.m_filename,
-                                         0 /* offset */,
-                                         0 /* lengthToSend */,
-                                         totalBodySize))
-                return false;
-            continue;
-        }
-
-        ASSERT(element.m_type == FormDataElement::Type::EncodedBlob);
-        addEncodedBlobToSoupMessageBody(message, element, totalBodySize);
-    }
-    return true;
-}
-
 #if ENABLE(WEB_TIMING)
 static double milisecondsSinceRequest(double requestTime)
 {
@@ -788,20 +623,13 @@ static bool createSoupMessageForHandleAndRequest(ResourceHandle* handle, const R
 
     SoupMessage* soupMessage = d->m_soupMessage.get();
     request.updateSoupMessage(soupMessage);
+    d->m_bodySize = soupMessage->request_body->length;
 
     g_object_set_data(G_OBJECT(soupMessage), "handle", handle);
     if (!handle->shouldContentSniff())
         soup_message_disable_feature(soupMessage, SOUP_TYPE_CONTENT_SNIFFER);
     if (!d->m_useAuthenticationManager)
         soup_message_disable_feature(soupMessage, SOUP_TYPE_AUTH_MANAGER);
-
-    FormData* httpBody = request.httpBody();
-    CString contentType = request.httpContentType().utf8().data();
-    if (httpBody && !httpBody->isEmpty() && !addFormElementsToSoupMessage(soupMessage, contentType.data(), httpBody, d->m_bodySize)) {
-        // We failed to prepare the body data, so just fail this load.
-        d->m_soupMessage.clear();
-        return false;
-    }
 
     // Make sure we have an Accept header for subresources; some sites
     // want this to serve some of their subresources
@@ -812,8 +640,7 @@ static bool createSoupMessageForHandleAndRequest(ResourceHandle* handle, const R
     // for consistency with other backends (e.g. Chromium's) and other UA implementations like FF. It's done
     // in the backend here instead of in XHR code since in XHR CORS checking prevents us from this kind of
     // late header manipulation.
-    if ((request.httpMethod() == "POST" || request.httpMethod() == "PUT")
-        && (!request.httpBody() || request.httpBody()->isEmpty()))
+    if ((request.httpMethod() == "POST" || request.httpMethod() == "PUT") && !d->m_bodySize)
         soup_message_headers_set_content_length(soupMessage->request_headers, 0);
 
     g_signal_connect(d->m_soupMessage.get(), "notify::tls-errors", G_CALLBACK(tlsErrorsChangedCallback), handle);
@@ -947,21 +774,6 @@ void ResourceHandle::cancel()
 bool ResourceHandle::shouldUseCredentialStorage()
 {
     return (!client() || client()->shouldUseCredentialStorage(this)) && firstRequest().url().protocolIsInHTTPFamily();
-}
-
-void ResourceHandle::setHostAllowsAnyHTTPSCertificate(const String& host)
-{
-    allowsAnyHTTPSCertificateHosts().add(host);
-}
-
-void ResourceHandle::setClientCertificate(const String& host, GTlsCertificate* certificate)
-{
-    clientCertificates().add(host, HostTLSCertificateSet()).iterator->value.add(certificate);
-}
-
-void ResourceHandle::setIgnoreSSLErrors(bool ignoreSSLErrors)
-{
-    gIgnoreSSLErrors = ignoreSSLErrors;
 }
 
 void ResourceHandle::continueDidReceiveAuthenticationChallenge(const Credential& credentialFromPersistentStorage)

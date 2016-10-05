@@ -24,6 +24,7 @@
 #include "KeyboardEvent.h"
 
 #include "Document.h"
+#include "Editor.h"
 #include "EventDispatcher.h"
 #include "EventHandler.h"
 #include "EventNames.h"
@@ -91,14 +92,7 @@ static inline KeyboardEvent::KeyLocationCode keyLocationCode(const PlatformKeybo
     }
 }
 
-KeyboardEvent::KeyboardEvent()
-    : m_location(DOM_KEY_LOCATION_STANDARD)
-    , m_altGraphKey(false)
-#if PLATFORM(COCOA)
-    , m_handledByInputMethod(false)
-#endif
-{
-}
+KeyboardEvent::KeyboardEvent() = default;
 
 KeyboardEvent::KeyboardEvent(const PlatformKeyboardEvent& key, DOMWindow* view)
     : UIEventWithKeyState(eventTypeForKeyboardEventType(key.type()),
@@ -107,10 +101,14 @@ KeyboardEvent::KeyboardEvent(const PlatformKeyboardEvent& key, DOMWindow* view)
 #if ENABLE(KEYBOARD_KEY_ATTRIBUTE)
     , m_key(key.key())
 #endif
+#if ENABLE(KEYBOARD_CODE_ATTRIBUTE)
+    , m_code(key.code())
+#endif
     , m_keyIdentifier(key.keyIdentifier())
     , m_location(keyLocationCode(key))
     , m_repeat(key.isAutoRepeat())
     , m_altGraphKey(false)
+    , m_isComposing(view && view->frame() && view->frame()->editor().hasComposition())
 #if PLATFORM(COCOA)
 #if USE(APPKIT)
     , m_handledByInputMethod(key.handledByInputMethod())
@@ -133,10 +131,14 @@ KeyboardEvent::KeyboardEvent(const AtomicString& eventType, const KeyboardEventI
 #if ENABLE(KEYBOARD_KEY_ATTRIBUTE)
     , m_key(initializer.key)
 #endif
+#if ENABLE(KEYBOARD_CODE_ATTRIBUTE)
+    , m_code(initializer.code)
+#endif
     , m_keyIdentifier(initializer.keyIdentifier)
     , m_location(initializer.location)
     , m_repeat(initializer.repeat)
     , m_altGraphKey(false)
+    , m_isComposing(initializer.isComposing)
 #if PLATFORM(COCOA)
     , m_handledByInputMethod(false)
 #endif

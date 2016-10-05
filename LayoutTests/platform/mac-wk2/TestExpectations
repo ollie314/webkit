@@ -280,7 +280,9 @@ webkit.org/b/151326 [ Yosemite+ ] webarchive/loading/missing-data.html [ Pass Cr
 
 webkit.org/b/151455 [ Release ] http/tests/xmlhttprequest/workers/methods-async.html [ Pass Timeout ]
 
-webkit.org/b/151661 http/tests/cache/disk-cache/disk-cache-request-max-stale.html [ Pass Timeout ]
+webkit.org/b/162945 http/tests/cache/disk-cache/disk-cache-request-max-stale.html [ Pass Failure ]
+
+webkit.org/b/162946 http/tests/cache/disk-cache/disk-cache-media.html [ Pass Failure ]
 
 webkit.org/b/150542 fast/forms/state-restore-per-form.html [ Pass Timeout ]
 
@@ -560,3 +562,7 @@ webkit.org/b/162510 [ Debug ] fast/images/animated-gif-restored-from-bfcache.htm
 webkit.org/b/161745 http/tests/security/anchor-download-allow-data.html [ Pass Failure ]
 
 webkit.org/b/161926 storage/indexeddb/index-cursor.html [ Pass Timeout ]
+
+webkit.org/b/162685 http/tests/cache/disk-cache/disk-cache-204-status-code.html [ Pass Failure ]
+
+webkit.org/b/161649 http/tests/cache/disk-cache/resource-becomes-uncacheable.html [ Pass Failure ]

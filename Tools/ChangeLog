@@ -1,3 +1,201 @@
+2016-10-05  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser should correctly strip unnecessary 0's in IPv6 addresses
+        https://bugs.webkit.org/show_bug.cgi?id=162979
+
+        Reviewed by Brady Eidson.
+
+        * TestWebKitAPI/Tests/WebCore/URLParser.cpp:
+        (TestWebKitAPI::TEST_F):
+
+2016-10-05  Alex Christensen  <achristensen@webkit.org>
+
+        UTF-8 encode queries of nonspecial and websocket schemes
+        https://bugs.webkit.org/show_bug.cgi?id=162956
+
+        Reviewed by Geoffrey Garen and Brady Eidson.
+
+        * TestWebKitAPI/Tests/WebCore/URLParser.cpp:
+        (TestWebKitAPI::TEST_F):
+
+2016-10-05  Alex Christensen  <achristensen@webkit.org>
+
+        Prepare to enable URLParser
+        https://bugs.webkit.org/show_bug.cgi?id=162974
+
+        Reviewed by Brady Eidson.
+
+        * TestWebKitAPI/Tests/WebCore/URLParser.cpp:
+        (TestWebKitAPI::TEST_F):
+        Added some tests that are unrelated to the code change, but these are
+        reflected in changed LayoutTest results when enabling the URLParser,
+        and they weren't in the URLParser tests yet.  They should be.
+
+2016-10-05  Zan Dobersek  <zdobersek@igalia.com>
+
+        Rename ENABLE_ENCRYPTED_MEDIA_V2 to ENABLE_LEGACY_ENCRYPTED_MEDIA
+        https://bugs.webkit.org/show_bug.cgi?id=162903
+
+        Reviewed by Alex Christensen.
+
+        Rename build guards for the remaining implementation of the legacy EME API
+        to ENABLE_LEGACY_ENCRYPTED_MEDIA. This will allow for the future implementation
+        of the near-finished API to be guarded with the simple ENABLE_ENCRYPTED_MEDIA guards.
+
+        * TestWebKitAPI/Configurations/FeatureDefines.xcconfig: Also remove the
+        ENABLE_IOS_TEXT_AUTOSIZING feature define that was renamed in r206395 and was
+        throwing up style checker errors.
+
+2016-10-04  Andy Estes  <aestes@apple.com>
+
+        [iOS] Crash in WebResourceLoaderQuickLookDelegate when the client cancels the navigation to a QuickLook resource
+        https://bugs.webkit.org/show_bug.cgi?id=162950
+        <rdar://problem/23759114>
+
+        Reviewed by Brady Eidson.
+
+        Added a new API test.
+
+        * TestWebKitAPI/Tests/WebKit2Cocoa/QuickLook.mm: Sorted imports and removed redundant
+        initialization of static bools.
+        (runTest): Factored out the common test logic between QuickLook.NavigationDelegate and
+        QuickLook.CancelNavigationAfterResponse.
+        (TEST): Added QuickLook.CancelNavigationAfterResponse.
+        (-[QuickLookDecidePolicyDelegate
+        webView:decidePolicyForNavigationResponse:decisionHandler:]): Canceled the navigation.
+        (-[QuickLookDecidePolicyDelegate webView:didFailProvisionalNavigation:withError:]): Set
+        isDone to true.
+
+2016-10-04  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Add the support for running ES6SampleBench to run-benchmark
+        https://bugs.webkit.org/show_bug.cgi?id=162890
+
+        Reviewed by Saam Barati.
+
+        Added the support for running ES6SampleBench as "es6bench".
+        e.g. ./Tools/Scripts/run-benchmark --platform osx --plan es6bench --browser safari
+
+        Instead of the default 10 iterations, run the test 4 iterations using 5 instances of browser
+        for the total of 20 iterations.
+
+        * Scripts/webkitpy/benchmark_runner/data/patches/ES6SampleBench.patch: Added.
+        * Scripts/webkitpy/benchmark_runner/data/plans/es6bench.plan: Added.
+        * Scripts/webkitpy/benchmark_runner/run_benchmark.py:
+        (start): Fixed the bug that the linter will complain about the presence of "debugOutput" by
+        removing it if it's present.
+
+2016-10-04  Simon Fraser  <simon.fraser@apple.com>
+
+        [iOS WK2] Make it possible for a test to describe a user gesture as a stream of events in JSON format
+        https://bugs.webkit.org/show_bug.cgi?id=162934
+
+        Reviewed by Dean Jackson.
+
+        With this change, a test can describe a user gesture in an "event stream", which is
+        some JSON describing an array of events with their underlying touches. The added
+        test describes a single tap.
+        
+        The implementation fires up an NSThread, and sleeps the thread between events to dispatch
+        them at close to real time.
+        
+        In future, HIDEventGenerator could use this internally for all of the "compound" interactions.
+
+        * DumpRenderTree/ios/UIScriptControllerIOS.mm:
+        (WTR::UIScriptController::sendEventStream):
+        * TestRunnerShared/UIScriptContext/Bindings/UIScriptController.idl:
+        * TestRunnerShared/UIScriptContext/UIScriptController.cpp:
+        (WTR::UIScriptController::sendEventStream):
+        * TestRunnerShared/UIScriptContext/UIScriptController.h:
+        * WebKitTestRunner/ios/HIDEventGenerator.h:
+        * WebKitTestRunner/ios/HIDEventGenerator.mm:
+        (transducerTypeFromString):
+        (phaseFromString):
+        (-[HIDEventGenerator eventMaskFromEventInfo:]):
+        (-[HIDEventGenerator touchFromEventInfo:]):
+        (-[HIDEventGenerator _createIOHIDEventWithInfo:]):
+        (-[HIDEventGenerator dispatchEventWithInfo:]):
+        (-[HIDEventGenerator eventDispatchThreadEntry:]):
+        (-[HIDEventGenerator sendEventStream:completionBlock:]):
+        * WebKitTestRunner/ios/UIScriptControllerIOS.mm:
+        (WTR::UIScriptController::sendEventStream):
+
+2016-10-04  Megan Gardner  <megan_gardner@apple.com>
+
+        Add Megan to contributor's list
+        https://bugs.webkit.org/show_bug.cgi?id=162944
+
+        Reviewed by Tim Horton.
+
+        Add Megan to the contributor's lists so that her e-mail autocompletes for CC
+
+        * Scripts/webkitpy/common/config/contributors.json:
+
+2016-10-04  Alex Christensen  <achristensen@webkit.org>
+
+        Add tests verifying non-special URL hosts are parsed according to spec
+        https://bugs.webkit.org/show_bug.cgi?id=162885
+
+        Reviewed by Sam Weinig.
+
+        * TestWebKitAPI/Tests/WebCore/URLParser.cpp:
+        (TestWebKitAPI::TEST_F):
+
+2016-10-04  Anders Carlsson  <andersca@apple.com>
+
+        Properly kill web processes in the launching state
+        https://bugs.webkit.org/show_bug.cgi?id=162938
+
+        Reviewed by Tim Horton.
+
+        * TestWebKitAPI/Tests/WebKit2/TerminateTwice.cpp:
+        Enable this test again.
+
+2016-10-04  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser: query-only URLs relative to file URLs should just add a query
+        https://bugs.webkit.org/show_bug.cgi?id=162888
+
+        Reviewed by Tim Horton.
+
+        * TestWebKitAPI/Tests/WebCore/URLParser.cpp:
+        (TestWebKitAPI::TEST_F):
+
+2016-10-04  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser should match URL::parse and other browsers when parsing a URL containing only scheme://
+        https://bugs.webkit.org/show_bug.cgi?id=162909
+
+        Reviewed by Tim Horton.
+
+        * TestWebKitAPI/Tests/WebCore/URLParser.cpp:
+        (TestWebKitAPI::TEST_F):
+
+2016-10-04  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [DOMJIT] Introduce DOMJIT::GetterSetter to tell JIT information
+        https://bugs.webkit.org/show_bug.cgi?id=162916
+
+        Reviewed by Filip Pizlo.
+
+        * DumpRenderTree/CMakeLists.txt:
+
+2016-10-04  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        Media controls are displayed in the incorrect state momentarily after switching between tabs playing media
+        https://bugs.webkit.org/show_bug.cgi?id=162766
+        <rdar://problem/28533523>
+
+        Reviewed by Jer Noble.
+
+        Adds new tests and tweaks existing tests to verify last updated Now Playing information.
+
+        * TestWebKitAPI/Tests/WebKit2Cocoa/NowPlayingControlsTests.mm:
+        (-[NowPlayingTestWebView _handleActiveNowPlayingSessionInfoResponse:title:duration:elapsedTime:]):
+        (TestWebKitAPI::TEST):
+        (-[NowPlayingTestWebView _handleActiveNowPlayingSessionInfoResponse:]): Deleted.
+        * TestWebKitAPI/Tests/WebKit2Cocoa/large-video-test-now-playing.html:
+
 2016-10-03  Alex Christensen  <achristensen@webkit.org>
 
         URLParser should ignore tabs at all locations

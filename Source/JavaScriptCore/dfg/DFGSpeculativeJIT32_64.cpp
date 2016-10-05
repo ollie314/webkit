@@ -2678,6 +2678,11 @@ void SpeculativeJIT::compile(Node* node)
         } }
         break;
     }
+    
+    case ToLowerCase: {
+        compileToLowerCase(node);
+        break;
+    }
 
     case GetByValWithThis: {
         JSValueOperand base(this, node->child1());
@@ -4476,6 +4481,16 @@ void SpeculativeJIT::compile(Node* node)
     case PutGetterByVal:
     case PutSetterByVal: {
         compilePutAccessorByVal(node);
+        break;
+    }
+
+    case DefineDataProperty: {
+        compileDefineDataProperty(node);
+        break;
+    }
+
+    case DefineAccessorProperty: {
+        compileDefineAccessorProperty(node);
         break;
     }
 

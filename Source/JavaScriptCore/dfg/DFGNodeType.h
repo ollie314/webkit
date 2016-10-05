@@ -198,6 +198,8 @@ namespace JSC { namespace DFG {
     macro(PutGetterSetterById, NodeMustGenerate) \
     macro(PutGetterByVal, NodeMustGenerate) \
     macro(PutSetterByVal, NodeMustGenerate) \
+    macro(DefineDataProperty, NodeMustGenerate | NodeHasVarArgs) \
+    macro(DefineAccessorProperty, NodeMustGenerate | NodeHasVarArgs) \
     macro(DeleteById, NodeResultBoolean | NodeMustGenerate) \
     macro(DeleteByVal, NodeResultBoolean | NodeMustGenerate) \
     macro(CheckStructure, NodeMustGenerate) \
@@ -394,6 +396,8 @@ namespace JSC { namespace DFG {
     macro(GetMapBucket, NodeResultJS) \
     macro(LoadFromJSMapBucket, NodeResultJS) \
     macro(IsNonEmptyMapBucket, NodeResultBoolean) \
+    \
+    macro(ToLowerCase, NodeResultJS) \
 
 // This enum generates a monotonically increasing id for all Node types,
 // and is used by the subsequent enum to fill out the id (as accessed via the NodeIdMask).

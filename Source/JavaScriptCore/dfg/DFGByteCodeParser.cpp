@@ -2580,6 +2580,20 @@ bool ByteCodeParser::handleIntrinsicCall(Node* callee, int resultOperand, Intrin
         return true;
     }
 
+    case ToLowerCaseIntrinsic: {
+        if (argumentCountIncludingThis != 1)
+            return false;
+
+        if (m_inlineStackTop->m_exitProfile.hasExitSite(m_currentIndex, BadType))
+            return false;
+
+        insertChecks();
+        Node* thisString = get(virtualRegisterForArgument(0, registerOffset));
+        Node* result = addToGraph(ToLowerCase, thisString);
+        set(VirtualRegister(resultOperand), result);
+        return true;
+    }
+
     default:
         return false;
     }
@@ -4236,6 +4250,38 @@ bool ByteCodeParser::parseBlock(unsigned limit)
             addToGraph(Node::VarArg, PutByValWithThis, OpInfo(0), OpInfo(0));
 
             NEXT_OPCODE(op_put_by_val_with_this);
+        }
+
+        case op_define_data_property: {
+            Node* base = get(VirtualRegister(currentInstruction[1].u.operand));
+            Node* property = get(VirtualRegister(currentInstruction[2].u.operand));
+            Node* value = get(VirtualRegister(currentInstruction[3].u.operand));
+            Node* attributes = get(VirtualRegister(currentInstruction[4].u.operand));
+
+            addVarArgChild(base);
+            addVarArgChild(property);
+            addVarArgChild(value);
+            addVarArgChild(attributes);
+            addToGraph(Node::VarArg, DefineDataProperty, OpInfo(0), OpInfo(0));
+
+            NEXT_OPCODE(op_define_data_property);
+        }
+
+        case op_define_accessor_property: {
+            Node* base = get(VirtualRegister(currentInstruction[1].u.operand));
+            Node* property = get(VirtualRegister(currentInstruction[2].u.operand));
+            Node* getter = get(VirtualRegister(currentInstruction[3].u.operand));
+            Node* setter = get(VirtualRegister(currentInstruction[4].u.operand));
+            Node* attributes = get(VirtualRegister(currentInstruction[5].u.operand));
+
+            addVarArgChild(base);
+            addVarArgChild(property);
+            addVarArgChild(getter);
+            addVarArgChild(setter);
+            addVarArgChild(attributes);
+            addToGraph(Node::VarArg, DefineAccessorProperty, OpInfo(0), OpInfo(0));
+
+            NEXT_OPCODE(op_define_accessor_property);
         }
 
         case op_try_get_by_id:

@@ -1,3 +1,303 @@
+2016-10-05  Zalan Bujtas  <zalan@apple.com>
+
+        Missing quotation mark when <q> gets reparented.
+        https://bugs.webkit.org/show_bug.cgi?id=162940
+
+        Reviewed by Darin Adler.
+
+        The position of the closing quotation mark is driven by the multicolumn code hence the cover div.
+
+        * fast/css-generated-content/missing-quotes-with-dynamic-content-expected.html: Added.
+        * fast/css-generated-content/missing-quotes-with-dynamic-content.html: Added.
+
+2016-10-05  Daniel Bates  <dabates@apple.com>
+
+        [WK2][NetworkSession] Ping requests should follow redirects if applicable
+        https://bugs.webkit.org/show_bug.cgi?id=162580
+        <rdar://problem/28631274>
+
+        Rename test anchor-ping-and-do-not-follow-redirect-when-sending-ping.html to anchor-ping-and-follow-redirect-when-sending-ping.html
+        to reflect what it is actually testing - that we follow a redirect when sending a ping for a <a ping>.
+
+        * http/tests/navigation/ping-attribute/anchor-ping-and-follow-redirect-when-sending-ping-expected.txt: Renamed from LayoutTests/http/tests/navigation/ping-attribute/anchor-ping-and-do-not-follow-redirect-when-sending-ping-expected.txt.
+        * http/tests/navigation/ping-attribute/anchor-ping-and-follow-redirect-when-sending-ping.html: Renamed from LayoutTests/http/tests/navigation/ping-attribute/anchor-ping-and-do-not-follow-redirect-when-sending-ping.html.
+        * http/tests/navigation/resources/save-ping-and-redirect-to-save-ping.php: Only append the query string
+        if we have a non-empty query string to avoid appending a superfluous "?" on redirect.
+
+2016-10-05  Daniel Bates  <dabates@apple.com>
+
+        [WK2][NetworkSession] Ping requests should follow redirects if applicable
+        https://bugs.webkit.org/show_bug.cgi?id=162580
+        <rdar://problem/28631274>
+
+        Reviewed by Alex Christensen.
+
+        Add tests to ensure that we follow redirects for ping requests that are initiated as part
+        of hyperlink auditing.
+
+        Modified http/tests/navigation/resources/save-Ping.php to include the host and request URI
+        information in the saved report and updated expected results for existing tests as a result
+        of this change.
+
+        * http/tests/contentextensions/block-cookies-in-csp-report-expected.txt:
+        * http/tests/contentextensions/block-cookies-in-image-load-in-onunload-expected.txt:
+        * http/tests/contentextensions/block-cookies-in-ping-expected.txt:
+        * http/tests/contentextensions/hide-on-csp-report-expected.txt:
+        * http/tests/contentextensions/hide-on-ping-expected.txt:
+        * http/tests/contentextensions/hide-on-ping-with-ping-that-redirects-expected.txt: Added.
+        * http/tests/contentextensions/hide-on-ping-with-ping-that-redirects.html: Added.
+        * http/tests/contentextensions/hide-on-ping-with-ping-that-redirects.html.json: Added.
+        * http/tests/contentextensions/resources/save-ping-and-redirect-to-save-ping.php: Added.
+        * http/tests/contentextensions/resources/save-ping.php:
+        * http/tests/navigation/image-load-in-pagehide-handler-expected.txt:
+        * http/tests/navigation/image-load-in-unload-handler-expected.txt:
+        * http/tests/navigation/ping-attribute/anchor-cookie-expected.txt:
+        * http/tests/navigation/ping-attribute/anchor-cross-origin-expected.txt:
+        * http/tests/navigation/ping-attribute/anchor-cross-origin-from-https-expected.txt:
+        * http/tests/navigation/ping-attribute/anchor-ping-and-do-not-follow-redirect-when-sending-ping-expected.txt: Added.
+        * http/tests/navigation/ping-attribute/anchor-ping-and-do-not-follow-redirect-when-sending-ping.html: Added.
+        * http/tests/navigation/ping-attribute/anchor-same-origin-expected.txt:
+        * http/tests/navigation/ping-attribute/area-cookie-expected.txt:
+        * http/tests/navigation/ping-attribute/area-cross-origin-expected.txt:
+        * http/tests/navigation/ping-attribute/area-cross-origin-from-https-expected.txt:
+        * http/tests/navigation/ping-attribute/area-same-origin-expected.txt:
+        * http/tests/navigation/resources/save-Ping.php:
+        * http/tests/navigation/resources/save-ping-and-redirect-to-save-ping.php: Added.
+
+2016-10-05  Daniel Bates  <dabates@apple.com>
+
+        Do not follow redirects when sending violation report
+        https://bugs.webkit.org/show_bug.cgi?id=162520
+        <rdar://problem/27957639>
+
+        Reviewed by Alex Christensen.
+
+        Add tests for Content Security Policy and XSS Auditor to ensure that we do not follow redirects
+        when sending a violation report. Modified http/tests/security/contentSecurityPolicy/resources/save-report.php
+        to save the URL of the original ping request and conditionally clear cookies. Modified
+        http/tests/security/xssAuditor/resources/echo-intertag.pl to support testing for the XSS Auditor.
+        These changes together with the existing HTTP Host information that is saved with the report we can detect
+        if a redirect occurred when saving a report.
+
+        Updated expected results of existing tests now that we emit the URL of the ping request in the saved report.
+
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/report-frame-ancestors-cross-origin-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/report-frame-ancestors-cross-origin-https-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/report-frame-ancestors-same-origin-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/report-frame-ancestors-same-origin-https-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/report-uri-effective-directive-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/script-blocked-sends-multiple-reports-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/scripthash-allowed-by-enforced-policy-and-blocked-by-report-policy-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/scripthash-allowed-by-enforced-policy-and-blocked-by-report-policy2-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/scripthash-allowed-by-legacy-enforced-policy-and-blocked-by-report-policy-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/scripthash-allowed-by-legacy-enforced-policy-and-blocked-by-report-policy2-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/scripthash-blocked-by-enforced-policy-and-allowed-by-report-policy-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/scripthash-blocked-by-legacy-enforced-policy-and-allowed-by-report-policy-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/scripthash-blocked-by-legacy-enforced-policy-and-blocked-by-report-policy-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/scripthash-blocked-by-legacy-enforced-policy-and-blocked-by-report-policy2-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/scriptnonce-blocked-by-enforced-policy-and-allowed-by-report-policy-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/scriptnonce-blocked-by-legacy-enforced-policy-and-allowed-by-report-policy-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/scriptnonce-blocked-by-legacy-enforced-policy-and-blocked-by-report-policy-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/scriptnonce-blocked-by-legacy-enforced-policy-and-blocked-by-report-policy2-expected.txt:
+        * http/tests/security/contentSecurityPolicy/report-and-enforce-expected.txt:
+        * http/tests/security/contentSecurityPolicy/report-blocked-data-uri-expected.txt:
+        * http/tests/security/contentSecurityPolicy/report-blocked-file-uri-expected.txt:
+        * http/tests/security/contentSecurityPolicy/report-blocked-uri-and-do-not-follow-redirect-when-sending-report-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/report-blocked-uri-and-do-not-follow-redirect-when-sending-report.php: Added.
+        * http/tests/security/contentSecurityPolicy/report-blocked-uri-cross-origin-expected.txt:
+        * http/tests/security/contentSecurityPolicy/report-blocked-uri-expected.txt:
+        * http/tests/security/contentSecurityPolicy/report-cross-origin-no-cookies-expected.txt:
+        * http/tests/security/contentSecurityPolicy/report-cross-origin-no-cookies-when-private-browsing-enabled-expected.txt:
+        * http/tests/security/contentSecurityPolicy/report-cross-origin-no-cookies-when-private-browsing-toggled-expected.txt:
+        * http/tests/security/contentSecurityPolicy/report-only-expected.txt:
+        * http/tests/security/contentSecurityPolicy/report-only-from-header-expected.txt:
+        * http/tests/security/contentSecurityPolicy/report-only-upgrade-insecure-expected.txt:
+        * http/tests/security/contentSecurityPolicy/report-same-origin-no-cookies-when-private-browsing-toggled-expected.txt:
+        * http/tests/security/contentSecurityPolicy/report-same-origin-with-cookies-expected.txt:
+        * http/tests/security/contentSecurityPolicy/report-same-origin-with-cookies-when-private-browsing-enabled-expected.txt:
+        * http/tests/security/contentSecurityPolicy/report-status-code-zero-when-using-https-expected.txt:
+        * http/tests/security/contentSecurityPolicy/report-uri-expected.txt:
+        * http/tests/security/contentSecurityPolicy/report-uri-from-child-frame-expected.txt:
+        * http/tests/security/contentSecurityPolicy/report-uri-from-inline-javascript-expected.txt:
+        * http/tests/security/contentSecurityPolicy/report-uri-from-javascript-expected.txt:
+        * http/tests/security/contentSecurityPolicy/report-uri-scheme-relative-expected.txt:
+        * http/tests/security/contentSecurityPolicy/resources/save-report-and-redirect-to-save-report.php: Added.
+        * http/tests/security/contentSecurityPolicy/resources/save-report.php:
+        * http/tests/security/xssAuditor/report-script-tag-and-do-not-follow-redirect-when-sending-report-expected.txt: Added.
+        * http/tests/security/xssAuditor/report-script-tag-and-do-not-follow-redirect-when-sending-report.html: Added.
+        * http/tests/security/xssAuditor/report-script-tag-expected.txt:
+        * http/tests/security/xssAuditor/report-script-tag-full-block-and-do-not-follow-redirect-when-sending-report-expected.txt: Added.
+        * http/tests/security/xssAuditor/report-script-tag-full-block-and-do-not-follow-redirect-when-sending-report.html: Added.
+        * http/tests/security/xssAuditor/report-script-tag-full-block-expected.txt:
+        * http/tests/security/xssAuditor/report-script-tag-replace-state-expected.txt:
+        * http/tests/security/xssAuditor/resources/echo-intertag.pl:
+
+2016-10-04  Chris Dumez  <cdumez@apple.com>
+
+        Implement KeyboardEvent.code from the UI Event spec
+        https://bugs.webkit.org/show_bug.cgi?id=149584
+
+        Reviewed by Darin Adler.
+
+        Extend layout test coverage.
+
+        * fast/events/arrow-keys-on-body-expected.txt:
+        * fast/events/arrow-keys-on-body.html:
+        * fast/events/constructors/keyboard-event-constructor-expected.txt:
+        * fast/events/constructors/keyboard-event-constructor.html:
+        * fast/events/key-events-in-input-button-expected.txt:
+        * fast/events/key-events-in-input-button.html:
+        * fast/events/key-events-in-input-text-expected.txt:
+        * fast/events/key-events-in-input-text.html:
+        * fast/events/keyboardevent-code-expected.txt: Added.
+        * fast/events/keyboardevent-code.html: Added.
+        * fast/events/special-key-events-in-input-text-expected.txt:
+        * fast/events/special-key-events-in-input-text.html:
+
+2016-10-04  Simon Fraser  <simon.fraser@apple.com>
+
+        [iOS WK2] Make it possible for a test to describe a user gesture as a stream of events in JSON format
+        https://bugs.webkit.org/show_bug.cgi?id=162934
+
+        Reviewed by Dean Jackson.
+
+        * fast/events/ios/event-stream-single-tap-expected.txt: Added.
+        * fast/events/ios/event-stream-single-tap.html: Added.
+
+2016-10-04  Chris Dumez  <cdumez@apple.com>
+
+        Add support for KeyboardEvent.isComposing attribute
+        https://bugs.webkit.org/show_bug.cgi?id=162921
+
+        Reviewed by Darin Adler.
+
+        Extend layout test coverage to test KeyboardEvent.isComposing.
+
+        * editing/mac/input/kotoeri-enter-to-confirm-and-newline-expected.txt:
+        * editing/mac/input/kotoeri-enter-to-confirm-and-newline.html:
+        * fast/events/constructors/keyboard-event-constructor-expected.txt:
+        * fast/events/constructors/keyboard-event-constructor.html:
+
+2016-10-03  Ryosuke Niwa  <rniwa@webkit.org>
+
+        ShadowRoot interface should have elementFromPoint
+        https://bugs.webkit.org/show_bug.cgi?id=162882
+
+        Reviewed by Chris Dumez.
+
+        Add a W3C style testharness.js test for elementFromPoint on ShadowRoot.
+
+        * fast/shadow-dom/DocumentOrShadowRoot-prototype-elementFromPoint-expected.txt: Added.
+        * fast/shadow-dom/DocumentOrShadowRoot-prototype-elementFromPoint.html: Added.
+
+2016-10-04  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        font-family: cursive should map to KaiTi in Chinese
+        https://bugs.webkit.org/show_bug.cgi?id=162889
+        <rdar://problem/28363547>
+
+        Reviewed by Tim Horton.
+
+        * fast/text/cursive-zh-expected.html: Added.
+        * fast/text/cursive-zh.html: Added.
+
+2016-10-04  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking http/tests/cache/disk-cache/disk-cache-media.html as flaky on mac-wk2.
+        https://bugs.webkit.org/show_bug.cgi?id=162946
+
+        Unreviewed test gardening.
+
+        * platform/mac-wk2/TestExpectations:
+
+2016-10-04  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking http/tests/cache/disk-cache/disk-cache-request-max-stale.html as flaky on mac-wk2.
+        https://bugs.webkit.org/show_bug.cgi?id=162945
+
+        Unreviewed test gardening.
+
+        * platform/mac-wk2/TestExpectations:
+
+2016-10-04  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking http/tests/cache/disk-cache/resource-becomes-uncacheable.html as flaky on mac-wk2.
+        https://bugs.webkit.org/show_bug.cgi?id=161649
+
+        Unreviewed test gardening.
+
+        * platform/mac-wk2/TestExpectations:
+
+2016-10-04  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking transitions/background-position-transitions.html as flaky.
+        https://bugs.webkit.org/show_bug.cgi?id=162881
+
+        Unreviewed test gardening.
+
+        * TestExpectations:
+
+2016-10-04  Chris Dumez  <cdumez@apple.com>
+
+        Return null when window.open() is popup blocked
+        https://bugs.webkit.org/show_bug.cgi?id=162897
+
+        Reviewed by Michael Catanzaro.
+
+        Rebaseline existing tests to reflect behavior change.
+
+        * fast/events/popup-blocked-from-fake-button-click-expected.txt:
+        * fast/events/popup-blocked-from-fake-button-click.html:
+        * fast/events/popup-blocked-from-fake-focus-expected.txt:
+        * fast/events/popup-blocked-from-fake-focus.html:
+        * fast/events/popup-blocked-from-fake-user-gesture-expected.txt:
+        * fast/events/popup-blocked-from-fake-user-gesture.html:
+        * fast/events/popup-blocked-from-untrusted-click-event-on-anchor-expected.txt:
+        * fast/events/popup-blocked-from-untrusted-click-event-on-anchor.html:
+        * fast/events/popup-blocking-timers3-expected.txt:
+        * fast/events/popup-blocking-timers3.html:
+        * fast/events/popup-blocking-timers4-expected.txt:
+        * fast/events/popup-blocking-timers4.html:
+        * fast/events/popup-blocking-timers6-expected.txt:
+        * fast/events/popup-blocking-timers6.html:
+
+2016-10-04  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking http/tests/cache/disk-cache/disk-cache-204-status-code.html as flaky on mac-wk2.
+        https://bugs.webkit.org/show_bug.cgi?id=162685
+
+        Unreviewed test gardening.
+
+        * platform/mac-wk2/TestExpectations:
+
+2016-10-04  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Land TestExpectations for rdar://problem/28586837.
+
+        Unreviewed test gardening.
+
+        * platform/mac/TestExpectations:
+
+2016-10-04  Youenn Fablet  <youenn@apple.com>
+
+        [mac-wk1] LayoutTest http/tests/security/cached-cross-origin-preloading-css-stylesheet.html is a flaky failure
+        https://bugs.webkit.org/show_bug.cgi?id=162791
+
+        Reviewed by Alex Christensen.
+
+        Flackiness was due to one preload sometimes arriving after the test was finished.
+        This causes the issue of not having the preload actually being checked against CORS and the console error was not displayed.
+        Making the test wait 1 second after all loads finish to ensure the preload will also finishes.
+
+        Cleaning the test and improving it by:
+        - making each load to take 1 second (so that preload is not finished when actual load happens
+        - adding some comments explaining each subtest
+        - printing DONE at the end of all loads.
+
+        * http/tests/security/cached-cross-origin-preloading-css-stylesheet-expected.txt:
+        * http/tests/security/cached-cross-origin-preloading-css-stylesheet.html:
+        * platform/mac-wk1/TestExpectations: Removed flaky expectation.
+
 2016-10-03  Myles C. Maxfield  <mmaxfield@apple.com>
 
         Implement rendering of font-variation-settings

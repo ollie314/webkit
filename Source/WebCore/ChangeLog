@@ -1,3 +1,751 @@
+2016-10-05  Zalan Bujtas  <zalan@apple.com>
+
+        Missing quotation mark when <q> gets reparented.
+        https://bugs.webkit.org/show_bug.cgi?id=162940
+
+        Reviewed by Darin Adler.
+
+        When an opening RenderQuote gets removed due to some change in the render tree,
+        we notify the closing RenderQuote so that it can update its content (") accordingly (and vice versa).
+        However when the same RenderQuote is added back to the render tree (aka reparenting), we fail to
+        let the other RenderQuote know about it and its content becomes stale.  
+        This patch ensures that when either the opening or closing part of the quotation mark gets reparented,
+        we inform the other, corresponding opening/closing renderer about it.
+
+        Test: fast/css-generated-content/missing-quotes-with-dynamic-content.html
+
+        * dom/PseudoElement.cpp:
+        (WebCore::PseudoElement::didAttachRenderers):
+        * rendering/RenderQuote.cpp:
+        (WebCore::RenderQuote::insertedIntoTree):
+        * rendering/RenderQuote.h:
+
+2016-10-05  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser should correctly strip unnecessary 0's in IPv6 addresses
+        https://bugs.webkit.org/show_bug.cgi?id=162979
+
+        Reviewed by Brady Eidson.
+
+        Covered by new API tests.
+
+        * platform/URLParser.cpp:
+        (WebCore::URLParser::parseIPv6Host):
+        Strip leading 0's and any 0's before the last 0 if the value is 0.
+
+2016-10-05  Alex Christensen  <achristensen@webkit.org>
+
+        UTF-8 encode queries of nonspecial and websocket schemes
+        https://bugs.webkit.org/show_bug.cgi?id=162956
+
+        Reviewed by Geoffrey Garen and Brady Eidson.
+
+        The URL spec says in the query state:
+        'If url is not special or url's scheme is either "ws" or "wss", set encoding to UTF-8.'
+        This should be determined as soon as we are done parsing the scheme.
+        
+        Covered by new API tests.
+        This also fixes tests like fast/loader/javascript-url-encoding-2.html when URLParser is enabled.
+
+        * platform/URLParser.cpp:
+        (WebCore::isValidSchemeCharacter):
+        Renamed Scheme to ValidScheme so I can use Scheme as the name of an enum class in the same namespace.
+        (WebCore::isSpecial):
+        (WebCore::scheme):
+        Separate functionality so we can have different behavior for different sets of
+        ws and wss schemes, special, and non-special schemes.
+        (WebCore::URLParser::copyURLPartsUntil):
+        (WebCore::URLParser::parse):
+        Set isUTF8Encoding to true when we finish parsing the scheme if the scheme is ws, wss, or non-special,
+        according to spec.  This also matches existing behavior.  This way we will already know whether to go
+        into UTF8Query or NonUTF8Query state when we see a '?'.
+        (WebCore::isSpecialScheme): Deleted.
+
+2016-10-05  Alex Christensen  <achristensen@webkit.org>
+
+        Prepare to enable URLParser
+        https://bugs.webkit.org/show_bug.cgi?id=162974
+
+        Reviewed by Brady Eidson.
+
+        * platform/URL.cpp:
+        (WebCore::URL::serialize):
+        When we enable the URLParser, this attempt to make serialized URLs more spec compliant
+        won't be needed any more.
+
+2016-10-05  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win][Direct2D] Add initial D2D Path and Gradient implementation
+        https://bugs.webkit.org/show_bug.cgi?id=162923
+
+        Reviewed by Alex Christensen.
+
+        This patch lands a set of new files that implements initial Path
+        and Gradient features on Windows using Direct2D.
+
+        No new tests until complete backend lands.
+
+        * platform/graphics/Gradient.h:
+        * platform/graphics/Path.cpp:
+        * platform/graphics/Path.h:
+        * platform/graphics/win/GradientDirect2D.cpp: Added.
+        * platform/graphics/win/PathDirect2D.cpp: Added.
+
+2016-10-05  Romain Bellessort  <romain.bellessort@crf.canon.fr>
+
+        [Readable Streams API] Align function names with spec
+        https://bugs.webkit.org/show_bug.cgi?id=162967
+
+        Reviewed by Darin Adler.
+
+        Align function names with spec. Behaviour was already in line with spec, but previous function names had
+        sometimes been preserved to track the changes more easily. This led to some inconsistencies (for instance,
+        enqueueInReadableStream was still used even though it works on a controller instead of a stream) and it
+        also made it more difficult to compare spec and implementation.
+
+        No change in behaviour.
+
+        * Modules/fetch/FetchInternals.js:
+        (consumeStream): Updated with new function names.
+        * Modules/fetch/FetchResponse.js:
+        (clone): Updated with new function names.
+        * Modules/streams/ReadableStream.js:
+        (tee): Updated with new function names.
+        * Modules/streams/ReadableStreamDefaultController.js:
+        (enqueue): Updated with new function names.
+        (error): Updated with new function names.
+        * Modules/streams/ReadableStreamDefaultReader.js:
+        (read): Updated with new function names.
+        * Modules/streams/ReadableStreamInternals.js:
+        (privateInitializeReadableStreamDefaultController): Updated with new function names.
+        (readableStreamDefaultControllerError): Updated with new function names.
+        (readableStreamTee): Updated with new function names.
+        (readableStreamTeePullFunction): Updated with new function names.
+        (readableStreamTeeBranch2CancelFunction): Updated with new function names.
+        (readableStreamError): Updated with new function names.
+        (readableStreamCancel): Updated with new function names.
+        (readableStreamDefaultControllerPull): Updated with new function names.
+        (readableStreamDefaultControllerClose): Updated with new function names.
+        (readableStreamClose): Updated with new function names.
+        (readableStreamDefaultControllerEnqueue): Updated with new function names.
+        (readableStreamDefaultReaderRead): Updated with new function names.
+
+2016-10-05  Chris Dumez  <cdumez@apple.com>
+
+        [Bindings] Declare dictionary / enumeration template specializations in the header
+        https://bugs.webkit.org/show_bug.cgi?id=162929
+
+        Reviewed by Darin Adler.
+
+        Declare dictionary / enumeration template specializations in the header
+        so that:
+        - They can be used from custom bindings code.
+        - Dictionaries / enumerations can be used to their own IDL files to
+          share them (Bug 162912).
+
+        No new tests, rebaselined bindings tests.
+
+        * WebCore.xcodeproj/project.pbxproj:
+        * bindings/generic/IDLTypes.h:
+        * bindings/js/JSDOMConvert.h:
+        * bindings/scripts/CodeGeneratorJS.pm:
+        (GenerateInterface):
+        (GenerateEnumerationImplementationContent):
+        (GenerateEnumerationHeaderContent):
+        (GenerateDictionaryHeaderContent):
+        (GenerateHeader):
+        (GenerateCallbackHeader):
+        (GenerateCallbackImplementation):
+        (GenerateDefaultValue): Deleted.
+        (GenerateDictionaryImplementationContent): Deleted.
+        (GenerateParametersCheck): Deleted.
+        * bindings/scripts/test/JS/JSTestObj.cpp:
+        * bindings/scripts/test/JS/JSTestObj.h:
+
+2016-10-05  Zan Dobersek  <zdobersek@igalia.com>
+
+        Rename ENABLE_ENCRYPTED_MEDIA_V2 to ENABLE_LEGACY_ENCRYPTED_MEDIA
+        https://bugs.webkit.org/show_bug.cgi?id=162903
+
+        Reviewed by Alex Christensen.
+
+        Rename build guards for the remaining implementation of the legacy EME API
+        to ENABLE_LEGACY_ENCRYPTED_MEDIA. This will allow for the future implementation
+        of the near-finished API to be guarded with the simple ENABLE_ENCRYPTED_MEDIA guards.
+
+        No new tests -- no change in behavior.
+
+        * CMakeLists.txt:
+        * Configurations/FeatureDefines.xcconfig:
+        * DerivedSources.cpp:
+        * DerivedSources.make:
+        * Modules/encryptedmedia/CDM.cpp:
+        * Modules/encryptedmedia/CDM.h:
+        * Modules/encryptedmedia/CDMPrivate.h:
+        * Modules/encryptedmedia/CDMPrivateClearKey.cpp:
+        * Modules/encryptedmedia/CDMPrivateClearKey.h:
+        * Modules/encryptedmedia/CDMPrivateMediaPlayer.cpp:
+        * Modules/encryptedmedia/CDMPrivateMediaPlayer.h:
+        * Modules/encryptedmedia/CDMSessionClearKey.cpp:
+        * Modules/encryptedmedia/CDMSessionClearKey.h:
+        * Modules/encryptedmedia/MediaKeyMessageEvent.cpp:
+        * Modules/encryptedmedia/MediaKeyMessageEvent.h:
+        * Modules/encryptedmedia/MediaKeyMessageEvent.idl:
+        * Modules/encryptedmedia/MediaKeyNeededEvent.cpp:
+        * Modules/encryptedmedia/MediaKeyNeededEvent.h:
+        * Modules/encryptedmedia/MediaKeyNeededEvent.idl:
+        * Modules/encryptedmedia/MediaKeySession.cpp:
+        * Modules/encryptedmedia/MediaKeySession.h:
+        * Modules/encryptedmedia/MediaKeySession.idl:
+        * Modules/encryptedmedia/MediaKeys.cpp:
+        * Modules/encryptedmedia/MediaKeys.h:
+        * Modules/encryptedmedia/MediaKeys.idl:
+        * bindings/js/JSDictionary.cpp:
+        * bindings/js/JSDictionary.h:
+        * dom/Element.idl:
+        * dom/EventNames.in:
+        * dom/EventTargetFactory.in:
+        * html/HTMLMediaElement.cpp:
+        (WebCore::HTMLMediaElement::~HTMLMediaElement):
+        (WebCore::HTMLMediaElement::webkitGenerateKeyRequest):
+        (WebCore::HTMLMediaElement::webkitAddKey):
+        * html/HTMLMediaElement.h:
+        * html/HTMLMediaElement.idl:
+        * html/MediaError.h:
+        * html/MediaError.idl:
+        * html/MediaKeyError.h:
+        * html/MediaKeyError.idl:
+        * page/Settings.h:
+        * platform/graphics/CDMSession.h:
+        * platform/graphics/MediaPlayer.cpp:
+        * platform/graphics/MediaPlayer.h:
+        * platform/graphics/MediaPlayerPrivate.h:
+        * platform/graphics/avfoundation/CDMPrivateMediaSourceAVFObjC.h:
+        * platform/graphics/avfoundation/CDMPrivateMediaSourceAVFObjC.mm:
+        * platform/graphics/avfoundation/MediaPlayerPrivateAVFoundation.cpp:
+        * platform/graphics/avfoundation/MediaPlayerPrivateAVFoundation.h:
+        * platform/graphics/avfoundation/cf/CDMSessionAVFoundationCF.cpp:
+        * platform/graphics/avfoundation/cf/CDMSessionAVFoundationCF.h:
+        * platform/graphics/avfoundation/cf/MediaPlayerPrivateAVFoundationCF.cpp:
+        (WebCore::MediaPlayerPrivateAVFoundationCF::supportsKeySystem):
+        (WebCore::AVFWrapper::shouldWaitForLoadingOfResource):
+        * platform/graphics/avfoundation/cf/MediaPlayerPrivateAVFoundationCF.h:
+        * platform/graphics/avfoundation/objc/CDMSessionAVContentKeySession.h:
+        * platform/graphics/avfoundation/objc/CDMSessionAVContentKeySession.mm:
+        * platform/graphics/avfoundation/objc/CDMSessionAVFoundationObjC.h:
+        * platform/graphics/avfoundation/objc/CDMSessionAVFoundationObjC.mm:
+        * platform/graphics/avfoundation/objc/CDMSessionAVStreamSession.h:
+        * platform/graphics/avfoundation/objc/CDMSessionAVStreamSession.mm:
+        * platform/graphics/avfoundation/objc/CDMSessionMediaSourceAVFObjC.h:
+        * platform/graphics/avfoundation/objc/CDMSessionMediaSourceAVFObjC.mm:
+        * platform/graphics/avfoundation/objc/MediaPlayerPrivateAVFoundationObjC.h:
+        * platform/graphics/avfoundation/objc/MediaPlayerPrivateAVFoundationObjC.mm:
+        (WebCore::MediaPlayerPrivateAVFoundationObjC::supportsKeySystem):
+        (WebCore::MediaPlayerPrivateAVFoundationObjC::shouldWaitForLoadingOfResource):
+        (WebCore::playerKVOProperties):
+        (-[WebCoreAVFMovieObserver observeValueForKeyPath:ofObject:change:context:]):
+        * platform/graphics/avfoundation/objc/MediaPlayerPrivateMediaSourceAVFObjC.h:
+        * platform/graphics/avfoundation/objc/MediaPlayerPrivateMediaSourceAVFObjC.mm:
+        * platform/graphics/avfoundation/objc/MediaSourcePrivateAVFObjC.h:
+        * platform/graphics/avfoundation/objc/MediaSourcePrivateAVFObjC.mm:
+        * platform/graphics/avfoundation/objc/SourceBufferPrivateAVFObjC.mm:
+        (WebCore::SourceBufferPrivateAVFObjC::willProvideContentKeyRequestInitializationDataForTrackID):
+        (WebCore::SourceBufferPrivateAVFObjC::didProvideContentKeyRequestInitializationDataForTrackID):
+        * testing/Internals.cpp:
+        * testing/Internals.h:
+        * testing/Internals.idl:
+        * testing/MockCDM.cpp:
+        * testing/MockCDM.h:
+
+2016-10-05  Daniel Bates  <dabates@apple.com>
+
+        Do not follow redirects when sending violation report
+        https://bugs.webkit.org/show_bug.cgi?id=162520
+        <rdar://problem/27957639>
+
+        Reviewed by Alex Christensen.
+
+        Do not follow redirects when sending a Content Security Policy or XSS Auditor violation report
+        as redirects can be used to forward report details to a third-party.
+
+        This changes makes WebKit more closely conform to the reporting requirements in section Reporting
+        of the Content Security Level 2 standard: <https://w3c.github.io/webappsec-csp/2/#violation-reports>
+        (Editor's Draft, 25 April 2016).
+
+        Tests: http/tests/security/contentSecurityPolicy/report-blocked-uri-and-do-not-follow-redirect-when-sending-report.php
+               http/tests/security/xssAuditor/report-script-tag-and-do-not-follow-redirect-when-sending-report.html
+               http/tests/security/xssAuditor/report-script-tag-full-block-and-do-not-follow-redirect-when-sending-report.html
+
+        * loader/LoaderStrategy.h: Modified createPingHandle() to take a boolean, shouldFollowRedirects,
+        whether to follow redirect responses for a ping request.
+        * loader/PingLoader.cpp:
+        (WebCore::PingLoader::loadImage): Pass ShouldFollowRedirects::Yes to PingLoader::startPingLoad to
+        keep our current behavior.
+        (WebCore::PingLoader::sendPing): Ditto. Note our current behavior of following redirects matches
+        the behavior described in the section "Hyperlink auditing" of the HTML standard:
+        <https://html.spec.whatwg.org/multipage/semantics.html#hyperlink-auditing> (23 September 2016).
+        (WebCore::PingLoader::sendViolationReport): Pass ShouldFollowRedirects::No to PingLoader::startPingLoad
+        so that we do not follow redirects when sending a violation report.
+        (WebCore::PingLoader::startPingLoad): Modified to take argument shouldFollowRedirects whether to
+        follow redirect responses for a ping request.
+        * loader/PingLoader.h:
+        * platform/network/PingHandle.h: Add boolean m_shouldFollowRedirects. I grouped this boolean with
+        the existing boolean, m_shouldUseCredentialStorage, as opposed to appending to the end of the class
+        definition to avoid increasing object size as clang will coalesces the two bools into a single
+        machine word. Override ResourceHandleClient::willSendRequest() and ResourceHandleClient::willSendRequestAsync()
+        to follow a redirect, if applicable. 
+
+2016-10-05  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [SOUP] Move global TLS errors handling from ResourceHandle to SoupNetworkSession
+        https://bugs.webkit.org/show_bug.cgi?id=162910
+
+        Reviewed by Alex Christensen.
+
+        So that it will be shared with network session code. Also remove setHostAllowsAnyHTTPSCertificate() that we have
+        never actually used.
+
+        * platform/network/ResourceHandle.h:
+        * platform/network/soup/ResourceHandleSoup.cpp:
+        (WebCore::tlsErrorsChangedCallback): Use SoupNetworkSession::checkTLSErrors().
+        * platform/network/soup/SoupNetworkSession.cpp:
+        (WebCore::HostTLSCertificateSet::add):
+        (WebCore::HostTLSCertificateSet::contains):
+        (WebCore::HostTLSCertificateSet::computeCertificateHash):
+        (WebCore::clientCertificates):
+        (WebCore::SoupNetworkSession::setShouldIgnoreTLSErrors):
+        (WebCore::SoupNetworkSession::checkTLSErrors):
+        (WebCore::SoupNetworkSession::allowSpecificHTTPSCertificateForHost):
+        * platform/network/soup/SoupNetworkSession.h:
+
+2016-10-05  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [SOUP] Move request HTTP body handling to ResourceRequestSoup and simplify it
+        https://bugs.webkit.org/show_bug.cgi?id=162891
+
+        Reviewed by Michael Catanzaro.
+
+        We are currently adding the HTTP body to the message in ResourceHandleSoup, but we could do it as part of the
+        ResourceRequest::updateSoupMessage() method, since the HTTP body is indeed part of the request. The code can be
+        also simplified, especially the handling of files, by using SharedBuffer that already mmaps the file when
+        possible, instead of using GMappedFile API.
+
+        * platform/SharedBuffer.h: Add createSoupBuffer() method.
+        * platform/network/soup/ResourceHandleSoup.cpp:
+        (WebCore::createSoupMessageForHandleAndRequest):
+        (WebCore::milisecondsSinceRequest): Deleted.
+        (WebCore::ResourceHandle::didStartRequest): Deleted.
+        (WebCore::startingCallback): Deleted.
+        (WebCore::networkEventCallback): Deleted.
+        (WebCore::ResourceHandle::start): Deleted.
+        (WebCore::ResourceHandle::releaseForDownload): Deleted.
+        (WebCore::ResourceHandle::timeoutFired): Deleted.
+        * platform/network/soup/ResourceRequest.h:
+        * platform/network/soup/ResourceRequestSoup.cpp:
+        (WebCore::appendEncodedBlobItemToSoupMessageBody): Helper method to append the blob to the request message body.
+        (WebCore::ResourceRequest::updateSoupMessageBody): Add HTTPBody to the request message body.
+        (WebCore::ResourceRequest::updateSoupMessage): Call updateSoupMessageBody() to also update the body.
+        * platform/soup/SharedBufferSoup.cpp:
+        (WebCore::SharedBuffer::createSoupBuffer): Returns a new SoupBuffer for the SharedBuffer.
+
+2016-10-04  Chris Dumez  <cdumez@apple.com>
+
+        Implement KeyboardEvent.code from the UI Event spec
+        https://bugs.webkit.org/show_bug.cgi?id=149584
+
+        Reviewed by Darin Adler.
+
+        Add support for Keyboard.code attribute:
+        - https://w3c.github.io/uievents/#dom-keyboardevent-code
+        - https://w3c.github.io/uievents-code/
+
+        The feature is only enabled on Mac for now as the implementation is
+        platform-specific and Mac only.
+
+        Test: fast/events/keyboardevent-code.html
+
+        * dom/KeyboardEvent.cpp:
+        (WebCore::KeyboardEvent::KeyboardEvent):
+        * dom/KeyboardEvent.h:
+        * dom/KeyboardEvent.idl:
+        * platform/PlatformKeyboardEvent.h:
+        (WebCore::PlatformKeyboardEvent::PlatformKeyboardEvent):
+        (WebCore::PlatformKeyboardEvent::code):
+        (WebCore::PlatformKeyboardEvent::unmodifiedText): Deleted.
+        * platform/mac/PlatformEventFactoryMac.h:
+        * platform/mac/PlatformEventFactoryMac.mm:
+        (WebCore::codeForKeyEvent):
+        (WebCore::keyIdentifierForKeyEvent):
+        * replay/SerializationMethods.cpp:
+        (JSC::EncodingTraits<PlatformKeyboardEvent>::encodeValue):
+        (JSC::EncodingTraits<PlatformKeyboardEvent>::decodeValue):
+
+2016-10-04  Said Abou-Hallawa  <sabouhallawa@apple.com>
+
+        The dragged image should be the current frame only of the animated image
+        https://bugs.webkit.org/show_bug.cgi?id=162109
+
+        Reviewed by Tim Horton.
+
+        Instead of creating an NSImage with all the frames for the dragImage,
+        create an NSImage with the current frame only.
+
+        * dom/DataTransferMac.mm:
+        (WebCore::DataTransfer::createDragImage): Call snapshotNSImage() to create the dragImage.
+        * editing/cocoa/HTMLConverter.mm:
+        (fileWrapperForElement):  Call the Image function with its new name.
+        * platform/graphics/BitmapImage.h:
+        * platform/graphics/Image.h:
+        (WebCore::Image::nsImage): Rename getNSImage() to nsImage().
+        (WebCore::Image::snapshotNSImage): Returns the NSImage of the current frame.
+        (WebCore::Image::tiffRepresentation): Rename getTIFFRepresentation() to tiffRepresentation().
+        (WebCore::Image::getNSImage): Deleted.
+        (WebCore::Image::getTIFFRepresentation): Deleted.
+        * platform/graphics/mac/ImageMac.mm:
+        (WebCore::BitmapImage::tiffRepresentation): Rename getTIFFRepresentation() to tiffRepresentation().
+        (WebCore::BitmapImage::nsImage): Rename getNSImage() to nsImage().
+        (WebCore::BitmapImage::snapshotNSImage): Returns the NSImage of the current frame.
+        (WebCore::BitmapImage::getTIFFRepresentation): Deleted.
+        (WebCore::BitmapImage::getNSImage): Deleted.
+        * platform/mac/CursorMac.mm:
+        (WebCore::createCustomCursor): Call snapshotNSImage() since the cursor does not animate anyway.
+        * platform/mac/DragImageMac.mm:
+        (WebCore::createDragImageFromImage): Use snapshotNSImage() for the dragImage.
+        * platform/mac/PasteboardMac.mm:
+        (WebCore::Pasteboard::write): Call the Image function with its new name.
+
+2016-10-04  Andy Estes  <aestes@apple.com>
+
+        [iOS] Crash in WebResourceLoaderQuickLookDelegate when the client cancels the navigation to a QuickLook resource
+        https://bugs.webkit.org/show_bug.cgi?id=162950
+        <rdar://problem/23759114>
+
+        Reviewed by Brady Eidson.
+
+        When we receive data from QLPreviewConverter for the first time, we call
+        ResourceLoader::didReceiveResponse() with the preview NSURLResponse from QuickLook. If the
+        client decides to cancel this navigation in decidePolicyForResponse(),
+        WebResourceLoaderQuickLookDelegate will end up with a null _resourceLoader after
+        didReceiveResponse() returns. This change adds null checks in the methods that use
+        _resourceLoader after calling -_sendDidReceiveResponseIfNecessary.
+
+        New API test: QuickLook.CancelNavigationAfterResponse
+
+        * platform/network/ios/QuickLook.mm:
+        (-[WebResourceLoaderQuickLookDelegate connection:didReceiveDataArray:]): Changed to only
+        call ResourceLoader::didReceiveDataArray() if _resourceLoader is non-null.
+        (-[WebResourceLoaderQuickLookDelegate connection:didReceiveData:lengthReceived:]): Ditto for
+        ResourceLoader::didReceiveData().
+        (-[WebResourceLoaderQuickLookDelegate connection:didFailWithError:]): Ditto for
+        ResourceLoader::didFail().
+
+2016-10-04  Chris Dumez  <cdumez@apple.com>
+
+        Add support for KeyboardEvent.isComposing attribute
+        https://bugs.webkit.org/show_bug.cgi?id=162921
+
+        Reviewed by Darin Adler.
+
+        Add support for KeyboardEvent.isComposing attribute:
+        - https://www.w3.org/TR/uievents/#dom-keyboardevent-iscomposing
+        - https://www.w3.org/TR/uievents/#ref-for-dom-keyboardevent-iscomposing-3
+
+        Manual test: https://jsfiddle.net/ay92sr08/9/
+
+        No new tests, extended existing tests.
+
+        * dom/KeyboardEvent.cpp:
+        (WebCore::KeyboardEvent::KeyboardEvent):
+        * dom/KeyboardEvent.h:
+        * dom/KeyboardEvent.idl:
+
+2016-10-03  Ryosuke Niwa  <rniwa@webkit.org>
+
+        ShadowRoot interface should have elementFromPoint
+        https://bugs.webkit.org/show_bug.cgi?id=162882
+
+        Reviewed by Chris Dumez.
+
+        Add elementFromPoint to ShadowRoot's prototype as specified at:
+        https://www.w3.org/TR/shadow-dom/#extensions-to-the-documentorshadowroot-mixin
+        with changes proposed at https://github.com/w3c/csswg-drafts/issues/556
+
+        Added TreeScope::retargetToScope which implements 
+
+        This patch also factors DocumentOrShadowRoot.idl out of Document and ShadowRoot interfaces to better match
+        the latest DOM specification: https://dom.spec.whatwg.org/#mixin-documentorshadowroot
+
+        Test: fast/shadow-dom/Document-prototype-elementFromPoint.html
+
+        * CMakeLists.txt:
+        * DerivedSources.make:
+        * WebCore.xcodeproj/project.pbxproj:
+        * dom/Document.cpp:
+        (WebCore::Document::nodeFromPoint): Moved to TreeScope.
+        (WebCore::Document::elementFromPoint): Moved to TreeScope.
+        * dom/Document.h:
+        * dom/Document.idl: Moved elementFromPoint and activeElement to DocumentOrShadowRoot.idl.
+        * dom/DocumentOrShadowRoot.idl: Added.
+        * dom/EventPath.cpp:
+        (WebCore::RelatedNodeRetargeter::checkConsistency): Use newly added TreeScope::retargetToScope.
+        * dom/ShadowRoot.idl: Moved activeElement to DocumentOrShadowRoot.idl.
+        * dom/TreeScope.cpp:
+        (WebCore::TreeScope::retargetToScope): Added. Implements https://dom.spec.whatwg.org/#retarget efficiently.
+        Instead of checking whether A (node) is a shadow-including inclusive ancestor of B (this scope) at each
+        parent, find the lowest ancestor which contains both A and B, and return the self-inclusive ancestor of B
+        in that tree. To find the lowest common ancestor in O(n), traverse all ancestors of A and B separately and
+        do a top-down traversal. The last tree scope in which A's ancestor and B's ancestor match is the lowest
+        common ancestor.
+        (WebCore::TreeScope::nodeFromPoint): Moved from Document.
+        (WebCore::TreeScope::elementFromPoint): Moved from Document. Use retargetToScope and parentInComposedTree
+        instead of parentNode and ancestorInThisScope to match the semantics proposed in
+        https://github.com/w3c/csswg-drafts/issues/556
+        * dom/TreeScope.h:
+
+2016-10-04  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        font-family: cursive should map to KaiTi in Chinese
+        https://bugs.webkit.org/show_bug.cgi?id=162889
+        <rdar://problem/28363547>
+
+        Reviewed by Tim Horton.
+
+        According to Bobby Tung, this is a better mapping. Previously, we were
+        relying on the system fallback mechanism. However, an explicit mapping
+        is more robust.
+
+        Test: fast/text/cursive-zh.html
+
+        * page/cocoa/SettingsCocoa.mm:
+        (WebCore::Settings::initializeDefaultFontFamilies):
+
+2016-10-04  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser: query-only URLs relative to file URLs should just add a query
+        https://bugs.webkit.org/show_bug.cgi?id=162888
+
+        Reviewed by Tim Horton.
+
+        Covered by new API tests.
+
+        * platform/URLParser.cpp:
+        (WebCore::URLParser::parse):
+        Like bug 206749 but with queries instead of fragments.
+
+2016-10-04  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser should match URL::parse and other browsers when parsing a URL containing only scheme://
+        https://bugs.webkit.org/show_bug.cgi?id=162909
+
+        Reviewed by Tim Horton.
+
+        If there's no host in this case we shouldn't fail, but rather make a valid URL with the // in the path.
+        This matches Chrome, Firefox, and Safari's behavior.
+        Covered by API tests.
+
+        * platform/URLParser.cpp:
+        (WebCore::URLParser::parse):
+
+2016-10-04  Brent Fulgham  <bfulgham@apple.com>
+
+        Unreviewed build fix after r206773.
+
+        Exclude Direct2D definitions when building for normal CG Windows.
+
+        * platform/graphics/GraphicsContext.h:
+
+2016-10-04  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [DOMJIT] Introduce DOMJIT::GetterSetter to tell JIT information
+        https://bugs.webkit.org/show_bug.cgi?id=162916
+
+        Reviewed by Filip Pizlo.
+
+        * ForwardingHeaders/domjit/DOMJITGetterSetter.h: Added.
+        * PlatformEfl.cmake:
+        * PlatformGTK.cmake:
+        * PlatformMac.cmake:
+        * PlatformWin.cmake:
+
+2016-10-04  Chris Dumez  <cdumez@apple.com>
+
+        Return null when window.open() is popup blocked
+        https://bugs.webkit.org/show_bug.cgi?id=162897
+
+        Reviewed by Michael Catanzaro.
+
+        The return value of window.open() when the popup is blocked should be null:
+        - https://github.com/whatwg/html/pull/1854
+        - https://github.com/whatwg/html/issues/1851
+
+        Firefox / Edge return null.
+
+        No new tests, rebaselined existing tests.
+
+        * bindings/js/JSDOMWindowCustom.cpp:
+        (WebCore::JSDOMWindow::open):
+
+2016-10-04  Chris Dumez  <cdumez@apple.com>
+
+        [Web IDL] Add support for dictionary inheritance
+        https://bugs.webkit.org/show_bug.cgi?id=162907
+
+        Reviewed by Sam Weinig.
+
+        Add support for dictionary inheritance to our Web IDL parser and
+        bindings generator. Leverage this new support for EventTarget's
+        EventListenerOptions / AddEventListenerOptions dictionaries, in
+        order to match the DOM specification:
+        - https://dom.spec.whatwg.org/#interface-eventtarget
+
+        Also update the bindings generator to convert the dictionary
+        members in lexicographical order, as per:
+        - https://heycam.github.io/webidl/#es-dictionary (Step 5.1)
+
+        No new tests, rebaselined bindings tests.
+
+        * bindings/scripts/CodeGenerator.pm:
+        (GetDictionaryByName):
+        * bindings/scripts/CodeGeneratorJS.pm:
+        (GenerateDictionaryImplementationContent):
+        * bindings/scripts/IDLParser.pm:
+        (parseDictionary):
+        * bindings/scripts/test/JS/JSTestObj.cpp:
+        (WebCore::convertDictionary<TestObj::Dictionary>):
+        (WebCore::convertDictionary<TestObj::DictionaryThatShouldNotTolerateNull>):
+        (WebCore::convertDictionary<TestObj::DictionaryThatShouldTolerateNull>):
+        (WebCore::convertDictionary<AlternateDictionaryName>):
+        (WebCore::convertDictionary<TestObj::ParentDictionary>):
+        (WebCore::convertDictionary<TestObj::ChildDictionary>):
+        * bindings/scripts/test/TestObj.idl:
+        * dom/EventTarget.idl:
+
+2016-10-04  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win][Direct2D] Add initial D2D GraphicsContext implementation
+        https://bugs.webkit.org/show_bug.cgi?id=162917
+
+        Reviewed by Dean Jackson.
+
+        This patch lands a set of new files that implement the GraphicsContext
+        features on Windows using Direct2D.
+
+        No new tests until complete backend lands.
+
+        * platform/graphics/Color.h: Add new casting operator.
+        * platform/graphics/FloatSize.h: Ditto.
+        * platform/graphics/GraphicsContext.cpp: Update for Direct2D
+        implementation.
+        * platform/graphics/GraphicsContext.h:
+        * platform/graphics/win/ColorDirect2D.cpp:
+        (WebCore::Color::operator D2D1_VECTOR_4F): Added.
+        * platform/graphics/win/GraphicsContextCGWin.cpp: Add compiler
+        guard to avoid building when using Direct2D.
+        * platform/graphics/win/GraphicsContextDirect2D.cpp: Added.
+        * platform/graphics/win/GraphicsContextPlatformPrivateDirect2D.h: Added.
+        * platform/graphics/win/GraphicsContextWin.cpp: Update for Direct2D
+        includes.
+        * platform/graphics/win/TransformationMatrixDirect2D.cpp: Fix comment.
+
+2016-10-04  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [SOUP] Remove SSLPolicyFlags from SoupNetworkSession
+        https://bugs.webkit.org/show_bug.cgi?id=162906
+
+        Reviewed by Michael Catanzaro.
+
+        All soup based ports are setting SSLUseSystemCAFile flag unconditionally, so we can just use that when creating
+        the session like we do for all other construct parameters.
+
+        * platform/network/soup/SoupNetworkSession.cpp:
+        (WebCore::SoupNetworkSession::createTestingSession):
+        (WebCore::SoupNetworkSession::setupLogger):
+        (WebCore::SoupNetworkSession::SoupNetworkSession): Deleted.
+        (WebCore::SoupNetworkSession::clearOldSoupCache): Deleted.
+        (WebCore::SoupNetworkSession::setHTTPProxy): Deleted.
+        * platform/network/soup/SoupNetworkSession.h:
+        (WebCore::SoupNetworkSession::soupSession): Deleted.
+
+2016-10-04  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        Media controls are displayed in the incorrect state momentarily after switching between tabs playing media
+        https://bugs.webkit.org/show_bug.cgi?id=162766
+        <rdar://problem/28533523>
+
+        Reviewed by Jer Noble.
+
+        When showing Now Playing controls for a media session, we should first set up the Now Playing info and
+        playback state before telling MediaRemote to make the session visible. This is WebKit work in ensuring that
+        when switching Now Playing sessions by switching tabs, we do not first display an invalid Now Playing state
+        before updating to the expected state.
+
+        Adds 2 new WebKit API tests in NowPlayingControlsTests: NowPlayingControlsHideAfterShowingClearsInfo and
+        NowPlayingControlsClearInfoAfterSessionIsNoLongerValid.
+
+        * platform/audio/PlatformMediaSessionManager.h:
+        (WebCore::PlatformMediaSessionManager::lastUpdatedNowPlayingTitle):
+        (WebCore::PlatformMediaSessionManager::lastUpdatedNowPlayingDuration):
+        (WebCore::PlatformMediaSessionManager::lastUpdatedNowPlayingElapsedTime):
+        (WebCore::PlatformMediaSessionManager::hasActiveNowPlayingSession): Deleted.
+        * platform/audio/mac/MediaSessionManagerMac.h:
+        * platform/audio/mac/MediaSessionManagerMac.mm:
+        (WebCore::MediaSessionManagerMac::updateNowPlayingInfo):
+
+2016-10-04  Youenn Fablet  <youenn@apple.com>
+
+        [Fetch API] ReadableStream should be errored with TypeError values
+        https://bugs.webkit.org/show_bug.cgi?id=162895
+
+        Reviewed by Alex Christensen.
+
+        Test: imported/w3c/web-platform-tests/fetch/api/basic/error-after-response.html
+
+        * Modules/fetch/FetchResponse.cpp:
+        (WebCore::FetchResponse::BodyLoader::didFail): Removing FIXME.
+        * bindings/js/ReadableStreamDefaultController.h:
+        (WebCore::ReadableStreamDefaultController::error<String>): Erroring with TypeError values.
+
+2016-10-03  Chris Dumez  <cdumez@apple.com>
+
+        Bindings do not throw a TypeError if a required dictionary member is missing
+        https://bugs.webkit.org/show_bug.cgi?id=162734
+
+        Reviewed by Geoffrey Garen.
+
+        Bindings should throw a TypeError if a required dictionary member is missing.
+        For example, if there is a "required long id" member in a dictionary that is
+        missing, our bindings would prevously pass 0 to the implementation instead
+        of throwing a TypeError.
+
+        Relevant specification:
+        - https://heycam.github.io/webidl/#es-dictionary
+
+        I aligned our bindings generator implementation with the specification,
+        except for the support for dictionary inheritance that is still missing
+        and will be addressed in a follow-up patch.
+
+        No new tests, I rebaselined the bindings tests and this is already covered
+        by fast/events/touch/touch-constructor.html on iOS.
+
+        * bindings/js/JSCustomElementRegistryCustom.cpp:
+        (WebCore::JSCustomElementRegistry::define):
+        * bindings/js/JSDOMConvert.h:
+        (WebCore::convert): Deleted.
+        (WebCore::Converter<bool>::convert): Deleted.
+        (WebCore::Converter<String>::convert): Deleted.
+        (WebCore::Converter<IDLDOMString>::convert): Deleted.
+        (WebCore::Converter<IDLUSVString>::convert): Deleted.
+        (WebCore::Converter<JSC::JSValue>::convert): Deleted.
+        (WebCore::Converter<int8_t>::convert): Deleted.
+        (WebCore::Converter<uint8_t>::convert): Deleted.
+        * bindings/scripts/CodeGeneratorJS.pm:
+        (GenerateDictionaryImplementationContent):
+        * bindings/scripts/test/JS/JSTestObj.cpp:
+        (WebCore::convertDictionary<TestObj::Dictionary>):
+        (WebCore::convertDictionary<TestObj::DictionaryThatShouldNotTolerateNull>):
+        (WebCore::convertDictionary<TestObj::DictionaryThatShouldTolerateNull>):
+        (WebCore::convertDictionary<AlternateDictionaryName>):
+
 2016-10-03  Zalan Bujtas  <zalan@apple.com>
 
         [ListItems] Render tree should be all clean by the end of FrameView::layout().

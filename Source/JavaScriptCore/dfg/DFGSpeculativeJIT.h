@@ -938,6 +938,11 @@ public:
         m_jit.setupArgumentsWithExecState(cell);
         return appendCallSetResult(operation, result);
     }
+    JITCompiler::Call callOperation(Jss_JITOperation_EJssUi operation, GPRReg result, GPRReg arg1, GPRReg arg2)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, arg2);
+        return appendCallSetResult(operation, result);
+    }
     JITCompiler::Call callOperation(P_JITOperation_EO operation, GPRReg result, GPRReg object)
     {
         m_jit.setupArgumentsWithExecState(object);
@@ -1333,6 +1338,46 @@ public:
     JITCompiler::Call callOperation(V_JITOperation_EJJJJ operation, GPRReg arg1, GPRReg arg2, GPRReg arg3, GPRReg arg4)
     {
         m_jit.setupArgumentsWithExecState(arg1, arg2, arg3, arg4);
+        return appendCall(operation);
+    }
+    JITCompiler::Call callOperation(V_JITOperation_EOJJZ operation, GPRReg arg1, JSValueRegs arg2, JSValueRegs arg3, GPRReg arg4)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, arg2.payloadGPR(), arg3.payloadGPR(), arg4);
+        return appendCall(operation);
+    }
+    JITCompiler::Call callOperation(V_JITOperation_EOJssJZ operation, GPRReg arg1, GPRReg arg2, JSValueRegs arg3, GPRReg arg4)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, arg2, arg3.payloadGPR(), arg4);
+        return appendCall(operation);
+    }
+    JITCompiler::Call callOperation(V_JITOperation_EOIJZ operation, GPRReg arg1, GPRReg arg2, JSValueRegs arg3, GPRReg arg4)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, arg2, arg3.payloadGPR(), arg4);
+        return appendCall(operation);
+    }
+    JITCompiler::Call callOperation(V_JITOperation_EOSymJZ operation, GPRReg arg1, GPRReg arg2, JSValueRegs arg3, GPRReg arg4)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, arg2, arg3.payloadGPR(), arg4);
+        return appendCall(operation);
+    }
+    JITCompiler::Call callOperation(V_JITOperation_EOJOOZ operation, GPRReg arg1, JSValueRegs arg2, GPRReg arg3, GPRReg arg4, GPRReg arg5)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, arg2.payloadGPR(), arg3, arg4, arg5);
+        return appendCall(operation);
+    }
+    JITCompiler::Call callOperation(V_JITOperation_EOJssOOZ operation, GPRReg arg1, GPRReg arg2, GPRReg arg3, GPRReg arg4, GPRReg arg5)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, arg2, arg3, arg4, arg5);
+        return appendCall(operation);
+    }
+    JITCompiler::Call callOperation(V_JITOperation_EOIOOZ operation, GPRReg arg1, GPRReg arg2, GPRReg arg3, GPRReg arg4, GPRReg arg5)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, arg2, arg3, arg4, arg5);
+        return appendCall(operation);
+    }
+    JITCompiler::Call callOperation(V_JITOperation_EOSymOOZ operation, GPRReg arg1, GPRReg arg2, GPRReg arg3, GPRReg arg4, GPRReg arg5)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, arg2, arg3, arg4, arg5);
         return appendCall(operation);
     }
     JITCompiler::Call callOperation(V_JITOperation_EOJIUi operation, GPRReg arg1, GPRReg arg2, UniquedStringImpl* impl, unsigned value)
@@ -1779,7 +1824,46 @@ public:
         m_jit.setupArgumentsWithExecState(EABI_32BIT_DUMMY_ARG arg1.payloadGPR(), arg1.tagGPR(), arg2.payloadGPR(), arg2.tagGPR(), arg3.payloadGPR(), arg3.tagGPR(), arg4.payloadGPR(), arg4.tagGPR());
         return appendCall(operation);
     }
-
+    JITCompiler::Call callOperation(V_JITOperation_EOJJZ operation, GPRReg arg1, JSValueRegs arg2, JSValueRegs arg3, GPRReg arg4)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, arg2.payloadGPR(), arg2.tagGPR(), arg3.payloadGPR(), arg3.tagGPR(), arg4);
+        return appendCall(operation);
+    }
+    JITCompiler::Call callOperation(V_JITOperation_EOJssJZ operation, GPRReg arg1, GPRReg arg2, JSValueRegs arg3, GPRReg arg4)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, arg2, EABI_32BIT_DUMMY_ARG arg3.payloadGPR(), arg3.tagGPR(), arg4);
+        return appendCall(operation);
+    }
+    JITCompiler::Call callOperation(V_JITOperation_EOIJZ operation, GPRReg arg1, GPRReg arg2, JSValueRegs arg3, GPRReg arg4)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, arg2, EABI_32BIT_DUMMY_ARG arg3.payloadGPR(), arg3.tagGPR(), arg4);
+        return appendCall(operation);
+    }
+    JITCompiler::Call callOperation(V_JITOperation_EOSymJZ operation, GPRReg arg1, GPRReg arg2, JSValueRegs arg3, GPRReg arg4)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, arg2, EABI_32BIT_DUMMY_ARG arg3.payloadGPR(), arg3.tagGPR(), arg4);
+        return appendCall(operation);
+    }
+    JITCompiler::Call callOperation(V_JITOperation_EOJOOZ operation, GPRReg arg1, JSValueRegs arg2, GPRReg arg3, GPRReg arg4, GPRReg arg5)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, arg2.payloadGPR(), arg2.tagGPR(), arg3, arg4, arg5);
+        return appendCall(operation);
+    }
+    JITCompiler::Call callOperation(V_JITOperation_EOJssOOZ operation, GPRReg arg1, GPRReg arg2, GPRReg arg3, GPRReg arg4, GPRReg arg5)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, arg2, arg3, arg4, arg5);
+        return appendCall(operation);
+    }
+    JITCompiler::Call callOperation(V_JITOperation_EOIOOZ operation, GPRReg arg1, GPRReg arg2, GPRReg arg3, GPRReg arg4, GPRReg arg5)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, arg2, arg3, arg4, arg5);
+        return appendCall(operation);
+    }
+    JITCompiler::Call callOperation(V_JITOperation_EOSymOOZ operation, GPRReg arg1, GPRReg arg2, GPRReg arg3, GPRReg arg4, GPRReg arg5)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, arg2, arg3, arg4, arg5);
+        return appendCall(operation);
+    }
     JITCompiler::Call callOperation(V_JITOperation_EOJIUi operation, GPRReg arg1, JSValueRegs arg2, UniquedStringImpl* impl, unsigned value)
     {
         m_jit.setupArgumentsWithExecState(arg1, arg2.payloadGPR(), arg2.tagGPR(), TrustedImmPtr(impl), TrustedImm32(value));
@@ -2570,6 +2654,9 @@ public:
     void compileGetDynamicVar(Node*);
     void compilePutDynamicVar(Node*);
     void compileCompareEqPtr(Node*);
+    void compileDefineDataProperty(Node*);
+    void compileDefineAccessorProperty(Node*);
+    void compileToLowerCase(Node*);
 
     void moveTrueTo(GPRReg);
     void moveFalseTo(GPRReg);

@@ -494,6 +494,8 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
     case PutGetterSetterById:
     case PutGetterByVal:
     case PutSetterByVal:
+    case DefineDataProperty:
+    case DefineAccessorProperty:
     case DeleteById:
     case DeleteByVal:
     case ArrayPush:
@@ -1288,6 +1290,10 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
     case IsNonEmptyMapBucket:
         read(MiscFields);
         def(HeapLocation(MapHasLoc, MiscFields, node->child1()), LazyNode(node));
+        return;
+
+    case ToLowerCase:
+        def(PureValue(node));
         return;
         
     case LastNodeType:

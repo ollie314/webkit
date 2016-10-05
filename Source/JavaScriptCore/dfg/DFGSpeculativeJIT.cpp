@@ -1490,6 +1490,60 @@ void SpeculativeJIT::compilePeepHoleBooleanBranch(Node* node, Node* branchNode, 
     jump(notTaken);
 }
 
+void SpeculativeJIT::compileToLowerCase(Node* node)
+{
+    ASSERT(node->op() == ToLowerCase);
+    SpeculateCellOperand string(this, node->child1());
+    GPRTemporary temp(this);
+    GPRTemporary index(this);
+    GPRTemporary charReg(this);
+    GPRTemporary length(this);
+
+    GPRReg stringGPR = string.gpr();
+    GPRReg tempGPR = temp.gpr();
+    GPRReg indexGPR = index.gpr();
+    GPRReg charGPR = charReg.gpr();
+    GPRReg lengthGPR = length.gpr();
+
+    speculateString(node->child1(), stringGPR);
+
+    CCallHelpers::JumpList slowPath;
+
+    m_jit.move(TrustedImmPtr(0), indexGPR);
+
+    m_jit.loadPtr(MacroAssembler::Address(stringGPR, JSString::offsetOfValue()), tempGPR);
+    slowPath.append(m_jit.branchTestPtr(MacroAssembler::Zero, tempGPR));
+
+    slowPath.append(m_jit.branchTest32(
+        MacroAssembler::Zero, MacroAssembler::Address(tempGPR, StringImpl::flagsOffset()),
+        MacroAssembler::TrustedImm32(StringImpl::flagIs8Bit())));
+    m_jit.load32(MacroAssembler::Address(tempGPR, StringImpl::lengthMemoryOffset()), lengthGPR);
+    m_jit.loadPtr(MacroAssembler::Address(tempGPR, StringImpl::dataOffset()), tempGPR);
+
+    auto loopStart = m_jit.label();
+    auto loopDone = m_jit.branch32(CCallHelpers::AboveOrEqual, indexGPR, lengthGPR);
+    m_jit.load8(MacroAssembler::BaseIndex(tempGPR, indexGPR, MacroAssembler::TimesOne), charGPR);
+    slowPath.append(m_jit.branchTest32(CCallHelpers::NonZero, charGPR, TrustedImm32(~0x7F)));
+    m_jit.sub32(TrustedImm32('A'), charGPR);
+    slowPath.append(m_jit.branch32(CCallHelpers::BelowOrEqual, charGPR, TrustedImm32('Z' - 'A')));
+
+    m_jit.add32(TrustedImm32(1), indexGPR);
+    m_jit.jump().linkTo(loopStart, &m_jit);
+    
+    slowPath.link(&m_jit);
+    silentSpillAllRegisters(lengthGPR);
+    callOperation(operationToLowerCase, lengthGPR, stringGPR, indexGPR);
+    silentFillAllRegisters(lengthGPR);
+    m_jit.exceptionCheck();
+    auto done = m_jit.jump();
+
+    loopDone.link(&m_jit);
+    m_jit.move(stringGPR, lengthGPR);
+
+    done.link(&m_jit);
+    cellResult(lengthGPR, node);
+}
+
 void SpeculativeJIT::compilePeepHoleInt32Branch(Node* node, Node* branchNode, JITCompiler::RelationalCondition condition)
 {
     BasicBlock* taken = branchNode->branchData()->taken.block;
@@ -8642,6 +8696,165 @@ void SpeculativeJIT::compileCompareEqPtr(Node* node)
     m_jit.boxBooleanPayload(true, resultGPR);
     notEqual.link(&m_jit);
     blessedBooleanResult(resultGPR, node);
+}
+
+void SpeculativeJIT::compileDefineDataProperty(Node* node)
+{
+#if USE(JSVALUE64)
+    static_assert(GPRInfo::numberOfRegisters >= 5, "We are assuming we have enough registers to make this call without incrementally setting up the arguments.");
+#else
+    static_assert(GPRInfo::numberOfRegisters >= 6, "We are assuming we have enough registers to make this call without incrementally setting up the arguments.");
+#endif
+
+    SpeculateCellOperand base(this, m_jit.graph().varArgChild(node, 0));
+    GPRReg baseGPR = base.gpr();
+
+    JSValueOperand value(this, m_jit.graph().varArgChild(node, 2));
+    JSValueRegs valueRegs = value.jsValueRegs();
+
+    SpeculateInt32Operand attributes(this, m_jit.graph().varArgChild(node, 3));
+    GPRReg attributesGPR = attributes.gpr();
+
+    Edge& propertyEdge = m_jit.graph().varArgChild(node, 1);
+    switch (propertyEdge.useKind()) {
+    case StringUse: {
+        SpeculateCellOperand property(this, propertyEdge);
+        GPRReg propertyGPR = property.gpr();
+        speculateString(propertyEdge, propertyGPR);
+
+        useChildren(node);
+
+        flushRegisters();
+        callOperation(operationDefineDataPropertyString, NoResult, baseGPR, propertyGPR, valueRegs, attributesGPR);
+        m_jit.exceptionCheck();
+        break;
+    }
+    case StringIdentUse: {
+        SpeculateCellOperand property(this, propertyEdge);
+        GPRTemporary ident(this);
+
+        GPRReg propertyGPR = property.gpr();
+        GPRReg identGPR = ident.gpr();
+
+        speculateString(propertyEdge, propertyGPR);
+        speculateStringIdentAndLoadStorage(propertyEdge, propertyGPR, identGPR);
+
+        useChildren(node);
+
+        flushRegisters();
+        callOperation(operationDefineDataPropertyStringIdent, NoResult, baseGPR, identGPR, valueRegs, attributesGPR);
+        m_jit.exceptionCheck();
+        break;
+    }
+    case SymbolUse: {
+        SpeculateCellOperand property(this, propertyEdge);
+        GPRReg propertyGPR = property.gpr();
+        speculateSymbol(propertyEdge, propertyGPR);
+
+        useChildren(node);
+
+        flushRegisters();
+        callOperation(operationDefineDataPropertySymbol, NoResult, baseGPR, propertyGPR, valueRegs, attributesGPR);
+        m_jit.exceptionCheck();
+        break;
+    }
+    case UntypedUse: {
+        JSValueOperand property(this, propertyEdge);
+        JSValueRegs propertyRegs = property.jsValueRegs();
+
+        useChildren(node);
+
+        flushRegisters();
+        callOperation(operationDefineDataProperty, NoResult, baseGPR, propertyRegs, valueRegs, attributesGPR);
+        m_jit.exceptionCheck();
+        break;
+    }
+    default:
+        RELEASE_ASSERT_NOT_REACHED();
+    }
+
+    noResult(node, UseChildrenCalledExplicitly);
+}
+
+void SpeculativeJIT::compileDefineAccessorProperty(Node* node)
+{
+#if USE(JSVALUE64)
+    static_assert(GPRInfo::numberOfRegisters >= 5, "We are assuming we have enough registers to make this call without incrementally setting up the arguments.");
+#else
+    static_assert(GPRInfo::numberOfRegisters >= 6, "We are assuming we have enough registers to make this call without incrementally setting up the arguments.");
+#endif
+
+    SpeculateCellOperand base(this, m_jit.graph().varArgChild(node, 0));
+    GPRReg baseGPR = base.gpr();
+
+    SpeculateCellOperand getter(this, m_jit.graph().varArgChild(node, 2));
+    GPRReg getterGPR = getter.gpr();
+
+    SpeculateCellOperand setter(this, m_jit.graph().varArgChild(node, 3));
+    GPRReg setterGPR = setter.gpr();
+
+    SpeculateInt32Operand attributes(this, m_jit.graph().varArgChild(node, 4));
+    GPRReg attributesGPR = attributes.gpr();
+
+    Edge& propertyEdge = m_jit.graph().varArgChild(node, 1);
+    switch (propertyEdge.useKind()) {
+    case StringUse: {
+        SpeculateCellOperand property(this, propertyEdge);
+        GPRReg propertyGPR = property.gpr();
+        speculateString(propertyEdge, propertyGPR);
+
+        useChildren(node);
+
+        flushRegisters();
+        callOperation(operationDefineAccessorPropertyString, NoResult, baseGPR, propertyGPR, getterGPR, setterGPR, attributesGPR);
+        m_jit.exceptionCheck();
+        break;
+    }
+    case StringIdentUse: {
+        SpeculateCellOperand property(this, propertyEdge);
+        GPRTemporary ident(this);
+
+        GPRReg propertyGPR = property.gpr();
+        GPRReg identGPR = ident.gpr();
+
+        speculateString(propertyEdge, propertyGPR);
+        speculateStringIdentAndLoadStorage(propertyEdge, propertyGPR, identGPR);
+
+        useChildren(node);
+
+        flushRegisters();
+        callOperation(operationDefineAccessorPropertyStringIdent, NoResult, baseGPR, identGPR, getterGPR, setterGPR, attributesGPR);
+        m_jit.exceptionCheck();
+        break;
+    }
+    case SymbolUse: {
+        SpeculateCellOperand property(this, propertyEdge);
+        GPRReg propertyGPR = property.gpr();
+        speculateSymbol(propertyEdge, propertyGPR);
+
+        useChildren(node);
+
+        flushRegisters();
+        callOperation(operationDefineAccessorPropertySymbol, NoResult, baseGPR, propertyGPR, getterGPR, setterGPR, attributesGPR);
+        m_jit.exceptionCheck();
+        break;
+    }
+    case UntypedUse: {
+        JSValueOperand property(this, propertyEdge);
+        JSValueRegs propertyRegs = property.jsValueRegs();
+
+        useChildren(node);
+
+        flushRegisters();
+        callOperation(operationDefineAccessorProperty, NoResult, baseGPR, propertyRegs, getterGPR, setterGPR, attributesGPR);
+        m_jit.exceptionCheck();
+        break;
+    }
+    default:
+        RELEASE_ASSERT_NOT_REACHED();
+    }
+
+    noResult(node, UseChildrenCalledExplicitly);
 }
 
 } } // namespace JSC::DFG

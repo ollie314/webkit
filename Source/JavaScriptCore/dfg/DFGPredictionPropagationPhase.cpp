@@ -754,6 +754,11 @@ private:
             setPrediction(SpecInt32Only);
             break;
         }
+
+        case ToLowerCase:
+            setPrediction(SpecString);
+            break;
+
         case ArithPow:
         case ArithSqrt:
         case ArithFRound:
@@ -1041,6 +1046,8 @@ private:
         case PutGetterSetterById:
         case PutGetterByVal:
         case PutSetterByVal:
+        case DefineDataProperty:
+        case DefineAccessorProperty:
         case DFG::Jump:
         case Branch:
         case Switch:

@@ -4437,6 +4437,16 @@ void SpeculativeJIT::compile(Node* node)
         break;
     }
 
+    case DefineDataProperty: {
+        compileDefineDataProperty(node);
+        break;
+    }
+
+    case DefineAccessorProperty: {
+        compileDefineAccessorProperty(node);
+        break;
+    }
+
     case GetGlobalLexicalVariable:
     case GetGlobalVar: {
         GPRTemporary result(this);
@@ -4875,6 +4885,11 @@ void SpeculativeJIT::compile(Node* node)
         m_jit.comparePtr(MacroAssembler::NotEqual, bucketGPR, TrustedImm32(0), resultGPR);
         m_jit.or32(TrustedImm32(ValueFalse), resultGPR);
         jsValueResult(resultGPR, node, DataFormatJSBoolean);
+        break;
+    }
+
+    case ToLowerCase: {
+        compileToLowerCase(node);
         break;
     }
 

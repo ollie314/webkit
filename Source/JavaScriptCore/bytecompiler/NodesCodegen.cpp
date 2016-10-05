@@ -590,7 +590,7 @@ void PropertyListNode::emitPutConstantProperty(BytecodeGenerator& generator, Reg
         ASSERT(node.needsSuperBinding());
         RefPtr<RegisterID> propertyNameRegister;
         if (node.name())
-            propertyNameRegister = generator.emitLoad(generator.newTemporary(), *node.name());
+            propertyNameRegister = generator.emitLoad(nullptr, *node.name());
         else
             propertyNameRegister = generator.emitNode(node.m_expression);
 
@@ -605,7 +605,7 @@ void PropertyListNode::emitPutConstantProperty(BytecodeGenerator& generator, Reg
             return;
         }
 
-        RefPtr<RegisterID> index = generator.emitLoad(generator.newTemporary(), jsNumber(optionalIndex.value()));
+        RefPtr<RegisterID> index = generator.emitLoad(nullptr, jsNumber(optionalIndex.value()));
         generator.emitDirectPutByVal(newObj, index.get(), value.get());
         return;
     }
@@ -1623,7 +1623,7 @@ RegisterID* UnaryPlusNode::emitBytecode(BytecodeGenerator& generator, RegisterID
  
 RegisterID* BitwiseNotNode::emitBytecode(BytecodeGenerator& generator, RegisterID* dst)
 {
-    RefPtr<RegisterID> src2 = generator.emitLoad(generator.newTemporary(), jsNumber(-1));
+    RefPtr<RegisterID> src2 = generator.emitLoad(nullptr, jsNumber(-1));
     RefPtr<RegisterID> src1 = generator.emitNode(m_expr);
     return generator.emitBinaryOp(op_bitxor, generator.finalDestination(dst, src1.get()), src1.get(), src2.get(), OperandTypes(m_expr->resultDescriptor(), ResultType::numberTypeIsInt32()));
 }
@@ -3609,11 +3609,11 @@ RegisterID* ClassExprNode::emitBytecode(BytecodeGenerator& generator, RegisterID
         emitPutHomeObject(generator, constructor.get(), prototype.get());
     }
 
-    RefPtr<RegisterID> constructorNameRegister = generator.emitLoad(generator.newTemporary(), propertyNames.constructor);
+    RefPtr<RegisterID> constructorNameRegister = generator.emitLoad(nullptr, propertyNames.constructor);
     generator.emitCallDefineProperty(prototype.get(), constructorNameRegister.get(), constructor.get(), nullptr, nullptr,
         BytecodeGenerator::PropertyConfigurable | BytecodeGenerator::PropertyWritable, m_position);
 
-    RefPtr<RegisterID> prototypeNameRegister = generator.emitLoad(generator.newTemporary(), propertyNames.prototype);
+    RefPtr<RegisterID> prototypeNameRegister = generator.emitLoad(nullptr, propertyNames.prototype);
     generator.emitCallDefineProperty(constructor.get(), prototypeNameRegister.get(), prototype.get(), nullptr, nullptr, 0, m_position);
 
     if (m_staticMethods)
@@ -3876,7 +3876,7 @@ void ObjectPatternNode::bindValue(BytecodeGenerator& generator, RegisterID* rhs)
             if (!optionalIndex)
                 generator.emitGetById(temp.get(), rhs, target.propertyName);
             else {
-                RefPtr<RegisterID> index = generator.emitLoad(generator.newTemporary(), jsNumber(optionalIndex.value()));
+                RefPtr<RegisterID> index = generator.emitLoad(nullptr, jsNumber(optionalIndex.value()));
                 generator.emitGetByVal(temp.get(), rhs, index.get());
             }
         } else {

@@ -177,8 +177,8 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 #define ENABLE_DASHBOARD_SUPPORT 1
 #endif
 
-#if !defined(ENABLE_ENCRYPTED_MEDIA_V2)
-#define ENABLE_ENCRYPTED_MEDIA_V2 1
+#if !defined(ENABLE_LEGACY_ENCRYPTED_MEDIA)
+#define ENABLE_LEGACY_ENCRYPTED_MEDIA 1
 #endif
 
 #if !defined(ENABLE_FULLSCREEN_API)
@@ -245,6 +245,10 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 
 #if !defined(ENABLE_MAC_GESTURE_EVENTS) && USE(APPLE_INTERNAL_SDK)
 #define ENABLE_MAC_GESTURE_EVENTS 1
+#endif
+
+#if !defined(ENABLE_KEYBOARD_CODE_ATTRIBUTE)
+#define ENABLE_KEYBOARD_CODE_ATTRIBUTE 1
 #endif
 
 #endif /* PLATFORM(MAC) */
@@ -437,8 +441,8 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 #define ENABLE_DRAG_SUPPORT 1
 #endif
 
-#if !defined(ENABLE_ENCRYPTED_MEDIA_V2)
-#define ENABLE_ENCRYPTED_MEDIA_V2 0
+#if !defined(ENABLE_LEGACY_ENCRYPTED_MEDIA)
+#define ENABLE_LEGACY_ENCRYPTED_MEDIA 0
 #endif
 
 #if !defined(ENABLE_FETCH_API)
@@ -775,6 +779,10 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 
 #if !defined(ENABLE_KEYBOARD_KEY_ATTRIBUTE)
 #define ENABLE_KEYBOARD_KEY_ATTRIBUTE 0
+#endif
+
+#if !defined(ENABLE_KEYBOARD_CODE_ATTRIBUTE)
+#define ENABLE_KEYBOARD_CODE_ATTRIBUTE 0
 #endif
 
 /* Asserts, invariants for macro definitions */

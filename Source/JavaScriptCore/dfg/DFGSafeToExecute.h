@@ -213,6 +213,8 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case PutGetterSetterById:
     case PutGetterByVal:
     case PutSetterByVal:
+    case DefineDataProperty:
+    case DefineAccessorProperty:
     case CheckStructure:
     case GetExecutable:
     case GetButterfly:
@@ -359,6 +361,7 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case PutDynamicVar:
     case ResolveScope:
     case MapHash:
+    case ToLowerCase:
     case GetMapBucket:
     case LoadFromJSMapBucket:
     case IsNonEmptyMapBucket:

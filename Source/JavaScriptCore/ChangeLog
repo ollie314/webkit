@@ -1,3 +1,362 @@
+2016-10-05  Zan Dobersek  <zdobersek@igalia.com>
+
+        Rename ENABLE_ENCRYPTED_MEDIA_V2 to ENABLE_LEGACY_ENCRYPTED_MEDIA
+        https://bugs.webkit.org/show_bug.cgi?id=162903
+
+        Reviewed by Alex Christensen.
+
+        Rename build guards for the remaining implementation of the legacy EME API
+        to ENABLE_LEGACY_ENCRYPTED_MEDIA. This will allow for the future implementation
+        of the near-finished API to be guarded with the simple ENABLE_ENCRYPTED_MEDIA guards.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2016-10-05  Csaba Osztrogonác  <ossy@webkit.org>
+
+        ARM EABI buildfix after r206778
+        https://bugs.webkit.org/show_bug.cgi?id=162964
+
+        Unreviewed trivial fix.
+
+        * jit/CCallHelpers.h:
+        (JSC::CCallHelpers::setupArgumentsWithExecState):
+
+2016-10-04  Saam Barati  <sbarati@apple.com>
+
+        String.prototype.toLowerCase should be a DFG/FTL intrinsic
+        https://bugs.webkit.org/show_bug.cgi?id=162887
+
+        Reviewed by Filip Pizlo and Yusuke Suzuki.
+
+        This patch makes ToLowerCase an intrinsic in the DFG/FTL. On the fast
+        path, the intrinsic will loop over an 8-bit string ensuring it's already
+        lower case, and simply return the string. In the slow path, it'll call
+        into C code to make a new string.
+
+        This is a 7-8% speedup on ES6SampleBench/Basic.
+
+        * dfg/DFGAbstractInterpreterInlines.h:
+        (JSC::DFG::AbstractInterpreter<AbstractStateType>::executeEffects):
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::handleIntrinsicCall):
+        * dfg/DFGClobberize.h:
+        (JSC::DFG::clobberize):
+        * dfg/DFGDoesGC.cpp:
+        (JSC::DFG::doesGC):
+        * dfg/DFGFixupPhase.cpp:
+        (JSC::DFG::FixupPhase::fixupNode):
+        * dfg/DFGNodeType.h:
+        * dfg/DFGOperations.cpp:
+        * dfg/DFGOperations.h:
+        * dfg/DFGPredictionPropagationPhase.cpp:
+        * dfg/DFGSafeToExecute.h:
+        (JSC::DFG::safeToExecute):
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::compileToLowerCase):
+        * dfg/DFGSpeculativeJIT.h:
+        (JSC::DFG::SpeculativeJIT::callOperation):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * ftl/FTLAbstractHeapRepository.h:
+        * ftl/FTLCapabilities.cpp:
+        (JSC::FTL::canCompile):
+        * ftl/FTLLowerDFGToB3.cpp:
+        (JSC::FTL::DFG::LowerDFGToB3::compileNode):
+        (JSC::FTL::DFG::LowerDFGToB3::compileToLowerCase):
+        * jit/JITOperations.h:
+        * runtime/Intrinsic.h:
+        * runtime/StringPrototype.cpp:
+        (JSC::StringPrototype::finishCreation):
+
+2016-10-04  Brian Burg  <bburg@apple.com>
+
+        Web Inspector: don't synchronously send a listing message if we might need to query _WKAutomationDelegate
+        https://bugs.webkit.org/show_bug.cgi?id=162810
+        <rdar://problem/28571460>
+
+        Reviewed by Timothy Hatcher.
+
+        We shouldn't ever access the _WKAutomationDelegate through RemoteInspector::Client methods
+        off of the main thread, because it could cause problems. This happens when we pushListingsNow()
+        in response to a WIRApplicationGetListingMessage XPC message. In this case, just use
+        pushListingsSoon() since it dispatches on the correct (main) queue to gather listing information.
+
+        This may induce a slight update delay when first connecting to the UIProcess through RemoteInspector,
+        but this is at most 200ms and will coalesce with other updates that happen when UIProcess gets set up.
+
+        There are no other code paths through RemoteInspector (for UIProcess) that could cause a call
+        to pushListingsNow(), so this only needs to be changed in the XPC message handler.
+
+        * inspector/remote/RemoteInspector.mm:
+        (Inspector::RemoteInspector::receivedGetListingMessage):
+
+2016-10-04  JF Bastien  <jfbastien@apple.com>
+
+        WebAssembly: handle a few corner cases
+        https://bugs.webkit.org/show_bug.cgi?id=162884
+
+        Reviewed by Keith Miller.
+
+        * wasm/JSWASMModule.cpp: missing include broke cmake build
+        * wasm/WASMFunctionParser.h:
+        (JSC::WASM::FunctionParser<Context>::parseBlock): check op is valid
+        (JSC::WASM::FunctionParser<Context>::parseExpression): switch covers all cases
+        * wasm/WASMOps.h:
+        (JSC::WASM::isValidOpType): op is valid
+        * wasm/WASMParser.h:
+        (JSC::WASM::Parser::consumeString): avoid str[i] being one-past-the-end
+        (JSC::WASM::Parser::parseUInt32): shift math around to avoid overflow
+
+2016-10-04  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        REGRESSION (r206778): Release JSC test ChakraCore.yaml/ChakraCore/test/Error/validate_line_column.js.default failing
+        https://bugs.webkit.org/show_bug.cgi?id=162937
+
+        Reviewed by Saam Barati.
+
+        We dropped expression info accidentally at r206777.
+
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::emitCallDefineProperty):
+        * bytecompiler/BytecodeGenerator.h:
+        * bytecompiler/NodesCodegen.cpp:
+        (JSC::PropertyListNode::emitPutConstantProperty):
+        (JSC::ClassExprNode::emitBytecode):
+
+2016-10-04  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [DOMJIT] Introduce DOMJIT::GetterSetter to tell JIT information
+        https://bugs.webkit.org/show_bug.cgi?id=162916
+
+        Reviewed by Filip Pizlo.
+
+        In this patch, we introduce DOMJIT::GetterSetter.
+        This class maintains information required to emit JIT code in DFG and FTL.
+        DOMJIT::GetterSetter has 2 virtual functions: checkDOM and callDOM.
+        These functions can return a DOMJIT::Patchpoint that allows us to inject
+        appropriate machine code during DFG and FTL phases. DFG and FTL will invoke
+        these functions to get a patchpoint. And this patchpoint will be used to
+        emit code corresponding to CheckDOM and CallDOM DFG nodes, which will be added
+        in subsqeunt patch.
+
+        We propagate DOMJIT::GetterSetter through PropertySlot, AccessCase, GetByIdVariant,
+        and GetByIdStatus along with CustomGetter to teach DFG that this custom access
+        code has a chance to be inlined with this DOMJIT::GetterSetter information.
+        Instead of propagating CustomGetterSetter holding DOMJIT::GetterSetter and CustomGetter,
+        we propagate CustomGetter and DOMJIT::GetterSetter. This is because of the current
+        CustomGetterSetter design that we reify CustomGetterSetters only when we need to reify
+        all the properties. This design allows us to avoid frequent CustomGetterSetter allocations
+        and structure transitions.
+
+        Currently, domJIT field is always nullptr since there is no DOMJITAttribute user.
+        When we add this, we will add code handling this DOMJIT::GetterSetter in DFG::ByteCodeParser.
+
+        * CMakeLists.txt:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * bytecode/GetByIdStatus.cpp:
+        (JSC::GetByIdStatus::computeForStubInfoWithoutExitSiteFeedback):
+        * bytecode/GetByIdVariant.cpp:
+        (JSC::GetByIdVariant::GetByIdVariant):
+        (JSC::GetByIdVariant::operator=):
+        (JSC::GetByIdVariant::attemptToMerge):
+        (JSC::GetByIdVariant::dumpInContext):
+        * bytecode/GetByIdVariant.h:
+        (JSC::GetByIdVariant::domJIT):
+        (JSC::GetByIdVariant::intrinsic): Deleted.
+        * bytecode/PolymorphicAccess.cpp:
+        (JSC::AccessCase::get):
+        (JSC::AccessCase::clone):
+        * bytecode/PolymorphicAccess.h:
+        (JSC::AccessCase::domJIT):
+        (JSC::AccessCase::RareData::RareData):
+        * dfg/DFGNode.h:
+        * domjit/DOMJITGetterSetter.h: Added.
+        (JSC::DOMJIT::GetterSetter::GetterSetter):
+        (JSC::DOMJIT::GetterSetter::~GetterSetter):
+        (JSC::DOMJIT::GetterSetter::getter):
+        (JSC::DOMJIT::GetterSetter::setter):
+        (JSC::DOMJIT::GetterSetter::thisClassInfo):
+        * domjit/DOMJITPatchpoint.h: Added.
+        (JSC::DOMJIT::Patchpoint::create):
+        (JSC::DOMJIT::Patchpoint::setGenerator):
+        (JSC::DOMJIT::Patchpoint::generator):
+        * jit/Repatch.cpp:
+        (JSC::tryCacheGetByID):
+        * runtime/CustomGetterSetter.h:
+        * runtime/JSObject.h:
+        (JSC::JSObject::fillCustomGetterPropertySlot):
+        * runtime/Lookup.h:
+        (JSC::HashTableValue::domJIT):
+        (JSC::getStaticPropertySlotFromTable):
+        (JSC::putEntry):
+        (JSC::reifyStaticProperty):
+        * runtime/PropertySlot.h:
+        (JSC::PropertySlot::domJIT):
+        (JSC::PropertySlot::setCacheableCustom):
+
+2016-09-27  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [JSC] Add a new byte code op_define_property instead of calling defineProperty
+        https://bugs.webkit.org/show_bug.cgi?id=162108
+
+        Reviewed by Saam Barati.
+
+        To construct ES6 class, we emitted bytecode that performs the following operations.
+
+            1. construct a new object
+            2. put "configurable", "enumerable" etc. fields
+            3. call "defineProperty" function
+
+        However, this approach has problems. Every time we define a class method, we need to create
+        a new object to represent property descriptor. This can be removed if we can introduce
+        a special bytecode or special function.
+
+        This patch introduces new bytecodes, op_define_data_property and op_define_accessor_property.
+        Instead of taking an object, they takes several registers to avoid object allocations.
+        We're planning to use this bytecode to implement Object.defineProperty in builtin JS next.
+        This allows us to leverage object allocation sinking. And it also gives us a chance to use
+        faster ::get and ::hasProperty in JS.
+
+        Originally, I attempted to create one bytecode, op_define_property. However, it takes too many
+        children in DFG and uses so many registers in DFG. This leads tricky program in 32bit platforms.
+        Furthermore, it does not fit to the number of x64 argument registers. So instead, we introduce
+        two bytecodes.
+
+        And for op_define_accessor_property, we perform CellUse edge filter to getter and setter children.
+        This edge filter makes us possible to use SpeculateCellOperand and reduce the number of used registers
+        in comparison with JSValueOperand. To make children Cells even if we do not specify some accessors (for
+        example, { get: func, set: null } case), we fill registers with special throwTypeErrorFunction.
+        The attributes bitset keep information like "This property descriptor only has getter slot".
+
+        In these two bytecodes, we take attributes (configurable, enumerable, writable, hasGetter etc.) as
+        register instead of embedding constant int value because we will use these bytecodes to implement
+        Object.defineProperty next. In Object.defineProperty case, an attributes are not statically defined
+        at bytecode compiling time.
+
+        Run ES6SampleBench/Air 20 times. The result shows ~2% performance improvement.
+
+        Baseline:
+            firstIteration:     84.05 ms +- 4.37 ms
+            averageWorstCase:   40.54 ms +- 2.81 ms
+            steadyState:        3317.49 ms +- 48.25 ms
+            summary:            223.51 ms +- 5.07 ms
+
+        Patched:
+            firstIteration:     84.46 ms +- 4.22 ms
+            averageWorstCase:   41.48 ms +- 2.33 ms
+            steadyState:        3253.48 ms +- 29.31 ms
+            summary:            224.40 ms +- 4.72 ms
+
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * bytecode/BytecodeList.json:
+        * bytecode/BytecodeUseDef.h:
+        (JSC::computeUsesForBytecodeOffset):
+        (JSC::computeDefsForBytecodeOffset):
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::dumpBytecode):
+        * bytecode/SpecialPointer.h:
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::emitMoveLinkTimeConstant):
+        (JSC::BytecodeGenerator::emitCallDefineProperty):
+        * bytecompiler/BytecodeGenerator.h:
+        * bytecompiler/NodesCodegen.cpp:
+        (JSC::PropertyListNode::emitPutConstantProperty):
+        (JSC::BitwiseNotNode::emitBytecode):
+        (JSC::ClassExprNode::emitBytecode):
+        (JSC::ObjectPatternNode::bindValue):
+        * dfg/DFGAbstractInterpreterInlines.h:
+        (JSC::DFG::AbstractInterpreter<AbstractStateType>::executeEffects):
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::parseBlock):
+        * dfg/DFGCapabilities.cpp:
+        (JSC::DFG::capabilityLevel):
+        * dfg/DFGClobberize.h:
+        (JSC::DFG::clobberize):
+        * dfg/DFGDoesGC.cpp:
+        (JSC::DFG::doesGC):
+        * dfg/DFGFixupPhase.cpp:
+        (JSC::DFG::FixupPhase::fixupNode):
+        * dfg/DFGNodeType.h:
+        * dfg/DFGOperations.cpp:
+        * dfg/DFGOperations.h:
+        * dfg/DFGPredictionPropagationPhase.cpp:
+        * dfg/DFGSafeToExecute.h:
+        (JSC::DFG::safeToExecute):
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::compileDefineDataProperty):
+        (JSC::DFG::SpeculativeJIT::compileDefineAccessorProperty):
+        * dfg/DFGSpeculativeJIT.h:
+        (JSC::DFG::SpeculativeJIT::callOperation):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * ftl/FTLCapabilities.cpp:
+        (JSC::FTL::canCompile):
+        * ftl/FTLLowerDFGToB3.cpp:
+        (JSC::FTL::DFG::LowerDFGToB3::compileNode):
+        (JSC::FTL::DFG::LowerDFGToB3::compileDefineDataProperty):
+        (JSC::FTL::DFG::LowerDFGToB3::compileDefineAccessorProperty):
+        (JSC::FTL::DFG::LowerDFGToB3::compilePutByValWithThis): Deleted.
+        * jit/CCallHelpers.cpp:
+        (JSC::CCallHelpers::setupFourStubArgsGPR): Deleted.
+        * jit/CCallHelpers.h:
+        (JSC::CCallHelpers::setupFourStubArgsGPR):
+        (JSC::CCallHelpers::setupFiveStubArgsGPR):
+        (JSC::CCallHelpers::setupArgumentsWithExecState):
+        (JSC::CCallHelpers::setupStubArgsGPR):
+        (JSC::CCallHelpers::prepareForTailCallSlow): Deleted.
+        * jit/JIT.cpp:
+        (JSC::JIT::privateCompileMainPass):
+        * jit/JIT.h:
+        * jit/JITOperations.h:
+        * jit/JITPropertyAccess.cpp:
+        (JSC::JIT::emit_op_define_data_property):
+        (JSC::JIT::emit_op_define_accessor_property):
+        * llint/LowLevelInterpreter.asm:
+        * runtime/CommonSlowPaths.cpp:
+        (JSC::SLOW_PATH_DECL):
+        * runtime/CommonSlowPaths.h:
+        * runtime/DefinePropertyAttributes.h: Added.
+        (JSC::DefinePropertyAttributes::DefinePropertyAttributes):
+        (JSC::DefinePropertyAttributes::rawRepresentation):
+        (JSC::DefinePropertyAttributes::hasValue):
+        (JSC::DefinePropertyAttributes::setValue):
+        (JSC::DefinePropertyAttributes::hasGet):
+        (JSC::DefinePropertyAttributes::setGet):
+        (JSC::DefinePropertyAttributes::hasSet):
+        (JSC::DefinePropertyAttributes::setSet):
+        (JSC::DefinePropertyAttributes::writable):
+        (JSC::DefinePropertyAttributes::configurable):
+        (JSC::DefinePropertyAttributes::enumerable):
+        (JSC::DefinePropertyAttributes::setWritable):
+        (JSC::DefinePropertyAttributes::setConfigurable):
+        (JSC::DefinePropertyAttributes::setEnumerable):
+        (JSC::DefinePropertyAttributes::fillWithTriState):
+        (JSC::DefinePropertyAttributes::extractTriState):
+        * runtime/JSGlobalObject.cpp:
+        (JSC::JSGlobalObject::init):
+        (JSC::JSGlobalObject::visitChildren):
+        * runtime/JSGlobalObject.h:
+        (JSC::JSGlobalObject::throwTypeErrorFunction):
+        (JSC::JSGlobalObject::definePropertyFunction): Deleted.
+        * runtime/ObjectConstructor.cpp:
+        (JSC::ObjectConstructor::addDefineProperty): Deleted.
+        * runtime/ObjectConstructor.h:
+        * runtime/PropertyDescriptor.h:
+        (JSC::toPropertyDescriptor):
+
+2016-10-04  Saam Barati  <sbarati@apple.com>
+
+        Follow up fix to GetMapBucket and MapHash speculating on child node types.
+        To fix this, on 32-bit platforms, we do not speculate on the child
+        type since we just call into C code for these nodes.
+
+        * dfg/DFGFixupPhase.cpp:
+        (JSC::DFG::FixupPhase::fixupNode):
+
 2016-10-03  Saam Barati  <sbarati@apple.com>
 
         GetMapBucket node should speculate on the type of its 'key' child
