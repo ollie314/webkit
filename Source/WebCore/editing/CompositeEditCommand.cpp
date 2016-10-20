@@ -231,6 +231,9 @@ void EditCommandComposition::unapply()
     frame->editor().cancelComposition();
 #endif
 
+    if (!frame->editor().willUnapplyEditing(*this))
+        return;
+
     size_t size = m_commands.size();
     for (size_t i = size; i; --i)
         m_commands[i - 1]->doUnapply();
@@ -254,6 +257,9 @@ void EditCommandComposition::reapply()
     // Low level operations, like RemoveNodeCommand, don't require a layout because the high level operations that use them perform one
     // if one is necessary (like for the creation of VisiblePositions).
     m_document->updateLayoutIgnorePendingStylesheets();
+
+    if (!frame->editor().willReapplyEditing(*this))
+        return;
 
     for (auto& command : m_commands)
         command->doReapply();
@@ -311,17 +317,32 @@ CompositeEditCommand::~CompositeEditCommand()
     ASSERT(isTopLevelCommand() || !m_composition);
 }
 
+bool CompositeEditCommand::willApplyCommand()
+{
+    return frame().editor().willApplyEditing(*this);
+}
+
 void CompositeEditCommand::apply()
 {
     if (!endingSelection().isContentRichlyEditable()) {
         switch (editingAction()) {
-        case EditActionTyping:
+        case EditActionTypingDeleteSelection:
+        case EditActionTypingDeleteBackward:
+        case EditActionTypingDeleteForward:
+        case EditActionTypingDeleteWordBackward:
+        case EditActionTypingDeleteWordForward:
+        case EditActionTypingDeleteLineBackward:
+        case EditActionTypingDeleteLineForward:
+        case EditActionTypingInsertText:
+        case EditActionTypingInsertLineBreak:
+        case EditActionTypingInsertParagraph:
         case EditActionPaste:
         case EditActionDrag:
         case EditActionSetWritingDirection:
         case EditActionCut:
         case EditActionUnspecified:
         case EditActionInsert:
+        case EditActionInsertReplacement:
         case EditActionDelete:
         case EditActionDictation:
             break;
@@ -337,16 +358,21 @@ void CompositeEditCommand::apply()
     // if one is necessary (like for the creation of VisiblePositions).
     document().updateLayoutIgnorePendingStylesheets();
 
+    if (!willApplyCommand())
+        return;
+
     {
         EventQueueScope eventQueueScope;
         doApply();
     }
 
-    // Only need to call appliedEditing for top-level commands,
-    // and TypingCommands do it on their own (see TypingCommand::typingAddedToOpenCommand).
-    if (!isTypingCommand())
-        frame().editor().appliedEditing(this);
+    didApplyCommand();
     setShouldRetainAutocorrectionIndicator(false);
+}
+
+void CompositeEditCommand::didApplyCommand()
+{
+    frame().editor().appliedEditing(this);
 }
 
 EditCommandComposition* CompositeEditCommand::ensureComposition()
@@ -381,6 +407,11 @@ bool CompositeEditCommand::shouldRetainAutocorrectionIndicator() const
 
 void CompositeEditCommand::setShouldRetainAutocorrectionIndicator(bool)
 {
+}
+
+String CompositeEditCommand::inputEventTypeName() const
+{
+    return inputTypeNameForEditingAction(editingAction());
 }
 
 //
@@ -863,13 +894,15 @@ void CompositeEditCommand::rebalanceWhitespaceOnTextSubstring(PassRefPtr<Text> p
 
     VisiblePosition visibleUpstreamPos(Position(textNode, upstream));
     VisiblePosition visibleDownstreamPos(Position(textNode, downstream));
-    
+
+    Node* nextSibling = textNode->nextSibling();
     String string = text.substring(upstream, length);
     String rebalancedString = stringWithRebalancedWhitespace(string,
     // FIXME: Because of the problem mentioned at the top of this function, we must also use nbsps at the start/end of the string because
     // this function doesn't get all surrounding whitespace, just the whitespace in the current text node.
-                                                             isStartOfParagraph(visibleUpstreamPos) || upstream == 0, 
-                                                             isEndOfParagraph(visibleDownstreamPos) || (unsigned)downstream == text.length());
+        isStartOfParagraph(visibleUpstreamPos) || !upstream,
+        (isEndOfParagraph(visibleDownstreamPos) || (unsigned)downstream == text.length())
+        && !(nextSibling && nextSibling->isTextNode() && downcast<Text>(nextSibling)->data().at(0) != ' '));
     
     if (string != rebalancedString)
         replaceTextInNodePreservingMarkers(WTFMove(textNode), upstream, length, rebalancedString);

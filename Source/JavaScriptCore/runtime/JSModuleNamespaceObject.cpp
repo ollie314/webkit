@@ -167,7 +167,7 @@ bool JSModuleNamespaceObject::put(JSCell*, ExecState* exec, PropertyName, JSValu
 
     // http://www.ecma-international.org/ecma-262/6.0/#sec-module-namespace-exotic-objects-set-p-v-receiver
     if (slot.isStrictMode())
-        throwTypeError(exec, scope, ASCIILiteral(StrictModeReadonlyPropertyWriteError));
+        throwTypeError(exec, scope, ASCIILiteral(ReadonlyPropertyWriteError));
     return false;
 }
 
@@ -177,7 +177,7 @@ bool JSModuleNamespaceObject::putByIndex(JSCell*, ExecState* exec, unsigned, JSV
     auto scope = DECLARE_THROW_SCOPE(vm);
 
     if (shouldThrow)
-        throwTypeError(exec, scope, ASCIILiteral(StrictModeReadonlyPropertyWriteError));
+        throwTypeError(exec, scope, ASCIILiteral(ReadonlyPropertyWriteError));
     return false;
 }
 
@@ -204,7 +204,7 @@ bool JSModuleNamespaceObject::defineOwnProperty(JSObject*, ExecState* exec, Prop
 
     // http://www.ecma-international.org/ecma-262/6.0/#sec-module-namespace-exotic-objects-defineownproperty-p-desc
     if (shouldThrow)
-        throwTypeError(exec, scope, ASCIILiteral("Attempting to define property on object that is not extensible."));
+        throwTypeError(exec, scope, ASCIILiteral(NonExtensibleObjectPropertyDefineError));
     return false;
 }
 

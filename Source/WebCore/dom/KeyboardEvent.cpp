@@ -95,8 +95,9 @@ static inline KeyboardEvent::KeyLocationCode keyLocationCode(const PlatformKeybo
 KeyboardEvent::KeyboardEvent() = default;
 
 KeyboardEvent::KeyboardEvent(const PlatformKeyboardEvent& key, DOMWindow* view)
-    : UIEventWithKeyState(eventTypeForKeyboardEventType(key.type()),
-                          true, true, key.timestamp(), view, 0, key.ctrlKey(), key.altKey(), key.shiftKey(), key.metaKey())
+    : UIEventWithKeyState(eventTypeForKeyboardEventType(key.type())
+        , true, true, key.timestamp(), view, 0, key.ctrlKey(), key.altKey(), key.shiftKey()
+        , key.metaKey(), false, key.modifiers().contains(PlatformEvent::Modifier::CapsLockKey))
     , m_keyEvent(std::make_unique<PlatformKeyboardEvent>(key))
 #if ENABLE(KEYBOARD_KEY_ATTRIBUTE)
     , m_key(key.key())
@@ -107,7 +108,6 @@ KeyboardEvent::KeyboardEvent(const PlatformKeyboardEvent& key, DOMWindow* view)
     , m_keyIdentifier(key.keyIdentifier())
     , m_location(keyLocationCode(key))
     , m_repeat(key.isAutoRepeat())
-    , m_altGraphKey(false)
     , m_isComposing(view && view->frame() && view->frame()->editor().hasComposition())
 #if PLATFORM(COCOA)
 #if USE(APPKIT)
@@ -126,8 +126,8 @@ KeyboardEvent::KeyboardEvent(WTF::HashTableDeletedValueType)
 {
 }
 
-KeyboardEvent::KeyboardEvent(const AtomicString& eventType, const KeyboardEventInit& initializer)
-    : UIEventWithKeyState(eventType, initializer)
+KeyboardEvent::KeyboardEvent(const AtomicString& eventType, const Init& initializer, IsTrusted isTrusted)
+    : UIEventWithKeyState(eventType, initializer, isTrusted)
 #if ENABLE(KEYBOARD_KEY_ATTRIBUTE)
     , m_key(initializer.key)
 #endif
@@ -135,9 +135,8 @@ KeyboardEvent::KeyboardEvent(const AtomicString& eventType, const KeyboardEventI
     , m_code(initializer.code)
 #endif
     , m_keyIdentifier(initializer.keyIdentifier)
-    , m_location(initializer.location)
+    , m_location(initializer.keyLocation ? *initializer.keyLocation : initializer.location)
     , m_repeat(initializer.repeat)
-    , m_altGraphKey(false)
     , m_isComposing(initializer.isComposing)
 #if PLATFORM(COCOA)
     , m_handledByInputMethod(false)
@@ -179,7 +178,9 @@ bool KeyboardEvent::getModifierState(const String& keyIdentifier) const
         return metaKey();
     if (keyIdentifier == "AltGraph")
         return altGraphKey();
-    // FIXME: We should support CapsLock, Fn, FnLock, Hyper, NumLock, Super, ScrollLock, Symbol, SymbolLock.
+    if (keyIdentifier == "CapsLock")
+        return capsLockKey();
+    // FIXME: The specification also has Fn, FnLock, Hyper, NumLock, Super, ScrollLock, Symbol, SymbolLock.
     return false;
 }
 

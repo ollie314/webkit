@@ -26,11 +26,11 @@
 #include "JSDOMConstructor.h"
 #include "JSDOMIterator.h"
 #include "JSDOMPromise.h"
-#include "ObjectConstructor.h"
 #include "RuntimeEnabledFeatures.h"
 #include "URL.h"
 #include <runtime/Error.h>
 #include <runtime/JSString.h>
+#include <runtime/ObjectConstructor.h>
 #include <wtf/GetPtr.h>
 
 using namespace JSC;
@@ -146,9 +146,8 @@ void JSTestNodePrototype::finishCreation(VM& vm)
         VM::DeletePropertyModeScope scope(vm, VM::DeletePropertyMode::IgnoreConfigurable);
         JSObject::deleteProperty(this, globalObject()->globalExec(), propertyName);
     }
-    if (RuntimeEnabledFeatures::sharedFeatures().domIteratorEnabled()) {
+    if (RuntimeEnabledFeatures::sharedFeatures().domIteratorEnabled())
         putDirect(vm, vm.propertyNames->iteratorSymbol, JSFunction::create(vm, globalObject(), 0, ASCIILiteral("[Symbol.Iterator]"), jsTestNodePrototypeFunctionSymbolIterator), DontEnum);
-    }
 }
 
 const ClassInfo JSTestNode::s_info = { "TestNode", &Base::s_info, 0, CREATE_METHOD_TABLE(JSTestNode) };
@@ -168,22 +167,31 @@ JSObject* JSTestNode::prototype(VM& vm, JSGlobalObject* globalObject)
     return getDOMPrototype<JSTestNode>(vm, globalObject);
 }
 
-EncodedJSValue jsTestNodeName(ExecState* state, EncodedJSValue thisValue, PropertyName)
+template<> inline JSTestNode* BindingCaller<JSTestNode>::castForAttribute(ExecState&, EncodedJSValue thisValue)
 {
-    VM& vm = state->vm();
-    auto throwScope = DECLARE_THROW_SCOPE(vm);
-    UNUSED_PARAM(throwScope);
-    UNUSED_PARAM(thisValue);
-    JSValue decodedThisValue = JSValue::decode(thisValue);
-    auto* castedThis = jsDynamicCast<JSTestNode*>(decodedThisValue);
-    if (UNLIKELY(!castedThis)) {
-        return throwGetterTypeError(*state, throwScope, "TestNode", "name");
-    }
-    auto& impl = castedThis->wrapped();
-    JSValue result = jsStringWithCache(state, impl.name());
-    return JSValue::encode(result);
+    return jsDynamicCast<JSTestNode*>(JSValue::decode(thisValue));
 }
 
+template<> inline JSTestNode* BindingCaller<JSTestNode>::castForOperation(ExecState& state)
+{
+    return jsDynamicCast<JSTestNode*>(state.thisValue());
+}
+
+static inline JSValue jsTestNodeNameGetter(ExecState&, JSTestNode&, ThrowScope& throwScope);
+
+EncodedJSValue jsTestNodeName(ExecState* state, EncodedJSValue thisValue, PropertyName)
+{
+    return BindingCaller<JSTestNode>::attribute<jsTestNodeNameGetter>(state, thisValue, "name");
+}
+
+static inline JSValue jsTestNodeNameGetter(ExecState& state, JSTestNode& thisObject, ThrowScope& throwScope)
+{
+    UNUSED_PARAM(throwScope);
+    UNUSED_PARAM(state);
+    auto& impl = thisObject.wrapped();
+    JSValue result = jsStringWithCache(&state, impl.name());
+    return result;
+}
 
 EncodedJSValue jsTestNodeConstructor(ExecState* state, EncodedJSValue thisValue, PropertyName)
 {
@@ -209,19 +217,19 @@ bool setJSTestNodeConstructor(ExecState* state, EncodedJSValue thisValue, Encode
     return domObject->putDirect(state->vm(), state->propertyNames().constructor, value);
 }
 
+static inline bool setJSTestNodeNameFunction(ExecState&, JSTestNode&, JSValue, ThrowScope&);
+
 bool setJSTestNodeName(ExecState* state, EncodedJSValue thisValue, EncodedJSValue encodedValue)
 {
-    VM& vm = state->vm();
-    auto throwScope = DECLARE_THROW_SCOPE(vm);
+    return BindingCaller<JSTestNode>::setAttribute<setJSTestNodeNameFunction>(state, thisValue, encodedValue, "name");
+}
+
+static inline bool setJSTestNodeNameFunction(ExecState& state, JSTestNode& thisObject, JSValue value, ThrowScope& throwScope)
+{
+    UNUSED_PARAM(state);
     UNUSED_PARAM(throwScope);
-    JSValue value = JSValue::decode(encodedValue);
-    UNUSED_PARAM(thisValue);
-    JSTestNode* castedThis = jsDynamicCast<JSTestNode*>(JSValue::decode(thisValue));
-    if (UNLIKELY(!castedThis)) {
-        return throwSetterTypeError(*state, throwScope, "TestNode", "name");
-    }
-    auto& impl = castedThis->wrapped();
-    auto nativeValue = value.toWTFString(state);
+    auto& impl = thisObject.wrapped();
+    auto nativeValue = value.toWTFString(&state);
     RETURN_IF_EXCEPTION(throwScope, false);
     impl.setName(WTFMove(nativeValue));
     return true;
@@ -233,6 +241,8 @@ JSValue JSTestNode::getConstructor(VM& vm, const JSGlobalObject* globalObject)
     return getDOMConstructor<JSTestNodeConstructor>(vm, *jsCast<const JSDOMGlobalObject*>(globalObject));
 }
 
+static inline JSC::EncodedJSValue jsTestNodePrototypeFunctionTestWorkerPromiseCaller(JSC::ExecState*, JSTestNode*, Ref<DeferredPromise>&&, JSC::ThrowScope&);
+
 static EncodedJSValue jsTestNodePrototypeFunctionTestWorkerPromisePromise(ExecState*, Ref<DeferredPromise>&&);
 
 EncodedJSValue JSC_HOST_CALL jsTestNodePrototypeFunctionTestWorkerPromise(ExecState* state)
@@ -243,14 +253,13 @@ EncodedJSValue JSC_HOST_CALL jsTestNodePrototypeFunctionTestWorkerPromise(ExecSt
 
 static inline EncodedJSValue jsTestNodePrototypeFunctionTestWorkerPromisePromise(ExecState* state, Ref<DeferredPromise>&& promise)
 {
-    VM& vm = state->vm();
-    auto throwScope = DECLARE_THROW_SCOPE(vm);
+    return BindingCaller<JSTestNode>::callPromiseOperation<jsTestNodePrototypeFunctionTestWorkerPromiseCaller>(state, WTFMove(promise), "testWorkerPromise");
+}
+
+static inline JSC::EncodedJSValue jsTestNodePrototypeFunctionTestWorkerPromiseCaller(JSC::ExecState* state, JSTestNode* castedThis, Ref<DeferredPromise>&& promise, JSC::ThrowScope& throwScope)
+{
+    UNUSED_PARAM(state);
     UNUSED_PARAM(throwScope);
-    JSValue thisValue = state->thisValue();
-    auto castedThis = jsDynamicCast<JSTestNode*>(thisValue);
-    if (UNLIKELY(!castedThis))
-        return throwThisTypeError(*state, throwScope, "TestNode", "testWorkerPromise");
-    ASSERT_GC_OBJECT_INHERITS(castedThis, JSTestNode::info());
     auto& impl = castedThis->wrapped();
     impl.testWorkerPromise(WTFMove(promise));
     return JSValue::encode(jsUndefined());
@@ -265,48 +274,71 @@ const JSC::ClassInfo TestNodeIterator::s_info = { "TestNode Iterator", &Base::s_
 template<>
 const JSC::ClassInfo TestNodeIteratorPrototype::s_info = { "TestNode Iterator", &Base::s_info, 0, CREATE_METHOD_TABLE(TestNodeIteratorPrototype) };
 
+static inline EncodedJSValue jsTestNodePrototypeFunctionSymbolIteratorCaller(ExecState*, JSTestNode* thisObject, JSC::ThrowScope&)
+{
+    return JSValue::encode(iteratorCreate<JSTestNode>(*thisObject, IterationKind::Value));
+}
+
 JSC::EncodedJSValue JSC_HOST_CALL jsTestNodePrototypeFunctionSymbolIterator(JSC::ExecState* state)
 {
-    return iteratorCreate<JSTestNode>(*state, IterationKind::Value, "[Symbol.Iterator]");
+    return BindingCaller<JSTestNode>::callOperation<jsTestNodePrototypeFunctionSymbolIteratorCaller>(state, "[Symbol.Iterator]");
+}
+
+static inline EncodedJSValue jsTestNodePrototypeFunctionEntriesCaller(ExecState*, JSTestNode* thisObject, JSC::ThrowScope&)
+{
+    return JSValue::encode(iteratorCreate<JSTestNode>(*thisObject, IterationKind::KeyValue));
 }
 
 JSC::EncodedJSValue JSC_HOST_CALL jsTestNodePrototypeFunctionEntries(JSC::ExecState* state)
 {
-    return iteratorCreate<JSTestNode>(*state, IterationKind::KeyValue, "entries");
+    return BindingCaller<JSTestNode>::callOperation<jsTestNodePrototypeFunctionEntriesCaller>(state, "entries");
+}
+
+static inline EncodedJSValue jsTestNodePrototypeFunctionKeysCaller(ExecState*, JSTestNode* thisObject, JSC::ThrowScope&)
+{
+    return JSValue::encode(iteratorCreate<JSTestNode>(*thisObject, IterationKind::Key));
 }
 
 JSC::EncodedJSValue JSC_HOST_CALL jsTestNodePrototypeFunctionKeys(JSC::ExecState* state)
 {
-    return iteratorCreate<JSTestNode>(*state, IterationKind::Key, "keys");
+    return BindingCaller<JSTestNode>::callOperation<jsTestNodePrototypeFunctionKeysCaller>(state, "keys");
+}
+
+static inline EncodedJSValue jsTestNodePrototypeFunctionValuesCaller(ExecState*, JSTestNode* thisObject, JSC::ThrowScope&)
+{
+    return JSValue::encode(iteratorCreate<JSTestNode>(*thisObject, IterationKind::Value));
 }
 
 JSC::EncodedJSValue JSC_HOST_CALL jsTestNodePrototypeFunctionValues(JSC::ExecState* state)
 {
-    return iteratorCreate<JSTestNode>(*state, IterationKind::Value, "values");
+    return BindingCaller<JSTestNode>::callOperation<jsTestNodePrototypeFunctionValuesCaller>(state, "values");
+}
+
+static inline EncodedJSValue jsTestNodePrototypeFunctionForEachCaller(ExecState* state, JSTestNode* thisObject, JSC::ThrowScope& throwScope)
+{
+    return JSValue::encode(iteratorForEach<JSTestNode>(*state, *thisObject, throwScope));
 }
 
 JSC::EncodedJSValue JSC_HOST_CALL jsTestNodePrototypeFunctionForEach(JSC::ExecState* state)
 {
-    return iteratorForEach<JSTestNode>(*state, "forEach");
+    return BindingCaller<JSTestNode>::callOperation<jsTestNodePrototypeFunctionForEachCaller>(state, "forEach");
+}
+
+static inline EncodedJSValue jsTestNodePrototypeFunctionToJSONCaller(ExecState* state, JSTestNode* thisObject, JSC::ThrowScope& throwScope)
+{
+    auto& vm = state->vm();
+    auto* result = constructEmptyObject(state);
+
+    auto nameValue = jsTestNodeNameGetter(*state, *thisObject, throwScope);
+    ASSERT(!throwScope.exception());
+    result->putDirect(vm, Identifier::fromString(&vm, "name"), nameValue);
+
+    return JSValue::encode(result);
 }
 
 EncodedJSValue JSC_HOST_CALL jsTestNodePrototypeFunctionToJSON(ExecState* state)
 {
-    ASSERT(state);
-    auto thisValue = state->thisValue();
-    auto castedThis = jsDynamicCast<JSTestNode*>(thisValue);
-    VM& vm = state->vm();
-    auto throwScope = DECLARE_THROW_SCOPE(vm);
-    if (UNLIKELY(!castedThis)){
-        return throwThisTypeError(*state, throwScope, "TestNode", "toJSON");
-    }
-    ASSERT_GC_OBJECT_INHERITS(castedThis, JSTestNode::info());
-
-    auto* result = constructEmptyObject(state);
-    auto nameValue = jsTestNodeName(state, JSValue::encode(thisValue), Identifier());
-    ASSERT(!throwScope.exception());
-    result->putDirect(vm, Identifier::fromString(&vm, "name"), JSValue::decode(nameValue));
-    return JSValue::encode(result);
+    return BindingCaller<JSTestNode>::callOperation<jsTestNodePrototypeFunctionToJSONCaller>(state, "toJSON");
 }
 
 void JSTestNode::visitChildren(JSCell* cell, SlotVisitor& visitor)

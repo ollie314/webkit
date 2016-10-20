@@ -27,6 +27,8 @@
 
 #if ENABLE(VIDEO_TRACK)
 
+#if !USE(DIRECT2D)
+
 #include "CaptionUserPreferencesMediaAF.h"
 
 #include "AudioTrackList.h"
@@ -394,7 +396,7 @@ String CaptionUserPreferencesMediaAF::captionsTextEdgeCSS() const
     bool unused;
     Color color = captionsTextColor(unused);
     if (!color.isValid())
-        color.setNamedColor("black");
+        color = Color { Color::black };
     color = captionsEdgeColorForTextColor(color);
 
     MACaptionAppearanceBehavior behavior;
@@ -964,5 +966,7 @@ Vector<RefPtr<TextTrack>> CaptionUserPreferencesMediaAF::sortedTrackListForMenu(
 }
     
 }
+
+#endif
 
 #endif // ENABLE(VIDEO_TRACK)

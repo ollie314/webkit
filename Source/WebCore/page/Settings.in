@@ -127,6 +127,7 @@ shouldInjectUserScriptsInInitialEmptyDocument initial=false
 fixedElementsLayoutRelativeToFrame initial=false
 allowDisplayOfInsecureContent initial=false
 allowRunningOfInsecureContent initial=false
+requiresUserGestureToLoadVideo initial=defaultRequiresUserGestureToLoadVideo
 videoPlaybackRequiresUserGesture initial=defaultVideoPlaybackRequiresUserGesture
 audioPlaybackRequiresUserGesture initial=defaultAudioPlaybackRequiresUserGesture
 mainContentUserGestureOverrideEnabled initial=false
@@ -273,10 +274,14 @@ springTimingFunctionEnabled initial=false
 
 treatIPAddressAsDomain initial=false
 
-variationFontsEnabled initial=true, setNeedsStyleRecalcInAllFrames=1
+variationFontsEnabled initial=true, setNeedsStyleRecalcInAllFrames=1, conditional=VARIATION_FONTS
 
 # Runtime-enabled features
 visualViewportEnabled initial=false
 
+inputEventsEnabled initial=false
+
 quickTimePluginReplacementEnabled initial=defaultQuickTimePluginReplacementEnabled
 youTubeFlashPluginReplacementEnabled initial=defaultYouTubeFlashPluginReplacementEnabled
+
+forcedPrefersReducedMotionValue type=ForcedPrefersReducedMotionValue, initial=defaultForcedPrefersReducedMotionValue

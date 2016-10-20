@@ -58,14 +58,6 @@ class SpeculateBooleanOperand;
 
 enum GeneratedOperandType { GeneratedOperandTypeUnknown, GeneratedOperandInteger, GeneratedOperandJSValue};
 
-inline GPRReg extractResult(GPRReg result) { return result; }
-#if USE(JSVALUE64)
-inline GPRReg extractResult(JSValueRegs result) { return result.gpr(); }
-#else
-inline JSValueRegs extractResult(JSValueRegs result) { return result; }
-#endif
-inline NoResultTag extractResult(NoResultTag) { return NoResult; }
-
 // === SpeculativeJIT ===
 //
 // The SpeculativeJIT is used to generate a fast, but potentially
@@ -1163,6 +1155,12 @@ public:
         return appendCall(operation);
     }
 
+    JITCompiler::Call callOperation(V_JITOperation_ECliJsf operation, CallLinkInfo* callLinkInfo, GPRReg arg1)
+    {
+        m_jit.setupArgumentsWithExecState(TrustedImmPtr(callLinkInfo), arg1);
+        return appendCall(operation);
+    }
+
     JITCompiler::Call callOperation(V_JITOperation_EC operation, JSCell* arg1)
     {
         m_jit.setupArgumentsWithExecState(TrustedImmPtr(arg1));
@@ -1319,6 +1317,11 @@ public:
     {
         m_jit.setupArgumentsWithExecState(arg1, arg2, arg3);
         return appendCallSetResult(operation, result);
+    }
+    JITCompiler::Call callOperation(J_JITOperation_EJMic operation, JSValueRegs result, JSValueRegs arg, TrustedImmPtr mathIC)
+    {
+        m_jit.setupArgumentsWithExecState(arg.gpr(), mathIC);
+        return appendCallSetResult(operation, result.gpr());
     }
     JITCompiler::Call callOperation(J_JITOperation_EJJMic operation, JSValueRegs result, JSValueRegs arg1, JSValueRegs arg2, TrustedImmPtr mathIC)
     {
@@ -1647,6 +1650,11 @@ public:
         m_jit.setupArgumentsWithExecState(arg1, arg2);
         return appendCallSetResult(operation, result);
     }
+    JITCompiler::Call callOperation(J_JITOperation_EGP operation, GPRReg result, GPRReg arg1, GPRReg arg2)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, arg2);
+        return appendCallSetResult(operation, result);
+    }
     JITCompiler::Call callOperation(J_JITOperation_EJJ operation, GPRReg result, GPRReg arg1, GPRReg arg2)
     {
         m_jit.setupArgumentsWithExecState(arg1, arg2);
@@ -1802,7 +1810,11 @@ public:
         m_jit.setupArgumentsWithExecState(arg1, arg2.payloadGPR(), arg2.tagGPR(), arg3);
         return appendCallSetResult(operation, result);
     }
-
+    JITCompiler::Call callOperation(J_JITOperation_EJMic operation, JSValueRegs result, JSValueRegs arg, TrustedImmPtr mathIC)
+    {
+        m_jit.setupArgumentsWithExecState(EABI_32BIT_DUMMY_ARG arg.payloadGPR(), arg.tagGPR(), mathIC);
+        return appendCallSetResult(operation, result.payloadGPR(), result.tagGPR());
+    }
     JITCompiler::Call callOperation(J_JITOperation_EJJMic operation, JSValueRegs result, JSValueRegs arg1, JSValueRegs arg2, TrustedImmPtr mathIC)
     {
         m_jit.setupArgumentsWithExecState(EABI_32BIT_DUMMY_ARG arg1.payloadGPR(), arg1.tagGPR(), arg2.payloadGPR(), arg2.tagGPR(), mathIC);
@@ -1900,6 +1912,11 @@ public:
     JITCompiler::Call callOperation(J_JITOperation_EPP operation, JSValueRegs result, GPRReg arg1, void* pointer)
     {
         m_jit.setupArgumentsWithExecState(arg1, TrustedImmPtr(pointer));
+        return appendCallSetResult(operation, result.payloadGPR(), result.tagGPR());
+    }
+    JITCompiler::Call callOperation(J_JITOperation_EGP operation, JSValueRegs result, GPRReg arg1, GPRReg arg2)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, arg2);
         return appendCallSetResult(operation, result.payloadGPR(), result.tagGPR());
     }
     JITCompiler::Call callOperation(J_JITOperation_EP operation, JSValueRegs result, GPRReg arg1)
@@ -2543,6 +2560,8 @@ public:
     void compileAllocatePropertyStorage(Node*);
     void compileReallocatePropertyStorage(Node*);
     void compileGetButterfly(Node*);
+    void compileCallDOM(Node*);
+    void compileCheckDOM(Node*);
     
 #if USE(JSVALUE32_64)
     template<typename BaseOperandType, typename PropertyOperandType, typename ValueOperandType, typename TagType>
@@ -2591,6 +2610,8 @@ public:
 
     template <typename Generator, typename RepatchingFunction, typename NonRepatchingFunction>
     void compileMathIC(Node*, JITBinaryMathIC<Generator>*, bool needsScratchGPRReg, bool needsScratchFPRReg, RepatchingFunction, NonRepatchingFunction);
+    template <typename Generator, typename RepatchingFunction, typename NonRepatchingFunction>
+    void compileMathIC(Node*, JITUnaryMathIC<Generator>*, bool needsScratchGPRReg, RepatchingFunction, NonRepatchingFunction);
 
     void compileArithDoubleUnaryOp(Node*, double (*doubleFunction)(double), double (*operation)(ExecState*, EncodedJSValue));
     void compileValueAdd(Node*);

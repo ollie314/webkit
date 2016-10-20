@@ -29,6 +29,7 @@
 
 #include "ArrayConstructor.h"
 #include "DFGAbstractInterpreter.h"
+#include "DOMJITGetterSetter.h"
 #include "GetByIdStatus.h"
 #include "GetterSetter.h"
 #include "HashMapImpl.h"
@@ -656,7 +657,8 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
                     forNode(node->child1()).m_type));
             break;
         default:
-            RELEASE_ASSERT_NOT_REACHED();
+            DFG_ASSERT(m_graph, node, node->child1().useKind() == UntypedUse);
+            forNode(node).setType(SpecBytecodeNumber);
             break;
         }
         break;
@@ -1777,6 +1779,7 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         break;
 
     case TailCall:
+    case DirectTailCall:
     case TailCallVarargs:
     case TailCallForwardVarargs:
         clobberWorld(node->origin.semantic, clobberLimit);
@@ -1784,7 +1787,7 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         break;
         
     case Throw:
-    case ThrowReferenceError:
+    case ThrowStaticError:
         m_state.setIsValid(false);
         break;
             
@@ -2267,6 +2270,28 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
     case AllocatePropertyStorage:
     case ReallocatePropertyStorage:
         forNode(node).clear(); // The result is not a JS value.
+        break;
+    case CheckDOM: {
+        JSValue constant = forNode(node->child1()).value();
+        if (constant) {
+            if (constant.isCell() && constant.asCell()->inherits(node->classInfo())) {
+                m_state.setFoundConstants(true);
+                ASSERT(constant);
+                break;
+            }
+        }
+
+        AbstractValue& value = forNode(node->child1());
+
+        if (value.m_structure.isSubClassOf(node->classInfo()))
+            m_state.setFoundConstants(true);
+
+        filterClassInfo(value, node->classInfo());
+        break;
+    }
+    case CallDOM:
+        clobberWorld(node->origin.semantic, clobberLimit);
+        forNode(node).makeBytecodeTop();
         break;
     case CheckArray: {
         if (node->arrayMode().alreadyChecked(m_graph, node, forNode(node->child1()))) {
@@ -2800,6 +2825,9 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
     case ConstructForwardVarargs:
     case TailCallForwardVarargsInlinedCaller:
     case CallEval:
+    case DirectCall:
+    case DirectConstruct:
+    case DirectTailCallInlinedCaller:
         clobberWorld(node->origin.semantic, clobberLimit);
         forNode(node).makeHeapTop();
         break;
@@ -3050,6 +3078,16 @@ FiltrationResult AbstractInterpreter<AbstractStateType>::filterByValue(
     AbstractValue& abstractValue, FrozenValue concreteValue)
 {
     if (abstractValue.filterByValue(concreteValue) == FiltrationOK)
+        return FiltrationOK;
+    m_state.setIsValid(false);
+    return Contradiction;
+}
+
+template<typename AbstractStateType>
+FiltrationResult AbstractInterpreter<AbstractStateType>::filterClassInfo(
+    AbstractValue& value, const ClassInfo* classInfo)
+{
+    if (value.filterClassInfo(m_graph, classInfo) == FiltrationOK)
         return FiltrationOK;
     m_state.setIsValid(false);
     return Contradiction;

@@ -160,6 +160,7 @@ enum AccessibilityRole {
     ListBoxOptionRole,
     ListItemRole,
     ListMarkerRole,
+    MarkRole,
     MathElementRole,
     MatteRole,
     MenuRole,
@@ -560,6 +561,9 @@ public:
     bool isStyleFormatGroup() const;
     bool isSubscriptStyleGroup() const;
     bool isSuperscriptStyleGroup() const;
+    bool isFigure() const;
+    bool isSummary() const { return roleValue() == SummaryRole; }
+    bool isOutput() const;
     
     virtual bool isChecked() const { return false; }
     virtual bool isEnabled() const { return false; }
@@ -1060,6 +1064,8 @@ public:
     AccessibilityObject* focusableAncestor();
     AccessibilityObject* editableAncestor();
     AccessibilityObject* highestEditableAncestor();
+    
+    static const AccessibilityObject* matchedParent(const AccessibilityObject&, bool includeSelf, const std::function<bool(const AccessibilityObject&)>&);
     
 protected:
     AXID m_id;

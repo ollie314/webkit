@@ -35,7 +35,6 @@
 #include <runtime/TypedArrays.h>
 
 namespace JSC {
-class ArrayBuffer;
 class ExecState;
 class JSValue;
 };
@@ -46,15 +45,13 @@ class Dictionary;
 class FetchRequest;
 class ReadableStreamSource;
 
-typedef int ExceptionCode;
-
 class FetchResponse final : public FetchBodyOwner {
 public:
     using Type = ResourceResponse::Type;
 
     static Ref<FetchResponse> create(ScriptExecutionContext& context) { return adoptRef(*new FetchResponse(context, Nullopt, FetchHeaders::create(FetchHeaders::Guard::Response), ResourceResponse())); }
     static Ref<FetchResponse> error(ScriptExecutionContext&);
-    static RefPtr<FetchResponse> redirect(ScriptExecutionContext&, const String&, int, ExceptionCode&);
+    static ExceptionOr<Ref<FetchResponse>> redirect(ScriptExecutionContext&, const String& url, int status);
 
     using FetchPromise = DOMPromise<FetchResponse>;
     static void fetch(ScriptExecutionContext&, FetchRequest&, FetchPromise&&);
@@ -66,7 +63,7 @@ public:
     void finishConsumingStream(Ref<DeferredPromise>&&);
 #endif
 
-    void setStatus(int, const String&, ExceptionCode&);
+    ExceptionOr<void> setStatus(int status, const String& statusText);
     void initializeWith(JSC::ExecState&, JSC::JSValue);
 
     Type type() const { return m_response.type(); }
@@ -82,8 +79,10 @@ public:
 #if ENABLE(READABLE_STREAM_API)
     ReadableStreamSource* createReadableStreamSource();
     void consumeBodyAsStream();
+    void feedStream();
     void cancel();
 #endif
+
     bool isLoading() const { return !!m_bodyLoader; }
 
 private:
@@ -91,10 +90,13 @@ private:
 
     static void startFetching(ScriptExecutionContext&, const FetchRequest&, FetchPromise&&);
 
-    // ActiveDOMObject API
     void stop() final;
     const char* activeDOMObjectName() const final;
     bool canSuspendForDocumentSuspension() const final;
+
+#if ENABLE(READABLE_STREAM_API)
+    void closeStream();
+#endif
 
     class BodyLoader final : public FetchLoaderClient {
     public:

@@ -562,9 +562,9 @@ void ReplaceSelectionCommand::removeRedundantStylesAndKeepStyleSpanInline(Insert
 
             // Mutate using the CSSOM wrapper so we get the same event behavior as a script.
             if (isBlock(element))
-                element->cssomStyle()->setPropertyInternal(CSSPropertyDisplay, "inline", false, IGNORE_EXCEPTION);
+                element->cssomStyle()->setPropertyInternal(CSSPropertyDisplay, "inline", false);
             if (element->renderer() && element->renderer()->style().isFloating())
-                element->cssomStyle()->setPropertyInternal(CSSPropertyFloat, "none", false, IGNORE_EXCEPTION);
+                element->cssomStyle()->setPropertyInternal(CSSPropertyFloat, "none", false);
         }
     }
 }
@@ -1252,6 +1252,14 @@ void ReplaceSelectionCommand::doApply()
         m_matchStyle = false;
         
     completeHTMLReplacement(lastPositionToSelect);
+}
+
+String ReplaceSelectionCommand::inputEventData() const
+{
+    if (isEditingTextAreaOrTextInput())
+        return m_documentFragment->textContent();
+
+    return CompositeEditCommand::inputEventData();
 }
 
 bool ReplaceSelectionCommand::shouldRemoveEndBR(Node* endBR, const VisiblePosition& originalVisPosBeforeEndBR)

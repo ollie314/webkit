@@ -29,6 +29,8 @@ package CodeGenerator;
 use strict;
 
 use File::Find;
+use Carp qw<longmess>;
+use Data::Dumper;
 
 my $useDocument = "";
 my $useGenerator = "";
@@ -138,6 +140,17 @@ my %svgTypeWithWritablePropertiesNeedingTearOff = (
 # Cache of IDL file pathnames.
 my $idlFiles;
 my $cachedInterfaces = {};
+my $cachedExternalDictionaries = {};
+
+sub assert
+{
+    my $message = shift;
+    
+    my $mess = longmess();
+    print Dumper($mess);
+
+    die $message;
+}
 
 # Default constructor
 sub new
@@ -199,6 +212,14 @@ sub ProcessDocument
         $codeGenerator->GenerateInterface($interface, $defines, $useDocument->enumerations, $useDocument->dictionaries);
         $codeGenerator->WriteData($interface, $useOutputDir, $useOutputHeadersDir);
     }
+
+    # It is possible to have dictionaries in an IDL file without any interface.
+    unless (@$interfaces) {
+        foreach my $dictionary (@{$useDocument->dictionaries}) {
+            $codeGenerator->GenerateDictionary($dictionary);
+            $codeGenerator->WriteData($dictionary, $useOutputDir, $useOutputHeadersDir);
+        }
+    }
 }
 
 sub FileNamePrefix
@@ -219,6 +240,8 @@ sub UpdateFile
     my $fileName = shift;
     my $contents = shift;
 
+    # FIXME: We should only write content if it is different from what is in the file.
+    # But that would mean running more often the binding generator, see https://bugs.webkit.org/show_bug.cgi?id=131756
     open FH, ">", $fileName or die "Couldn't open $fileName: $!\n";
     print FH $contents;
     close FH;
@@ -310,6 +333,7 @@ sub ParseInterface
     my $interfaceName = shift;
 
     return undef if $interfaceName eq 'Object';
+    return undef if $interfaceName eq 'UNION';
 
     if (exists $cachedInterfaces->{$interfaceName}) {
         return $cachedInterfaces->{$interfaceName};
@@ -317,7 +341,7 @@ sub ParseInterface
 
     # Step #1: Find the IDL file associated with 'interface'
     my $filename = $object->IDLFileForInterface($interfaceName)
-        or die("Could NOT find IDL file for interface \"$interfaceName\", reachable from \"" . $outerInterface->name . "\"!\n");
+        or assert("Could NOT find IDL file for interface \"$interfaceName\", reachable from \"" . $outerInterface->name . "\"!\n");
 
     print "  |  |>  Parsing parent IDL \"$filename\" for interface \"$interfaceName\"\n" if $verbose;
 
@@ -347,21 +371,13 @@ sub SkipIncludeHeader
     return 1 if $object->IsPrimitiveType($type);
     return 1 if $object->IsTypedArrayType($type);
     return 1 if $type eq "Array";
+    return 1 if $type eq "BufferSource";
     return 1 if $type eq "DOMString" or $type eq "USVString";
     return 1 if $type eq "DOMTimeStamp";
     return 1 if $type eq "SVGNumber";
     return 1 if $type eq "any";
 
     return 0;
-}
-
-sub IsConstructorTemplate
-{
-    my $object = shift;
-    my $interface = shift;
-    my $template = shift;
-
-    return $interface->extendedAttributes->{"ConstructorTemplate"} && $interface->extendedAttributes->{"ConstructorTemplate"} eq $template;
 }
 
 sub IsNumericType
@@ -447,22 +463,53 @@ sub GetEnumImplementationNameOverride
     return $enumTypeImplementationNameOverrides{$type};
 }
 
-sub IsDictionaryType
-{
-    my ($object, $type) = @_;
-
-    return 1 if exists $dictionaryTypes{$type};
-    return 0;
-}
-
 sub GetDictionaryByName
 {
     my ($object, $name) = @_;
-    return unless defined($name);
+    die "GetDictionaryByName() was called with an undefined dictionary name" unless defined($name);
 
     for my $dictionary (@{$useDocument->dictionaries}) {
         return $dictionary if $dictionary->name eq $name;
     }
+
+    return $cachedExternalDictionaries->{$name} if exists($cachedExternalDictionaries->{$name});
+
+    # Find the IDL file associated with the dictionary.
+    my $filename = $object->IDLFileForInterface($name) or return;
+
+    # Do a fast check to see if it seems to contain a dictionary.
+    my $fileContents = slurp($filename);
+
+    if ($fileContents =~ /\bdictionary\s+$name/gs) {
+        # Parse the IDL.
+        my $parser = IDLParser->new(1);
+        my $document = $parser->Parse($filename, $defines, $preprocessor);
+
+        foreach my $dictionary (@{$document->dictionaries}) {
+            next unless $dictionary->name eq $name;
+
+            $cachedExternalDictionaries->{$name} = $dictionary;
+            my $implementedAs = $dictionary->extendedAttributes->{ImplementedAs};
+            $dictionaryTypeImplementationNameOverrides{$dictionary->name} = $implementedAs if $implementedAs;
+            return $dictionary;
+        }
+    }
+    $cachedExternalDictionaries->{$name} = undef;
+}
+
+sub IsDictionaryType
+{
+    my ($object, $type) = @_;
+
+    return $type =~ /^[A-Z]/ && defined($object->GetDictionaryByName($type));
+}
+
+# A dictionary defined in its own IDL file.
+sub IsExternalDictionaryType
+{
+    my ($object, $type) = @_;
+
+    return $object->IsDictionaryType($type) && defined($cachedExternalDictionaries->{$type});
 }
 
 sub HasDictionaryImplementationNameOverride
@@ -658,6 +705,16 @@ sub WK_lcfirst
     return $ret;
 }
 
+sub slurp {
+    my $file = shift;
+
+    open my $fh, '<', $file or die;
+    local $/ = undef;
+    my $content = <$fh>;
+    close $fh;
+    return $content;
+}
+
 sub trim
 {
     my $string = shift;
@@ -801,6 +858,8 @@ sub IsWrapperType
 
     return 0 if !$object->IsRefPtrType($type);
     return 0 if $object->IsTypedArrayType($type);
+    return 0 if $type eq "BufferSource";
+    return 0 if $type eq "UNION";
     return 0 if $webCoreTypeHash{$type};
 
     return 1;
@@ -814,7 +873,7 @@ sub getInterfaceExtendedAttributesFromName
     my $object = shift;
     my $interfaceName = shift;
 
-    my $idlFile = $object->IDLFileForInterface($interfaceName) or die("Could NOT find IDL file for interface \"$interfaceName\"!\n");
+    my $idlFile = $object->IDLFileForInterface($interfaceName) or assert("Could NOT find IDL file for interface \"$interfaceName\"!\n");
 
     open FILE, "<", $idlFile or die;
     my @lines = <FILE>;
@@ -846,7 +905,7 @@ sub ComputeIsCallbackInterface
 
   return 0 unless $object->IsWrapperType($type);
 
-  my $idlFile = $object->IDLFileForInterface($type) or die("Could NOT find IDL file for interface \"$type\"!\n");
+  my $idlFile = $object->IDLFileForInterface($type) or assert("Could NOT find IDL file for interface \"$type\"!\n");
 
   open FILE, "<", $idlFile or die;
   my @lines = <FILE>;
@@ -882,7 +941,7 @@ sub ComputeIsFunctionOnlyCallbackInterface
 
   return 0 unless $object->IsCallbackInterface($type);
 
-  my $idlFile = $object->IDLFileForInterface($type) or die("Could NOT find IDL file for interface \"$type\"!\n");
+  my $idlFile = $object->IDLFileForInterface($type) or assert("Could NOT find IDL file for interface \"$type\"!\n");
 
   open FILE, "<", $idlFile or die;
   my @lines = <FILE>;
@@ -927,19 +986,6 @@ sub GenerateConditionalString
     my $node = shift;
 
     my $conditional = $node->extendedAttributes->{"Conditional"};
-    if ($conditional) {
-        return $generator->GenerateConditionalStringFromAttributeValue($conditional);
-    } else {
-        return "";
-    }
-}
-
-sub GenerateConstructorConditionalString
-{
-    my $generator = shift;
-    my $node = shift;
-
-    my $conditional = $node->extendedAttributes->{"ConstructorConditional"};
     if ($conditional) {
         return $generator->GenerateConditionalStringFromAttributeValue($conditional);
     } else {

@@ -336,14 +336,14 @@ void Path::addArcTo(const FloatPoint& p1, const FloatPoint& p2, float radius)
     notImplemented();
 }
 
-static equalRadiusWidths(const FloatSize& topLeftRadius, const FloatSize& topRightRadius, const FloatSize& bottomLeftRadius, const FloatSize& bottomRightRadius)
+static bool equalRadiusWidths(const FloatSize& topLeftRadius, const FloatSize& topRightRadius, const FloatSize& bottomLeftRadius, const FloatSize& bottomRightRadius)
 {
     return topLeftRadius.width() == topRightRadius.width()
         && topRightRadius.width() == bottomLeftRadius.width()
         && bottomLeftRadius.width() == bottomRightRadius.width();
 }
 
-static equalRadiusHeights(const FloatSize& topLeftRadius, const FloatSize& topRightRadius, const FloatSize& bottomLeftRadius, const FloatSize& bottomRightRadius)
+static bool equalRadiusHeights(const FloatSize& topLeftRadius, const FloatSize& topRightRadius, const FloatSize& bottomLeftRadius, const FloatSize& bottomRightRadius)
 {
     return topLeftRadius.height() == bottomLeftRadius.height()
         && bottomLeftRadius.height() == topRightRadius.height()
@@ -414,7 +414,7 @@ void Path::addArc(const FloatPoint& center, float radius, float startAngle, floa
     float firstArcEnd = startAngle + maxSweep;
     drawArcSection(m_activePath.get(), center, radius, startAngle, firstArcEnd, clockwise);
 
-    if (areEssentiallyEqual(firstArcEnd, endAngle))
+    if (WTF::areEssentiallyEqual(firstArcEnd, endAngle))
         return;
 
     drawArcSection(m_activePath.get(), center, radius, firstArcEnd, endAngle, clockwise);
@@ -490,7 +490,7 @@ FloatPoint Path::currentPoint() const
     if (isNull())
         return FloatPoint();
 
-    float length;
+    float length = 0;
     HRESULT hr = m_path->ComputeLength(nullptr, &length);
     if (!SUCCEEDED(hr))
         return FloatPoint();
@@ -502,6 +502,16 @@ FloatPoint Path::currentPoint() const
         return FloatPoint();
 
     return point;
+}
+
+float Path::length() const
+{
+    float length = 0;
+    HRESULT hr = m_path->ComputeLength(nullptr, &length);
+    if (!SUCCEEDED(hr))
+        return 0;
+
+    return length;
 }
 
 void Path::apply(const PathApplierFunction& function) const

@@ -27,6 +27,8 @@
 #include "config.h"
 #include "GraphicsContextCG.h"
 
+#if USE(CG)
+
 #include "AffineTransform.h"
 #include "CoreGraphicsSPI.h"
 #include "DisplayListRecorder.h"
@@ -90,6 +92,16 @@ CGColorSpaceRef sRGBColorSpaceRef()
         sRGBSpace = deviceRGBColorSpaceRef();
 #endif // PLATFORM(WIN)
     return sRGBSpace;
+}
+
+CGColorSpaceRef displayP3ColorSpaceRef()
+{
+#if PLATFORM(IOS) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED > 101100)
+    static CGColorSpaceRef displayP3Space = CGColorSpaceCreateWithName(kCGColorSpaceDisplayP3);
+#else
+    static CGColorSpaceRef displayP3Space = sRGBColorSpaceRef();
+#endif
+    return displayP3Space;
 }
 
 #if PLATFORM(WIN)
@@ -468,7 +480,7 @@ void GraphicsContext::drawLine(const FloatPoint& point1, const FloatPoint& point
     CGContextStateSaver stateSaver(context, drawsDashedLine);
     if (drawsDashedLine) {
         // Figure out end points to ensure we always paint corners.
-        cornerWidth = strokeStyle == DottedStroke ? thickness : std::min(2 * thickness, std::max(thickness, strokeWidth / 3));
+        cornerWidth = dashedLineCornerWidthForStrokeWidth(strokeWidth);
         setCGFillColor(context, strokeColor());
         if (isVerticalLine) {
             CGContextFillRect(context, FloatRect(point1.x(), point1.y(), thickness, cornerWidth));
@@ -478,44 +490,19 @@ void GraphicsContext::drawLine(const FloatPoint& point1, const FloatPoint& point
             CGContextFillRect(context, FloatRect(point2.x() - cornerWidth, point1.y(), cornerWidth, thickness));
         }
         strokeWidth -= 2 * cornerWidth;
-        float patternWidth = strokeStyle == DottedStroke ? thickness : std::min(3 * thickness, std::max(thickness, strokeWidth / 3));
+        float patternWidth = dashedLinePatternWidthForStrokeWidth(strokeWidth);
         // Check if corner drawing sufficiently covers the line.
         if (strokeWidth <= patternWidth + 1)
             return;
 
-        // Pattern starts with full fill and ends with the empty fill.
-        // 1. Let's start with the empty phase after the corner.
-        // 2. Check if we've got odd or even number of patterns and whether they fully cover the line.
-        // 3. In case of even number of patterns and/or remainder, move the pattern start position
-        // so that the pattern is balanced between the corners.
-        float patternOffset = patternWidth;
-        int numberOfSegments = floorf(strokeWidth / patternWidth);
-        bool oddNumberOfSegments = numberOfSegments % 2;
-        float remainder = strokeWidth - (numberOfSegments * patternWidth);
-        if (oddNumberOfSegments && remainder)
-            patternOffset -= remainder / 2;
-        else if (!oddNumberOfSegments) {
-            if (remainder)
-                patternOffset += patternOffset - (patternWidth + remainder)  / 2;
-            else
-                patternOffset += patternWidth  / 2;
-        }
+        float patternOffset = dashedLinePatternOffsetForPatternAndStrokeWidth(patternWidth, strokeWidth);
         const CGFloat dashedLine[2] = { static_cast<CGFloat>(patternWidth), static_cast<CGFloat>(patternWidth) };
         CGContextSetLineDash(context, patternOffset, dashedLine, 2);
     }
 
-    FloatPoint p1 = point1;
-    FloatPoint p2 = point2;
-    // Center line and cut off corners for pattern patining.
-    if (isVerticalLine) {
-        float centerOffset = (p2.x() - p1.x()) / 2;
-        p1.move(centerOffset, cornerWidth);
-        p2.move(-centerOffset, -cornerWidth);
-    } else {
-        float centerOffset = (p2.y() - p1.y()) / 2;
-        p1.move(cornerWidth, centerOffset);
-        p2.move(-cornerWidth, -centerOffset);
-    }
+    auto centeredPoints = centerLineAndCutOffCorners(isVerticalLine, cornerWidth, point1, point2);
+    auto p1 = centeredPoints[0];
+    auto p2 = centeredPoints[1];
 
     if (shouldAntialias()) {
 #if PLATFORM(IOS)
@@ -1047,7 +1034,6 @@ IntRect GraphicsContext::clipBounds() const
         WTFLogAlways("Getting the clip bounds not yet supported with display lists");
         return IntRect(-2048, -2048, 4096, 4096); // FIXME: display lists.
     }
-
 
     return enclosingIntRect(CGContextGetClipBoundingBox(platformContext()));
 }
@@ -1905,3 +1891,5 @@ void GraphicsContext::platformStrokeEllipse(const FloatRect& ellipse)
 }
 
 }
+
+#endif

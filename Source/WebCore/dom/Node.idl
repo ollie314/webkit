@@ -44,32 +44,32 @@
     readonly attribute DOMString nodeName;
 
     // FIXME: the spec says this can also raise on retrieval.
-    [SetterMayThrowLegacyException] attribute DOMString? nodeValue;
+    [CEReactions, SetterMayThrowLegacyException] attribute DOMString? nodeValue;
 
-    readonly attribute unsigned short nodeType;
-    readonly attribute Node? parentNode;
+    [DOMJIT, CustomGetter] readonly attribute unsigned short nodeType;
+    [DOMJIT] readonly attribute Node? parentNode;
     readonly attribute NodeList childNodes;
-    readonly attribute Node? firstChild;
-    readonly attribute Node? lastChild;
-    readonly attribute Node? previousSibling;
-    readonly attribute Node? nextSibling;
+    [DOMJIT] readonly attribute Node? firstChild;
+    [DOMJIT] readonly attribute Node? lastChild;
+    [DOMJIT] readonly attribute Node? previousSibling;
+    [DOMJIT] readonly attribute Node? nextSibling;
     readonly attribute Document? ownerDocument;
 
-    [Custom, MayThrowLegacyException] Node insertBefore([CustomReturn] Node newChild, Node? refChild);
-    [Custom, MayThrowLegacyException] Node replaceChild(Node newChild, [CustomReturn] Node oldChild);
-    [Custom, MayThrowLegacyException, CEReactions] Node removeChild([CustomReturn] Node oldChild);
-    [Custom, MayThrowLegacyException, CEReactions] Node appendChild([CustomReturn] Node newChild);
+    [CEReactions, Custom, MayThrowLegacyException] Node insertBefore(Node newChild, Node? refChild);
+    [CEReactions, Custom, MayThrowLegacyException] Node replaceChild(Node newChild, Node oldChild);
+    [CEReactions, Custom, MayThrowLegacyException] Node removeChild(Node oldChild);
+    [CEReactions, Custom, MayThrowLegacyException] Node appendChild(Node newChild);
 
     boolean hasChildNodes();
 
-    [NewObject, MayThrowLegacyException, ImplementedAs=cloneNodeForBindings, CEReactions] Node cloneNode(optional boolean deep = false);
+    [CEReactions, ImplementedAs=cloneNodeForBindings, MayThrowLegacyException, NewObject] Node cloneNode(optional boolean deep = false);
 
     void normalize();
 
     readonly attribute USVString baseURI;
 
     // FIXME: the spec says this can also raise on retrieval.
-    [SetterMayThrowLegacyException] attribute DOMString? textContent;
+    [CEReactions, SetterMayThrowLegacyException] attribute DOMString? textContent;
 
     boolean isSameNode(Node? other);
     boolean isEqualNode(Node? other);

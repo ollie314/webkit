@@ -446,6 +446,51 @@ String AXDescriptionListDetailText()
     return String::fromUTF8(_("description"));
 }
 
+String AXDetailsText()
+{
+    return String::fromUTF8(_("details"));
+}
+
+String AXSummaryText()
+{
+    return String::fromUTF8(_("summary"));
+}
+
+String AXFigureText()
+{
+    return String::fromUTF8(_("figure"));
+}
+
+String AXOutputText()
+{
+    return String::fromUTF8(_("output"));
+}
+
+String AXEmailFieldText()
+{
+    return String::fromUTF8(_("email field"));
+}
+
+String AXTelephoneFieldText()
+{
+    return String::fromUTF8(_("telephone number field"));
+}
+
+String AXURLFieldText()
+{
+    return String::fromUTF8(_("URL field"));
+}
+
+String AXDateFieldText()
+{
+    return String::fromUTF8(_("date field"));
+}
+
+String AXTimeFieldText()
+{
+    return String::fromUTF8(_("time field"));
+}
+
 String AXFooterRoleDescriptionText()
 {
     return String::fromUTF8(_("footer"));

@@ -113,6 +113,7 @@ HTMLElement::EventHandlerNameMap HTMLBodyElement::createWindowEventHandlerNameMa
         &onfocusinAttr,
         &onfocusoutAttr,
         &onhashchangeAttr,
+        &onlanguagechangeAttr,
         &onloadAttr,
         &onmessageAttr,
         &onofflineAttr,
@@ -157,8 +158,8 @@ void HTMLBodyElement::parseAttribute(const QualifiedName& name, const AtomicStri
             else
                 document().resetActiveLinkColor();
         } else {
-            RGBA32 color;
-            if (CSSParser::parseColor(color, value, !document().inQuirksMode())) {
+            Color color = CSSParser::parseColor(value, !document().inQuirksMode());
+            if (color.isValid()) {
                 if (name == linkAttr)
                     document().setLinkColor(color);
                 else if (name == vlinkAttr)
@@ -168,7 +169,7 @@ void HTMLBodyElement::parseAttribute(const QualifiedName& name, const AtomicStri
             }
         }
 
-        setNeedsStyleRecalc();
+        invalidateStyleForSubtree();
         return;
     }
 
@@ -306,7 +307,7 @@ void HTMLBodyElement::scrollTo(const ScrollToOptions& options)
         if (!window)
             return;
 
-        window->scrollTo({ options.left, options.top });
+        window->scrollTo(options);
         return;
     }
     return HTMLElement::scrollTo(options);

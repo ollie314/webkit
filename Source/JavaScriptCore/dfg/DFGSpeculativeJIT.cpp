@@ -34,10 +34,12 @@
 #include "DFGCallArrayAllocatorSlowPathGenerator.h"
 #include "DFGCallCreateDirectArgumentsSlowPathGenerator.h"
 #include "DFGCapabilities.h"
+#include "DFGDOMJITPatchpointParams.h"
 #include "DFGMayExit.h"
 #include "DFGOSRExitFuzz.h"
 #include "DFGSaneStringGetByValSlowPathGenerator.h"
 #include "DFGSlowPathGenerator.h"
+#include "DOMJITPatchpoint.h"
 #include "DirectArguments.h"
 #include "JITAddGenerator.h"
 #include "JITBitAndGenerator.h"
@@ -385,14 +387,14 @@ void SpeculativeJIT::addSlowPathGenerator(std::function<void()> lambda)
 void SpeculativeJIT::runSlowPathGenerators(PCToCodeOriginMapBuilder& pcToCodeOriginMapBuilder)
 {
     for (auto& slowPathGenerator : m_slowPathGenerators) {
-        pcToCodeOriginMapBuilder.appendItem(m_jit.label(), slowPathGenerator->origin().semantic);
+        pcToCodeOriginMapBuilder.appendItem(m_jit.labelIgnoringWatchpoints(), slowPathGenerator->origin().semantic);
         slowPathGenerator->generate(this);
     }
     for (auto& slowPathLambda : m_slowPathLambdas) {
         Node* currentNode = slowPathLambda.currentNode;
         m_currentNode = currentNode;
         m_outOfLineStreamIndex = slowPathLambda.streamIndex;
-        pcToCodeOriginMapBuilder.appendItem(m_jit.label(), currentNode->origin.semantic);
+        pcToCodeOriginMapBuilder.appendItem(m_jit.labelIgnoringWatchpoints(), currentNode->origin.semantic);
         slowPathLambda.generator();
         m_outOfLineStreamIndex = Nullopt;
     }
@@ -1740,7 +1742,7 @@ void SpeculativeJIT::compileCurrentBlock()
         if (Options::validateDFGExceptionHandling() && (mayExit(m_jit.graph(), m_currentNode) != DoesNotExit || m_currentNode->isTerminal()))
             m_jit.jitReleaseAssertNoException();
 
-        m_jit.pcToCodeOriginMapBuilder().appendItem(m_jit.label(), m_origin.semantic);
+        m_jit.pcToCodeOriginMapBuilder().appendItem(m_jit.labelIgnoringWatchpoints(), m_origin.semantic);
 
         compile(m_currentNode);
         
@@ -4235,11 +4237,106 @@ void SpeculativeJIT::compileArithNegate(Node* node)
         return;
     }
         
-    default:
-        RELEASE_ASSERT_NOT_REACHED();
+    default: {
+        ArithProfile* arithProfile = m_jit.graph().baselineCodeBlockFor(node->origin.semantic)->arithProfileForBytecodeOffset(node->origin.semantic.bytecodeIndex);
+        JITNegIC* negIC = m_jit.codeBlock()->addJITNegIC(arithProfile);
+        auto repatchingFunction = operationArithNegateOptimize;
+        auto nonRepatchingFunction = operationArithNegate;
+        bool needsScratchGPRReg = true;
+        compileMathIC(node, negIC, needsScratchGPRReg, repatchingFunction, nonRepatchingFunction);
         return;
     }
+    }
 }
+
+template <typename Generator, typename RepatchingFunction, typename NonRepatchingFunction>
+void SpeculativeJIT::compileMathIC(Node* node, JITUnaryMathIC<Generator>* mathIC, bool needsScratchGPRReg, RepatchingFunction repatchingFunction, NonRepatchingFunction nonRepatchingFunction)
+{
+    GPRReg scratchGPR = InvalidGPRReg;
+    Optional<GPRTemporary> gprScratch;
+    if (needsScratchGPRReg) {
+        gprScratch = GPRTemporary(this);
+        scratchGPR = gprScratch->gpr();
+    }
+    JSValueOperand childOperand(this, node->child1());
+    JSValueRegs childRegs = childOperand.jsValueRegs();
+#if USE(JSVALUE64)
+    GPRTemporary result(this, Reuse, childOperand);
+    JSValueRegs resultRegs(result.gpr());
+#else
+    GPRTemporary resultTag(this);
+    GPRTemporary resultPayload(this);
+    JSValueRegs resultRegs(resultPayload.gpr(), resultTag.gpr());
+#endif
+
+#if ENABLE(MATH_IC_STATS)
+    auto inlineStart = m_jit.label();
+#endif
+
+    Box<MathICGenerationState> icGenerationState = Box<MathICGenerationState>::create();
+    mathIC->m_generator = Generator(resultRegs, childRegs, scratchGPR);
+
+    bool shouldEmitProfiling = false;
+    bool generatedInline = mathIC->generateInline(m_jit, *icGenerationState, shouldEmitProfiling);
+
+    if (generatedInline) {
+        ASSERT(!icGenerationState->slowPathJumps.empty());
+
+        Vector<SilentRegisterSavePlan> savePlans;
+        silentSpillAllRegistersImpl(false, savePlans, resultRegs);
+
+        auto done = m_jit.label();
+
+        addSlowPathGenerator([=, savePlans = WTFMove(savePlans)] () {
+            icGenerationState->slowPathJumps.link(&m_jit);
+            icGenerationState->slowPathStart = m_jit.label();
+#if ENABLE(MATH_IC_STATS)
+            auto slowPathStart = m_jit.label();
+#endif
+
+            silentSpill(savePlans);
+
+            if (icGenerationState->shouldSlowPathRepatch)
+                icGenerationState->slowPathCall = callOperation(bitwise_cast<J_JITOperation_EJMic>(repatchingFunction), resultRegs, childRegs, TrustedImmPtr(mathIC));
+            else
+                icGenerationState->slowPathCall = callOperation(nonRepatchingFunction, resultRegs, childRegs);
+
+            silentFill(savePlans);
+            m_jit.exceptionCheck();
+            m_jit.jump().linkTo(done, &m_jit);
+
+            m_jit.addLinkTask([=] (LinkBuffer& linkBuffer) {
+                mathIC->finalizeInlineCode(*icGenerationState, linkBuffer);
+            });
+
+#if ENABLE(MATH_IC_STATS)
+            auto slowPathEnd = m_jit.label();
+            m_jit.addLinkTask([=] (LinkBuffer& linkBuffer) {
+                size_t size = static_cast<char*>(linkBuffer.locationOf(slowPathEnd).executableAddress()) - static_cast<char*>(linkBuffer.locationOf(slowPathStart).executableAddress());
+                mathIC->m_generatedCodeSize += size;
+            });
+#endif
+
+        });
+    } else {
+        flushRegisters();
+        callOperation(nonRepatchingFunction, resultRegs, childRegs);
+        m_jit.exceptionCheck();
+    }
+
+#if ENABLE(MATH_IC_STATS)
+    auto inlineEnd = m_jit.label();
+    m_jit.addLinkTask([=] (LinkBuffer& linkBuffer) {
+        size_t size = static_cast<char*>(linkBuffer.locationOf(inlineEnd).executableAddress()) - static_cast<char*>(linkBuffer.locationOf(inlineStart).executableAddress());
+        mathIC->m_generatedCodeSize += size;
+    });
+#endif
+
+    jsValueResult(resultRegs, node);
+    return;
+}
+
+
 void SpeculativeJIT::compileArithMul(Node* node)
 {
     switch (node->binaryUseKind()) {
@@ -7109,6 +7206,76 @@ void SpeculativeJIT::compileGetButterfly(Node* node)
     m_jit.loadPtr(JITCompiler::Address(baseGPR, JSObject::butterflyOffset()), resultGPR);
 
     storageResult(resultGPR, node);
+}
+
+static void allocateTemporaryRegistersForPatchpoint(SpeculativeJIT* jit, Vector<GPRTemporary>& gpHolders, Vector<FPRTemporary>& fpHolders, Vector<GPRReg>& gpScratch, Vector<FPRReg>& fpScratch, DOMJIT::Patchpoint& patchpoint)
+{
+    for (unsigned i = 0; i < patchpoint.numGPScratchRegisters; ++i) {
+        GPRTemporary temporary(jit);
+        gpScratch.append(temporary.gpr());
+        gpHolders.append(WTFMove(temporary));
+    }
+
+    for (unsigned i = 0; i < patchpoint.numFPScratchRegisters; ++i) {
+        FPRTemporary temporary(jit);
+        fpScratch.append(temporary.fpr());
+        fpHolders.append(WTFMove(temporary));
+    }
+}
+
+void SpeculativeJIT::compileCallDOM(Node* node)
+{
+    DOMJIT::CallDOMPatchpoint* patchpoint = node->callDOMPatchpoint();
+
+    Vector<GPRReg> gpScratch;
+    Vector<FPRReg> fpScratch;
+    Vector<DOMJIT::Value> regs;
+
+    JSValueRegsTemporary result(this);
+    regs.append(result.regs());
+
+    int childIndex = 0;
+
+    Optional<SpeculateCellOperand> globalObject;
+    if (patchpoint->requireGlobalObject) {
+        Edge& globalObjectEdge = m_jit.graph().varArgChild(node, childIndex++);
+        globalObject = SpeculateCellOperand(this, globalObjectEdge);
+        regs.append(DOMJIT::Value(globalObject->gpr(), m_state.forNode(globalObjectEdge).value()));
+    }
+
+    Edge& baseEdge = m_jit.graph().varArgChild(node, childIndex++);
+    SpeculateCellOperand base(this, baseEdge);
+    regs.append(DOMJIT::Value(base.gpr(), m_state.forNode(baseEdge).value()));
+
+    Vector<GPRTemporary> gpTempraries;
+    Vector<FPRTemporary> fpTempraries;
+    allocateTemporaryRegistersForPatchpoint(this, gpTempraries, fpTempraries, gpScratch, fpScratch, *patchpoint);
+    DOMJITPatchpointParams params(this, WTFMove(regs), WTFMove(gpScratch), WTFMove(fpScratch));
+    patchpoint->generator()->run(m_jit, params);
+    jsValueResult(result.regs(), node);
+}
+
+void SpeculativeJIT::compileCheckDOM(Node* node)
+{
+    // FIXME: We can add the fallback implementation that inlines jsDynamicCast things here.
+    DOMJIT::Patchpoint* patchpoint = node->checkDOMPatchpoint();
+
+    Vector<GPRReg> gpScratch;
+    Vector<FPRReg> fpScratch;
+    Vector<DOMJIT::Value> regs;
+
+    SpeculateCellOperand base(this, node->child1());
+    GPRReg baseGPR = base.gpr();
+    regs.append(DOMJIT::Value(baseGPR, m_state.forNode(node->child1()).value()));
+
+    Vector<GPRTemporary> gpTempraries;
+    Vector<FPRTemporary> fpTempraries;
+    allocateTemporaryRegistersForPatchpoint(this, gpTempraries, fpTempraries, gpScratch, fpScratch, *patchpoint);
+
+    DOMJITPatchpointParams params(this, WTFMove(regs), WTFMove(gpScratch), WTFMove(fpScratch));
+    CCallHelpers::JumpList failureCases = patchpoint->generator()->run(m_jit, params);
+    speculationCheck(BadType, JSValueSource::unboxedCell(baseGPR), node->child1(), failureCases);
+    noResult(node);
 }
 
 GPRReg SpeculativeJIT::temporaryRegisterForPutByVal(GPRTemporary& temporary, ArrayMode arrayMode)

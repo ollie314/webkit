@@ -33,6 +33,7 @@
 #include "ImageObserver.h"
 #include "Length.h"
 #include "MIMETypeRegistry.h"
+#include "NotImplemented.h"
 #include "SharedBuffer.h"
 #include "TextStream.h"
 #include <math.h>
@@ -193,12 +194,7 @@ void Image::drawTiled(GraphicsContext& ctxt, const FloatRect& destRect, const Fl
     AffineTransform patternTransform = AffineTransform().scaleNonUniform(scale.width(), scale.height());
     FloatRect tileRect(FloatPoint(), intrinsicTileSize);
     drawPattern(ctxt, destRect, tileRect, patternTransform, oneTileRect.location(), spacing, op, blendMode);
-
-#if PLATFORM(IOS)
-    startAnimation(DoNotCatchUp);
-#else
     startAnimation();
-#endif
 }
 
 // FIXME: Merge with the other drawTiled eventually, since we need a combination of both for some things.
@@ -278,12 +274,7 @@ void Image::drawTiled(GraphicsContext& ctxt, const FloatRect& dstRect, const Flo
 
     FloatPoint patternPhase(dstRect.x() - hPhase, dstRect.y() - vPhase);
     drawPattern(ctxt, dstRect, srcRect, patternTransform, patternPhase, spacing, op);
-
-#if PLATFORM(IOS)
-    startAnimation(DoNotCatchUp);
-#else
     startAnimation();
-#endif
 }
 
 #if ENABLE(IMAGE_DECODER_DOWN_SAMPLING)

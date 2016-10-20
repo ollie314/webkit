@@ -124,10 +124,10 @@ public:
     ResourceLoadPriority loadPriority() const { return m_loadPriority; }
     void setLoadPriority(const Optional<ResourceLoadPriority>&);
 
-    WEBCORE_EXPORT void addClient(CachedResourceClient*);
-    WEBCORE_EXPORT void removeClient(CachedResourceClient*);
+    WEBCORE_EXPORT void addClient(CachedResourceClient&);
+    WEBCORE_EXPORT void removeClient(CachedResourceClient&);
     bool hasClients() const { return !m_clients.isEmpty() || !m_clientsAwaitingCallback.isEmpty(); }
-    bool hasClient(CachedResourceClient* client) { return m_clients.contains(client) || m_clientsAwaitingCallback.contains(client); }
+    bool hasClient(CachedResourceClient& client) { return m_clients.contains(&client) || m_clientsAwaitingCallback.contains(&client); }
     bool deleteIfPossible();
 
     enum PreloadResult {
@@ -138,8 +138,8 @@ public:
     };
     PreloadResult preloadResult() const { return static_cast<PreloadResult>(m_preloadResult); }
 
-    virtual void didAddClient(CachedResourceClient*);
-    virtual void didRemoveClient(CachedResourceClient*) { }
+    virtual void didAddClient(CachedResourceClient&);
+    virtual void didRemoveClient(CachedResourceClient&) { }
     virtual void allClientsRemoved() { }
     void destroyDecodedDataIfNeeded();
 
@@ -208,7 +208,7 @@ public:
 
     void setCrossOrigin();
     bool isCrossOrigin() const;
-    bool isClean() const;
+    bool isCORSSameOrigin() const;
     ResourceResponse::Tainting responseTainting() const { return m_responseTainting; }
 
     void loadFrom(const CachedResource&);
@@ -234,25 +234,26 @@ public:
     virtual void destroyDecodedData() { }
 
     void setOwningCachedResourceLoader(CachedResourceLoader* cachedResourceLoader) { m_owningCachedResourceLoader = cachedResourceLoader; }
-    
+
     bool isPreloaded() const { return m_preloadCount; }
     void increasePreloadCount() { ++m_preloadCount; }
     void decreasePreloadCount() { ASSERT(m_preloadCount); --m_preloadCount; }
-    
+
     void registerHandle(CachedResourceHandleBase* h);
     WEBCORE_EXPORT void unregisterHandle(CachedResourceHandleBase* h);
-    
+
     bool canUseCacheValidator() const;
 
     enum class RevalidationDecision { No, YesDueToCachePolicy, YesDueToNoStore, YesDueToNoCache, YesDueToExpired };
     virtual RevalidationDecision makeRevalidationDecision(CachePolicy) const;
     bool redirectChainAllowsReuse(ReuseExpiredRedirectionOrNot) const;
+    bool hasRedirections() const { return m_redirectChainCacheStatus.status != RedirectChainCacheStatus::Status::NoRedirection;  }
 
     bool varyHeaderValuesMatch(const ResourceRequest&, const CachedResourceLoader&);
 
     bool isCacheValidator() const { return m_resourceToRevalidate; }
     CachedResource* resourceToRevalidate() const { return m_resourceToRevalidate; }
-    
+
     // HTTP revalidation support methods for CachedResourceLoader.
     void setResourceToRevalidate(CachedResource*);
     virtual void switchClientsToRevalidatedResource();
@@ -301,9 +302,7 @@ protected:
 private:
     class Callback;
 
-    void finishRequestInitialization();
-
-    bool addClientToSet(CachedResourceClient*);
+    bool addClientToSet(CachedResourceClient&);
 
     void decodedDataDeletionTimerFired();
 

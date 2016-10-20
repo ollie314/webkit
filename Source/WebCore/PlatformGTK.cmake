@@ -84,6 +84,7 @@ list(APPEND WebCore_SOURCES
     loader/soup/SubresourceLoaderSoup.cpp
 
     platform/KillRingNone.cpp
+    platform/UserAgentQuirks.cpp
 
     platform/audio/glib/AudioBusGLib.cpp
 
@@ -148,6 +149,7 @@ list(APPEND WebCore_SOURCES
     platform/graphics/wayland/PlatformDisplayWayland.cpp
 
     platform/graphics/x11/PlatformDisplayX11.cpp
+    platform/graphics/x11/XErrorTrapper.cpp
     platform/graphics/x11/XUniqueResource.cpp
 
     platform/gtk/DragDataGtk.cpp
@@ -400,6 +402,7 @@ if (ENABLE_SUBTLE_CRYPTO)
         crypto/CryptoAlgorithmRegistry.cpp
         crypto/CryptoKey.cpp
         crypto/CryptoKeyPair.cpp
+        crypto/SubtleCrypto.cpp
         crypto/WebKitSubtleCrypto.cpp
 
         crypto/algorithms/CryptoAlgorithmAES_CBC.cpp

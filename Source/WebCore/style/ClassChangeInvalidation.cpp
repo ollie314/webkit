@@ -32,6 +32,7 @@
 #include "SpaceSplitString.h"
 #include "StyleInvalidationAnalysis.h"
 #include "StyleResolver.h"
+#include "StyleScope.h"
 #include <wtf/BitVector.h>
 
 namespace WebCore {
@@ -87,7 +88,7 @@ static ClassChangeVector computeClassChange(const SpaceSplitString& oldClasses, 
 
 static bool mayBeAffectedByHostStyle(ShadowRoot& shadowRoot, AtomicStringImpl* changedClass)
 {
-    auto& shadowRuleSets = shadowRoot.styleResolver().ruleSets();
+    auto& shadowRuleSets = shadowRoot.styleScope().resolver().ruleSets();
     if (shadowRuleSets.authorStyle().hostPseudoClassRules().isEmpty())
         return false;
     return shadowRuleSets.features().classesInRules.contains(changedClass);
@@ -115,11 +116,11 @@ void ClassChangeInvalidation::invalidateStyle(const SpaceSplitString& oldClasses
         return;
 
     if (shadowRoot && ruleSets.authorStyle().hasShadowPseudoElementRules()) {
-        m_element.setNeedsStyleRecalc(FullStyleChange);
+        m_element.invalidateStyleForSubtree();
         return;
     }
 
-    m_element.setNeedsStyleRecalc(InlineStyleChange);
+    m_element.invalidateStyle();
 
     if (!childrenOfType<Element>(m_element).first())
         return;

@@ -72,7 +72,6 @@
 #import "WebTypesInternal.h"
 #import "WebUIDelegatePrivate.h"
 #import "WebViewInternal.h"
-#import <WebCore/AuthorStyleSheets.h>
 #import <WebCore/CSSStyleDeclaration.h>
 #import <WebCore/CachedImage.h>
 #import <WebCore/CachedResourceClient.h>
@@ -119,6 +118,7 @@
 #import <WebCore/RuntimeApplicationChecks.h>
 #import <WebCore/SharedBuffer.h>
 #import <WebCore/StyleProperties.h>
+#import <WebCore/StyleScope.h>
 #import <WebCore/Text.h>
 #import <WebCore/TextAlternativeWithRange.h>
 #import <WebCore/TextIndicator.h>
@@ -789,10 +789,10 @@ const float _WebHTMLViewPrintingMaximumShrinkFactor = PrintContext::maximumShrin
 
 #if !PLATFORM(IOS)
 // We need this to be able to safely reference the CachedImage for the promised drag data
-static CachedImageClient* promisedDataClient()
+static CachedImageClient& promisedDataClient()
 {
     static CachedImageClient* staticCachedResourceClient = new CachedImageClient;
-    return staticCachedResourceClient;
+    return *staticCachedResourceClient;
 }
 #endif
 
@@ -3612,7 +3612,7 @@ WEBCORE_COMMAND(toggleUnderline)
 #endif
 
     if (Frame* coreFrame = core([self _frame])) {
-        coreFrame->document()->authorStyleSheets().didChangeContentsOrInterpretation();
+        coreFrame->document()->styleScope().didChangeContentsOrInterpretation();
         coreFrame->document()->updateStyleIfNeeded();
     }
 
@@ -3956,6 +3956,9 @@ static RetainPtr<NSMenuItem> createMenuItem(const HitTestResult& hitTestResult, 
             [menu addItem:menuItem];
 
         auto menuItem = adoptNS([[NSMenuItem alloc] initWithTitle:item.title() action:nullptr keyEquivalent:@""]);
+
+        if (auto tag = toTag(item.action()))
+            [menuItem setTag:*tag];
         [menuItem setEnabled:item.enabled()];
         [menuItem setSubmenu:menu.get()];
 
@@ -4110,9 +4113,19 @@ static RetainPtr<NSArray> customMenuFromDefaultItems(WebView *webView, const Con
 }
 #endif
 
+static BOOL currentScrollIsBlit(NSView *clipView)
+{
+#if PLATFORM(MAC)
+    return [clipView isKindOfClass:[WebClipView class]] && [(WebClipView *)clipView currentScrollIsBlit];
+#else
+    return NO;
+#endif
+}
+
+// FIXME: this entire function could be #ifdeffed out on iOS. The below workaround is AppKit-specific.
 - (void)setNeedsDisplayInRect:(NSRect)invalidRect
 {
-    if (_private->inScrollPositionChanged) {
+    if (_private->inScrollPositionChanged && currentScrollIsBlit([self superview])) {
         // When scrolling, the dirty regions are adjusted for the scroll only
         // after NSViewBoundsDidChangeNotification is sent. Translate the invalid
         // rect to pre-scrolled coordinates in order to get the right dirty region
@@ -4227,7 +4240,7 @@ static RetainPtr<NSArray> customMenuFromDefaultItems(WebView *webView, const Con
     const int cRectThreshold = 10; 
     const float cWastedSpaceThreshold = 0.75f; 
     BOOL useUnionedRect = (count <= 1) || (count > cRectThreshold); 
-    if (!useUnionedRect) { 
+    if (!useUnionedRect) {
         // Attempt to guess whether or not we should use the unioned rect or the individual rects. 
         // We do this by computing the percentage of "wasted space" in the union.  If that wasted space 
         // is too large, then we will do individual rect painting instead. 
@@ -4489,6 +4502,8 @@ static RetainPtr<NSArray> customMenuFromDefaultItems(WebView *webView, const Con
 - (void)mouseDown:(WebEvent *)event
 #endif
 {
+    [[self _webView] prepareForMouseDown];
+
 #if !PLATFORM(IOS)
     // There's a chance that responding to this event will run a nested event loop, and
     // fetching a new event might release the old one. Retaining and then autoreleasing
@@ -4708,6 +4723,8 @@ static bool matchesExtensionOrEquivalent(NSString *filename, NSString *extension
 - (void)mouseUp:(WebEvent *)event
 #endif
 {
+    [[self _webView] prepareForMouseUp];
+
 #if !PLATFORM(IOS)
     // There's a chance that responding to this event will run a nested event loop, and
     // fetching a new event might release the old one. Retaining and then autoreleasing
@@ -5007,7 +5024,7 @@ static PassRefPtr<KeyboardEvent> currentKeyboardEvent(Frame* coreFrame)
 
             document->setPaginatedForScreen(_private->paginateScreenContent);
             document->setPrinting(_private->printing);
-            document->authorStyleSheets().didChangeContentsOrInterpretation();
+            document->styleScope().didChangeContentsOrInterpretation();
         }
     }
 

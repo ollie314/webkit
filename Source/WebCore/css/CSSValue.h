@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include "ExceptionCode.h"
+#include "ExceptionOr.h"
 #include "URLHash.h"
 #include <wtf/HashMap.h>
 #include <wtf/ListHashSet.h>
@@ -64,7 +64,7 @@ public:
 
     WEBCORE_EXPORT String cssText() const;
 
-    void setCssText(const String&, ExceptionCode&) { } // FIXME: Not implemented.
+    ExceptionOr<void> setCssText(const String&) { return { }; } // FIXME: Not implemented.
 
     bool isPrimitiveValue() const { return m_classType == PrimitiveClass; }
     bool isValueList() const { return m_classType >= ValueListClass; }
@@ -83,7 +83,9 @@ public:
     bool isVariableValue() const { return m_classType == VariableClass; }
     bool isFunctionValue() const { return m_classType == FunctionClass; }
     bool isFontFeatureValue() const { return m_classType == FontFeatureClass; }
+#if ENABLE(VARIATION_FONTS)
     bool isFontVariationValue() const { return m_classType == FontVariationClass; }
+#endif
     bool isFontFaceSrcValue() const { return m_classType == FontFaceSrcClass; }
     bool isFontValue() const { return m_classType == FontClass; }
     bool isImageGeneratorValue() const { return m_classType >= CanvasClass && m_classType <= RadialGradientClass; }
@@ -127,6 +129,7 @@ public:
     bool isCustomPropertyDeclaration() const { return m_classType == CustomPropertyDeclarationClass; }
     bool isCustomIdentValue() const { return m_classType == CustomIdentClass; }
     bool isVariableReferenceValue() const { return m_classType == VariableReferenceClass; }
+    bool isPendingSubstitutionValue() const { return m_classType == PendingSubstitutionValueClass; }
 
     bool isCSSOMSafe() const { return m_isCSSOMSafe; }
     bool isSubtypeExposedToCSSOM() const
@@ -170,7 +173,9 @@ protected:
         AspectRatioClass,
         BorderImageSliceClass,
         FontFeatureClass,
+#if ENABLE(VARIATION_FONTS)
         FontVariationClass,
+#endif
         FontClass,
         FontFaceSrcClass,
         FunctionClass,
@@ -206,6 +211,7 @@ protected:
         CustomPropertyDeclarationClass,
         CustomIdentClass,
         VariableReferenceClass,
+        PendingSubstitutionValueClass,
 
         // List class types must appear after ValueListClass.
         ValueListClass,

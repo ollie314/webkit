@@ -70,7 +70,6 @@ class MediaControls;
 class MediaControlsHost;
 class MediaElementAudioSourceNode;
 class MediaError;
-class MediaKeys;
 class MediaPlayer;
 class MediaSession;
 class MediaSource;
@@ -84,6 +83,9 @@ class URL;
 class VideoPlaybackQuality;
 class VideoTrackList;
 class VideoTrackPrivate;
+#if ENABLE(LEGACY_ENCRYPTED_MEDIA)
+class WebKitMediaKeys;
+#endif
 
 #if ENABLE(VIDEO_TRACK)
 typedef PODIntervalTree<MediaTime, TextTrackCue*> CueIntervalTree;
@@ -249,8 +251,8 @@ public:
 #endif
 
 #if ENABLE(LEGACY_ENCRYPTED_MEDIA)
-    MediaKeys* keys() const { return m_mediaKeys.get(); }
-    void setMediaKeys(MediaKeys*);
+    WebKitMediaKeys* webkitKeys() const { return m_mediaKeys.get(); }
+    void webkitSetMediaKeys(WebKitMediaKeys*);
 
     void keyAdded();
 #endif
@@ -767,6 +769,8 @@ private:
 
     bool effectiveMuted() const;
 
+    void updateAudioAssertionState();
+
     void registerWithDocument(Document&);
     void unregisterWithDocument(Document&);
 
@@ -999,11 +1003,11 @@ private:
     friend class TrackDisplayUpdateScope;
 
 #if ENABLE(LEGACY_ENCRYPTED_MEDIA)
-    RefPtr<MediaKeys> m_mediaKeys;
+    RefPtr<WebKitMediaKeys> m_mediaKeys;
 #endif
 
     std::unique_ptr<MediaElementSession> m_mediaSession;
-    PageActivityAssertionToken m_activityToken;
+    PageActivityAssertionToken m_audioActivityToken;
     size_t m_reportedExtraMemoryCost;
 
 #if ENABLE(MEDIA_CONTROLS_SCRIPT)

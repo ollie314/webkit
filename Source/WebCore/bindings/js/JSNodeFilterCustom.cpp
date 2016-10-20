@@ -51,7 +51,7 @@ uint16_t JSNodeFilter::acceptNode(Node* node)
     args.append(toJS(state, m_data->globalObject(), node));
     RETURN_IF_EXCEPTION(scope, NodeFilter::FILTER_REJECT);
 
-    NakedPtr<Exception> returnedException;
+    NakedPtr<JSC::Exception> returnedException;
     JSValue value = m_data->invokeCallback(args, JSCallbackData::CallbackType::FunctionOrObject, Identifier::fromString(state, "acceptNode"), returnedException);
     ASSERT(!scope.exception() || returnedException);
     if (returnedException) {
@@ -61,7 +61,7 @@ uint16_t JSNodeFilter::acceptNode(Node* node)
         return NodeFilter::FILTER_REJECT;
     }
 
-    uint16_t result = convert<uint16_t>(*state, value, NormalConversion);
+    auto result = convert<IDLUnsignedShort>(*state, value, NormalConversion);
     RETURN_IF_EXCEPTION(scope, NodeFilter::FILTER_REJECT);
 
     return result;

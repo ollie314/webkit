@@ -140,24 +140,33 @@ void JSTestActiveDOMObject::destroy(JSC::JSCell* cell)
     thisObject->JSTestActiveDOMObject::~JSTestActiveDOMObject();
 }
 
-EncodedJSValue jsTestActiveDOMObjectExcitingAttr(ExecState* state, EncodedJSValue thisValue, PropertyName)
+template<> inline JSTestActiveDOMObject* BindingCaller<JSTestActiveDOMObject>::castForAttribute(ExecState&, EncodedJSValue thisValue)
 {
-    VM& vm = state->vm();
-    auto throwScope = DECLARE_THROW_SCOPE(vm);
-    UNUSED_PARAM(throwScope);
-    UNUSED_PARAM(thisValue);
-    JSValue decodedThisValue = JSValue::decode(thisValue);
-    auto* castedThis = jsDynamicCast<JSTestActiveDOMObject*>(decodedThisValue);
-    if (UNLIKELY(!castedThis)) {
-        return throwGetterTypeError(*state, throwScope, "TestActiveDOMObject", "excitingAttr");
-    }
-    if (!BindingSecurity::shouldAllowAccessToFrame(state, castedThis->wrapped().frame(), ThrowSecurityError))
-        return JSValue::encode(jsUndefined());
-    auto& impl = castedThis->wrapped();
-    JSValue result = jsNumber(impl.excitingAttr());
-    return JSValue::encode(result);
+    return jsDynamicCast<JSTestActiveDOMObject*>(JSValue::decode(thisValue));
 }
 
+template<> inline JSTestActiveDOMObject* BindingCaller<JSTestActiveDOMObject>::castForOperation(ExecState& state)
+{
+    return jsDynamicCast<JSTestActiveDOMObject*>(state.thisValue());
+}
+
+static inline JSValue jsTestActiveDOMObjectExcitingAttrGetter(ExecState&, JSTestActiveDOMObject&, ThrowScope& throwScope);
+
+EncodedJSValue jsTestActiveDOMObjectExcitingAttr(ExecState* state, EncodedJSValue thisValue, PropertyName)
+{
+    return BindingCaller<JSTestActiveDOMObject>::attribute<jsTestActiveDOMObjectExcitingAttrGetter>(state, thisValue, "excitingAttr");
+}
+
+static inline JSValue jsTestActiveDOMObjectExcitingAttrGetter(ExecState& state, JSTestActiveDOMObject& thisObject, ThrowScope& throwScope)
+{
+    UNUSED_PARAM(throwScope);
+    UNUSED_PARAM(state);
+    if (!BindingSecurity::shouldAllowAccessToFrame(&state, thisObject.wrapped().frame(), ThrowSecurityError))
+        return jsUndefined();
+    auto& impl = thisObject.wrapped();
+    JSValue result = jsNumber(impl.excitingAttr());
+    return result;
+}
 
 EncodedJSValue jsTestActiveDOMObjectConstructor(ExecState* state, EncodedJSValue thisValue, PropertyName)
 {
@@ -188,16 +197,17 @@ JSValue JSTestActiveDOMObject::getConstructor(VM& vm, const JSGlobalObject* glob
     return getDOMConstructor<JSTestActiveDOMObjectConstructor>(vm, *jsCast<const JSDOMGlobalObject*>(globalObject));
 }
 
+static inline JSC::EncodedJSValue jsTestActiveDOMObjectPrototypeFunctionExcitingFunctionCaller(JSC::ExecState*, JSTestActiveDOMObject*, JSC::ThrowScope&);
+
 EncodedJSValue JSC_HOST_CALL jsTestActiveDOMObjectPrototypeFunctionExcitingFunction(ExecState* state)
 {
-    VM& vm = state->vm();
-    auto throwScope = DECLARE_THROW_SCOPE(vm);
+    return BindingCaller<JSTestActiveDOMObject>::callOperation<jsTestActiveDOMObjectPrototypeFunctionExcitingFunctionCaller>(state, "excitingFunction");
+}
+
+static inline JSC::EncodedJSValue jsTestActiveDOMObjectPrototypeFunctionExcitingFunctionCaller(JSC::ExecState* state, JSTestActiveDOMObject* castedThis, JSC::ThrowScope& throwScope)
+{
+    UNUSED_PARAM(state);
     UNUSED_PARAM(throwScope);
-    JSValue thisValue = state->thisValue();
-    auto castedThis = jsDynamicCast<JSTestActiveDOMObject*>(thisValue);
-    if (UNLIKELY(!castedThis))
-        return throwThisTypeError(*state, throwScope, "TestActiveDOMObject", "excitingFunction");
-    ASSERT_GC_OBJECT_INHERITS(castedThis, JSTestActiveDOMObject::info());
     if (!BindingSecurity::shouldAllowAccessToFrame(state, castedThis->wrapped().frame(), ThrowSecurityError))
         return JSValue::encode(jsUndefined());
     auto& impl = castedThis->wrapped();
@@ -210,16 +220,17 @@ EncodedJSValue JSC_HOST_CALL jsTestActiveDOMObjectPrototypeFunctionExcitingFunct
     return JSValue::encode(jsUndefined());
 }
 
+static inline JSC::EncodedJSValue jsTestActiveDOMObjectPrototypeFunctionPostMessageCaller(JSC::ExecState*, JSTestActiveDOMObject*, JSC::ThrowScope&);
+
 EncodedJSValue JSC_HOST_CALL jsTestActiveDOMObjectPrototypeFunctionPostMessage(ExecState* state)
 {
-    VM& vm = state->vm();
-    auto throwScope = DECLARE_THROW_SCOPE(vm);
+    return BindingCaller<JSTestActiveDOMObject>::callOperation<jsTestActiveDOMObjectPrototypeFunctionPostMessageCaller>(state, "postMessage");
+}
+
+static inline JSC::EncodedJSValue jsTestActiveDOMObjectPrototypeFunctionPostMessageCaller(JSC::ExecState* state, JSTestActiveDOMObject* castedThis, JSC::ThrowScope& throwScope)
+{
+    UNUSED_PARAM(state);
     UNUSED_PARAM(throwScope);
-    JSValue thisValue = state->thisValue();
-    auto castedThis = jsDynamicCast<JSTestActiveDOMObject*>(thisValue);
-    if (UNLIKELY(!castedThis))
-        return throwThisTypeError(*state, throwScope, "TestActiveDOMObject", "postMessage");
-    ASSERT_GC_OBJECT_INHERITS(castedThis, JSTestActiveDOMObject::info());
     auto& impl = castedThis->wrapped();
     if (UNLIKELY(state->argumentCount() < 1))
         return throwVMError(state, throwScope, createNotEnoughArgumentsError(state));

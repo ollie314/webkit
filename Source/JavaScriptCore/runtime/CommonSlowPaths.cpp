@@ -276,7 +276,7 @@ SLOW_PATH_DECL(slow_path_throw_tdz_error)
 SLOW_PATH_DECL(slow_path_throw_strict_mode_readonly_property_write_error)
 {
     BEGIN();
-    THROW(createTypeError(exec, ASCIILiteral(StrictModeReadonlyPropertyWriteError)));
+    THROW(createTypeError(exec, ASCIILiteral(ReadonlyPropertyWriteError)));
 }
 
 SLOW_PATH_DECL(slow_path_not)
@@ -631,16 +631,16 @@ SLOW_PATH_DECL(slow_path_del_by_val)
     
     uint32_t i;
     if (subscript.getUInt32(i))
-        couldDelete = baseObject->methodTable()->deletePropertyByIndex(baseObject, exec, i);
+        couldDelete = baseObject->methodTable(vm)->deletePropertyByIndex(baseObject, exec, i);
     else {
         CHECK_EXCEPTION();
         auto property = subscript.toPropertyKey(exec);
         CHECK_EXCEPTION();
-        couldDelete = baseObject->methodTable()->deleteProperty(baseObject, exec, property);
+        couldDelete = baseObject->methodTable(vm)->deleteProperty(baseObject, exec, property);
     }
     
     if (!couldDelete && exec->codeBlock()->isStrictMode())
-        THROW(createTypeError(exec, "Unable to delete property."));
+        THROW(createTypeError(exec, UnableToDeletePropertyError));
     
     RETURN(jsBoolean(couldDelete));
 }
@@ -964,6 +964,16 @@ SLOW_PATH_DECL(slow_path_define_accessor_property)
     ASSERT((descriptor.attributes() & Accessor) || (!descriptor.isAccessorDescriptor()));
     base->methodTable(vm)->defineOwnProperty(base, exec, propertyName, descriptor, true);
     END();
+}
+
+SLOW_PATH_DECL(slow_path_throw_static_error)
+{
+    BEGIN();
+    JSValue errorMessageValue = OP_C(1).jsValue();
+    RELEASE_ASSERT(errorMessageValue.isString());
+    String errorMessage = asString(errorMessageValue)->value(exec);
+    ErrorType errorType = static_cast<ErrorType>(pc[2].u.unsignedValue);
+    THROW(createError(exec, errorType, errorMessage));
 }
 
 } // namespace JSC

@@ -1204,14 +1204,24 @@ public:
         move(TrustedImm32(JSValue::Int32Tag), boxedRegs.tagGPR());
 #endif
     }
+
+    void boxCell(GPRReg cellGPR, JSValueRegs boxedRegs)
+    {
+#if USE(JSVALUE64)
+        move(cellGPR, boxedRegs.gpr());
+#else
+        move(cellGPR, boxedRegs.payloadGPR());
+        move(TrustedImm32(JSValue::CellTag), boxedRegs.tagGPR());
+#endif
+    }
     
     void callExceptionFuzz();
     
     enum ExceptionCheckKind { NormalExceptionCheck, InvertedExceptionCheck };
     enum ExceptionJumpWidth { NormalJumpWidth, FarJumpWidth };
-    Jump emitExceptionCheck(
+    JS_EXPORT_PRIVATE Jump emitExceptionCheck(
         ExceptionCheckKind = NormalExceptionCheck, ExceptionJumpWidth = NormalJumpWidth);
-    Jump emitNonPatchableExceptionCheck();
+    JS_EXPORT_PRIVATE Jump emitNonPatchableExceptionCheck();
 
 #if ENABLE(SAMPLING_COUNTERS)
     static void emitCount(MacroAssembler& jit, AbstractSamplingCounter& counter, int32_t increment = 1)

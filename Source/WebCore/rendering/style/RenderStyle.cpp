@@ -541,10 +541,8 @@ bool RenderStyle::changeRequiresLayout(const RenderStyle& other, unsigned& chang
         if (rareNonInheritedData->m_regionFragment != other.rareNonInheritedData->m_regionFragment)
             return true;
 
-#if ENABLE(CSS_SHAPES)
         if (rareNonInheritedData->m_shapeMargin != other.rareNonInheritedData->m_shapeMargin)
             return true;
-#endif
 
         if (rareNonInheritedData->m_deprecatedFlexibleBox != other.rareNonInheritedData->m_deprecatedFlexibleBox)
             return true;
@@ -838,10 +836,8 @@ bool RenderStyle::changeRequiresRepaint(const RenderStyle& other, unsigned& chan
         || rareInheritedData->m_imageRendering != other.rareInheritedData->m_imageRendering)
         return true;
 
-#if ENABLE(CSS_SHAPES)
     if (rareNonInheritedData->m_shapeOutside != other.rareNonInheritedData->m_shapeOutside)
         return true;
-#endif
 
     // FIXME: this should probably be moved to changeRequiresLayerRepaint().
     if (rareNonInheritedData->m_clipPath != other.rareNonInheritedData->m_clipPath) {
@@ -1550,6 +1546,7 @@ void RenderStyle::setFontSize(float size)
     fontCascade().update(currentFontSelector);
 }
 
+#if ENABLE(VARIATION_FONTS)
 void RenderStyle::setFontVariationSettings(FontVariationSettings settings)
 {
     FontSelector* currentFontSelector = fontCascade().fontSelector();
@@ -1559,6 +1556,7 @@ void RenderStyle::setFontVariationSettings(FontVariationSettings settings)
     setFontDescription(description);
     fontCascade().update(currentFontSelector);
 }
+#endif
 
 void RenderStyle::getShadowExtent(const ShadowData* shadow, LayoutUnit &top, LayoutUnit &right, LayoutUnit &bottom, LayoutUnit &left) const
 {
@@ -1681,7 +1679,7 @@ Color RenderStyle::colorIncludingFallback(int colorProperty, bool visitedLink) c
 
     if (!result.isValid()) {
         if (!visitedLink && (borderStyle == INSET || borderStyle == OUTSET || borderStyle == RIDGE || borderStyle == GROOVE))
-            result.setRGB(238, 238, 238);
+            result = Color(238, 238, 238);
         else
             result = visitedLink ? visitedLinkColor() : color();
     }

@@ -1,3 +1,1536 @@
+2016-10-20  Manuel Rego Casasnovas  <rego@igalia.com>
+
+        [GTK] Cannot build GTK+ with CUPS 2.* versions
+        https://bugs.webkit.org/show_bug.cgi?id=163591
+
+        Reviewed by Michael Catanzaro.
+
+        GTK+ is wrongly checking about the available CUPS version,
+        so if you have CUPS 2.* the configure step fails.
+
+        This has been already fixed upstream and included in 2.30 series:
+        https://git.gnome.org/browse/gtk+/commit/?id=631f6b536485829a0bd00532f5826ad302b4951b
+
+        Added patch on JHBuild so we can now build GTK+ with CUPS 2.*.
+
+        * gtk/jhbuild.modules: Applied patch and avoid using "configure" script directly
+        as the patch modifies "configure.ac".
+        * gtk/patches/configure-fix-detecting-CUPS-2.x.patch: Added.
+
+2016-10-20  Manuel Rego Casasnovas  <rego@igalia.com>
+
+        [GTK] Bump glib to 2.50.1
+        https://bugs.webkit.org/show_bug.cgi?id=163689
+
+        Reviewed by Michael Catanzaro.
+
+        This is need in order to fix GTK+ build with CUPS 2.* (bug #163591).
+
+        * gtk/jhbuild.modules: Bump glib version. Pass --disable-libmount to build properly.
+        Also we don't need the patches anymore.
+        * gtk/patches/gdate-suppress-string-format-literal-warning.patch: Removed.
+        * gtk/patches/glib-warning-fix.patch: Removed.
+
+2016-10-19  Alex Christensen  <achristensen@webkit.org>
+
+        Re-enable URLParser for non-Safari Cocoa apps after r207321
+        https://bugs.webkit.org/show_bug.cgi?id=163690
+
+        Reviewed by Darin Adler.
+
+        * DumpRenderTree/mac/DumpRenderTree.mm:
+        (DumpRenderTreeMain):
+        * TestWebKitAPI/Tests/WebKit2Cocoa/LoadInvalidURLRequest.mm:
+        (-[LoadInvalidURLNavigationActionDelegate webView:didFailProvisionalNavigation:withError:]):
+        * TestWebKitAPI/Tests/mac/LoadInvalidURLRequest.mm:
+        (TestWebKitAPI::TEST):
+        * WebKitTestRunner/TestController.cpp:
+        (WTR::TestController::TestController):
+
+2016-10-19  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Unreviewed, rolling out r207557.
+
+        This change caused animations/font-variations tests to time
+        out on pre-Sierra Macs.
+
+        Reverted changeset:
+
+        "[macOS] [iOS] Disable variation fonts on macOS El Capitan and
+        iOS 9"
+        https://bugs.webkit.org/show_bug.cgi?id=163374
+        http://trac.webkit.org/changeset/207557
+
+2016-10-19  Andy Estes  <aestes@apple.com>
+
+        Crash in ASCIICaseInsensitiveHash::hash() when a response has a null MIME type
+        https://bugs.webkit.org/show_bug.cgi?id=163476
+        <rdar://problem/26941395>
+
+        Reviewed by Andreas Kling.
+
+        * TestWebKitAPI/TestWebKitAPI.xcodeproj/project.pbxproj:
+        * TestWebKitAPI/Tests/WebKit2Cocoa/LoadDataWithNilMIMEType.mm: Added.
+        (TEST): Added an API test that passes a nil MIMEType to
+        -[WKWebView loadData:MIMEType:characterEncodingName:baseURL:].
+
+2016-10-19  Jer Noble  <jer.noble@apple.com>
+
+        Modify testrunner to mute audio during tests
+        https://bugs.webkit.org/show_bug.cgi?id=162582
+
+        Reviewed by Alexey Proskuryakov.
+
+        * DumpRenderTree/mac/DumpRenderTree.mm:
+        (createWebViewAndOffscreenWindow):
+        * WebKitTestRunner/TestController.cpp:
+        (WTR::TestController::resetStateToConsistentValues):
+
+2016-10-19  Joseph Pecoraro  <pecoraro@apple.com>
+
+        check-webkit-style: fix false-positive warnings about using #pragma once header guard
+        https://bugs.webkit.org/show_bug.cgi?id=163575
+
+        Reviewed by Brady Eidson.
+
+        There were some false positive warnings about header guards
+        for ObjC headers that don't need guards. This changes the
+        style checker to no longer warn if there is no #pragma once.
+        It only warns if there are #ifndef that should be #pragma once.
+
+        * Scripts/webkitpy/style/checkers/cpp.py:
+        (check_for_header_guard):
+        Change when we output an error.
+
+        * Scripts/webkitpy/style/checkers/cpp_unittest.py:
+        (CppStyleTest.test_build_header_guard):
+        Update tests.
+
+2016-10-19  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        [macOS] [iOS] Disable variation fonts on macOS El Capitan and iOS 9
+        https://bugs.webkit.org/show_bug.cgi?id=163374
+
+        Reviewed by Darin Adler.
+
+        * TestWebKitAPI/Configurations/FeatureDefines.xcconfig:
+
+2016-10-18  Philippe Normand  <pnormand@igalia.com>
+
+        WebRTC: [GTK] Update jhbuild environment for OpenWebRTC
+        https://bugs.webkit.org/show_bug.cgi?id=163330
+
+        Reviewed by Michael Catanzaro.
+
+        Bring back the openwebrtc JHBuild moduleset in the time being. It
+        should be removed after the bump to GStreamer 1.10 is complete and
+        the libnice patches have been upstreamed. The GStreamer git
+        snapshots used in this patch are the ones configured in Ericsson's
+        GStreamer Cerbero fork.
+
+        * gtk/openwebrtc.modules: Added.
+        * gtk/patches/libnice-0001-TURN-allow-REALM-to-be-empty.patch: Added.
+        * gtk/patches/libnice-0001-agent-Remove-unnecessary-NULL-check.patch: Added.
+        * gtk/patches/libnice-0001-nicesrc-spin-the-agent-mainloop-in-a-separate-thread.patch: Added.
+        * gtk/patches/libnice-0002-Do-not-update-a-remote-candidate-s-type.patch: Added.
+        * gtk/patches/libnice-0002-TURN-handle-437-Allocation-Mismatch-responses.patch: Added.
+        * gtk/patches/libnice-0003-Do-not-compare-scope-for-IPv6-address-when-scope-is-.patch: Added.
+        * gtk/patches/libnice-0004-Removing-no-op-assignment.patch: Added.
+
+2016-10-18  Sam Weinig  <sam@webkit.org>
+
+        Replace std::experimental::variant with WTF::Variant (or similar)
+        https://bugs.webkit.org/show_bug.cgi?id=163626
+
+        Reviewed by Chris Dumez.
+
+        Rename std::experimental::variant, Variant. Move helpers get/holds_alternative/etc.
+        into the WTF namespace.
+
+        * TestWebKitAPI/Tests/WTF/Variant.cpp:
+        (TestWebKitAPI::TEST):
+
+2016-10-18  Simon Fraser  <simon.fraser@apple.com>
+
+        Add a MiniBrowser menu item to apply page scale in WK1 and WK2
+        https://bugs.webkit.org/show_bug.cgi?id=163627
+
+        Reviewed by Dean Jackson.
+
+        Rename setScale: to setViewScale: and add setPageScale:, hooking it up for WK1 (via exisiting SPI)
+        and WK2 (via new SPI).
+
+        * MiniBrowser/mac/BrowserWindowController.h:
+        * MiniBrowser/mac/BrowserWindowController.m:
+        (-[BrowserWindowController pageScaleForMenuItemTag:]):
+        (-[BrowserWindowController setPageScale:]):
+        (-[BrowserWindowController setViewScale:]):
+        (-[BrowserWindowController setScale:]): Deleted.
+        * MiniBrowser/mac/MainMenu.xib:
+        * MiniBrowser/mac/WK1BrowserWindowController.m:
+        (-[WK1BrowserWindowController setPageScale:]):
+        (-[WK1BrowserWindowController setViewScale:]):
+        (areEssentiallyEqual):
+        (-[WK1BrowserWindowController validateMenuItem:]):
+        (-[WK1BrowserWindowController setScale:]): Deleted.
+        * MiniBrowser/mac/WK2BrowserWindowController.m:
+        (-[WK2BrowserWindowController setPageScale:]):
+        (-[WK2BrowserWindowController viewScaleForMenuItemTag:]):
+        (-[WK2BrowserWindowController setViewScale:]):
+        (areEssentiallyEqual):
+        (-[WK2BrowserWindowController validateMenuItem:]):
+        (viewScaleForMenuItemTag): Deleted.
+        (-[WK2BrowserWindowController setScale:]): Deleted.
+
+2016-10-18  Anders Carlsson  <andersca@apple.com>
+
+        Add an beforeunload alert to the WebKitLegacy MiniBrowser
+        https://bugs.webkit.org/show_bug.cgi?id=163634
+
+        Reviewed by Sam Weinig.
+
+        * MiniBrowser/mac/WK1BrowserWindowController.m:
+        (-[WK1BrowserWindowController webView:runBeforeUnloadConfirmPanelWithMessage:initiatedByFrame:]):
+
+2016-10-18  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r207443.
+        https://bugs.webkit.org/show_bug.cgi?id=163616
+
+        "Caused 5% PLT regression" (Requested by krollin on #webkit).
+
+        Reverted changeset:
+
+        "Crash in ASCIICaseInsensitiveHash::hash() when a response has
+        a null MIME type"
+        https://bugs.webkit.org/show_bug.cgi?id=163476
+        http://trac.webkit.org/changeset/207443
+
+2016-10-18  Eric Carlson  <eric.carlson@apple.com>
+
+        [MediaStream] Resolve constraints and enumerate devices in the UI process
+        https://bugs.webkit.org/show_bug.cgi?id=162147
+        <rdar://problem/28803569>
+
+        Reviewed by Darin Adler.
+
+        * WebKitTestRunner/TestController.cpp:
+        (WTR::TestController::resetPreferencesToConsistentValues): Enable mock capture devices.
+        (WTR::TestController::decidePolicyForUserMediaPermissionRequestIfPossible): Update for API changes.
+
+2016-10-17  Megan Gardner  <megan_gardner@apple.com>
+
+        Add test and infrastructure for link popover
+        https://bugs.webkit.org/show_bug.cgi?id=163406
+
+        Reviewed by Simon Fraser.
+
+        Added functionality test for link popovers.
+        Can query for what URL is loaded, and that the popover has appeared or has
+        been dismissed.
+        Added a link popover test.
+
+        * DumpRenderTree/ios/UIScriptControllerIOS.mm:
+        (WTR::UIScriptController::platformSetDidShowForcePressPreviewCallback):
+        (WTR::UIScriptController::platformSetDidDismissForcePressPreviewCallback):
+        (WTR::UIScriptController::platformSetDidEndFormControlInteractionCallback): Deleted.
+        * TestRunnerShared/UIScriptContext/Bindings/UIScriptController.idl:
+        * TestRunnerShared/UIScriptContext/UIScriptContext.h:
+        * TestRunnerShared/UIScriptContext/UIScriptController.cpp:
+        (WTR::UIScriptController::setDidShowForcePressPreviewCallback):
+        (WTR::UIScriptController::didShowForcePressPreviewCallback):
+        (WTR::UIScriptController::setDidDismissForcePressPreviewCallback):
+        (WTR::UIScriptController::didDismissForcePressPreviewCallback):
+        (WTR::UIScriptController::platformSetDidShowForcePressPreviewCallback):
+        (WTR::UIScriptController::platformSetDidDismissForcePressPreviewCallback):
+        (WTR::UIScriptController::didEndFormControlInteractionCallback): Deleted.
+        (WTR::UIScriptController::platformSetDidEndFormControlInteractionCallback): Deleted.
+        * TestRunnerShared/UIScriptContext/UIScriptController.h:
+        * WebKitTestRunner/cocoa/TestRunnerWKWebView.h:
+        * WebKitTestRunner/cocoa/TestRunnerWKWebView.mm:
+        (-[TestRunnerWKWebView dealloc]):
+        (-[TestRunnerWKWebView didShowForcePressPreview]):
+        (-[TestRunnerWKWebView didDismissForcePressPreview]):
+        * WebKitTestRunner/ios/UIScriptControllerIOS.mm:
+        (WTR::UIScriptController::platformSetDidShowForcePressPreviewCallback):
+        (WTR::UIScriptController::platformSetDidDismissForcePressPreviewCallback):
+        (WTR::UIScriptController::platformSetDidEndFormControlInteractionCallback): Deleted.
+
+2016-10-17  Tim Horton  <timothy_horton@apple.com>
+
+        REGRESSION (r169805): WKWebView canGoBack returning YES when nothing is in the back-forward list after restoring session state
+        https://bugs.webkit.org/show_bug.cgi?id=163573
+        <rdar://problem/28744549>
+
+        Reviewed by Dan Bernstein.
+
+        * TestWebKitAPI/Tests/WebKit2/WKBackForwardList.mm:
+        (TEST):
+        Add a test ensuring that canGoBack returns NO after restoring session state without navigating.
+
+2016-10-17  Andy Estes  <aestes@apple.com>
+
+        Crash in ASCIICaseInsensitiveHash::hash() when a response has a null MIME type
+        https://bugs.webkit.org/show_bug.cgi?id=163476
+        <rdar://problem/26941395>
+
+        Reviewed by Tim Horton.
+
+        * TestWebKitAPI/TestWebKitAPI.xcodeproj/project.pbxproj:
+        * TestWebKitAPI/Tests/WebKit2Cocoa/LoadDataWithNilMIMEType.mm: Added.
+        (TEST): Added an API test that passes a nil MIMEType to
+        -[WKWebView loadData:MIMEType:characterEncodingName:baseURL:].
+
+2016-10-17  Dean Jackson  <dino@apple.com>
+
+        Allow creation of ExtendedColors and make Color immutable
+        https://bugs.webkit.org/show_bug.cgi?id=163557
+        <rdar://problem/28805360>
+
+        Reviewed by Darin Adler and Dave Hyatt.
+
+        API tests for ExtendedColor.
+
+        * TestWebKitAPI/TestWebKitAPI.xcodeproj/project.pbxproj:
+        * TestWebKitAPI/Tests/WebCore/ExtendedColor.cpp: Added.
+        (TestWebKitAPI::TEST):
+        (TestWebKitAPI::makeColor):
+
+2016-10-17  JF Bastien  <jfbastien@apple.com>
+
+        WebAssembly JS API: implement basic stub
+
+        Implement the global WebAssembly JavaScript object, and its constructor +
+        function properties as described in:
+          https://github.com/WebAssembly/design/blob/master/JS.md
+
+        These don't do anything at the moment, the parent bug will take care of adding
+        more functionality and associated tests.
+
+        WebAssembly JS API: implement basic stub
+        https://bugs.webkit.org/show_bug.cgi?id=163404
+
+        Reviewed by Keith Miller.
+
+        * Scripts/run-jsc-stress-tests: use the new JSC option which exposes the WebAssembly object.
+
+2016-10-17  Fujii Hironori  <Hironori.Fujii@sony.com>
+
+        resolve-ChangeLogs: Specify --no-page to git diff
+        https://bugs.webkit.org/show_bug.cgi?id=163441
+
+        Reviewed by Darin Adler.
+
+        resolve-ChangeLogs shows the result after resolving by invoking
+        'git diff'. It runs a pager for every ChangeLog if it is under
+        TTY.
+
+        * Scripts/resolve-ChangeLogs:
+        (showStatus): Specify '--no-page' to git diff.
+
+2016-10-17  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        Move user agent quirks to cross-platform location
+        https://bugs.webkit.org/show_bug.cgi?id=163508
+
+        Reviewed by Carlos Garcia Campos.
+
+        Move the test to a cross-platform location and improve it to better check the full list of
+        sites we have defined quirks for.
+
+        * TestWebKitAPI/PlatformGTK.cmake:
+        * TestWebKitAPI/Tests/WebCore/UserAgentQuirks.cpp: Renamed from Tools/TestWebKitAPI/Tests/WebCore/gtk/UserAgentQuirks.cpp.
+        (TestWebKitAPI::assertUserAgentForURLHasChromeBrowserQuirk):
+        (TestWebKitAPI::assertUserAgentForURLHasMacPlatformQuirk):
+        (TestWebKitAPI::TEST):
+
+2016-10-17  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [SOUP] Downloads should always sniff contents
+        https://bugs.webkit.org/show_bug.cgi?id=163538
+
+        Reviewed by Michael Catanzaro.
+
+        Add a test case to check that the MIME type is correctly guessed for downloads.
+
+        * TestWebKitAPI/Tests/WebKit2Gtk/TestDownloads.cpp:
+        (writeNextChunk):
+        (serverCallback):
+        (testDownloadMIMEType):
+        (beforeAll):
+        (writeNextChunkIdle): Deleted.
+
+2016-10-16  Daniel Bates  <dabates@apple.com>
+
+        Fix Perl warning about masked variable following <http://trac.webkit.org/changeset/207382>
+        (https://bugs.webkit.org/show_bug.cgi?id=163456)
+
+        * Scripts/prepare-ChangeLog:
+        (actuallyGenerateFunctionLists):
+
+2016-10-16  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Fix GTK+ unit test /webkit2/WebKitWebContext/languages after r206949.
+
+        After r206949 navigator.language returns en-US instead of en-us. Language tags in Accept-Language header are
+        actually case-insensitive, so we should actually do case-insensitive comparisons, but we only have
+        g_assert_cmpstr for tests.
+
+        * TestWebKitAPI/Tests/WebKit2Gtk/TestWebKitWebContext.cpp:
+        (testWebContextLanguages):
+
+2016-10-16  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] WebKitWebPage URI not updated after URI is modified by InjectedBundlePageResourceLoadClient::willSendRequestForFrame
+        https://bugs.webkit.org/show_bug.cgi?id=163389
+
+        Reviewed by Michael Catanzaro.
+
+        Update /webkit2/WebKitWebPage/get-uri test to check that web view and page uri always match even when request is
+        modified by WebKitWebPage::send-request signal.
+
+        * TestWebKitAPI/Tests/WebKit2Gtk/TestLoaderClient.cpp:
+        (testWebPageURI):
+
+2016-10-16  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Document request not updated after willSendRequest is called for a redirect
+        https://bugs.webkit.org/show_bug.cgi?id=163436
+
+        Reviewed by Michael Catanzaro.
+
+        Update /webkit2/WebKitWebView/active-uri test to check the active URI also when modified by
+        WebKitPage::send-request signal in a web extension.
+
+        * TestWebKitAPI/Tests/WebKit2Gtk/TestLoaderClient.cpp:
+        (testWebViewActiveURI):
+        (serverCallback):
+        * TestWebKitAPI/Tests/WebKit2Gtk/WebExtensionTest.cpp:
+        (sendRequestCallback):
+        * TestWebKitAPI/gtk/WebKit2Gtk/LoadTrackingTest.cpp:
+        (loadChangedCallback):
+
+2016-10-15  Dan Bernstein  <mitz@apple.com>
+
+        REGRESSION (r191699): Contextual menu in Mail compose view doesn’t include any of the standard submenus
+        https://bugs.webkit.org/show_bug.cgi?id=163492
+        <rdar://problem/28654799>
+
+        Reviewed by Darin Adler.
+
+        * TestWebKitAPI/TestWebKitAPI.xcodeproj/project.pbxproj:
+        * TestWebKitAPI/Tests/mac/ContextMenuDefaultItemsHaveTags.mm: Added.
+        (-[ContextMenuDefaultItemsHaveTagsDelegate webView:didFinishLoadForFrame:]):
+        (TestWebKitAPI::TEST):
+
+2016-10-15  Daniel Bates  <dabates@apple.com>
+
+        prepare-ChangeLog erroneously said that a python __init__ method was deleted
+        https://bugs.webkit.org/show_bug.cgi?id=163456
+
+        Reviewed by Simon Fraser.
+
+        Fixes an issue where prepare-ChangeLog may list as deleted functions that are
+        immediately above added code.
+
+        Currently prepare-ChangeLog makes use of the same overlap detection algorithm
+        to compute the list of deleted functions as it does to compute added and modified
+        functions. We consider a function deleted if its entire function body and signature
+        are removed. It is sufficient to compare the list of functions before the patch
+        is applied and the list of functions are the patch is applied to identify
+        these functions.
+
+        * Scripts/prepare-ChangeLog: Fix some style nits, including using Camel Case for
+        variable names.
+        (actuallyGenerateFunctionLists): Modified to call computeModifiedFunctions(). Always
+        compute the list of functions in the file after the patch regardless of whether the
+        patch only contains deletions. We will compare this list against the list of functions
+        before the patch was applied to determine the deleted functions.
+        (computeModifiedFunctions): Renamed; formerly named generateFunctionListsByRanges.
+        Removed out argument for the seen functions as we no longer make use of when computing
+        the list of deleted functions.
+        (diffCommand): Update comment.
+        (generateFunctionListsByRanges): Deleted.
+        * Scripts/webkitperl/prepare-ChangeLog_unittest/generateFunctionLists.pl: Added more unit tests.
+
+2016-10-14  Simon Fraser  <simon.fraser@apple.com>
+
+        REGRESSION (r206973): Running "webkit-patch suggest-reviewers" throws an AttributeError: 'NoneType' object has no attribute 'full_name'
+        https://bugs.webkit.org/show_bug.cgi?id=163478
+
+        Reviewed by Daniel Bates.
+        
+        Handle a None other in Contributor.__eq__.
+
+        * Scripts/webkitpy/common/config/committers.py:
+        (Contributor.__eq__):
+
+2016-10-14  JF Bastien  <jfbastien@apple.com>
+
+        Basic WebAssembly testing
+
+        Create a small DSL in JavaScript which can build WebAssembly binary modules based on the JSON description of the format as described in:
+        https://github.com/WebAssembly/design/blob/master/BinaryEncoding.md
+
+        This DSL can then be used to write small text description of valid and invalid WebAssembly binaries, making testing the JSC implementation much easier.
+
+        Details and example in README.md.
+
+        Basic WebAssembly testing
+        https://bugs.webkit.org/show_bug.cgi?id=163267
+
+        Reviewed by Keith Miller.
+
+        * Scripts/run-javascriptcore-tests:
+        (runJSCStressTests): run wasm.yaml tests
+        * Scripts/run-jsc-stress-tests: add a WebAssembly-specific runner
+
+2016-10-14  Simon Fraser  <simon.fraser@apple.com>
+
+        Annotate bots in contributors.json and don't show them on webkit.org/team
+        https://bugs.webkit.org/show_bug.cgi?id=163317
+
+        Reviewed by Daniel Bates.
+        
+        Add "class" : "bot" for non-humans in contributors.json and round-trip it.
+
+        * Scripts/webkitpy/common/config/committers.py:
+        (Contributor.__init__):
+        (Contributor.as_dict):
+        (Bot):
+        (Bot.__init__):
+        (CommitterList.load_json):
+        * Scripts/webkitpy/common/config/contributors.json:
+
+2016-10-14  Simon Fraser  <simon.fraser@apple.com>
+
+        Fix printing in WK2 MiniBrowser
+        https://bugs.webkit.org/show_bug.cgi?id=163455
+
+        Reviewed by Tim Horton.
+        
+        Call the basic -_printOperationWithPrintInfo: which doens't require a frame argument.
+
+        * MiniBrowser/mac/WK2BrowserWindowController.m:
+        (-[WK2BrowserWindowController printWebView:]):
+
+2016-10-14  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r207335.
+        https://bugs.webkit.org/show_bug.cgi?id=163445
+
+        WebKit2.ProvisionalURLAfterWillSendRequestCallback is timing
+        out on Mac bots (Requested by youenn on #webkit).
+
+        Reverted changeset:
+
+        "Add ProvisionalURLAfterWillSendRequestCallback.cpp and
+        ProvisionalURLAfterWillSendRequestCallback_Bundle.cpp to Mac
+        builds"
+        https://bugs.webkit.org/show_bug.cgi?id=163440
+        http://trac.webkit.org/changeset/207335
+
+2016-10-14  Youenn Fablet  <youenn@apple.com>
+
+        Add ProvisionalURLAfterWillSendRequestCallback.cpp and ProvisionalURLAfterWillSendRequestCallback_Bundle.cpp to Mac builds
+        https://bugs.webkit.org/show_bug.cgi?id=163440
+
+        Unreviewed.
+
+        * TestWebKitAPI/TestWebKitAPI.xcodeproj/project.pbxproj: Adding new test files introduced in
+        https://bugs.webkit.org/show_bug.cgi?id=146306 patch.
+
+2016-10-13  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Removed myself from BindingsScripts watch list.
+
+        * Scripts/webkitpy/common/config/watchlist:
+
+2016-10-13  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        WebView and WebPage URLs not updated after URL is modified by InjectedBundlePageResourceLoadClient::willSendRequestForFrame
+        https://bugs.webkit.org/show_bug.cgi?id=146306
+
+        Reviewed by Darin Adler.
+
+        Add unit test to check that the committed URL is updated when changed in willSendRequest callback.
+
+        * TestWebKitAPI/CMakeLists.txt:
+        * TestWebKitAPI/PlatformEfl.cmake:
+        * TestWebKitAPI/PlatformGTK.cmake:
+        * TestWebKitAPI/Tests/WebKit2/ProvisionalURLAfterWillSendRequestCallback.cpp: Added.
+        (TestWebKitAPI::didCommitLoadForFrame):
+        (TestWebKitAPI::TEST):
+        * TestWebKitAPI/Tests/WebKit2/ProvisionalURLAfterWillSendRequestCallback_Bundle.cpp: Added.
+        (TestWebKitAPI::ProvisionalURLAfterWillSendRequestCallbackTest::ProvisionalURLAfterWillSendRequestCallbackTest):
+        (TestWebKitAPI::ProvisionalURLAfterWillSendRequestCallbackTest::willSendRequestForFrame):
+        (TestWebKitAPI::ProvisionalURLAfterWillSendRequestCallbackTest::didCommitLoadForFrame):
+
+2016-10-13  Alex Christensen  <achristensen@webkit.org>
+
+        Hosts of URLs with non-special schemes should be case-sensitive, and non-ASCII characters in such hosts should be punycode-encoded
+        https://bugs.webkit.org/show_bug.cgi?id=163413
+
+        Reviewed by Tim Horton.
+
+        * TestWebKitAPI/Tests/WebCore/URLParser.cpp:
+        (TestWebKitAPI::TEST_F):
+        Update parsing results.  There are now fewer differences between the new URLParser and the old URL::parse.
+
+2016-10-13  Alex Christensen  <achristensen@webkit.org>
+
+        Rebase API tests after r207305.
+
+        * TestWebKitAPI/TestWebKitAPI.xcodeproj/project.pbxproj:
+        Actually build Tests/mac/LoadInvalidURLRequest.mm so we are running the WebKit1.LoadInvalidURLRequest API test.
+        * TestWebKitAPI/Tests/WebKit2Cocoa/LoadInvalidURLRequest.mm:
+        (-[LoadInvalidURLNavigationActionDelegate webView:didFailProvisionalNavigation:withError:]):
+        * TestWebKitAPI/Tests/mac/LoadInvalidURLRequest.mm:
+        (-[LoadInvalidURLWebFrameLoadDelegate webView:didFailProvisionalLoadWithError:forFrame:]):
+        Change results back to what they were before r207162, r207167, and r207184.
+
+2016-10-13  Alex Christensen  <achristensen@webkit.org>
+
+        Disable URLParser for non-Safari iOS and Mac apps for now
+        https://bugs.webkit.org/show_bug.cgi?id=163397
+
+        Reviewed by Tim Horton.
+
+        * DumpRenderTree/mac/DumpRenderTree.mm:
+        (DumpRenderTreeMain):
+        * WebKitTestRunner/TestController.cpp:
+        Enable the URLParser for testing.
+        * WebKitTestRunner/Configurations/WebKitTestRunnerApp.xcconfig:
+        Link with WebCoreTestSupport so we can find setURLParserEnabled.
+
+2016-10-13  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Unreviewed, rolling out r207297.
+
+        This change broke the iOS build.
+
+        Reverted changeset:
+
+        "Disable URLParser for non-Safari iOS and Mac apps for now"
+        https://bugs.webkit.org/show_bug.cgi?id=163397
+        http://trac.webkit.org/changeset/207297
+
+2016-10-13  Alex Christensen  <achristensen@webkit.org>
+
+        Disable URLParser for non-Safari iOS and Mac apps for now
+        https://bugs.webkit.org/show_bug.cgi?id=163397
+
+        Reviewed by Tim Horton.
+
+        * DumpRenderTree/mac/DumpRenderTree.mm:
+        (DumpRenderTreeMain):
+        * WebKitTestRunner/ios/mainIOS.mm:
+        (main):
+        * WebKitTestRunner/mac/main.mm:
+        (main):
+
+2016-10-12  Alex Christensen  <achristensen@webkit.org>
+
+        Fix out-of-bounds reading in URLParser when parsing improperly percent-encoded values
+        https://bugs.webkit.org/show_bug.cgi?id=163376
+
+        Reviewed by Saam Barati.
+
+        * TestWebKitAPI/Tests/WebCore/URLParser.cpp:
+        (TestWebKitAPI::TEST_F):
+
+2016-10-11  Dean Jackson  <dino@apple.com>
+
+        Add preliminary support for extended colors to WebCore::Color
+        https://bugs.webkit.org/show_bug.cgi?id=162878
+        <rdar://problem/28596413>
+
+        Reviewed by Darin Adler.
+
+        A new API test for Colors.
+
+        * TestWebKitAPI/Tests/WebCore/Color.cpp:
+        (TestWebKitAPI::TEST):
+
+2016-10-12  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Unreviewed, rolling out r207225.
+
+        This change causes debug tests to exit early with crashes.
+
+        Reverted changeset:
+
+        "Optional's move-constructor and move-assignment operator
+        don't disengage the value being moved from"
+        https://bugs.webkit.org/show_bug.cgi?id=163309
+        http://trac.webkit.org/changeset/207225
+
+2016-10-12  Alex Christensen  <achristensen@webkit.org>
+
+        Fix assertion after switching to URLParser
+        https://bugs.webkit.org/show_bug.cgi?id=163350
+        rdar://problem/28739938
+
+        Reviewed by Brady Eidson.
+
+        * TestWebKitAPI/Tests/WebKit2Cocoa/UserContentController.mm:
+        (TEST):
+
+2016-10-11  Sam Weinig  <sam@webkit.org>
+
+        Optional's move-constructor and move-assignment operator don't disengage the value being moved from
+        https://bugs.webkit.org/show_bug.cgi?id=163309
+
+        Reviewed by Anders Carlsson.
+
+        * TestWebKitAPI/Tests/WTF/Optional.cpp:
+        (TestWebKitAPI::TEST):
+        Add tests for Optional's move-constructor and move-assignment operator.
+
+2016-10-12  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        Now playing media sessions are always cleared for the active foreground tab
+        https://bugs.webkit.org/show_bug.cgi?id=163310
+        <rdar://problem/28573301>
+
+        Reviewed by Jer Noble.
+
+        Tweaks existing unit tests to verify that media session info persists when backgrounding and foregrounding, but
+        that media session info is correctly cleared out if the media session itself is no longer eligible for Now
+        Playing (not accounting for foreground/active state). Previously, these tests were verifying that we would
+        always clear out the information, but this is incorrect, and is the source of the problem.
+
+        * TestWebKitAPI/Tests/WebKit2Cocoa/NowPlayingControlsTests.mm:
+        (-[NowPlayingTestWebView waitForNowPlayingInfoToChange]):
+        (TestWebKitAPI::TEST):
+
+2016-10-12  Per Arne Vollan  <pvollan@apple.com>
+
+        [Win] Parallel DRTs are sharing preferences and cache.
+        https://bugs.webkit.org/show_bug.cgi?id=163013
+
+        Reviewed by Brent Fulgham.
+
+        Use separate cache and preferences for each DRT instance.
+
+        * DumpRenderTree/win/DumpRenderTree.cpp:
+        (applicationId):
+        (setApplicationId):
+        (setCacheFolder):
+        (setDefaultsToConsistentValuesForTesting):
+        * Scripts/webkitpy/port/win.py:
+        (WinPort.setup_test_run):
+
+2016-10-11  Alex Christensen  <achristensen@webkit.org>
+
+        Update API test expectation after r207162.
+       ​https://bugs.webkit.org/show_bug.cgi?id=162660
+
+        * TestWebKitAPI/Tests/WebKit2Cocoa/LoadInvalidURLRequest.mm:
+        (-[LoadInvalidURLNavigationActionDelegate webView:didFailProvisionalNavigation:withError:]):
+        Like r207167 but with a WebKit2 test.
+        "https://www.example.com<>/" was an invalid URL with the old URL parser, is now valid with URLParser but not with NSURL's parser.
+
+2016-10-11  Alex Christensen  <achristensen@webkit.org>
+
+        Update API test expectation after r207162.
+        https://bugs.webkit.org/show_bug.cgi?id=162660
+
+        * TestWebKitAPI/Tests/mac/LoadInvalidURLRequest.mm:
+        (-[LoadInvalidURLWebFrameLoadDelegate webView:didFailProvisionalLoadWithError:forFrame:]):
+        "https://www.example.com<>/" was an invalid URL with the old URL parser.
+        It is now a valid URL, but NSURL still considers it invalid.
+        This will be looked into more with https://bugs.webkit.org/show_bug.cgi?id=163127
+
+2016-10-11  Edward O'Connor  <eoconnor@apple.com>
+
+        Update my name in contributors.json
+        https://bugs.webkit.org/show_bug.cgi?id=163251
+
+        Reviewed by Simon Fraser.
+
+        * Scripts/webkitpy/common/config/contributors.json:
+
+2016-10-11  Said Abou-Hallawa  <sabouhallawa@apple.com>
+
+        Add SynchronizedFixedQueue class
+        https://bugs.webkit.org/show_bug.cgi?id=162478
+
+        Reviewed by Geoffrey Garen.
+
+        Add a new test for SynchronizedFixedQueue. The test defines a new class
+        called ToUpperConverter which converts strings from lower case to upper
+        case. It creates two threads : (1) produce thread and (2) consume thread.
+        Here is what each thread does:
+
+        1. Main threads: Enqueues lower case strings into m_lowerQueue.
+        2. Produce thread: Dequeues lower case strings from m_lowerQueue and 
+           enqueue their upper case strings in the m_upperQueue.
+        3. Consume thread: Dequeues upper case strings from m_upperQueue.
+
+        * TestWebKitAPI/TestWebKitAPI.xcodeproj/project.pbxproj:
+        * TestWebKitAPI/Tests/WTF/SynchronizedFixedQueue.cpp: Added.
+        (TestWebKitAPI::textItem): A helper function which returns a lower case string given an index.
+        (TestWebKitAPI::toUpper): A helper function which Returns the upper case of a string.
+        (TestWebKitAPI::ToUpperConverter::ToUpperConverter):
+        (TestWebKitAPI::ToUpperConverter::produceQueue): Returns a workQueue for the produce thread.
+        (TestWebKitAPI::ToUpperConverter::consumeQueue): Returns a workQueue for the consume thread.
+        (TestWebKitAPI::ToUpperConverter::startProducing): Creates a thread for the producer.
+        (TestWebKitAPI::ToUpperConverter::startConsuming): Creates a thread for the consumer.
+        (TestWebKitAPI::ToUpperConverter::start): Starts both the producer and the consumer threads.
+        (TestWebKitAPI::ToUpperConverter::stopProducing): Terminates the producer thread.
+        (TestWebKitAPI::ToUpperConverter::stopConsuming): Terminates the consumer thread.
+        (TestWebKitAPI::ToUpperConverter::stop): Terminates both the producer and the consumer threads.
+        (TestWebKitAPI::ToUpperConverter::enqueueLower): Adds a lower case string to the m_lowerQueue on the main thread.
+        (TestWebKitAPI::ToUpperConverter::isProducing): Returns whether the producing thread is active.
+        (TestWebKitAPI::ToUpperConverter::isConsuming): Returns whether the consuming thread is active.
+        (TestWebKitAPI::ToUpperConverter::produceCount): Returns the number of produced elements.
+        (TestWebKitAPI::ToUpperConverter::consumeCount): Returns the number of consumed elements.
+        (TestWebKitAPI::TEST):
+
+2016-10-11  Megan Gardner  <megan_gardner@apple.com>
+
+        Extend event stream to include interpolated events and add a force press test that uses that interpolation
+        https://bugs.webkit.org/show_bug.cgi?id=163161
+
+        Reviewed by Simon Fraser.
+
+        Added functionality to the event stream to allow for interpolated events.
+        Can now do long press, as well as a better way to do drag and other time-based
+        events that require a large stream of descrete HID events.
+        Added a basic force touch test to demostrate this interpolation.
+        Also updated the script to allow for iPhone 7 specific tests, as force touch
+        needs to be on a device that had force touch.
+
+        * Scripts/webkitpy/port/ios.py:
+        (IOSSimulatorPort):
+        * TestRunnerShared/UIScriptContext/Bindings/UIScriptController.idl:
+        * WebKitTestRunner/ios/HIDEventGenerator.mm:
+        (linearInterpolation):
+        (simpleCurveInterpolation):
+        (calculateNextCurveLocation):
+        (phaseFromString):
+        (interpolationFromString):
+        (-[HIDEventGenerator eventMaskFromEventInfo:]):
+        (-[HIDEventGenerator _createIOHIDEventWithInfo:]):
+        (-[HIDEventGenerator moveToPoints:touchCount:duration:]):
+        (-[HIDEventGenerator interpolatedEvents:]):
+        (-[HIDEventGenerator processEventsArray:withStartTime:]):
+        (-[HIDEventGenerator eventDispatchThreadEntry:]):
+        (simpleDragCurve): Deleted.
+        (calculateNextLocation): Deleted.
+
+2016-10-11  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser should percent-encode non-ASCII and non-printable characters in fragment
+        https://bugs.webkit.org/show_bug.cgi?id=163287
+
+        Reviewed by Brady Eidson.
+
+        * TestWebKitAPI/Tests/WebCore/URLParser.cpp:
+        (TestWebKitAPI::TEST_F):
+
+2016-10-11  Alex Christensen  <achristensen@webkit.org>
+
+        Remove dead networking code
+        https://bugs.webkit.org/show_bug.cgi?id=163263
+
+        Reviewed by Daniel Bates.
+
+        * DumpRenderTree/DumpRenderTree.h:
+        * DumpRenderTree/config.h:
+        * DumpRenderTree/win/DumpRenderTree.cpp:
+        (main):
+
+2016-10-11  John Wilander  <wilander@apple.com>
+
+        Modify check-webkit-style to prohibit sensitive phrases
+        https://bugs.webkit.org/show_bug.cgi?id=163048
+        <rdar://problem/28289755>
+
+        Terms considered or found to be too general to flag:
+        ASSERT_WITH_SECURITY_IMPLICATION, bad cast, bug, bypass, crash,
+        denial of service, dereference, disclosure, error, exploit,
+        failure, heap, integer overflow, leak, null dereference,
+        null pointer dereference, out of bounds, overflow,
+        race condition, sensitive information, stack, type confusion.
+
+        Reviewed by Brent Fulgham.
+
+        * Scripts/webkitpy/style/checkers/changelog.py:
+        (ChangeLogChecker.check_entry):
+            Now calls ChangeLogChecker.check_for_unwanted_security_terms().
+        (ChangeLogChecker):
+        (ChangeLogChecker.check_for_unwanted_security_terms):
+            New function to check for sensitive terms.
+        (ChangeLogChecker.check_for_unwanted_security_terms.FoundUnwantedSecurityTerm):
+        (ChangeLogChecker.check_for_unwanted_security_terms.FoundUnwantedSecurityTerm.__init__):
+            Convenience class.
+        * Scripts/webkitpy/style/checkers/changelog_unittest.py:
+        (ChangeLogCheckerTest.test_unwanted_security_terms):
+
+2016-10-11  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Unreviewed, rolling out r207067.
+
+        This change caused webkitpy test failures.
+
+        Reverted changeset:
+
+        "[Win] Parallel DRTs are sharing preferences and cache."
+        https://bugs.webkit.org/show_bug.cgi?id=163013
+        http://trac.webkit.org/changeset/207067
+
+2016-10-11  Per Arne Vollan  <pvollan@apple.com>
+
+        [Win] Parallel DRTs are sharing preferences and cache.
+        https://bugs.webkit.org/show_bug.cgi?id=163013
+
+        Reviewed by Brent Fulgham.
+
+        Use separate cache and preferences for each DRT instance.
+
+        * DumpRenderTree/win/DumpRenderTree.cpp:
+        (applicationId):
+        (setApplicationId):
+        (setCacheFolder):
+        (setDefaultsToConsistentValuesForTesting):
+        * Scripts/webkitpy/port/win.py:
+        (WinPort.setup_test_run):
+
+2016-10-10  Zan Dobersek  <zdobersek@igalia.com>
+
+        Add ENABLE_ENCRYPTED_MEDIA configuration option
+        https://bugs.webkit.org/show_bug.cgi?id=163219
+
+        Reviewed by Darin Adler.
+
+        * Scripts/webkitperl/FeatureList.pm:
+        Make the ENABLE_ENCRYPTED_MEDIA option overridable via build-webkit.
+        * TestWebKitAPI/Configurations/FeatureDefines.xcconfig:
+        Add the ENABLE_ENCRYPTED_MEDIA configuration option. It will be used
+        to enable or disable the new EME implementation at build-time.
+
+2016-10-10  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r206972.
+        https://bugs.webkit.org/show_bug.cgi?id=163227
+
+        Making EWS flaky (Requested by bfulgham_ on #webkit).
+
+        Reverted changeset:
+
+        "[CMake] CMake does not support the dep files for implicit
+        dependency"
+        https://bugs.webkit.org/show_bug.cgi?id=161433
+        http://trac.webkit.org/changeset/206972
+
+2016-10-10  Youenn Fablet  <youenn@apple.com>
+
+        W3C test downloader should be able to import specific files/sub-directories in a skipped directory
+        https://bugs.webkit.org/show_bug.cgi?id=161789
+
+        Reviewed by Ryosuke Niwa.
+
+        Removed tests_directory option and corresponding test.
+        This option was allowing to import a sub-directory from a test repository.
+        We can readd it if necessary.
+
+        Adding support for finer-grained import rules.
+        Previously skipped directories were fully removed.
+        Now, directories may be skipped but sub directories of them may be imported.
+        This currently happens in web-platform-tests repo.
+
+        * Scripts/webkitpy/w3c/test_downloader.py:
+        (TestDownloader._add_test_suite_paths): Removing tests_directory option.
+        (TestDownloader.copy_tests): Refactoring file copy by generating the list of all directories for which direct files should be imported.
+        (TestDownloader.copy_tests.should_copy_dir):
+        (TestDownloader.copy_tests.should_copy_file):
+        * Scripts/webkitpy/w3c/test_importer_unittest.py:
+        (TestImporterTest.test_tests_directory): Deleted.
+        (TestImporterTest.test_skip_test_import): Added.
+
+2016-10-09  Simon Fraser  <simon.fraser@apple.com>
+
+        Make validate-committer-lists show inactive reviewers
+        https://bugs.webkit.org/show_bug.cgi?id=163193
+
+        Reviewed by Sam Weinig.
+        
+        In preparation for updating contributors.json with the WebKit policy of retiring
+        inactive reviewers, make validate-committer-lists show the list of reviewers who
+        have not reviewed in the past year.
+        
+        This list is computed by grepping the output of 'git log --since=1.year" for
+        the reviewer line, and looking up reviewers via Contributor.mentioned_in_text(),
+        which looks for full names, aliases, irc nicks and email addresses.
+        
+        Support for aliases is added to Contributor. Aliases are alternates
+        or misspellings of the reviewer's name. Some common aliases were added to
+        contributors.json by manual examination of "Reviewed by" lines.
+
+        * Scripts/validate-committer-lists:
+        (CommitterListFromGit.possibly_expired_committers):
+        (CommitterListFromGit):
+        (CommitterListFromGit.possibly_inactive_reviewers):
+        (CommitterListFromGit.print_possibly_expired_committers):
+        (CommitterListFromGit.print_possibly_inactive_reviewers):
+        * Scripts/webkitpy/common/config/committers.py:
+        (Contributor.__init__):
+        (Contributor.contains_string):
+        (Contributor.mentioned_in_text):
+        (Contributor.as_dict):
+        (Committer.__init__):
+        (Reviewer.__init__):
+        (CommitterList.load_json):
+        * Scripts/webkitpy/common/config/contributors.json:
+
+2016-10-09  Simon Fraser  <simon.fraser@apple.com>
+
+        Convert contributors.json to a flat list
+        https://bugs.webkit.org/show_bug.cgi?id=163183
+
+        Reviewed by Darin Adler.
+        
+        Make contributors.json easier to maintain by eliminating the big groupings ("Committers", "Reviewers" etc)
+        and moving that data to a "status" property on each contributor.
+
+        * Scripts/webkitpy/common/config/committers.py:
+        (Contributor.__eq__): Implement this to fix unit tests, now that load_json() is not @memoized.
+        (Contributor.as_dict): Include status in the dict.
+        (CommitterList.__init__): Clean up to make the testing code path more explicit.
+        (CommitterList.load_json):
+        (CommitterList.load_test_data):
+        (CommitterList.as_json):
+        (Contributor.__unicode__): Deleted.
+        * Scripts/webkitpy/common/config/contributors.json:
+        * Scripts/webkitpy/tool/bot/irc_command_unittest.py:
+        (IRCCommandTest.test_whois): The ordering here is now alphabetical.
+
+2016-10-09  Fujii Hironori  <Hironori.Fujii@sony.com>
+
+        [CMake] CMake does not support the dep files for implicit dependency
+        https://bugs.webkit.org/show_bug.cgi?id=161433
+
+        Reviewed by Brent Fulgham.
+
+        Created a Perl script to generate all IDL bindings for CMake.
+        This script can regenerate outdated bindings by based on the
+        supplemental dependency and dep files created by
+        '--write-dependencies' switch of generate-bindings.pl.
+
+        add_custom_target is used to invoke the script instead of
+        add_custom_command because Ninja deletes all output files before
+        executing the command in case of add_custom_command.
+
+        USES_TERMINAL option of add_custom_target has two effects:
+        1) Not buffering output of the command
+        2) Invoking the command in the special Ninja pool which inhibits parallel build
+        One needs to use CMake 3.2 or later to enable this feature.
+
+        * DumpRenderTree/CMakeLists.txt: Specified a target name for
+        GENERATE_BINDINGS. Added dependency for the target.
+        * WebKitTestRunner/CMakeLists.txt: Ditto.
+
+2016-10-09  Simon Fraser  <simon.fraser@apple.com>
+
+        Add support for canonicalizing contributors.json, and have check-webkit-style check the format.
+        https://bugs.webkit.org/show_bug.cgi?id=163177
+
+        Follow-up fix.
+        
+        For unknown reasons, overriding Commiter.__dict__() caused mysterious test failures.
+        Rename it to as_dict().
+
+        * Scripts/webkitpy/common/config/committers.py:
+        (Contributor.as_dict):
+        (CommitterList._contributor_list_to_dict):
+        (Contributor.__dict__): Deleted.
+
+2016-10-08  Simon Fraser  <simon.fraser@apple.com>
+
+        Add support for canonicalizing contributors.json, and have check-webkit-style check the format.
+        https://bugs.webkit.org/show_bug.cgi?id=163177
+
+        Reviewed by Ryosuke Niwa.
+        
+        Make it possible to round-trip contributors.json through CommitterList, so we can
+        support writing out contributors.json in canonical format. This requires saving
+        the case-preserved email and expertise in Contributor. CommitterList also needs
+        to be able to generate the "exclusive" lists, since it currently uses lists
+        that are the union of, say, committers and reviewers.
+        
+        If contributors.json is malformed (invalid JSON), catch the Exception, report it
+        and exit rather than allowing the exception to propagate. With an invalid file,
+        an exception would be thrown before the JSON style checker reached this file, so
+        the error was not correctly reported.
+        
+        Add style/checker/committer.py for checking that committers.json has the canonical format.
+        
+        Add support to validate-committer-lists to dump out the canonical json (-d) or update
+        the file in-place (-c).
+
+        * Scripts/validate-committer-lists:
+        (CommitterListFromGit._print_three_column_row):
+        (CommitterListFromGit.possibly_expired_committers):
+        (CommitterListFromGit):
+        (CommitterListFromGit.print_possibly_expired_committers):
+        (main):
+        * Scripts/webkitpy/common/config/committers.py:
+        (Contributor.__init__):
+        (Contributor.__dict__):
+        (Committer.__init__):
+        (Reviewer.__init__):
+        (CommitterList.load_json):
+        (CommitterList):
+        (CommitterList._contributor_list_to_dict):
+        (CommitterList.as_json):
+        (CommitterList.reformat_in_place):
+        (CommitterList._exclusive_contributors):
+        (CommitterList._exclusive_committers):
+        (Contributor.matches_glob): Deleted.
+        (CommitterList.contributors): Deleted.
+        * Scripts/webkitpy/common/config/contributors.json:
+        * Scripts/webkitpy/style/checker.py:
+        (CheckerDispatcher._create_checker):
+        * Scripts/webkitpy/style/checkers/contributors.py: Added.
+        (ContributorsChecker):
+        (ContributorsChecker.__init__):
+        (ContributorsChecker.check):
+        (ContributorsChecker._unidiff_output):
+
+2016-10-06  Darin Adler  <darin@apple.com>
+
+        Next step on moving to modern way to return DOM exceptions
+        https://bugs.webkit.org/show_bug.cgi?id=163016
+
+        Reviewed by Ryosuke Niwa.
+
+        * Scripts/do-webcore-rename: Add proposed name change of setDOMException
+        to propagateException, since this function is primarily used to take an
+        exception already effectively "thrown" by setting an ExceptionCode out
+        argument and propagate it into the JavaScript engine's exception machinery.
+
+2016-10-07  Alex Christensen  <achristensen@webkit.org>
+
+        Non-special URL fragments should percent-encode non-ASCII characters
+        https://bugs.webkit.org/show_bug.cgi?id=163153
+
+        Reviewed by Tim Horton.
+
+        * TestWebKitAPI/Tests/WebCore/URLParser.cpp:
+        (TestWebKitAPI::TEST_F):
+
+2016-10-07  Jonathan Bedard  <jbedard@apple.com>
+
+        Build fix for “Move functionality common to Darwin ports into a base class”
+        https://bugs.webkit.org/show_bug.cgi?id=160709
+
+        Unreviewed build fix.
+
+        * Scripts/webkitpy/port/ios.py:
+        (IOSSimulatorPort._get_crash_log): Added iOS implementation.
+        * Scripts/webkitpy/port/mac.py:
+        (MacPort._get_crash_log): Added Mac implementation.
+
+2016-10-07  Chelsea Pugh  <cpugh@apple.com>
+
+        Unreviewed. Added myself to the list of committers.
+
+        * Scripts/webkitpy/common/config/contributors.json:
+
+2016-10-07  Jonathan Bedard  <jbedard@apple.com>
+
+        Move functionality common to Darwin ports into a base class
+        https://bugs.webkit.org/show_bug.cgi?id=160709
+
+        Reviewed by Darin Adler.
+
+        * Scripts/webkitpy/port/apple.py:
+        (ApplePort.determine_full_port_name): Specific iOS port check.
+        (ApplePort.__init__): Move leak detector to DarwinPort.
+        (ApplePort._make_leak_detector): Moved to DarwinPort.
+        (ApplePort.supports_per_test_timeout): Moved to Port.
+        (ApplePort.check_for_leaks): Moved to DarwinPort.
+        (ApplePort.print_leaks_summary): Moved to DarwinPort.
+        (ApplePort._path_to_webcore_library): Moved to DarwinPort.
+        (ApplePort.show_results_html_file): Moved to DarwinPort.
+        (ApplePort._merge_crash_logs): Moved to DarwinPort.
+        (ApplePort._look_for_all_crash_logs_in_log_dir): Moved to DarwinPort.
+        (ApplePort._get_crash_log): Moved to DarwinPort.
+        (ApplePort.look_for_new_crash_logs): Moved to DarwinPort.
+        (ApplePort.sample_process): Moved to DarwinPort.
+        (ApplePort.sample_file_path): Moved to DarwinPort.
+        (ApplePort.look_for_new_samples): Moved to DarwinPort.
+        * Scripts/webkitpy/port/base.py:
+        (Port.supports_per_test_timeout): Return true for all ports.
+        * Scripts/webkitpy/port/darwin.py: Added.
+        (DarwinPort): Shared iOS and Mac functions.
+        * Scripts/webkitpy/port/darwin_testcase.py: Added.
+        (DarwinTest): Shared iOS and Mac testing.
+        * Scripts/webkitpy/port/efl.py:
+        (EflPort):
+        (EflPort.supports_per_test_timeout): Moved to Port.
+        * Scripts/webkitpy/port/gtk.py:
+        (GtkPort._driver_class):
+        (GtkPort):
+        (GtkPort.supports_per_test_timeout): Moved to Port.
+        * Scripts/webkitpy/port/ios.py:
+        (IOSPort):
+        (IOSPort.operating_system):
+        (IOSSimulatorPort):
+        (IOSSimulatorPort.__init__): Inherits from DarwinPort.
+        (IOSSimulatorPort._port_specific_expectations_files): Moved to DarwinPort.
+        (IOSSimulatorPort._get_crash_log): Deleted.
+        (IOSSimulatorPort.xcrun_find): Deleted.
+        * Scripts/webkitpy/port/ios_unittest.py: Added.
+        (iosTest): Unit tests for the iOS port.
+        * Scripts/webkitpy/port/mac.py:
+        (MacPort):
+        (MacPort.__init__): Inherits from DarwinPort.
+        (MacPort._port_specific_expectations_files): Moved to DarwinPort.
+        (MacPort.make_command): Moved to DarwinPort.
+        (MacPort._get_crash_log): Moved to DarwinPort.
+        (MacPort.nm_command): Moved to DarwinPort.
+        * Scripts/webkitpy/port/mac_unittest.py:
+        (MacTest):
+        (MacTest.test_sdk_name): Added test.
+        (MacTest.test_xcrun): Added test.
+        (MacTest.assert_skipped_file_search_paths): Moved to DarwinTest.
+        (MacTest.test_default_timeout_ms): Moved to DarwinTest.
+        (MacTest.assert_name): Moved to DarwinTest.
+        (MacTest.test_helper_starts): Moved to DarwinTest.
+        (MacTest.test_helper_fails_to_start): Moved to DarwinTest.
+        (MacTest.test_helper_fails_to_stop): Moved to DarwinTest.
+        (MacTest.test_spindump): Moved to DarwinTest.
+        (MacTest.test_sample_process): Moved to DarwinTest.
+        (MacTest.test_sample_process_exception): Moved to DarwinTest.
+        * Scripts/webkitpy/port/port_testcase.py:
+        (PortTestCase):
+        (PortTestCase.test_diff_image): Added is_simulator flag.
+        (PortTestCase.test_diff_image): Skip test if on a simulator.
+        (PortTestCase.test_diff_image_crashed): Skip test if on a simulator.
+        * Scripts/webkitpy/port/win.py:
+        (WinPort):
+        (WinPort.look_for_new_samples): Used default, ApplePort no longer implements.
+        (WinPort.sample_process): Ditto.
+        (WinPort._make_leak_detector): Ditto.
+        (WinPort.check_for_leaks): Ditto.
+        (WinPort.print_leaks_summary): Ditto.
+        (WinPort._path_to_webcore_library): Ditto.
+
+2016-10-07  Anders Carlsson  <andersca@apple.com>
+
+        Get rid of WKPageSetSession
+        https://bugs.webkit.org/show_bug.cgi?id=163129
+
+        Reviewed by Tim Horton.
+
+        Rewrite this test to use WKPageConfigurationRef and WKWebsiteDataStoreRef.
+
+        * TestWebKitAPI/Tests/WebKit2/EphemeralSessionPushStateNoHistoryCallback.cpp:
+        (TestWebKitAPI::TEST):
+
+2016-10-07  Andreas Kling  <akling@apple.com>
+
+        [WK2] didRemoveFrameFromHierarchy callback doesn't fire for subframes when evicting from PageCache.
+        <https://webkit.org/b/163098>
+        <rdar://problem/28663488>
+
+        Reviewed by Antti Koivisto.
+
+        Add an API test that puts a 10-subframe page into the page cache, then loads other pages
+        until the first page gets kicked out. The test succeeds if we receive didRemoveFrameFromHierarchy
+        callbacks for all the subframes.
+
+        * TestWebKitAPI/TestWebKitAPI.xcodeproj/project.pbxproj:
+        * TestWebKitAPI/Tests/WebKit2/DidRemoveFrameFromHiearchyInPageCache.cpp: Added.
+        (TestWebKitAPI::didFinishLoadForFrame):
+        (TestWebKitAPI::setPageLoaderClient):
+        (TestWebKitAPI::didReceivePageMessageFromInjectedBundle):
+        (TestWebKitAPI::setInjectedBundleClient):
+        (TestWebKitAPI::TEST):
+        * TestWebKitAPI/Tests/WebKit2/DidRemoveFrameFromHiearchyInPageCache_Bundle.cpp: Added.
+        (TestWebKitAPI::didRemoveFrameFromHierarchyCallback):
+        (TestWebKitAPI::DidRemoveFrameFromHiearchyInPageCacheTest::DidRemoveFrameFromHiearchyInPageCacheTest):
+        (TestWebKitAPI::DidRemoveFrameFromHiearchyInPageCacheTest::didCreatePage):
+        * TestWebKitAPI/Tests/WebKit2/many-iframes.html: Added.
+
+2016-10-07  Emanuele Aina  <emanuele.aina@collabora.com>
+
+        Replace bug URL placeholders independently of the short desc one
+        https://bugs.webkit.org/show_bug.cgi?id=161684
+
+        Reviewed by Darin Adler.
+
+        Instead of adding the bug URL when replacing the short description
+        placeholder and then ignoring the bug URL placeholder, use the former
+        to set the short description and the latter for the bug URL.
+        This means that developers can fully prepare the changelog with short
+        and long description before submission leaving the bug placeholder in
+        place, and the changelog machinery will make sure to replace the
+        latter with the URL of the newly created bug while submitting.
+
+        Note that this also means that the short description placeholder alone
+        no longer causes the bug URL to be added.
+
+        * Scripts/webkitpy/common/checkout/changelog.py:
+        (ChangeLog.set_short_description_and_bug_url):
+        * Scripts/webkitpy/common/checkout/changelog_unittest.py:
+        (test_set_short_description_and_bug_url):
+
+2016-10-07  Jonathan Bedard  <jbedard@apple.com>
+
+        Style Checking Error when Objective C Blocks passed as Argument
+        https://bugs.webkit.org/show_bug.cgi?id=162463
+
+        Reviewed by Darin Adler.
+
+        * Scripts/webkitpy/style/checkers/cpp.py:
+        (regex_for_lambdas_and_blocks): Consider case where block is passed as a function argument.
+        * Scripts/webkitpy/style/checkers/cpp_unittest.py:
+        (CppStyleTest.test_objective_c_block_as_argument): Test case where block is passed as a function argument. 
+
+2016-10-07  Philippe Normand  <pnormand@igalia.com>
+
+        [GTK] Docs build failure
+        https://bugs.webkit.org/show_bug.cgi?id=163102
+
+        Reviewed by Carlos Garcia Campos.
+
+        * gtk/jhbuild.modules: Bump to gtk-doc 1.25 to fix build errors on Debian Testing.
+
+2016-10-06  Joseph Pecoraro  <pecoraro@apple.com>
+
+        check-webkit-style: Enable the legal/copyright rule for cpp/h files
+        https://bugs.webkit.org/show_bug.cgi?id=162707
+
+        Reviewed by Darin Adler.
+
+        * Scripts/webkitpy/style/checker.py:
+        Enable this rule by default.
+
+2016-10-06  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Header guard style should be updated to be "#pragma once"
+        https://bugs.webkit.org/show_bug.cgi?id=159785
+
+        Reviewed by Darin Adler.
+
+        * Scripts/webkitpy/style/checkers/cpp.py:
+        (check_for_header_guard):
+        (_process_lines):
+        Simplify header_guard check to warn for a missing #pragma once
+        in header files. For legacy files that contain an #ifndef only
+        warn if the #ifndef line itself is changing.
+
+        * Scripts/webkitpy/style/checkers/cpp_unittest.py:
+        (CppStyleTestBase.perform_header_guard_check):
+        (CppStyleTestBase.assert_header_guard):
+        Helpers for enabling just this warning.
+
+        (CppStyleTest.test_build_header_guard):
+        Test different header guard cases.
+
+        * Scripts/webkitpy/style/error_handlers.py:
+        (DefaultStyleErrorHandler.should_line_be_checked):
+        Always allow warnings that output for "line 0" which won't be in
+        the list of modified lines that are 1-based.
+
+2016-10-06  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r206713.
+        https://bugs.webkit.org/show_bug.cgi?id=163097
+
+        triggers apparent codegen bug on ARM 32-bit (Requested by smfr
+        on #webkit).
+
+        Reverted changeset:
+
+        "Support transitions/animations of background-position with
+        right/bottom-relative values"
+        https://bugs.webkit.org/show_bug.cgi?id=162048
+        http://trac.webkit.org/changeset/206713
+
+2016-10-06  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser: Non-ASCII characters in Non-UTF-8 encoded queries of relative URLs with ws, wss, or nonspecial schemes should be UTF-8 encoded
+        https://bugs.webkit.org/show_bug.cgi?id=163089
+
+        Reviewed by Tim Horton.
+
+        * TestWebKitAPI/Tests/WebCore/URLParser.cpp:
+        (TestWebKitAPI::checkURL):
+        (TestWebKitAPI::TEST_F):
+
+2016-10-06  Alex Christensen  <achristensen@webkit.org>
+
+        Skip tabs and newlines between end of query and beginning of fragment in non-UTF-8-encoded URLs
+        https://bugs.webkit.org/show_bug.cgi?id=163071
+
+        Reviewed by Tim Horton.
+
+        * TestWebKitAPI/Tests/WebCore/URLParser.cpp:
+        (TestWebKitAPI::TEST_F):
+
+2016-10-06  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser should parse file URLs with ports consistently
+        https://bugs.webkit.org/show_bug.cgi?id=163075
+
+        Reviewed by Brady Eidson.
+
+        * TestWebKitAPI/Tests/WebCore/URLParser.cpp:
+        (TestWebKitAPI::TEST_F):
+
+2016-10-06  John Wilander  <wilander@apple.com>
+
+        Update Resource Load Statistics
+        https://bugs.webkit.org/show_bug.cgi?id=162811
+
+        Reviewed by Alex Christensen.
+
+        * TestWebKitAPI/Tests/mac/PublicSuffix.mm:
+            Change from USE(PUBLIC_SUFFIX_LIST) to ENABLE(PUBLIC_SUFFIX_LIST)
+
+2016-10-05  Philippe Normand  <pnormand@igalia.com>
+
+        [GStreamer][OWR] GL rendering support
+        https://bugs.webkit.org/show_bug.cgi?id=162972
+
+        Reviewed by Žan Doberšek.
+
+        When GStreamer-GL is enabled the GL context needs to be properly passed
+        to the GStreamer pipeline running within the OpenWebRTC video renderer.
+        This is now supported using a new OpenWebRTC API that allows the
+        renderer to request the context from the application using a callback
+        registered within the renderer.
+
+        * gtk/jhbuild.modules: Bump to latest OpenWebRTC for the new
+        owr_video_renderer_set_request_context_callback API added
+        recently.
+
+2016-10-05  Youenn Fablet  <youenn@apple.com>
+
+        Reuse CodeGenerator::UpdateFile in Tools CodeGenerator
+        https://bugs.webkit.org/show_bug.cgi?id=162960
+
+        Reviewed by Alex Christensen.
+
+        * DumpRenderTree/Bindings/CodeGeneratorDumpRenderTree.pm:
+        (WriteData): Using CodeGenerator::UpdateFile to do lazy generated file update when it is made feasible.
+        * WebKitTestRunner/InjectedBundle/Bindings/CodeGeneratorTestRunner.pm:
+        (WriteData): Ditto.
+
+2016-10-05  Alex Christensen  <achristensen@webkit.org>
+
+        URLParser should parse IPv4 addresses as the last two pieces of an IPv6 address
+        https://bugs.webkit.org/show_bug.cgi?id=162991
+
+        Reviewed by Saam Barati.
+
+        * TestWebKitAPI/Tests/WebCore/URLParser.cpp:
+        (TestWebKitAPI::TEST_F):
+
+2016-10-05  Tim Horton  <timothy_horton@apple.com>
+
+        Avoid automatically re-taking snapshots for back-forward items that were never loaded into the view
+        https://bugs.webkit.org/show_bug.cgi?id=162955
+        <rdar://problem/27659173>
+
+        Reviewed by Simon Fraser.
+
+        * TestWebKitAPI/Tests/WebKit2Cocoa/SnapshotStore.mm:
+        (-[SnapshotTestWKWebView init]):
+        (forceRepaintCallback):
+        (-[SnapshotTestWKWebView synchronouslyForceRepaint]):
+        (-[SnapshotTestWKWebView synchronouslyLoadTestPageAndForceRepaint:]):
+        (TEST):
+        (makeRedSquareView):
+        Add a test that restoring session state into a web view without navigating,
+        then explicitly snapshotting and navigating away, leaves the original snapshot alone.
+
+        Adjust the existing test, as well, to ensure that it will reliably fail
+        if the feature is broken. Use an explicitly added and removed red square
+        instead of scrolling, because we can't scroll in the restore-without-navigating case.
+
+        Stop trying to override the window scale, because it's not working (we're getting partial snapshots)
+        and isn't necessary; instead just multiply the expected value by the page scale.
+
+        (-[SnapshotTestWKWebView loadPageNamed:]): Deleted.
+        * TestWebKitAPI/mac/TestWKWebViewMac.h:
+        * TestWebKitAPI/mac/TestWKWebViewMac.mm:
+        (-[TestWKWebView synchronouslyLoadTestPageNamed:]):
+        Reorganize to reduce duplication.
+
+2016-10-05  Tim Horton  <timothy_horton@apple.com>
+
+        Make it possible to test ViewSnapshotStore behaviors
+        https://bugs.webkit.org/show_bug.cgi?id=162983
+
+        Reviewed by Simon Fraser.
+
+        * TestWebKitAPI/TestWebKitAPI.xcodeproj/project.pbxproj:
+        * TestWebKitAPI/Tests/WebKit2Cocoa/SnapshotStore.mm: Added.
+        (-[SnapshotTestWKWebView init]):
+        (-[SnapshotTestWKWebView loadPageNamed:]):
+        (imagesAreEqual):
+        Add tests for existing basic snapshotting behavior:
+
+        - a back-forward item shouldn't have a snapshot
+          until it is navigated away from
+
+        - causing a back-forward item to fall out of the
+          back-forward list should remove the snapshot
+
+        - calling the explicit snapshotting SPI, then navigating away from the page,
+          should result in the snapshot being retaken
+
+2016-10-05  Chris Dumez  <cdumez@apple.com>
+
+        KeyboardEvent.getModifierState() should support "CapsLock" modifier
+        https://bugs.webkit.org/show_bug.cgi?id=162861
+
+        Reviewed by Darin Adler.
+
+        Add support for 'capsLockKey' modifier for EventSender.keyDown() so
+        that we can test this new modifier support for layout tests.
+
+        * TestWebKitAPI/mac/PlatformWebViewMac.mm:
+        (TestWebKitAPI::modifierFlagsForWKModifiers):
+        * WebKitTestRunner/InjectedBundle/EventSendingController.cpp:
+        (WTR::parseModifier):
+        * WebKitTestRunner/mac/EventSenderProxy.mm:
+        (WTR::buildModifierFlags):
+
+2016-10-05  Jeremy Jones  <jeremyj@apple.com>
+
+        Add MobileMiniBrowser tests for control center and looping fullscreen.
+        https://bugs.webkit.org/show_bug.cgi?id=162748
+
+        Reviewed by Jer Noble.
+
+        Refactor existing MobileMiniBrowserTests and add new tests for 
+        - fullscreen rotation
+        - fullscreen looping (failing)
+        - control center interruption (failing)
+
+        * MobileMiniBrowser/MobileMiniBrowser.xcodeproj/project.pbxproj:
+        * MobileMiniBrowser/MobileMiniBrowserFramework/Resources/looping2s.html: Added.
+        * MobileMiniBrowser/MobileMiniBrowserFramework/test2s.mp4: Added.
+        * MobileMiniBrowser/MobileMiniBrowserUITests/MobileMiniBrowserUITests.m:
+        (-[MobileMiniBrowserUITests setUp]):
+        (-[MobileMiniBrowserUITests waitToTapButtonNamed:forApp:]):
+        (-[MobileMiniBrowserUITests loadURL:]):
+        (-[MobileMiniBrowserUITests requireMinFPS:sampleDurationSeconds:message:]):
+        (-[MobileMiniBrowserUITests ensureFullscreenControls]):
+        (-[MobileMiniBrowserUITests timeForTimeString:]):
+        (-[MobileMiniBrowserUITests testBasicVideoPlayback]):
+        (-[MobileMiniBrowserUITests testBasicVideoFullscreen]):
+        (-[MobileMiniBrowserUITests testVideoFullscreenAndRotationAnimation]):
+        (-[MobileMiniBrowserUITests testVideoFullscreenControlCenter]):
+        (-[MobileMiniBrowserUITests testLoopingFullscreenLockup]):
+
 2016-10-05  Alex Christensen  <achristensen@webkit.org>
 
         URLParser should correctly strip unnecessary 0's in IPv6 addresses

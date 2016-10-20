@@ -59,7 +59,7 @@ JSValue JSIDBDatabase::createObjectStore(ExecState& state)
 
     JSValue optionsValue = state.argument(1);
     if (!optionsValue.isUndefinedOrNull() && !optionsValue.isObject())
-        return throwTypeError(&state, scope, "Not an object.");
+        return throwTypeError(&state, scope, ASCIILiteral("Not an object."));
 
     IDBKeyPath keyPath;
     bool autoIncrement = false;
@@ -76,10 +76,7 @@ JSValue JSIDBDatabase::createObjectStore(ExecState& state)
         RETURN_IF_EXCEPTION(scope, JSValue());
     }
 
-    ExceptionCodeWithMessage ec;
-    JSValue result = toJS(&state, globalObject(), wrapped().createObjectStore(name, keyPath, autoIncrement, ec));
-    setDOMException(&state, ec);
-    return result;
+    return toJS(state, *globalObject(), scope, wrapped().createObjectStore(name, keyPath, autoIncrement));
 }
 
 }

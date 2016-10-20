@@ -102,29 +102,28 @@ void CachedImage::setBodyDataFrom(const CachedResource& resource)
         m_svgImageCache = std::make_unique<SVGImageCache>(&downcast<SVGImage>(*m_image));
 }
 
-void CachedImage::didAddClient(CachedResourceClient* client)
+void CachedImage::didAddClient(CachedResourceClient& client)
 {
     if (m_data && !m_image && !errorOccurred()) {
         createImage();
         m_image->setData(m_data.copyRef(), true);
     }
 
-    ASSERT(client->resourceClientType() == CachedImageClient::expectedType());
+    ASSERT(client.resourceClientType() == CachedImageClient::expectedType());
     if (m_image && !m_image->isNull())
-        static_cast<CachedImageClient*>(client)->imageChanged(this);
+        static_cast<CachedImageClient&>(client).imageChanged(this);
 
     CachedResource::didAddClient(client);
 }
 
-void CachedImage::didRemoveClient(CachedResourceClient* client)
+void CachedImage::didRemoveClient(CachedResourceClient& client)
 {
-    ASSERT(client);
-    ASSERT(client->resourceClientType() == CachedImageClient::expectedType());
+    ASSERT(client.resourceClientType() == CachedImageClient::expectedType());
 
-    m_pendingContainerSizeRequests.remove(static_cast<CachedImageClient*>(client));
+    m_pendingContainerSizeRequests.remove(&static_cast<CachedImageClient&>(client));
 
     if (m_svgImageCache)
-        m_svgImageCache->removeClientFromCache(static_cast<CachedImageClient*>(client));
+        m_svgImageCache->removeClientFromCache(&static_cast<CachedImageClient&>(client));
 
     CachedResource::didRemoveClient(client);
 }
@@ -493,13 +492,12 @@ bool CachedImage::currentFrameKnownToBeOpaque(const RenderElement* renderer)
     return image->currentFrameKnownToBeOpaque();
 }
 
-bool CachedImage::isOriginClean(SecurityOrigin* securityOrigin)
+bool CachedImage::isOriginClean(SecurityOrigin* origin)
 {
-    if (!image()->hasSingleSecurityOrigin())
-        return false;
-    if (passesAccessControlCheck(*securityOrigin))
-        return true;
-    return !securityOrigin->taintsCanvas(responseForSameOriginPolicyChecks().url());
+    ASSERT_UNUSED(origin, origin);
+    ASSERT(this->origin());
+    ASSERT(origin->toString() == this->origin()->toString());
+    return !loadFailedOrCanceled() && isCORSSameOrigin();
 }
 
 CachedResource::RevalidationDecision CachedImage::makeRevalidationDecision(CachePolicy cachePolicy) const

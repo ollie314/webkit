@@ -25,7 +25,7 @@
 
 const LayoutTraits = {
     Unknown     : 0,
-    Mac         : 1 << 0,
+    macOS       : 1 << 0,
     iOS         : 1 << 1,
     Fullscreen  : 1 << 2
 };

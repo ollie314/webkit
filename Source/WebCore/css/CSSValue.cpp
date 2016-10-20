@@ -52,6 +52,7 @@
 #include "CSSInitialValue.h"
 #include "CSSLineBoxContainValue.h"
 #include "CSSNamedImageValue.h"
+#include "CSSPendingSubstitutionValue.h"
 #include "CSSPrimitiveValue.h"
 #include "CSSProperty.h"
 #include "CSSReflectValue.h"
@@ -177,8 +178,10 @@ bool CSSValue::equals(const CSSValue& other) const
             return compareCSSValues<CSSFontFaceSrcValue>(*this, other);
         case FontFeatureClass:
             return compareCSSValues<CSSFontFeatureValue>(*this, other);
+#if ENABLE(VARIATION_FONTS)
         case FontVariationClass:
             return compareCSSValues<CSSFontVariationValue>(*this, other);
+#endif
         case FunctionClass:
             return compareCSSValues<CSSFunctionValue>(*this, other);
         case LinearGradientClass:
@@ -285,8 +288,10 @@ String CSSValue::cssText() const
         return downcast<CSSFontFaceSrcValue>(*this).customCSSText();
     case FontFeatureClass:
         return downcast<CSSFontFeatureValue>(*this).customCSSText();
+#if ENABLE(VARIATION_FONTS)
     case FontVariationClass:
         return downcast<CSSFontVariationValue>(*this).customCSSText();
+#endif
     case FunctionClass:
         return downcast<CSSFunctionValue>(*this).customCSSText();
     case LinearGradientClass:
@@ -361,6 +366,8 @@ String CSSValue::cssText() const
         return downcast<CSSCustomIdentValue>(*this).customCSSText();
     case VariableReferenceClass:
         return downcast<CSSVariableReferenceValue>(*this).customCSSText();
+    case PendingSubstitutionValueClass:
+        return downcast<CSSPendingSubstitutionValue>(*this).customCSSText();
     }
 
     ASSERT_NOT_REACHED();
@@ -401,9 +408,11 @@ void CSSValue::destroy()
     case FontFeatureClass:
         delete downcast<CSSFontFeatureValue>(this);
         return;
+#if ENABLE(VARIATION_FONTS)
     case FontVariationClass:
         delete downcast<CSSFontVariationValue>(this);
         return;
+#endif
     case FunctionClass:
         delete downcast<CSSFunctionValue>(this);
         return;
@@ -515,6 +524,9 @@ void CSSValue::destroy()
         return;
     case VariableReferenceClass:
         delete downcast<CSSVariableReferenceValue>(this);
+        return;
+    case PendingSubstitutionValueClass:
+        delete downcast<CSSPendingSubstitutionValue>(this);
         return;
     }
     ASSERT_NOT_REACHED();

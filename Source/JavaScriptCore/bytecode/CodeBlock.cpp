@@ -36,6 +36,7 @@
 #include "BytecodeLivenessAnalysis.h"
 #include "BytecodeUseDef.h"
 #include "CallLinkStatus.h"
+#include "CodeBlockSet.h"
 #include "DFGCapabilities.h"
 #include "DFGCommon.h"
 #include "DFGDriver.h"
@@ -1674,9 +1675,10 @@ void CodeBlock::dumpBytecode(
         }
         case op_throw_static_error: {
             int k0 = (++it)->u.operand;
-            int k1 = (++it)->u.operand;
+            ErrorType k1 = static_cast<ErrorType>((++it)->u.unsignedValue);
             printLocationAndOp(out, exec, location, it, "throw_static_error");
-            out.printf("%s, %s", constantName(k0).data(), k1 ? "true" : "false");
+            out.printf("%s, ", constantName(k0).data());
+            out.print(k1);
             break;
         }
         case op_debug: {

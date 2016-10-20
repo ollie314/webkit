@@ -39,6 +39,7 @@
 #include "NetworkProcessPlatformStrategies.h"
 #include "NetworkProcessProxyMessages.h"
 #include "NetworkResourceLoader.h"
+#include "NetworkSession.h"
 #include "RemoteNetworkingContext.h"
 #include "SessionTracker.h"
 #include "StatisticsData.h"
@@ -100,7 +101,7 @@ NetworkProcess::NetworkProcess()
     addSupplement<AuthenticationManager>();
     addSupplement<WebCookieManager>();
     addSupplement<CustomProtocolManager>();
-#if USE(NETWORK_SESSION)
+#if USE(NETWORK_SESSION) && PLATFORM(COCOA)
     NetworkSession::setCustomProtocolManager(supplement<CustomProtocolManager>());
 #endif
 }
@@ -230,20 +231,16 @@ void NetworkProcess::initializeNetworkProcess(NetworkProcessCreationParameters&&
     if (parameters.shouldUseTestingNetworkSession)
         NetworkStorageSession::switchToNewTestingSession();
 
-    NetworkProcessSupplementMap::const_iterator it = m_supplements.begin();
-    NetworkProcessSupplementMap::const_iterator end = m_supplements.end();
-    for (; it != end; ++it)
-        it->value->initialize(parameters);
+    for (auto& supplement : m_supplements.values())
+        supplement->initialize(parameters);
 }
 
 void NetworkProcess::initializeConnection(IPC::Connection* connection)
 {
     ChildProcess::initializeConnection(connection);
 
-    NetworkProcessSupplementMap::const_iterator it = m_supplements.begin();
-    NetworkProcessSupplementMap::const_iterator end = m_supplements.end();
-    for (; it != end; ++it)
-        it->value->initializeConnection(connection);
+    for (auto& supplement : m_supplements.values())
+        supplement->initializeConnection(connection);
 }
 
 void NetworkProcess::createNetworkConnectionToWebProcess()
@@ -510,10 +507,9 @@ void NetworkProcess::pendingDownloadCanceled(DownloadID downloadID)
     downloadProxyConnection()->send(Messages::DownloadProxy::DidCancel({ }), downloadID.downloadID());
 }
 
-void NetworkProcess::findPendingDownloadLocation(NetworkDataTask& networkDataTask, ResponseCompletionHandler&& completionHandler, const ResourceRequest& updatedRequest, const ResourceResponse& response)
+void NetworkProcess::findPendingDownloadLocation(NetworkDataTask& networkDataTask, ResponseCompletionHandler&& completionHandler, const ResourceResponse& response)
 {
     uint64_t destinationID = networkDataTask.pendingDownloadID().downloadID();
-    downloadProxyConnection()->send(Messages::DownloadProxy::DidStart(updatedRequest, String()), destinationID);
     downloadProxyConnection()->send(Messages::DownloadProxy::DidReceiveResponse(response), destinationID);
 
     downloadManager().willDecidePendingDownloadDestination(networkDataTask, WTFMove(completionHandler));

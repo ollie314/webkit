@@ -26,7 +26,6 @@
 #pragma once
 
 #include "APIObject.h"
-#include "APISession.h"
 #include "AssistedNodeInformation.h"
 #include "AutoCorrectionCallback.h"
 #include "Connection.h"
@@ -157,6 +156,7 @@ enum class HasInsecureContent;
 struct DictionaryPopupInfo;
 struct ExceptionDetails;
 struct FileChooserSettings;
+struct MediaConstraintsData;
 struct SecurityOriginData;
 struct TextAlternativeWithRange;
 struct TextCheckingResult;
@@ -283,7 +283,6 @@ public:
 
     uint64_t pageID() const { return m_pageID; }
     WebCore::SessionID sessionID() const { return m_sessionID; }
-    void setSessionID(WebCore::SessionID);
 
     WebFrameProxy* mainFrame() const { return m_mainFrame.get(); }
     WebFrameProxy* focusedFrame() const { return m_focusedFrame.get(); }
@@ -1003,7 +1002,7 @@ public:
 
     bool shouldRecordNavigationSnapshots() const { return m_shouldRecordNavigationSnapshots; }
     void setShouldRecordNavigationSnapshots(bool shouldRecordSnapshots) { m_shouldRecordNavigationSnapshots = shouldRecordSnapshots; }
-    void recordNavigationSnapshot();
+    void recordAutomaticNavigationSnapshot();
     void recordNavigationSnapshot(WebBackForwardListItem&);
 
 #if PLATFORM(COCOA)
@@ -1131,14 +1130,15 @@ public:
 #if ENABLE(GAMEPAD)
     void gamepadActivity(const Vector<GamepadData>&);
 #endif
+        
+    WeakPtr<WebPageProxy> createWeakPtr() const { return m_weakPtrFactory.createWeakPtr(); }
 
 private:
     WebPageProxy(PageClient&, WebProcessProxy&, uint64_t pageID, Ref<API::PageConfiguration>&&);
     void platformInitialize();
 
     void updateViewState(WebCore::ViewState::Flags flagsToUpdate = WebCore::ViewState::AllFlags);
-    void updateActivityToken();
-    void updateProccessSuppressionState();
+    void updateThrottleState();
     void updateHiddenPageThrottlingAutoIncreases();
 
     enum class ResetStateReason {
@@ -1250,8 +1250,8 @@ private:
     void reachedApplicationCacheOriginQuota(const String& originIdentifier, uint64_t currentQuota, uint64_t totalBytesNeeded, PassRefPtr<Messages::WebPageProxy::ReachedApplicationCacheOriginQuota::DelayedReply>);
     void requestGeolocationPermissionForFrame(uint64_t geolocationID, uint64_t frameID, String originIdentifier);
 
-    void requestUserMediaPermissionForFrame(uint64_t userMediaID, uint64_t frameID, String userMediaDocumentOriginIdentifier, String topLevelDocumentOriginIdentifier, const Vector<String>& audioDeviceUIDs, const Vector<String>& videoDeviceUIDs);
-    void checkUserMediaPermissionForFrame(uint64_t userMediaID, uint64_t frameID, String userMediaDocumentOriginIdentifier, String topLevelDocumentOriginIdentifier);
+    void requestUserMediaPermissionForFrame(uint64_t userMediaID, uint64_t frameID, String userMediaDocumentOriginIdentifier, String topLevelDocumentOriginIdentifier, const WebCore::MediaConstraintsData& audioConstraints, const WebCore::MediaConstraintsData& videoConstraints);
+    void enumerateMediaDevicesForFrame(uint64_t userMediaID, uint64_t frameID, String userMediaDocumentOriginIdentifier, String topLevelDocumentOriginIdentifier);
 
     void runModal();
     void notifyScrollerThumbIsVisibleInRect(const WebCore::IntRect&);
@@ -1520,6 +1520,7 @@ private:
     void dispatchViewStateChange();
     void viewDidLeaveWindow();
     void viewDidEnterWindow();
+    void setPageActivityState(WebCore::PageActivityState::Flags);
 
 #if PLATFORM(MAC)
     void didPerformImmediateActionHitTest(const WebHitTestResultData&, bool contentPreventsDefault, const UserData&);
@@ -1653,6 +1654,8 @@ private:
         
     bool m_maintainsInactiveSelection;
 
+    bool m_waitsForPaintAfterViewDidMoveToWindow;
+
     String m_toolTip;
 
     EditorState m_editorState;
@@ -1711,6 +1714,8 @@ private:
     WebCore::PolicyAction m_syncNavigationActionPolicyAction;
     DownloadID m_syncNavigationActionPolicyDownloadID;
     bool m_shouldSuppressAppLinksInNextNavigationPolicyDecision { false };
+    WebCore::PageActivityState::Flags m_activityState { WebCore::PageActivityState::NoFlags };
+    bool m_pageSuppressed { false };
 
     Deque<NativeWebKeyboardEvent> m_keyEventQueue;
     Deque<NativeWebWheelEvent> m_wheelEventQueue;
@@ -1757,7 +1762,7 @@ private:
 #endif
 
     const uint64_t m_pageID;
-    WebCore::SessionID m_sessionID;
+    const WebCore::SessionID m_sessionID;
 
     bool m_isPageSuspended;
     bool m_addsVisitedLinks;
@@ -1843,7 +1848,7 @@ private:
     bool m_waitingForDidUpdateViewState;
 
     bool m_shouldScaleViewToFitDocument { false };
-    bool m_suppressNavigationSnapshotting { false };
+    bool m_suppressAutomaticNavigationSnapshotting { false };
 
 #if PLATFORM(COCOA)
     HashMap<String, String> m_temporaryPDFFiles;
@@ -1891,6 +1896,8 @@ private:
 #if ENABLE(DOWNLOAD_ATTRIBUTE)
     bool m_syncNavigationActionHasDownloadAttribute { false };
 #endif
+        
+    WeakPtrFactory<WebPageProxy> m_weakPtrFactory;
 };
 
 } // namespace WebKit

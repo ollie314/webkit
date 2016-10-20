@@ -140,9 +140,13 @@ inline CapabilityLevel canCompile(Node* node)
     case StoreBarrier:
     case FencedStoreBarrier:
     case Call:
+    case DirectCall:
     case TailCall:
+    case DirectTailCall:
     case TailCallInlinedCaller:
+    case DirectTailCallInlinedCaller:
     case Construct:
+    case DirectConstruct:
     case CallVarargs:
     case CallEval:
     case TailCallVarargs:
@@ -179,7 +183,7 @@ inline CapabilityLevel canCompile(Node* node)
     case MultiPutByOffset:
     case ToPrimitive:
     case Throw:
-    case ThrowReferenceError:
+    case ThrowStaticError:
     case Unreachable:
     case In:
     case HasOwnProperty:
@@ -266,6 +270,8 @@ inline CapabilityLevel canCompile(Node* node)
     case DefineDataProperty:
     case DefineAccessorProperty:
     case ToLowerCase:
+    case CheckDOM:
+    case CallDOM:
         // These are OK.
         break;
 

@@ -21,6 +21,7 @@
 #pragma once
 
 #include "CSSParserMode.h"
+#include "ExceptionOr.h"
 #include "StyleSheet.h"
 #include <memory>
 #include <wtf/HashMap.h>
@@ -39,18 +40,21 @@ class CSSRuleList;
 class CSSStyleSheet;
 class CachedCSSStyleSheet;
 class Document;
+class Element;
 class MediaQuerySet;
 class SecurityOrigin;
 class StyleRuleKeyframes;
 class StyleSheetContents;
 
-typedef int ExceptionCode;
+namespace Style {
+class Scope;
+}
 
 class CSSStyleSheet final : public StyleSheet {
 public:
     static Ref<CSSStyleSheet> create(Ref<StyleSheetContents>&&, CSSImportRule* ownerRule = 0);
     static Ref<CSSStyleSheet> create(Ref<StyleSheetContents>&&, Node& ownerNode, const Optional<bool>& isOriginClean = Nullopt);
-    static Ref<CSSStyleSheet> createInline(Node&, const URL&, const TextPosition& startPosition = TextPosition::minimumPosition(), const String& encoding = String());
+    static Ref<CSSStyleSheet> createInline(Ref<StyleSheetContents>&&, Element& owner, const TextPosition& startPosition);
 
     virtual ~CSSStyleSheet();
 
@@ -63,14 +67,13 @@ public:
     void setDisabled(bool) final;
     
     WEBCORE_EXPORT RefPtr<CSSRuleList> cssRules();
-    WEBCORE_EXPORT unsigned insertRule(const String& rule, unsigned index, ExceptionCode&);
-    unsigned deprecatedInsertRule(const String& rule, ExceptionCode&);
-    WEBCORE_EXPORT void deleteRule(unsigned index, ExceptionCode&);
+    WEBCORE_EXPORT ExceptionOr<unsigned> insertRule(const String& rule, unsigned index);
+    ExceptionOr<unsigned> deprecatedInsertRule(const String& rule);
+    WEBCORE_EXPORT ExceptionOr<void> deleteRule(unsigned index);
     
-    // IE Extensions
     WEBCORE_EXPORT RefPtr<CSSRuleList> rules();
-    WEBCORE_EXPORT int addRule(const String& selector, const String& style, Optional<unsigned> index, ExceptionCode&);
-    void removeRule(unsigned index, ExceptionCode& ec) { deleteRule(index, ec); }
+    WEBCORE_EXPORT ExceptionOr<int> addRule(const String& selector, const String& style, Optional<unsigned> index);
+    ExceptionOr<void> removeRule(unsigned index) { return deleteRule(index); }
     
     // For CSSRuleList.
     unsigned length() const;
@@ -82,7 +85,12 @@ public:
     bool isLoading() const final;
     
     void clearOwnerRule() { m_ownerRule = 0; }
+
     Document* ownerDocument() const;
+    CSSStyleSheet& rootStyleSheet();
+    const CSSStyleSheet& rootStyleSheet() const;
+    Style::Scope* styleScope();
+
     MediaQuerySet* mediaQueries() const { return m_mediaQueries.get(); }
     void setMediaQueries(Ref<MediaQuerySet>&&);
     void setTitle(const String& title) { m_title = title; }

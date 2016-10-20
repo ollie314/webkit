@@ -95,8 +95,8 @@ set(JavaScriptCore_SOURCES
     b3/air/AirLowerEntrySwitch.cpp
     b3/air/AirLowerMacros.cpp
     b3/air/AirOptimizeBlockOrder.cpp
+    b3/air/AirPadInterference.cpp
     b3/air/AirPhaseScope.cpp
-    b3/air/AirRegisterPriority.cpp
     b3/air/AirReportUsedRegisters.cpp
     b3/air/AirSimplifyCFG.cpp
     b3/air/AirSpecial.cpp
@@ -173,6 +173,8 @@ set(JavaScriptCore_SOURCES
     b3/B3ValueRep.cpp
     b3/B3Variable.cpp
     b3/B3VariableValue.cpp
+    b3/B3WasmAddressValue.cpp
+    b3/B3WasmBoundsCheckValue.cpp
 
     bindings/ScriptFunctionCall.cpp
     bindings/ScriptObject.cpp
@@ -203,6 +205,7 @@ set(JavaScriptCore_SOURCES
     bytecode/ComplexGetStatus.cpp
     bytecode/DataFormat.cpp
     bytecode/DFGExitProfile.cpp
+    bytecode/DOMJITAccessCasePatchpointParams.cpp
     bytecode/DeferredCompilationCallback.cpp
     bytecode/DeferredSourceDump.cpp
     bytecode/ExecutionCounter.cpp
@@ -286,6 +289,7 @@ set(JavaScriptCore_SOURCES
     dfg/DFGConstantHoistingPhase.cpp
     dfg/DFGCriticalEdgeBreakingPhase.cpp
     dfg/DFGDCEPhase.cpp
+    dfg/DFGDOMJITPatchpointParams.cpp
     dfg/DFGDesiredIdentifiers.cpp
     dfg/DFGDesiredTransitions.cpp
     dfg/DFGDesiredWatchpoints.cpp
@@ -415,6 +419,7 @@ set(JavaScriptCore_SOURCES
     ftl/FTLCapabilities.cpp
     ftl/FTLCommonValues.cpp
     ftl/FTLCompile.cpp
+    ftl/FTLDOMJITPatchpointParams.cpp
     ftl/FTLExceptionTarget.cpp
     ftl/FTLExitArgument.cpp
     ftl/FTLExitArgumentForOperand.cpp
@@ -858,8 +863,29 @@ set(JavaScriptCore_SOURCES
     wasm/JSWASMModule.cpp
     wasm/WASMB3IRGenerator.cpp
     wasm/WASMCallingConvention.cpp
+    wasm/WASMMemory.cpp
     wasm/WASMModuleParser.cpp
     wasm/WASMPlan.cpp
+    wasm/WebAssemblyObject.cpp
+
+    wasm/js/JSWebAssemblyCompileError.cpp
+    wasm/js/JSWebAssemblyInstance.cpp
+    wasm/js/JSWebAssemblyMemory.cpp
+    wasm/js/JSWebAssemblyModule.cpp
+    wasm/js/JSWebAssemblyRuntimeError.cpp
+    wasm/js/JSWebAssemblyTable.cpp
+    wasm/js/WebAssemblyCompileErrorConstructor.cpp
+    wasm/js/WebAssemblyCompileErrorPrototype.cpp
+    wasm/js/WebAssemblyInstanceConstructor.cpp
+    wasm/js/WebAssemblyInstancePrototype.cpp
+    wasm/js/WebAssemblyMemoryConstructor.cpp
+    wasm/js/WebAssemblyMemoryPrototype.cpp
+    wasm/js/WebAssemblyModuleConstructor.cpp
+    wasm/js/WebAssemblyModulePrototype.cpp
+    wasm/js/WebAssemblyRuntimeErrorConstructor.cpp
+    wasm/js/WebAssemblyRuntimeErrorPrototype.cpp
+    wasm/js/WebAssemblyTableConstructor.cpp
+    wasm/js/WebAssemblyTablePrototype.cpp
 
     yarr/RegularExpression.cpp
     yarr/YarrCanonicalizeUCS2.cpp
@@ -911,6 +937,19 @@ set(JavaScriptCore_OBJECT_LUT_SOURCES
     runtime/StringPrototype.cpp
     runtime/SymbolConstructor.cpp
     runtime/SymbolPrototype.cpp
+
+    wasm/js/WebAssemblyCompileErrorConstructor.cpp
+    wasm/js/WebAssemblyCompileErrorPrototype.cpp
+    wasm/js/WebAssemblyInstanceConstructor.cpp
+    wasm/js/WebAssemblyInstancePrototype.cpp
+    wasm/js/WebAssemblyMemoryConstructor.cpp
+    wasm/js/WebAssemblyMemoryPrototype.cpp
+    wasm/js/WebAssemblyModuleConstructor.cpp
+    wasm/js/WebAssemblyModulePrototype.cpp
+    wasm/js/WebAssemblyRuntimeErrorConstructor.cpp
+    wasm/js/WebAssemblyRuntimeErrorPrototype.cpp
+    wasm/js/WebAssemblyTableConstructor.cpp
+    wasm/js/WebAssemblyTablePrototype.cpp
 )
 
 set(JavaScriptCore_LIBRARIES

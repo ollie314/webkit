@@ -217,6 +217,7 @@ set(WebKit2_SOURCES
     NetworkProcess/Downloads/BlobDownloadClient.cpp
     NetworkProcess/Downloads/Download.cpp
     NetworkProcess/Downloads/DownloadManager.cpp
+    NetworkProcess/Downloads/PendingDownload.cpp
 
     Platform/Logging.cpp
     Platform/Module.cpp
@@ -414,7 +415,6 @@ set(WebKit2_SOURCES
     UIProcess/API/APIPageConfiguration.cpp
     UIProcess/API/APIProcessPoolConfiguration.cpp
     UIProcess/API/APIOpenPanelParameters.cpp
-    UIProcess/API/APISession.cpp
     UIProcess/API/APISessionState.cpp
     UIProcess/API/APIUserContentExtension.cpp
     UIProcess/API/APIUserContentExtensionStore.cpp

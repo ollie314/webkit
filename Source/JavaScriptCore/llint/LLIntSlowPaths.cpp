@@ -784,7 +784,7 @@ LLINT_SLOW_PATH_DECL(slow_path_del_by_id)
     bool couldDelete = baseObject->methodTable()->deleteProperty(baseObject, exec, codeBlock->identifier(pc[3].u.operand));
     LLINT_CHECK_EXCEPTION();
     if (!couldDelete && codeBlock->isStrictMode())
-        LLINT_THROW(createTypeError(exec, "Unable to delete property."));
+        LLINT_THROW(createTypeError(exec, UnableToDeletePropertyError));
     LLINT_RETURN(jsBoolean(couldDelete));
 }
 
@@ -915,7 +915,7 @@ LLINT_SLOW_PATH_DECL(slow_path_del_by_val)
     }
     
     if (!couldDelete && exec->codeBlock()->isStrictMode())
-        LLINT_THROW(createTypeError(exec, "Unable to delete property."));
+        LLINT_THROW(createTypeError(exec, UnableToDeletePropertyError));
     
     LLINT_RETURN(jsBoolean(couldDelete));
 }
@@ -1275,7 +1275,7 @@ inline SlowPathReturnType setUpCall(ExecState* execCallee, Instruction* pc, Code
             LLINT_CALL_THROW(exec, createNotAConstructorError(exec, callee));
 
         CodeBlock** codeBlockSlot = execCallee->addressOfCodeBlock();
-        JSObject* error = functionExecutable->prepareForExecution<FunctionExecutable>(execCallee, callee, scope, kind, *codeBlockSlot);
+        JSObject* error = functionExecutable->prepareForExecution<FunctionExecutable>(vm, callee, scope, kind, *codeBlockSlot);
         if (error)
             LLINT_CALL_THROW(exec, error);
         codeBlock = *codeBlockSlot;
@@ -1472,18 +1472,6 @@ LLINT_SLOW_PATH_DECL(slow_path_throw)
 {
     LLINT_BEGIN();
     LLINT_THROW(LLINT_OP_C(1).jsValue());
-}
-
-LLINT_SLOW_PATH_DECL(slow_path_throw_static_error)
-{
-    LLINT_BEGIN();
-    JSValue errorMessageValue = LLINT_OP_C(1).jsValue();
-    RELEASE_ASSERT(errorMessageValue.isString());
-    String errorMessage = asString(errorMessageValue)->value(exec);
-    if (pc[2].u.operand)
-        LLINT_THROW(createReferenceError(exec, errorMessage));
-    else
-        LLINT_THROW(createTypeError(exec, errorMessage));
 }
 
 LLINT_SLOW_PATH_DECL(slow_path_handle_watchdog_timer)

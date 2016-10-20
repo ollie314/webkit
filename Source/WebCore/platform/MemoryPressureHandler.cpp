@@ -33,12 +33,14 @@
 #include "FontCache.h"
 #include "GCController.h"
 #include "HTMLMediaElement.h"
+#include "InlineStyleSheetOwner.h"
 #include "InspectorInstrumentation.h"
 #include "Logging.h"
 #include "MemoryCache.h"
 #include "Page.h"
 #include "PageCache.h"
 #include "ScrollingThread.h"
+#include "StyleScope.h"
 #include "StyledElement.h"
 #include "WorkerThread.h"
 #include <JavaScriptCore/IncrementalSweeper.h>
@@ -102,6 +104,11 @@ void MemoryPressureHandler::releaseNoncriticalMemory()
         ReliefLogger log("Prune presentation attribute cache");
         StyledElement::clearPresentationAttributeCache();
     }
+
+    {
+        ReliefLogger log("Clear inline stylesheet cache");
+        InlineStyleSheetOwner::clearCache();
+    }
 }
 
 void MemoryPressureHandler::releaseCriticalMemory(Synchronous synchronous)
@@ -128,7 +135,7 @@ void MemoryPressureHandler::releaseCriticalMemory(Synchronous synchronous)
         Vector<RefPtr<Document>> documents;
         copyToVector(Document::allDocuments(), documents);
         for (auto& document : documents)
-            document->clearStyleResolver();
+            document->styleScope().clearResolver();
     }
 
     {

@@ -173,6 +173,9 @@ void SubresourceLoader::willSendRequestInternal(ResourceRequest& newRequest, con
         return;
     }
 
+    if (newRequest.requester() != ResourceRequestBase::Requester::Main)
+        ResourceLoadObserver::sharedObserver().logSubresourceLoading(m_frame.get(), newRequest, redirectResponse);
+
     ASSERT(!newRequest.isNull());
     if (!redirectResponse.isNull()) {
         if (options().redirect != FetchOptions::Redirect::Follow) {
@@ -200,7 +203,7 @@ void SubresourceLoader::willSendRequestInternal(ResourceRequest& newRequest, con
                 m_frame->page()->diagnosticLoggingClient().logDiagnosticMessageWithResult(DiagnosticLoggingKeys::cachedResourceRevalidationKey(), emptyString(), DiagnosticLoggingResultFail, ShouldSample::Yes);
         }
 
-        if (!m_documentLoader->cachedResourceLoader().canRequest(m_resource->type(), newRequest.url(), options(), false /* forPreload */, true /* didReceiveRedirectResponse */)) {
+        if (!m_documentLoader->cachedResourceLoader().canRequestAfterRedirection(m_resource->type(), newRequest.url(), options())) {
             cancel();
             return;
         }
@@ -226,10 +229,13 @@ void SubresourceLoader::willSendRequestInternal(ResourceRequest& newRequest, con
         return;
 
     ResourceLoader::willSendRequestInternal(newRequest, redirectResponse);
-    if (newRequest.isNull())
+    if (newRequest.isNull()) {
         cancel();
+        return;
+    }
 
-    ResourceLoadObserver::sharedObserver().logSubresourceLoading(m_frame.get(), newRequest, redirectResponse);
+    if (m_resource->type() == CachedResource::MainResource && !redirectResponse.isNull())
+        m_documentLoader->willContinueMainResourceLoadAfterRedirect(newRequest);
 }
 
 void SubresourceLoader::didSendData(unsigned long long bytesSent, unsigned long long totalBytesToBeSent)

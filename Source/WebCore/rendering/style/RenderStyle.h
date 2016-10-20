@@ -719,7 +719,9 @@ public:
     float specifiedFontSize() const;
     float computedFontSize() const;
     int fontSize() const;
+#if ENABLE(VARIATION_FONTS)
     FontVariationSettings fontVariationSettings() const { return fontDescription().variationSettings(); }
+#endif
     std::pair<FontOrientation, NonCJKGlyphOrientation> fontAndGlyphOrientation();
 
     const Length& textIndent() const { return rareInheritedData->indent; }
@@ -1368,7 +1370,9 @@ public:
     bool setFontDescription(const FontCascadeDescription&);
     // Only used for blending font sizes when animating, for MathML anonymous blocks, and for text autosizing.
     void setFontSize(float);
+#if ENABLE(VARIATION_FONTS)
     void setFontVariationSettings(FontVariationSettings);
+#endif
 
     void setColor(const Color&);
     void setTextIndent(Length length) { SET_VAR(rareInheritedData, indent, WTFMove(length)); }
@@ -1788,7 +1792,6 @@ public:
     SVGLength kerning() const { return svgStyle().kerning(); }
     void setKerning(SVGLength k) { accessSVGStyle().setKerning(k); }
 
-#if ENABLE(CSS_SHAPES)
     void setShapeOutside(PassRefPtr<ShapeValue> value)
     {
         if (rareNonInheritedData->m_shapeOutside == value)
@@ -1810,7 +1813,6 @@ public:
         SET_VAR(rareNonInheritedData, m_shapeImageThreshold, clampedShapeImageThreshold); 
     }
     static float initialShapeImageThreshold() { return 0; }
-#endif
 
     void setClipPath(PassRefPtr<ClipPathOperation> operation)
     {
@@ -2002,7 +2004,7 @@ public:
     static int initialOrder() { return 0; }
     static StyleSelfAlignmentData initialSelfAlignment() { return StyleSelfAlignmentData(ItemPositionAuto, OverflowAlignmentDefault); }
     static StyleSelfAlignmentData initialDefaultAlignment() { return StyleSelfAlignmentData(isCSSGridLayoutEnabled() ? ItemPositionNormal : ItemPositionStretch, OverflowAlignmentDefault); }
-    static StyleContentAlignmentData initialContentAlignment() { return StyleContentAlignmentData(isCSSGridLayoutEnabled() ? ContentPositionNormal : ContentPositionFlexStart, ContentDistributionDefault, OverflowAlignmentDefault); }
+    static StyleContentAlignmentData initialContentAlignment() { return StyleContentAlignmentData(ContentPositionNormal, ContentDistributionDefault, OverflowAlignmentDefault); }
     static EFlexDirection initialFlexDirection() { return FlowRow; }
     static EFlexWrap initialFlexWrap() { return FlexNoWrap; }
     static int initialMarqueeLoopCount() { return -1; }

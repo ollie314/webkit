@@ -32,8 +32,8 @@
 #include "AirInsertionSet.h"
 #include "AirInstInlines.h"
 #include "AirLiveness.h"
+#include "AirPadInterference.h"
 #include "AirPhaseScope.h"
-#include "AirRegisterPriority.h"
 #include "AirTmpInlines.h"
 #include "AirTmpWidth.h"
 #include "AirUseCounts.h"
@@ -57,8 +57,11 @@ public:
         , m_lastPrecoloredRegisterIndex(lastPrecoloredRegisterIndex)
         , m_unspillableTmps(unspillableTmp)
     {
+        for (Reg reg : m_regsInPriorityOrder)
+            m_mutableRegs.set(reg);
+        
         initializeDegrees(tmpArraySize);
-
+        
         m_adjacencyList.resize(tmpArraySize);
         m_moveList.resize(tmpArraySize);
         m_coalescedTmps.fill(0, tmpArraySize);
@@ -86,9 +89,6 @@ protected:
         IndexType firstNonRegIndex = m_lastPrecoloredRegisterIndex + 1;
         for (IndexType i = firstNonRegIndex; i < m_degrees.size(); ++i) {
             unsigned degree = m_degrees[i];
-            if (!degree)
-                continue;
-
             if (degree >= m_regsInPriorityOrder.size())
                 addToSpill(i);
             else if (!m_moveList[i].isEmpty())
@@ -161,7 +161,7 @@ protected:
             std::swap(u, v);
 
         if (traceDebug)
-            dataLog("Coalescing move at index", moveIndex, " u = ", u, " v = ", v, "\n");
+            dataLog("Coalescing move at index ", moveIndex, " u = ", u, " v = ", v, "\n");
 
         if (u == v) {
             addWorkList(u);
@@ -461,8 +461,15 @@ private:
 
     bool precoloredCoalescingHeuristic(IndexType u, IndexType v)
     {
+        if (traceDebug)
+            dataLog("    Checking precoloredCoalescingHeuristic\n");
         ASSERT(isPrecolored(u));
         ASSERT(!isPrecolored(v));
+        
+        // If u is a pinned register then it's always safe to coalesce. Note that when we call this,
+        // we have already proved that there is no interference between u and v.
+        if (!m_mutableRegs.get(m_coloredTmp[u]))
+            return true;
 
         // If any adjacent of the non-colored node is not an adjacent of the colored node AND has a degree >= K
         // there is a risk that this node needs to have the same color as our precolored node. If we coalesce such
@@ -549,6 +556,7 @@ protected:
     typedef SimpleClassHashTraits<InterferenceEdge> InterferenceEdgeHashTraits;
 
     const Vector<Reg>& m_regsInPriorityOrder;
+    RegisterSet m_mutableRegs;
     IndexType m_lastPrecoloredRegisterIndex { 0 };
 
     // The interference graph.
@@ -727,7 +735,7 @@ template<Arg::Type type>
 class ColoringAllocator : public AbstractColoringAllocator<unsigned> {
 public:
     ColoringAllocator(Code& code, TmpWidth& tmpWidth, const UseCounts<Tmp>& useCounts, const HashSet<unsigned>& unspillableTmp)
-        : AbstractColoringAllocator<unsigned>(regsInPriorityOrder(type), AbsoluteTmpMapper<type>::lastMachineRegisterIndex(), tmpArraySize(code), unspillableTmp)
+        : AbstractColoringAllocator<unsigned>(code.regsInPriorityOrder(type), AbsoluteTmpMapper<type>::lastMachineRegisterIndex(), tmpArraySize(code), unspillableTmp)
         , m_code(code)
         , m_tmpWidth(tmpWidth)
         , m_useCounts(useCounts)
@@ -837,9 +845,10 @@ public:
 
         Reg reg = m_coloredTmp[AbsoluteTmpMapper<type>::absoluteIndex(tmp)];
         if (!reg) {
-            // We only care about Tmps that interfere. A Tmp that never interfere with anything
-            // can take any register.
-            reg = regsInPriorityOrder(type).first();
+            dataLog("FATAL: No color for ", tmp, "\n");
+            dataLog("Code:\n");
+            dataLog(m_code);
+            RELEASE_ASSERT_NOT_REACHED();
         }
         return reg;
     }
@@ -921,6 +930,8 @@ private:
 
     void build(Inst* prevInst, Inst* nextInst, const typename TmpLiveness<type>::LocalCalc& localCalc)
     {
+        if (traceDebug)
+            dataLog("Building between ", pointerDump(prevInst), " and ", pointerDump(nextInst), ":\n");
         Inst::forEachDefWithExtraClobberedRegs<Tmp>(
             prevInst, nextInst,
             [&] (const Tmp& arg, Arg::Role, Arg::Type argType, Arg::Width) {
@@ -936,6 +947,8 @@ private:
                         if (argType != type)
                             return;
                         
+                        if (traceDebug)
+                            dataLog("    Adding def-def edge: ", arg, ", ", otherArg, "\n");
                         this->addEdge(arg, otherArg);
                     });
             });
@@ -972,8 +985,11 @@ private:
             }
 
             for (const Tmp& liveTmp : localCalc.live()) {
-                if (liveTmp != useTmp)
+                if (liveTmp != useTmp) {
+                    if (traceDebug)
+                        dataLog("    Adding def-live for coalescable: ", defTmp, ", ", liveTmp, "\n");
                     addEdge(defTmp, liveTmp);
+                }
             }
 
             // The next instruction could have early clobbers or early def's. We need to consider
@@ -1019,6 +1035,10 @@ private:
                 
                 for (const Tmp& liveTmp : liveTmps) {
                     ASSERT(liveTmp.isGP() == (type == Arg::GP));
+                    
+                    if (traceDebug)
+                        dataLog("    Adding def-live edge: ", arg, ", ", liveTmp, "\n");
+                    
                     addEdge(arg, liveTmp);
                 }
 
@@ -1249,6 +1269,8 @@ public:
 
     void run()
     {
+        padInterference(m_code);
+        
         iteratedRegisterCoalescingOnType<Arg::GP>();
         iteratedRegisterCoalescingOnType<Arg::FP>();
 
@@ -1562,7 +1584,7 @@ private:
 void iteratedRegisterCoalescing(Code& code)
 {
     PhaseScope phaseScope(code, "iteratedRegisterCoalescing");
-
+    
     IteratedRegisterCoalescing iteratedRegisterCoalescing(code);
     iteratedRegisterCoalescing.run();
 }

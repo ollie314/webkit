@@ -182,6 +182,7 @@ list(APPEND WebCore_SOURCES
     platform/graphics/surfaces/glx/X11Helper.cpp
 
     platform/graphics/x11/PlatformDisplayX11.cpp
+    platform/graphics/x11/XErrorTrapper.cpp
     platform/graphics/x11/XUniqueResource.cpp
 
     platform/image-decoders/cairo/ImageBackingStoreCairo.cpp
@@ -407,6 +408,7 @@ if (ENABLE_SUBTLE_CRYPTO)
         crypto/CryptoAlgorithmRegistry.cpp
         crypto/CryptoKey.cpp
         crypto/CryptoKeyPair.cpp
+        crypto/SubtleCrypto.cpp
         crypto/WebKitSubtleCrypto.cpp
 
         crypto/algorithms/CryptoAlgorithmAES_CBC.cpp

@@ -44,6 +44,8 @@ PendingDownload::PendingDownload(NetworkLoadParameters&& parameters, DownloadID 
     m_networkLoad->setPendingDownloadID(downloadID);
     m_networkLoad->setPendingDownload(*this);
     m_networkLoad->setSuggestedFilename(suggestedName);
+
+    send(Messages::DownloadProxy::DidStart(m_networkLoad->currentRequest(), suggestedName));
 }
 
 void PendingDownload::willSendRedirectedRequest(WebCore::ResourceRequest&&, WebCore::ResourceRequest&& redirectRequest, WebCore::ResourceResponse&& redirectResponse)
@@ -54,6 +56,13 @@ void PendingDownload::willSendRedirectedRequest(WebCore::ResourceRequest&&, WebC
 void PendingDownload::continueWillSendRequest(WebCore::ResourceRequest&& newRequest)
 {
     m_networkLoad->continueWillSendRequest(WTFMove(newRequest));
+}
+
+void PendingDownload::cancel()
+{
+    ASSERT(m_networkLoad);
+    m_networkLoad->cancel();
+    send(Messages::DownloadProxy::DidCancel({ }));
 }
 
 #if USE(PROTECTION_SPACE_AUTH_CALLBACK)

@@ -22,6 +22,9 @@
 #   along with this library; see the file COPYING.LIB.  If not, write to
 #   the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
 #   Boston, MA 02110-1301, USA.
+use FindBin;
+use lib "$FindBin::Bin/../bindings/scripts";
+
 use Getopt::Long;
 use preprocessor;
 use strict;
@@ -515,7 +518,7 @@ sub handleCurrentColorValue {
   my $primitiveValue = shift;
   my $indent = shift;
 
-  my $code = $indent . "if (" . $primitiveValue . ".getValueID() == CSSValueCurrentcolor) {\n";
+  my $code = $indent . "if (" . $primitiveValue . ".valueID() == CSSValueCurrentcolor) {\n";
   $code .= $indent . "    applyInherit" . $nameToId{$name} . "(styleResolver);\n";
   $code .= $indent . "    return;\n";
   $code .= $indent . "}\n";
@@ -791,7 +794,7 @@ sub generateValueSetter {
   my $style = "styleResolver.style()";
   my $didCallSetValue = 0;
   if (exists $propertiesWithStyleBuilderOptions{$name}{"AutoFunctions"}) {
-    $setterContent .= $indent . "    if (downcast<CSSPrimitiveValue>(value).getValueID() == CSSValueAuto) {\n";
+    $setterContent .= $indent . "    if (downcast<CSSPrimitiveValue>(value).valueID() == CSSValueAuto) {\n";
     $setterContent .= $indent . "        ". getAutoSetter($name, $style) . ";\n";
     $setterContent .= $indent . "        return;\n";
     $setterContent .= $indent . "    }\n";

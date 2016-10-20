@@ -106,7 +106,6 @@
 #include "JSTypedArrayViewConstructor.h"
 #include "JSTypedArrayViewPrototype.h"
 #include "JSTypedArrays.h"
-#include "JSWASMModule.h"
 #include "JSWeakMap.h"
 #include "JSWeakSet.h"
 #include "JSWithScope.h"
@@ -155,6 +154,7 @@
 #include "WeakMapPrototype.h"
 #include "WeakSetConstructor.h"
 #include "WeakSetPrototype.h"
+#include "WebAssemblyObject.h"
 #include <wtf/RandomNumber.h>
 
 #if ENABLE(INTL)
@@ -817,6 +817,19 @@ putDirectWithoutTransition(vm, vm.propertyNames-> jsName, lowerName ## Construct
 
         putDirectWithoutTransition(vm, Identifier::fromString(exec, "$vm"), dollarVM, DontEnum);
     }
+
+#if ENABLE(WEBASSEMBLY)
+    if (Options::useWebAssembly()) {
+        auto* wasm = WebAssemblyObject::create(vm, this, WebAssemblyObject::createStructure(vm, this, m_objectPrototype.get()));
+        putDirectWithoutTransition(vm, Identifier::fromString(exec, "WebAssembly"), wasm, DontEnum);
+        GlobalPropertyInfo extraStaticGlobals[] = {
+#define REGISTER_WASM_CONSTRUCTOR_AS_GLOBAL_PROPERTY(NAME, ...) \
+            GlobalPropertyInfo(vm.propertyNames->builtinNames().NAME ## PrivateName(), wasm->getDirect(vm, Identifier::fromString(exec, #NAME)), DontEnum | DontDelete | ReadOnly),
+            FOR_EACH_WASM_CONSTRUCTOR_PROPERTY(REGISTER_WASM_CONSTRUCTOR_AS_GLOBAL_PROPERTY)
+        };
+        addStaticGlobals(extraStaticGlobals, WTF_ARRAY_LENGTH(extraStaticGlobals));
+    }
+#endif // ENABLE(WEBASSEMBLY)
 
     resetPrototype(vm, getPrototypeDirect());
 }

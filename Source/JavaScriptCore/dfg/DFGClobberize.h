@@ -211,6 +211,17 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
         }
         return;
 
+    case ArithNegate:
+        if (node->child1().useKind() == Int32Use
+            || node->child1().useKind() == DoubleRepUse
+            || node->child1().useKind() == Int52RepUse)
+            def(PureValue(node));
+        else {
+            read(World);
+            write(Heap);
+        }
+        return;
+
     case IsCellWithType:
         def(PureValue(node, node->queriedType()));
         return;
@@ -262,6 +273,10 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
         read(JSObject_butterfly);
         ArrayMode mode = node->arrayMode();
         switch (mode.type()) {
+        case Array::ForceExit: {
+            write(SideState);
+            return;
+        }
         case Array::Int32: {
             if (mode.isInBounds()) {
                 read(Butterfly_publicLength);
@@ -330,7 +345,6 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
         return;
 
     case ArithAdd:
-    case ArithNegate:
     case ArithMod:
     case DoubleAsInt32:
     case UInt32ToNumber:
@@ -501,8 +515,11 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
     case ArrayPush:
     case ArrayPop:
     case Call:
+    case DirectCall:
     case TailCallInlinedCaller:
+    case DirectTailCallInlinedCaller:
     case Construct:
+    case DirectConstruct:
     case CallVarargs:
     case CallForwardVarargs:
     case TailCallVarargsInlinedCaller:
@@ -530,6 +547,7 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
         return;
 
     case TailCall:
+    case DirectTailCall:
     case TailCallVarargs:
     case TailCallForwardVarargs:
         read(World);
@@ -883,6 +901,15 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
     case GetButterfly:
         read(JSObject_butterfly);
         def(HeapLocation(ButterflyLoc, JSObject_butterfly, node->child1()), LazyNode(node));
+        return;
+
+    case CheckDOM:
+        def(PureValue(node, node->classInfo()));
+        return;
+
+    case CallDOM:
+        read(World);
+        write(Heap);
         return;
 
     case Arrayify:
@@ -1256,7 +1283,7 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
             return;
         }
         
-    case ThrowReferenceError:
+    case ThrowStaticError:
         write(SideState);
         return;
         

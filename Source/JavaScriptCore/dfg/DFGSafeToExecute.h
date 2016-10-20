@@ -218,6 +218,8 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case CheckStructure:
     case GetExecutable:
     case GetButterfly:
+    case CallDOM:
+    case CheckDOM:
     case CheckArray:
     case Arrayify:
     case ArrayifyToStructure:
@@ -243,8 +245,11 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case CompareStrictEq:
     case CompareEqPtr:
     case Call:
+    case DirectCall:
     case TailCallInlinedCaller:
+    case DirectTailCallInlinedCaller:
     case Construct:
+    case DirectConstruct:
     case CallVarargs:
     case CallEval:
     case TailCallVarargsInlinedCaller:
@@ -299,10 +304,11 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case Switch:
     case Return:
     case TailCall:
+    case DirectTailCall:
     case TailCallVarargs:
     case TailCallForwardVarargs:
     case Throw:
-    case ThrowReferenceError:
+    case ThrowStaticError:
     case CountExecution:
     case ForceOSRExit:
     case CheckWatchdogTimer:

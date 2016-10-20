@@ -167,7 +167,7 @@ void DocumentThreadableLoader::makeCrossOriginAccessRequestWithPreflight(Resourc
 DocumentThreadableLoader::~DocumentThreadableLoader()
 {
     if (m_resource)
-        m_resource->removeClient(this);
+        m_resource->removeClient(*this);
 }
 
 void DocumentThreadableLoader::cancel()
@@ -200,7 +200,7 @@ void DocumentThreadableLoader::clearResource()
     // prevent the reentrancy.
     if (CachedResourceHandle<CachedRawResource> resource = m_resource) {
         m_resource = nullptr;
-        resource->removeClient(this);
+        resource->removeClient(*this);
     }
     if (m_preflightChecker)
         m_preflightChecker = Nullopt;
@@ -216,12 +216,27 @@ static inline void reportCrossOriginResourceSharingError(ThreadableLoaderClient&
     client.didFail(ResourceError(errorDomainWebKitInternal, 0, url, "Cross-origin redirection denied by Cross-Origin Resource Sharing policy.", ResourceError::Type::AccessControl));
 }
 
-void DocumentThreadableLoader::redirectReceived(CachedResource* resource, ResourceRequest& request, const ResourceResponse& redirectResponse)
+static inline void reportRedirectionWithBadScheme(ThreadableLoaderClient& client, const URL& url)
+{
+    client.didFail(ResourceError(errorDomainWebKitInternal, 0, url, "Redirection to URL with a scheme that is not HTTP(S).", ResourceError::Type::AccessControl));
+}
+
+void DocumentThreadableLoader::redirectReceived(CachedResource& resource, ResourceRequest& request, const ResourceResponse& redirectResponse)
 {
     ASSERT(m_client);
-    ASSERT_UNUSED(resource, resource == m_resource);
+    ASSERT_UNUSED(resource, &resource == m_resource);
 
     Ref<DocumentThreadableLoader> protectedThis(*this);
+
+    // FIXME: We restrict this check to Fetch API for the moment, as this might disrupt WorkerScriptLoader.
+    // Reassess this check based on https://github.com/whatwg/fetch/issues/393 discussions.
+    // We should also disable that check in navigation mode.
+    if (!request.url().protocolIsInHTTPFamily() && m_options.initiator == cachedResourceRequestInitiators().fetch) {
+        reportRedirectionWithBadScheme(*m_client, request.url());
+        clearResource();
+        return;
+    }
+
     if (!isAllowedByContentSecurityPolicy(request.url(), redirectResponse.isNull() ? ContentSecurityPolicy::RedirectResponseReceived::No : ContentSecurityPolicy::RedirectResponseReceived::Yes)) {
         reportContentSecurityPolicyError(*m_client, redirectResponse.url());
         clearResource();
@@ -261,16 +276,16 @@ void DocumentThreadableLoader::redirectReceived(CachedResource* resource, Resour
     makeCrossOriginAccessRequest(ResourceRequest(request));
 }
 
-void DocumentThreadableLoader::dataSent(CachedResource* resource, unsigned long long bytesSent, unsigned long long totalBytesToBeSent)
+void DocumentThreadableLoader::dataSent(CachedResource& resource, unsigned long long bytesSent, unsigned long long totalBytesToBeSent)
 {
     ASSERT(m_client);
-    ASSERT_UNUSED(resource, resource == m_resource);
+    ASSERT_UNUSED(resource, &resource == m_resource);
     m_client->didSendData(bytesSent, totalBytesToBeSent);
 }
 
-void DocumentThreadableLoader::responseReceived(CachedResource* resource, const ResourceResponse& response)
+void DocumentThreadableLoader::responseReceived(CachedResource& resource, const ResourceResponse& response)
 {
-    ASSERT_UNUSED(resource, resource == m_resource);
+    ASSERT_UNUSED(resource, &resource == m_resource);
     didReceiveResponse(m_resource->identifier(), response, m_resource->responseTainting());
 }
 
@@ -292,9 +307,9 @@ void DocumentThreadableLoader::didReceiveResponse(unsigned long identifier, cons
     }
 }
 
-void DocumentThreadableLoader::dataReceived(CachedResource* resource, const char* data, int dataLength)
+void DocumentThreadableLoader::dataReceived(CachedResource& resource, const char* data, int dataLength)
 {
-    ASSERT_UNUSED(resource, resource == m_resource);
+    ASSERT_UNUSED(resource, &resource == m_resource);
     didReceiveData(m_resource->identifier(), data, dataLength);
 }
 
@@ -305,10 +320,10 @@ void DocumentThreadableLoader::didReceiveData(unsigned long, const char* data, i
     m_client->didReceiveData(data, dataLength);
 }
 
-void DocumentThreadableLoader::notifyFinished(CachedResource* resource)
+void DocumentThreadableLoader::notifyFinished(CachedResource& resource)
 {
     ASSERT(m_client);
-    ASSERT_UNUSED(resource, resource == m_resource);
+    ASSERT_UNUSED(resource, &resource == m_resource);
 
     if (m_resource->errorOccurred())
         didFail(m_resource->identifier(), m_resource->resourceError());
@@ -365,10 +380,10 @@ void DocumentThreadableLoader::loadRequest(ResourceRequest&& request, SecurityCh
         options.clientCredentialPolicy = m_sameOriginRequest ? ClientCredentialPolicy::MayAskClientForCredentials : ClientCredentialPolicy::CannotAskClientForCredentials;
         options.contentSecurityPolicyImposition = ContentSecurityPolicyImposition::SkipPolicyCheck;
 
+        request.setAllowCookies(m_options.allowCredentials == AllowStoredCredentials);
         CachedResourceRequest newRequest(WTFMove(request), options);
         if (RuntimeEnabledFeatures::sharedFeatures().resourceTimingEnabled())
             newRequest.setInitiator(m_options.initiator);
-        newRequest.mutableResourceRequest().setAllowCookies(m_options.allowCredentials == AllowStoredCredentials);
         newRequest.setOrigin(&securityOrigin());
 
         ASSERT(!m_resource);
@@ -376,7 +391,7 @@ void DocumentThreadableLoader::loadRequest(ResourceRequest&& request, SecurityCh
         URL requestUrl = newRequest.resourceRequest().url();
         m_resource = m_document.cachedResourceLoader().requestRawResource(WTFMove(newRequest));
         if (m_resource)
-            m_resource->addClient(this);
+            m_resource->addClient(*this);
         else {
             // FIXME: Since we receive a synchronous error, this is probably due to some AccessControl checks. We should try to retrieve the actual error.
             m_client->didFail(ResourceError(String(), 0, requestUrl, String(), ResourceError::Type::AccessControl));

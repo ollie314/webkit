@@ -586,6 +586,9 @@ Effects Value::effects() const
         result.writes = as<MemoryValue>()->range();
         result.controlDependent = true;
         break;
+    case WasmAddress:
+        result.readsPinned = true;
+        break;
     case Fence: {
         const FenceValue* fence = as<FenceValue>();
         result.reads = fence->read;
@@ -614,9 +617,11 @@ Effects Value::effects() const
     case CheckSub:
     case CheckMul:
     case Check:
+        result = Effects::forCheck();
+        break;
+    case WasmBoundsCheck:
+        result.readsPinned = true;
         result.exitsSideways = true;
-        // The program could read anything after exiting, and it's on us to declare this.
-        result.reads = HeapRange::top();
         break;
     case Upsilon:
     case Set:
@@ -811,6 +816,7 @@ Type Value::typeFor(Kind kind, Value* firstChild, Value* secondChild)
     case Return:
     case Oops:
     case EntrySwitch:
+    case WasmBoundsCheck:
         return Void;
     case Select:
         ASSERT(secondChild);

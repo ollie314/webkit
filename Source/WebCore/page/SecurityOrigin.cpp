@@ -298,29 +298,12 @@ bool SecurityOrigin::canRequest(const URL& url) const
     return false;
 }
 
-bool SecurityOrigin::taintsCanvas(const URL& url) const
-{
-    if (canRequest(url))
-        return false;
-
-    // This function exists because we treat data URLs as having a unique origin,
-    // contrary to the current (9/19/2009) draft of the HTML5 specification.
-    // We still want to let folks paint data URLs onto untainted canvases, so
-    // we special case data URLs below. If we change to match HTML5 w.r.t.
-    // data URL security, then we can remove this function in favor of
-    // !canRequest.
-    if (url.protocolIsData())
-        return false;
-
-    return true;
-}
-
 bool SecurityOrigin::canReceiveDragData(const SecurityOrigin* dragInitiator) const
 {
     if (this == dragInitiator)
         return true;
 
-    return canAccess(dragInitiator);  
+    return canAccess(dragInitiator);
 }
 
 // This is a hack to allow keep navigation to http/https feeds working. To remove this
@@ -520,7 +503,9 @@ RefPtr<SecurityOrigin> SecurityOrigin::maybeCreateFromDatabaseIdentifier(const S
     String host = databaseIdentifier.substring(separator1 + 1, separator2 - separator1 - 1);
     
     host = decodeURLEscapeSequences(host);
-    return create(URL(URL(), protocol + "://" + host + ":" + String::number(port) + "/"));
+    auto origin = create(URL(URL(), protocol + "://" + host + "/"));
+    origin->m_port = port;
+    return WTFMove(origin);
 }
 
 Ref<SecurityOrigin> SecurityOrigin::createFromDatabaseIdentifier(const String& databaseIdentifier)
@@ -535,7 +520,9 @@ Ref<SecurityOrigin> SecurityOrigin::create(const String& protocol, const String&
     if (port < 0 || port > MaxAllowedPort)
         return createUnique();
     String decodedHost = decodeURLEscapeSequences(host);
-    return create(URL(URL(), protocol + "://" + host + ":" + String::number(port) + "/"));
+    auto origin = create(URL(URL(), protocol + "://" + host + "/"));
+    origin->m_port = port;
+    return origin;
 }
 
 String SecurityOrigin::databaseIdentifier() const 

@@ -28,6 +28,7 @@
 
 #if USE(NETWORK_SESSION)
 
+#import "AuthenticationManager.h"
 #import "CustomProtocolManager.h"
 #import "DataReference.h"
 #import "Download.h"
@@ -295,14 +296,14 @@ static NSURLSessionAuthChallengeDisposition toNSURLSessionAuthChallengeDispositi
 {
     auto storedCredentials = _withCredentials ? WebCore::StoredCredentials::AllowStoredCredentials : WebCore::StoredCredentials::DoNotAllowStoredCredentials;
     if (auto* networkDataTask = _session->dataTaskForIdentifier([dataTask taskIdentifier], storedCredentials)) {
+        Ref<NetworkDataTask> protectedNetworkDataTask(*networkDataTask);
         auto downloadID = networkDataTask->pendingDownloadID();
         auto& downloadManager = WebKit::NetworkProcess::singleton().downloadManager();
         auto download = std::make_unique<WebKit::Download>(downloadManager, downloadID, downloadTask, _session->sessionID(), networkDataTask->suggestedFilename());
         networkDataTask->transferSandboxExtensionToDownload(*download);
         ASSERT(WebCore::fileExists(networkDataTask->pendingDownloadLocation()));
         download->didCreateDestination(networkDataTask->pendingDownloadLocation());
-        auto pendingDownload = downloadManager.dataTaskBecameDownloadTask(downloadID, WTFMove(download));
-
+        downloadManager.dataTaskBecameDownloadTask(downloadID, WTFMove(download));
         networkDataTask->didBecomeDownload();
 
         _session->addDownloadID([downloadTask taskIdentifier], downloadID);
@@ -475,7 +476,7 @@ void NetworkSession::invalidateAndCancel()
 }
 
 
-WebCore::NetworkStorageSession& NetworkSession::networkStorageSession()
+WebCore::NetworkStorageSession& NetworkSession::networkStorageSession() const
 {
     auto* storageSession = WebCore::NetworkStorageSession::storageSession(m_sessionID);
     RELEASE_ASSERT(storageSession);

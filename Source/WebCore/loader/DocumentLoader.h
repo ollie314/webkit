@@ -55,7 +55,7 @@
 #include "QuickLook.h"
 #endif
 
-#if PLATFORM(COCOA) && !USE(CFNETWORK)
+#if PLATFORM(COCOA) && !USE(CFURLCONNECTION)
 #include <wtf/SchedulePair.h>
 #endif
 
@@ -145,7 +145,7 @@ namespace WebCore {
         WEBCORE_EXPORT void setTitle(const StringWithDirection&);
         const String& overrideEncoding() const { return m_overrideEncoding; }
 
-#if PLATFORM(COCOA) && !USE(CFNETWORK)
+#if PLATFORM(COCOA) && !USE(CFURLCONNECTION)
         void schedule(SchedulePair&);
         void unschedule(SchedulePair&);
 #endif
@@ -213,7 +213,8 @@ namespace WebCore {
 
         void startLoadingMainResource();
         WEBCORE_EXPORT void cancelMainResourceLoad(const ResourceError&);
-        
+        void willContinueMainResourceLoadAfterRedirect(const ResourceRequest&);
+
         // Support iconDatabase in synchronous mode.
         void iconLoadDecisionAvailable();
         
@@ -316,10 +317,13 @@ namespace WebCore {
         void willSendRequest(ResourceRequest&, const ResourceResponse&);
         void finishedLoading(double finishTime);
         void mainReceivedError(const ResourceError&);
-        WEBCORE_EXPORT void redirectReceived(CachedResource*, ResourceRequest&, const ResourceResponse&) override;
-        WEBCORE_EXPORT void responseReceived(CachedResource*, const ResourceResponse&) override;
-        WEBCORE_EXPORT void dataReceived(CachedResource*, const char* data, int length) override;
-        WEBCORE_EXPORT void notifyFinished(CachedResource*) override;
+        WEBCORE_EXPORT void redirectReceived(CachedResource&, ResourceRequest&, const ResourceResponse&) override;
+        WEBCORE_EXPORT void responseReceived(CachedResource&, const ResourceResponse&) override;
+        WEBCORE_EXPORT void dataReceived(CachedResource&, const char* data, int length) override;
+        WEBCORE_EXPORT void notifyFinished(CachedResource&) override;
+
+        void responseReceived(const ResourceResponse&);
+        void dataReceived(const char* data, int length);
 
         bool maybeLoadEmpty();
 

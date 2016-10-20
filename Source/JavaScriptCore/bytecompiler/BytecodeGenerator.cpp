@@ -3504,14 +3504,16 @@ void BytecodeGenerator::emitDebugHook(DebugHookType debugHookType, unsigned line
 
 void BytecodeGenerator::emitDebugHook(StatementNode* statement)
 {
-    RELEASE_ASSERT(statement->needsDebugHook());
+    // DebuggerStatementNode will output its own special debug hook.
+    if (statement->isDebuggerStatement())
+        return;
+
     emitDebugHook(WillExecuteStatement, statement->position());
 }
 
-void BytecodeGenerator::emitDebugHook(ExpressionNode* expr, DebugHookType debugHookType)
+void BytecodeGenerator::emitDebugHook(ExpressionNode* expr)
 {
-    RELEASE_ASSERT(expr->needsDebugHook());
-    emitDebugHook(debugHookType, expr->position());
+    emitDebugHook(WillExecuteStatement, expr->position());
 }
 
 void BytecodeGenerator::emitWillLeaveCallFrameDebugHook()
@@ -3905,18 +3907,45 @@ int BytecodeGenerator::labelScopeDepth() const
     return localScopeDepth() + m_finallyDepth;
 }
 
-void BytecodeGenerator::emitThrowReferenceError(const String& message)
+void BytecodeGenerator::emitThrowStaticError(ErrorType errorType, RegisterID* raw)
+{
+    RefPtr<RegisterID> message = newTemporary();
+    emitToString(message.get(), raw);
+    emitOpcode(op_throw_static_error);
+    instructions().append(message->index());
+    instructions().append(static_cast<unsigned>(errorType));
+}
+
+void BytecodeGenerator::emitThrowStaticError(ErrorType errorType, const Identifier& message)
 {
     emitOpcode(op_throw_static_error);
-    instructions().append(addConstantValue(addStringConstant(Identifier::fromString(m_vm, message)))->index());
-    instructions().append(true);
+    instructions().append(addConstantValue(addStringConstant(message))->index());
+    instructions().append(static_cast<unsigned>(errorType));
+}
+
+void BytecodeGenerator::emitThrowReferenceError(const String& message)
+{
+    emitThrowStaticError(ErrorType::ReferenceError, Identifier::fromString(m_vm, message));
 }
 
 void BytecodeGenerator::emitThrowTypeError(const String& message)
 {
-    emitOpcode(op_throw_static_error);
-    instructions().append(addConstantValue(addStringConstant(Identifier::fromString(m_vm, message)))->index());
-    instructions().append(false);
+    emitThrowStaticError(ErrorType::TypeError, Identifier::fromString(m_vm, message));
+}
+
+void BytecodeGenerator::emitThrowTypeError(const Identifier& message)
+{
+    emitThrowStaticError(ErrorType::TypeError, message);
+}
+
+void BytecodeGenerator::emitThrowRangeError(const Identifier& message)
+{
+    emitThrowStaticError(ErrorType::RangeError, message);
+}
+
+void BytecodeGenerator::emitThrowOutOfMemoryError()
+{
+    emitThrowStaticError(ErrorType::Error, Identifier::fromString(m_vm, "Out of memory"));
 }
 
 void BytecodeGenerator::emitPushFunctionNameScope(const Identifier& property, RegisterID* callee, bool isCaptured)
@@ -4104,9 +4133,7 @@ bool BytecodeGenerator::emitReadOnlyExceptionIfNeeded(const Variable& variable)
     // If we're in strict mode, we always throw.
     // If we're not in strict mode, we throw for "const" variables but not the function callee.
     if (isStrictMode() || variable.isConst()) {
-        emitOpcode(op_throw_static_error);
-        instructions().append(addConstantValue(addStringConstant(Identifier::fromString(m_vm, StrictModeReadonlyPropertyWriteError)))->index());
-        instructions().append(false);
+        emitThrowTypeError(Identifier::fromString(m_vm, ReadonlyPropertyWriteError));
         return true;
     }
     return false;
@@ -4177,7 +4204,7 @@ void BytecodeGenerator::emitEnumeration(ThrowableExpressionData* node, Expressio
         if (forLoopNode) {
             RELEASE_ASSERT(forLoopNode->isForOfNode());
             prepareLexicalScopeForNextForLoopIteration(forLoopNode, forLoopSymbolTable);
-            emitDebugHook(forLoopNode->expr(), WillExecuteStatement);
+            emitDebugHook(forLoopNode->lexpr());
         }
 
         {
