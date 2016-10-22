@@ -500,7 +500,7 @@ static inline bool isSimpleLengthPropertyID(CSSPropertyID propertyId, bool& acce
     case CSSPropertyGridColumnGap:
     case CSSPropertyGridRowGap:
 #endif
-    case CSSPropertyWebkitShapeMargin:
+    case CSSPropertyShapeMargin:
         acceptsNegativeNumbers = false;
         return true;
     case CSSPropertyBottom:
@@ -1149,11 +1149,30 @@ static bool isUniversalKeyword(const String& string)
         || equalLettersIgnoringASCIICase(string, "revert");
 }
 
+static bool isKeywordPropertyID(CSSPropertyID propertyID)
+{
+    switch (propertyID) {
+        case CSSPropertyWebkitColumnBreakAfter:
+        case CSSPropertyWebkitColumnBreakBefore:
+        case CSSPropertyWebkitColumnBreakInside:
+#if ENABLE(CSS_REGIONS)
+        case CSSPropertyWebkitRegionBreakAfter:
+        case CSSPropertyWebkitRegionBreakBefore:
+        case CSSPropertyWebkitRegionBreakInside:
+#endif
+            return true;
+        default:
+            break;
+    }
+    
+    return CSSParserFastPaths::isKeywordPropertyID(propertyID);
+}
+
 static CSSParser::ParseResult parseKeywordValue(MutableStyleProperties& declaration, CSSPropertyID propertyId, const String& string, bool important, const CSSParserContext& parserContext, StyleSheetContents* styleSheetContents)
 {
     ASSERT(!string.isEmpty());
 
-    if (!CSSParserFastPaths::isKeywordPropertyID(propertyId)) {
+    if (!isKeywordPropertyID(propertyId)) {
         if (!isUniversalKeyword(string))
             return CSSParser::ParseResult::Error;
 
@@ -1842,7 +1861,7 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
     if (propId == CSSPropertyAll)
         return false; // "all" doesn't allow you to specify anything other than inherit/initial/unset.
 
-    if (CSSParserFastPaths::isKeywordPropertyID(propId)) {
+    if (isKeywordPropertyID(propId)) {
         if (!isValidKeywordPropertyAndValue(propId, id, m_context, m_styleSheet))
             return false;
         if (m_valueList->next() && !inShorthand())
@@ -2976,13 +2995,13 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
     case CSSPropertyWebkitClipPath:
         parsedValue = parseClipPath();
         break;
-    case CSSPropertyWebkitShapeOutside:
+    case CSSPropertyShapeOutside:
         parsedValue = parseShapeProperty(propId);
         break;
-    case CSSPropertyWebkitShapeMargin:
+    case CSSPropertyShapeMargin:
         validPrimitive = !id && validateUnit(valueWithCalculation, FLength | FPercent | FNonNeg);
         break;
-    case CSSPropertyWebkitShapeImageThreshold:
+    case CSSPropertyShapeImageThreshold:
         validPrimitive = !id && validateUnit(valueWithCalculation, FNumber);
         break;
 #if ENABLE(CSS_IMAGE_ORIENTATION)

@@ -408,7 +408,6 @@ messages -> WebPageProxy {
 #endif
 
     DidUpdateViewState()
-    SetPageActivityState(int32_t pageActivityState)
 
     DidSaveToPageCache()
 
@@ -456,6 +455,11 @@ messages -> WebPageProxy {
     PlaybackTargetPickerClientStateDidChange(uint64_t contextId, unsigned mediaState)
     SetMockMediaPlaybackTargetPickerEnabled(bool enabled)
     SetMockMediaPlaybackTargetPickerState(String name, unsigned pickerState)
+#endif
+
+#if ENABLE(POINTER_LOCK)
+    RequestPointerLock()
+    RequestPointerUnlock()
 #endif
 
     ImageOrMediaDocumentSizeChanged(WebCore::IntSize newSize)

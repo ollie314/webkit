@@ -1161,7 +1161,7 @@ sub GenerateDictionaryImplementationContent
             } elsif (!$member->isOptional) {
                 # 5.5. Otherwise, if value is undefined and the dictionary member is a required dictionary member, then throw a TypeError.
                 $result .= "    } else {\n";
-                $result .= "        throwTypeError(&state, throwScope);\n";
+                $result .= "        throwRequiredMemberTypeError(state, throwScope, \"".$member->name."\", \"$name\", \"".$idlType->name."\");\n";
                 $result .= "        return { };\n";
                 $result .= "    }\n";
             } else {
@@ -1914,7 +1914,7 @@ sub ComputeEffectiveOverloadSet
         my @o;
         my $isVariadic = 0;
         foreach my $parameter (@{$overload->parameters}) {
-            push(@t, $parameter->isNullable ? $parameter->type . "?" : $parameter->type);
+            push(@t, $parameter->idlType);
             if ($parameter->isOptional) {
                 push(@o, "optional");
             } elsif ($parameter->isVariadic) {
@@ -1945,12 +1945,23 @@ sub ComputeEffectiveOverloadSet
     return %allSets;
 }
 
+sub IsIDLTypeDistinguishableWithUnionForOverloadResolution
+{
+    my ($idlType, $unionSubtypes) = @_;
+
+    assert("First type should not be a union") if $idlType->isUnion;
+    for my $unionSubType (@$unionSubtypes) {
+        return 0 unless AreTypesDistinguishableForOverloadResolution($idlType, $unionSubType);
+    }
+    return 1;
+}
+
 # Determines if two types are distinguishable in the context of overload resolution,
 # according to the Web IDL specification:
 # http://heycam.github.io/webidl/#dfn-distinguishable
 sub AreTypesDistinguishableForOverloadResolution
 {
-    my ($typeA, $typeB) = @_;
+    my ($idlTypeA, $idlTypeB) = @_;
 
     my $isDictionary = sub {
         my $type = shift;
@@ -1962,20 +1973,33 @@ sub AreTypesDistinguishableForOverloadResolution
     };
 
     # FIXME: The WebIDL mandates this but this currently does not work because some of our IDL is wrong.
-    # return 0 if IsNullableType($typeA) && IsNullableType($typeB);
+    # return 0 if $idlTypeA->isNullable && $idlTypeB->isNullable;
 
-    $typeA = StripNullable($typeA);
-    $typeB = StripNullable($typeB);
+    # Union types: idlTypeA and idlTypeB  are distinguishable if:
+    # - Both types are either a union type or nullable union type, and each member type of the one is
+    #   distinguishable with each member type of the other.
+    # - One type is a union type or nullable union type, the other is neither a union type nor a nullable
+    #   union type, and each member type of the first is distinguishable with the second.
+    if ($idlTypeA->isUnion && $idlTypeB->isUnion) {
+        for my $unionASubType (@{$idlTypeA->subtypes}) {
+            return 0 unless IsIDLTypeDistinguishableWithUnionForOverloadResolution($unionASubType, $idlTypeB->subtypes);
+        }
+        return 1;
+    } elsif ($idlTypeA->isUnion) {
+        return IsIDLTypeDistinguishableWithUnionForOverloadResolution($idlTypeB, $idlTypeA->subtypes);
+    } elsif ($idlTypeB->isUnion) {
+        return IsIDLTypeDistinguishableWithUnionForOverloadResolution($idlTypeA, $idlTypeB->subtypes);
+    }
 
-    return 0 if $typeA eq $typeB;
-    return 0 if $typeA eq "object" or $typeB eq "object";
-    return 0 if $codeGenerator->IsNumericType($typeA) && $codeGenerator->IsNumericType($typeB);
-    return 0 if $codeGenerator->IsStringOrEnumType($typeA) && $codeGenerator->IsStringOrEnumType($typeB);
-    return 0 if &$isDictionary($typeA) && &$isDictionary($typeB);
-    return 0 if $codeGenerator->IsCallbackInterface($typeA) && $codeGenerator->IsCallbackInterface($typeB);
-    return 0 if &$isCallbackFunctionOrDictionary($typeA) && &$isCallbackFunctionOrDictionary($typeB);
-    return 0 if $codeGenerator->IsSequenceOrFrozenArrayType($typeA) && $codeGenerator->IsSequenceOrFrozenArrayType($typeB);
-    # FIXME: return 0 if typeA and typeB are both exception types.
+    return 0 if $idlTypeA->name eq $idlTypeB->name;
+    return 0 if $idlTypeA->name eq "object" or $idlTypeB->name eq "object";
+    return 0 if $codeGenerator->IsNumericType($idlTypeA->name) && $codeGenerator->IsNumericType($idlTypeB->name);
+    return 0 if $codeGenerator->IsStringOrEnumType($idlTypeA->name) && $codeGenerator->IsStringOrEnumType($idlTypeB->name);
+    return 0 if &$isDictionary($idlTypeA->name) && &$isDictionary($idlTypeB->name);
+    return 0 if $codeGenerator->IsCallbackInterface($idlTypeA->name) && $codeGenerator->IsCallbackInterface($idlTypeB->name);
+    return 0 if &$isCallbackFunctionOrDictionary($idlTypeA->name) && &$isCallbackFunctionOrDictionary($idlTypeB->name);
+    return 0 if $codeGenerator->IsSequenceOrFrozenArrayType($idlTypeA->name) && $codeGenerator->IsSequenceOrFrozenArrayType($idlTypeB->name);
+    # FIXME: return 0 if $idlTypeA and $idlTypeB are both exception types.
     return 1;
 }
 
@@ -1988,12 +2012,12 @@ sub GetDistinguishingArgumentIndex
     my ($function, $S) = @_;
 
     # FIXME: Consider all the tuples, not just the 2 first ones?
-    my $firstTupleTypes = @{@{$S}[0]}[1];
-    my $secondTupleTypes = @{@{$S}[1]}[1];
-    for (my $index = 0; $index < scalar(@$firstTupleTypes); $index++) {
-        return $index if AreTypesDistinguishableForOverloadResolution(@{$firstTupleTypes}[$index], @{$secondTupleTypes}[$index]);
+    my $firstTupleIDLTypes = @{@{$S}[0]}[1];
+    my $secondTupleIDLTypes = @{@{$S}[1]}[1];
+    for (my $index = 0; $index < scalar(@$firstTupleIDLTypes); $index++) {
+        return $index if AreTypesDistinguishableForOverloadResolution(@{$firstTupleIDLTypes}[$index], @{$secondTupleIDLTypes}[$index]);
     }
-    die "Undistinguishable overloads for operation " . $function->signature->name . " with length: " . scalar(@$firstTupleTypes);
+    die "Undistinguishable overloads for operation " . $function->signature->name . " with length: " . scalar(@$firstTupleIDLTypes);
 }
 
 sub GetOverloadThatMatches
@@ -2001,10 +2025,26 @@ sub GetOverloadThatMatches
     my ($S, $parameterIndex, $matches) = @_;
 
     for my $tuple (@{$S}) {
-        my $type = @{@{$tuple}[1]}[$parameterIndex];
+        my $idlType = @{@{$tuple}[1]}[$parameterIndex];
         my $optionality = @{@{$tuple}[2]}[$parameterIndex];
-        my $isNullable = IsNullableType($type);
-        return @{$tuple}[0] if $matches->(StripNullable($type), $optionality, $isNullable);
+        if ($idlType->isUnion) {
+            for my $idlSubtype (GetFlattenedMemberTypes($idlType)) {
+                return @{$tuple}[0] if $matches->($idlSubtype, $optionality);
+            }
+        } else {
+            return @{$tuple}[0] if $matches->($idlType, $optionality);
+        }
+    }
+}
+
+sub GetOverloadThatMatchesIgnoringUnionSubtypes
+{
+    my ($S, $parameterIndex, $matches) = @_;
+
+    for my $tuple (@{$S}) {
+        my $idlType = @{@{$tuple}[1]}[$parameterIndex];
+        my $optionality = @{@{$tuple}[2]}[$parameterIndex];
+        return @{$tuple}[0] if $matches->($idlType, $optionality);
     }
 }
 
@@ -2050,60 +2090,68 @@ sub GenerateOverloadedFunctionOrConstructor
         push(@implContent, "#endif\n") if $conditionalString;
     };
     my $isOptionalParameter = sub {
-        my ($type, $optionality, $isNullable) = @_;
+        my ($idlType, $optionality) = @_;
         return $optionality eq "optional";
     };
     my $isDictionaryParameter = sub {
-        my ($type, $optionality, $isNullable) = @_;
-        return $type eq "Dictionary" || $codeGenerator->IsDictionaryType($type);
+        my ($idlType, $optionality) = @_;
+        return $idlType->name eq "Dictionary" || $codeGenerator->IsDictionaryType($idlType->name);
     };
-    my $isNullableOrDictionaryParameter = sub {
-        my ($type, $optionality, $isNullable) = @_;
-        return $isNullable || &$isDictionaryParameter($type, $optionality, $isNullable);
+    my $isNullableOrDictionaryParameterOrUnionContainingOne = sub {
+        my ($idlType, $optionality) = @_;
+        return 1 if $idlType->isNullable;
+        if ($idlType->isUnion) {
+            for my $idlSubtype (GetFlattenedMemberTypes($idlType)) {
+                return 1 if $idlType->isNullable || &$isDictionaryParameter($idlSubtype, $optionality);
+            }
+            return 0;
+        } else {
+            return &$isDictionaryParameter($idlType, $optionality);
+        }
     };
     my $isRegExpOrObjectParameter = sub {
-        my ($type, $optionality, $isNullable) = @_;
-        return $type eq "RegExp" || $type eq "object";
+        my ($idlType, $optionality) = @_;
+        return $idlType->name eq "RegExp" || $idlType->name eq "object";
     };
     my $isObjectOrErrorParameter = sub {
-        my ($type, $optionality, $isNullable) = @_;
-        return $type eq "object" || $type eq "Error";
+        my ($idlType, $optionality) = @_;
+        return $idlType->name eq "object" || $idlType->name eq "Error";
     };
     my $isObjectOrErrorOrDOMExceptionParameter = sub {
-        my ($type, $optionality, $isNullable) = @_;
-        return 1 if &$isObjectOrErrorParameter($type, $optionality, $isNullable);
-        return $type eq "DOMException";
+        my ($idlType, $optionality) = @_;
+        return 1 if &$isObjectOrErrorParameter($idlType, $optionality);
+        return $idlType->name eq "DOMException";
     };
     my $isObjectOrCallbackFunctionParameter = sub {
-        my ($type, $optionality, $isNullable) = @_;
-        return $type eq "object" || $codeGenerator->IsFunctionOnlyCallbackInterface($type);
+        my ($idlType, $optionality) = @_;
+        return $idlType->name eq "object" || $codeGenerator->IsFunctionOnlyCallbackInterface($idlType->name);
     };
     my $isSequenceOrFrozenArrayParameter = sub {
-        my ($type, $optionality, $isNullable) = @_;
-        return $codeGenerator->IsSequenceOrFrozenArrayType($type);
+        my ($idlType, $optionality) = @_;
+        return $codeGenerator->IsSequenceOrFrozenArrayType($idlType->name);
     };
     my $isDictionaryOrObjectOrCallbackInterfaceParameter = sub {
-        my ($type, $optionality, $isNullable) = @_;
-        return 1 if &$isDictionaryParameter($type, $optionality, $isNullable);
-        return 1 if $type eq "object";
-        return 1 if $codeGenerator->IsCallbackInterface($type) && !$codeGenerator->IsFunctionOnlyCallbackInterface($type);
+        my ($idlType, $optionality) = @_;
+        return 1 if &$isDictionaryParameter($idlType, $optionality);
+        return 1 if $idlType->name eq "object";
+        return 1 if $codeGenerator->IsCallbackInterface($idlType->name) && !$codeGenerator->IsFunctionOnlyCallbackInterface($idlType->name);
         return 0;
     };
     my $isBooleanParameter = sub {
-        my ($type, $optionality, $isNullable) = @_;
-        return $type eq "boolean";
+        my ($idlType, $optionality) = @_;
+        return $idlType->name eq "boolean";
     };
     my $isNumericParameter = sub {
-        my ($type, $optionality, $isNullable) = @_;
-        return $codeGenerator->IsNumericType($type);
+        my ($idlType, $optionality) = @_;
+        return $codeGenerator->IsNumericType($idlType->name);
     };
     my $isStringOrEnumParameter = sub {
-        my ($type, $optionality, $isNullable) = @_;
-        return $codeGenerator->IsStringOrEnumType($type);
+        my ($idlType, $optionality) = @_;
+        return $codeGenerator->IsStringOrEnumType($idlType->name);
     };
     my $isAnyParameter = sub {
-        my ($type, $optionality, $isNullable) = @_;
-        return $type eq "any";
+        my ($idlType, $optionality) = @_;
+        return $idlType->name eq "any";
     };
 
     my $maxArgCount = LengthOfLongestFunctionParameterList($function->{overloads});
@@ -2133,21 +2181,26 @@ END
             my $d = GetDistinguishingArgumentIndex($function, $S);
             push(@implContent, "        JSValue distinguishingArg = state->uncheckedArgument($d);\n");
 
-            my $overload = GetOverloadThatMatches($S, $d, \&$isOptionalParameter);
+            my $overload = GetOverloadThatMatchesIgnoringUnionSubtypes($S, $d, \&$isOptionalParameter);
             &$generateOverloadCallIfNecessary($overload, "distinguishingArg.isUndefined()");
 
-            $overload = GetOverloadThatMatches($S, $d, \&$isNullableOrDictionaryParameter);
+            $overload = GetOverloadThatMatchesIgnoringUnionSubtypes($S, $d, \&$isNullableOrDictionaryParameterOrUnionContainingOne);
             &$generateOverloadCallIfNecessary($overload, "distinguishingArg.isUndefinedOrNull()");
 
             for my $tuple (@{$S}) {
                 my $overload = @{$tuple}[0];
-                my $type = StripNullable(@{@{$tuple}[1]}[$d]);
-                if ($codeGenerator->IsWrapperType($type) || $codeGenerator->IsTypedArrayType($type)) {
-                    if ($type eq "DOMWindow") {
-                        AddToImplIncludes("JSDOMWindowShell.h");
-                        &$generateOverloadCallIfNecessary($overload, "distinguishingArg.isObject() && (asObject(distinguishingArg)->inherits(JSDOMWindowShell::info()) || asObject(distinguishingArg)->inherits(JSDOMWindow::info()))");
-                    } else {
-                        &$generateOverloadCallIfNecessary($overload, "distinguishingArg.isObject() && asObject(distinguishingArg)->inherits(JS${type}::info())");
+                my $idlType = @{@{$tuple}[1]}[$d];
+
+                my @idlSubtypes = $idlType->isUnion ? GetFlattenedMemberTypes($idlType) : ( $idlType );
+                for my $idlSubtype (@idlSubtypes) {
+                    my $type = $idlSubtype->name;
+                    if ($codeGenerator->IsWrapperType($type) || $codeGenerator->IsTypedArrayType($type)) {
+                        if ($type eq "DOMWindow") {
+                            AddToImplIncludes("JSDOMWindowShell.h");
+                            &$generateOverloadCallIfNecessary($overload, "distinguishingArg.isObject() && (asObject(distinguishingArg)->inherits(JSDOMWindowShell::info()) || asObject(distinguishingArg)->inherits(JSDOMWindow::info()))");
+                        } else {
+                            &$generateOverloadCallIfNecessary($overload, "distinguishingArg.isObject() && asObject(distinguishingArg)->inherits(JS${type}::info())");
+                        }
                     }
                 }
             }
@@ -3444,7 +3497,7 @@ sub GenerateImplementation
                 my $shouldPassByReference = ShouldPassWrapperByReference($attribute->signature, $interface);
 
                 my ($nativeValue, $mayThrowException) = JSValueToNative($interface, $attribute->signature, "value", $attribute->signature->extendedAttributes->{Conditional}, "&state", "state", "thisObject");
-                if (!$shouldPassByReference && $codeGenerator->IsWrapperType($type)) {
+                if (!$shouldPassByReference && ($codeGenerator->IsWrapperType($type) || $codeGenerator->IsTypedArrayType($type))) {
                     $implIncludes{"<runtime/Error.h>"} = 1;
                     push(@implContent, "    " . GetNativeTypeFromSignature($interface, $attribute->signature) . " nativeValue = nullptr;\n");
                     push(@implContent, "    if (!value.isUndefinedOrNull()) {\n");
@@ -4312,7 +4365,7 @@ sub GenerateParametersCheck
             die "Variadic parameter is already handled here" if $parameter->isVariadic;
             my $argumentLookupMethod = $parameter->isOptional ? "argument" : "uncheckedArgument";
 
-            if (!$shouldPassByReference && $codeGenerator->IsWrapperType($type)) {
+            if (!$shouldPassByReference && ($codeGenerator->IsWrapperType($type) || $codeGenerator->IsTypedArrayType($type))) {
                 $implIncludes{"<runtime/Error.h>"} = 1;
                 my $checkedArgument = "state->$argumentLookupMethod($argumentIndex)";
                 my $uncheckedArgument = "state->uncheckedArgument($argumentIndex)";

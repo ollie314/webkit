@@ -152,6 +152,7 @@
 #include <WebCore/PageThrottler.h>
 #include <WebCore/PlatformKeyboardEvent.h>
 #include <WebCore/PluginDocument.h>
+#include <WebCore/PointerLockController.h>
 #include <WebCore/PrintContext.h>
 #include <WebCore/Range.h>
 #include <WebCore/RenderLayer.h>
@@ -377,6 +378,7 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     , m_useAsyncScrolling(false)
     , m_viewState(parameters.viewState)
     , m_userActivity("Process suppression disabled for page.")
+    , m_userActivityHysteresis([this](HysteresisState) { updateUserActivity(); })
     , m_pendingNavigationID(0)
 #if ENABLE(WEBGL)
     , m_systemWebGLPolicy(WebGLAllowCreation)
@@ -579,19 +581,22 @@ void WebPage::reinitializeWebPage(const WebPageCreationParameters& parameters)
         setLayerHostingMode(parameters.layerHostingMode);
 }
 
-void WebPage::setPageActivityState(PageActivityState::Flags activityState)
-{
-    send(Messages::WebPageProxy::SetPageActivityState(activityState));
-}
-
 void WebPage::setPageSuppressed(bool pageSuppressed)
 {
     // The UserActivity keeps the processes runnable. So if the page should be suppressed, stop the activity.
     // If the page should not be supressed, start it.
     if (pageSuppressed)
-        m_userActivity.stop();
+        m_userActivityHysteresis.stop();
     else
+        m_userActivityHysteresis.start();
+}
+
+void WebPage::updateUserActivity()
+{
+    if (m_userActivityHysteresis.state() == HysteresisState::Started)
         m_userActivity.start();
+    else
+        m_userActivity.stop();
 }
 
 WebPage::~WebPage()
@@ -2237,7 +2242,7 @@ void WebPage::mouseEvent(const WebMouseEvent& mouseEvent)
 {
     TemporaryChange<bool> userIsInteractingChange { m_userIsInteracting, true };
 
-    m_page->pageThrottler().didReceiveUserInput();
+    m_userActivityHysteresis.impulse();
 
     bool shouldHandleEvent = true;
 
@@ -2292,7 +2297,7 @@ static bool handleWheelEvent(const WebWheelEvent& wheelEvent, Page* page)
 
 void WebPage::wheelEvent(const WebWheelEvent& wheelEvent)
 {
-    m_page->pageThrottler().didReceiveUserInput();
+    m_userActivityHysteresis.impulse();
 
     CurrentEvent currentEvent(wheelEvent);
 
@@ -2315,7 +2320,7 @@ void WebPage::keyEvent(const WebKeyboardEvent& keyboardEvent)
 {
     TemporaryChange<bool> userIsInteractingChange { m_userIsInteracting, true };
 
-    m_page->pageThrottler().didReceiveUserInput();
+    m_userActivityHysteresis.impulse();
 
     CurrentEvent currentEvent(keyboardEvent);
 
@@ -3224,6 +3229,7 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
 #endif
 
     settings.setInputEventsEnabled(store.getBoolValueForKey(WebPreferencesKey::inputEventsEnabledKey()));
+    RuntimeEnabledFeatures::sharedFeatures().setInputEventsEnabled(store.getBoolValueForKey(WebPreferencesKey::inputEventsEnabledKey()));
 
     RuntimeEnabledFeatures::sharedFeatures().setModernMediaControlsEnabled(store.getBoolValueForKey(WebPreferencesKey::modernMediaControlsEnabledKey()));
 
@@ -3694,6 +3700,11 @@ void WebPage::userMediaAccessWasDenied(uint64_t userMediaID, uint64_t reason, St
 void WebPage::didCompleteMediaDeviceEnumeration(uint64_t userMediaID, const Vector<CaptureDevice>& devices, const String& deviceIdentifierHashSalt, bool originHasPersistentAccess)
 {
     m_userMediaPermissionRequestManager.didCompleteMediaDeviceEnumeration(userMediaID, devices, deviceIdentifierHashSalt, originHasPersistentAccess);
+}
+
+void WebPage::grantUserMediaDevicesSandboxExtension(const SandboxExtension::HandleArray& handles)
+{
+    m_userMediaPermissionRequestManager.grantUserMediaDevicesSandboxExtension(handles);
 }
 #endif
 
@@ -5610,6 +5621,23 @@ void WebPage::gamepadActivity(const Vector<GamepadData>& gamepadDatas)
     WebGamepadProvider::singleton().gamepadActivity(gamepadDatas);
 }
 
+#endif
+
+#if ENABLE(POINTER_LOCK)
+void WebPage::didAcquirePointerLock()
+{
+    corePage()->pointerLockController().didAcquirePointerLock();
+}
+
+void WebPage::didNotAcquirePointerLock()
+{
+    corePage()->pointerLockController().didNotAcquirePointerLock();
+}
+
+void WebPage::didLosePointerLock()
+{
+    corePage()->pointerLockController().didLosePointerLock();
+}
 #endif
 
 } // namespace WebKit

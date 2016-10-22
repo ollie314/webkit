@@ -44,6 +44,7 @@
 #include "CSSGridTemplateAreasValue.h"
 #include "CSSInheritedValue.h"
 #include "CSSInitialValue.h"
+#include "CSSLineBoxContainValue.h"
 #include "CSSParserFastPaths.h"
 #include "CSSParserIdioms.h"
 #include "CSSPendingSubstitutionValue.h"
@@ -266,6 +267,27 @@ RefPtr<CSSValue> CSSPropertyParser::parseSingleValue(CSSPropertyID property, con
     return value;
 }
 
+static bool isLegacyBreakProperty(CSSPropertyID propertyID)
+{
+    switch (propertyID) {
+    case CSSPropertyPageBreakAfter:
+    case CSSPropertyPageBreakBefore:
+    case CSSPropertyPageBreakInside:
+    case CSSPropertyWebkitColumnBreakAfter:
+    case CSSPropertyWebkitColumnBreakBefore:
+    case CSSPropertyWebkitColumnBreakInside:
+#if ENABLE(CSS_REGIONS)
+    case CSSPropertyWebkitRegionBreakAfter:
+    case CSSPropertyWebkitRegionBreakBefore:
+    case CSSPropertyWebkitRegionBreakInside:
+#endif
+        return true;
+    default:
+        break;
+    }
+    return false;
+}
+
 bool CSSPropertyParser::parseValueStart(CSSPropertyID propertyID, bool important)
 {
     if (consumeCSSWideKeyword(propertyID, important))
@@ -277,6 +299,11 @@ bool CSSPropertyParser::parseValueStart(CSSPropertyID propertyID, bool important
     if (isShorthand) {
         // Variable references will fail to parse here and will fall out to the variable ref parser below.
         if (parseShorthand(propertyID, important))
+            return true;
+    } else if (isLegacyBreakProperty(propertyID)) {
+        // FIXME-NEWPARSER: Can turn this into a shorthand once old parser is gone, and then
+        // we don't need the special case.
+        if (consumeLegacyBreakProperty(propertyID, important))
             return true;
     } else {
         RefPtr<CSSValue> parsedValue = parseSingleValue(propertyID);
@@ -706,13 +733,13 @@ static String concatenateFamilyName(CSSParserTokenRange& range)
 static RefPtr<CSSValue> consumeFamilyName(CSSParserTokenRange& range)
 {
     if (range.peek().type() == StringToken)
-        return CSSPrimitiveValue::create(range.consumeIncludingWhitespace().value().toString(), CSSPrimitiveValue::UnitTypes::CSS_STRING);
+        return CSSValuePool::singleton().createFontFamilyValue(range.consumeIncludingWhitespace().value().toString());
     if (range.peek().type() != IdentToken)
         return nullptr;
     String familyName = concatenateFamilyName(range);
     if (familyName.isNull())
         return nullptr;
-    return CSSPrimitiveValue::create(familyName, CSSPrimitiveValue::UnitTypes::CSS_STRING);
+    return CSSValuePool::singleton().createFontFamilyValue(familyName);
 }
 
 static RefPtr<CSSValue> consumeGenericFamily(CSSParserTokenRange& range)
@@ -3007,6 +3034,66 @@ static RefPtr<CSSValue> consumeGridTemplateAreas(CSSParserTokenRange& range)
     return CSSGridTemplateAreasValue::create(gridAreaMap, rowCount, columnCount);
 }
 
+#if ENABLE(CSS_REGIONS)
+static RefPtr<CSSValue> consumeFlowProperty(CSSParserTokenRange& range)
+{
+    RefPtr<CSSValue> result;
+    if (range.peek().id() == CSSValueNone)
+        result = consumeIdent(range);
+    else
+        result = consumeCustomIdent(range);
+    return result;
+}
+#endif
+
+static RefPtr<CSSValue> consumeLineBoxContain(CSSParserTokenRange& range)
+{
+    if (range.peek().id() == CSSValueNone)
+        return consumeIdent(range);
+
+    LineBoxContain lineBoxContain = LineBoxContainNone;
+    
+    while (range.peek().type() == IdentToken) {
+        auto id = range.peek().id();
+        if (id == CSSValueBlock) {
+            if (lineBoxContain & LineBoxContainBlock)
+                return nullptr;
+            lineBoxContain |= LineBoxContainBlock;
+        } else if (id == CSSValueInline) {
+            if (lineBoxContain & LineBoxContainInline)
+                return nullptr;
+            lineBoxContain |= LineBoxContainInline;
+        } else if (id == CSSValueFont) {
+            if (lineBoxContain & LineBoxContainFont)
+                return nullptr;
+            lineBoxContain |= LineBoxContainFont;
+        } else if (id == CSSValueGlyphs) {
+            if (lineBoxContain & LineBoxContainGlyphs)
+                return nullptr;
+            lineBoxContain |= LineBoxContainGlyphs;
+        } else if (id == CSSValueReplaced) {
+            if (lineBoxContain & LineBoxContainReplaced)
+                return nullptr;
+            lineBoxContain |= LineBoxContainReplaced;
+        } else if (id == CSSValueInlineBox) {
+            if (lineBoxContain & LineBoxContainInlineBox)
+                return nullptr;
+            lineBoxContain |= LineBoxContainInlineBox;
+        } else if (id == CSSValueInitialLetter) {
+            if (lineBoxContain & LineBoxContainInitialLetter)
+                return nullptr;
+            lineBoxContain |= LineBoxContainInitialLetter;
+        } else
+            return nullptr;
+        range.consumeIncludingWhitespace();
+    }
+    
+    if (!lineBoxContain)
+        return nullptr;
+    
+    return CSSLineBoxContainValue::create(lineBoxContain);
+}
+
 RefPtr<CSSValue> CSSPropertyParser::parseSingleValue(CSSPropertyID property, CSSPropertyID currentShorthand)
 {
     if (CSSParserFastPaths::isKeywordPropertyID(property)) {
@@ -3138,9 +3225,9 @@ RefPtr<CSSValue> CSSPropertyParser::parseSingleValue(CSSPropertyID property, CSS
     case CSSPropertyGridColumnGap:
     case CSSPropertyGridRowGap:
         return consumeLength(m_range, m_context.mode, ValueRangeNonNegative);
-    case CSSPropertyWebkitShapeMargin:
+    case CSSPropertyShapeMargin:
         return consumeLengthOrPercent(m_range, m_context.mode, ValueRangeNonNegative);
-    case CSSPropertyWebkitShapeImageThreshold:
+    case CSSPropertyShapeImageThreshold:
         return consumeNumber(m_range, ValueRangeAll);
     case CSSPropertyWebkitBoxOrdinalGroup:
     case CSSPropertyOrphans:
@@ -3297,7 +3384,7 @@ RefPtr<CSSValue> CSSPropertyParser::parseSingleValue(CSSPropertyID property, CSS
         return consumeIdent<CSSValueAuto, CSSValueUnder>(m_range);
     case CSSPropertyVerticalAlign:
         return consumeVerticalAlign(m_range, m_context.mode);
-    case CSSPropertyWebkitShapeOutside:
+    case CSSPropertyShapeOutside:
         return consumeShapeOutside(m_range, m_context);
     case CSSPropertyWebkitClipPath:
         return consumeWebkitClipPath(m_range, m_context);
@@ -3321,6 +3408,8 @@ RefPtr<CSSValue> CSSPropertyParser::parseSingleValue(CSSPropertyID property, CSS
         return consumeWebkitBorderImage(property, m_range, m_context);
     case CSSPropertyWebkitBoxReflect:
         return consumeReflect(m_range, m_context);
+    case CSSPropertyWebkitLineBoxContain:
+        return consumeLineBoxContain(m_range);
 #if ENABLE(CSS_IMAGE_ORIENTATION)
     case CSSPropertyImageOrientation:
         return consumeImageOrientation(m_range, m_context.mode);
@@ -3368,6 +3457,11 @@ RefPtr<CSSValue> CSSPropertyParser::parseSingleValue(CSSPropertyID property, CSS
         return consumeGridTemplateAreas(m_range);
     case CSSPropertyGridAutoFlow:
         return consumeGridAutoFlow(m_range);
+#if ENABLE(CSS_REGIONS)
+    case CSSPropertyWebkitFlowInto:
+    case CSSPropertyWebkitFlowFrom:
+        return consumeFlowProperty(m_range);
+#endif
     default:
         return nullptr;
     }
@@ -3986,8 +4080,10 @@ static inline CSSValueID mapFromPageBreakBetween(CSSValueID value)
 {
     if (value == CSSValueAlways)
         return CSSValuePage;
-    if (value == CSSValueAuto || value == CSSValueAvoid || value == CSSValueLeft || value == CSSValueRight)
+    if (value == CSSValueAuto || value == CSSValueLeft || value == CSSValueRight)
         return value;
+    if (value == CSSValueAvoid)
+        return CSSValueAvoidPage;
     return CSSValueInvalid;
 }
 
@@ -3995,12 +4091,27 @@ static inline CSSValueID mapFromColumnBreakBetween(CSSValueID value)
 {
     if (value == CSSValueAlways)
         return CSSValueColumn;
-    if (value == CSSValueAuto || value == CSSValueAvoid)
+    if (value == CSSValueAuto)
         return value;
+    if (value == CSSValueAvoid)
+        return CSSValueAvoidColumn;
     return CSSValueInvalid;
 }
 
-static inline CSSValueID mapFromColumnOrPageBreakInside(CSSValueID value)
+#if ENABLE(CSS_REGIONS)
+static inline CSSValueID mapFromRegionBreakBetween(CSSValueID value)
+{
+    if (value == CSSValueAlways)
+        return CSSValueRegion;
+    if (value == CSSValueAuto)
+        return value;
+    if (value == CSSValueAvoid)
+        return CSSValueAvoidRegion;
+    return CSSValueInvalid;
+}
+#endif
+
+static inline CSSValueID mapFromColumnRegionOrPageBreakInside(CSSValueID value)
 {
     if (value == CSSValueAuto || value == CSSValueAvoid)
         return value;
@@ -4013,7 +4124,15 @@ static inline CSSPropertyID mapFromLegacyBreakProperty(CSSPropertyID property)
         return CSSPropertyBreakAfter;
     if (property == CSSPropertyPageBreakBefore || property == CSSPropertyWebkitColumnBreakBefore)
         return CSSPropertyBreakBefore;
+#if ENABLE(CSS_REGIONS)
+    if (property == CSSPropertyWebkitRegionBreakAfter)
+        return CSSPropertyBreakAfter;
+    if (property == CSSPropertyWebkitRegionBreakBefore)
+        return CSSPropertyBreakBefore;
+    ASSERT(property == CSSPropertyPageBreakInside || property == CSSPropertyWebkitColumnBreakInside || property == CSSPropertyWebkitRegionBreakInside);
+#else
     ASSERT(property == CSSPropertyPageBreakInside || property == CSSPropertyWebkitColumnBreakInside);
+#endif
     return CSSPropertyBreakInside;
 }
 
@@ -4037,9 +4156,16 @@ bool CSSPropertyParser::consumeLegacyBreakProperty(CSSPropertyID property, bool 
     case CSSPropertyWebkitColumnBreakBefore:
         value = mapFromColumnBreakBetween(value);
         break;
+#if ENABLE(CSS_REGIONS)
+    case CSSPropertyWebkitRegionBreakAfter:
+    case CSSPropertyWebkitRegionBreakBefore:
+        value = mapFromRegionBreakBetween(value);
+        break;
+    case CSSPropertyWebkitRegionBreakInside:
+#endif
     case CSSPropertyPageBreakInside:
     case CSSPropertyWebkitColumnBreakInside:
-        value = mapFromColumnOrPageBreakInside(value);
+        value = mapFromColumnRegionOrPageBreakInside(value);
         break;
     default:
         ASSERT_NOT_REACHED();
@@ -4413,10 +4539,9 @@ bool CSSPropertyParser::parseShorthand(CSSPropertyID property, bool important)
         CSSValueID id = m_range.consumeIncludingWhitespace().id();
         if (!CSSParserFastPaths::isValidKeywordPropertyAndValue(CSSPropertyWebkitMarginBeforeCollapse, id, m_context.mode))
             return false;
-        RefPtr<CSSValue> beforeCollapse = CSSValuePool::singleton().createIdentifierValue(id);
-        addProperty(CSSPropertyWebkitMarginBeforeCollapse, CSSPropertyWebkitMarginCollapse, beforeCollapse.releaseNonNull(), important);
+        addProperty(CSSPropertyWebkitMarginBeforeCollapse, CSSPropertyWebkitMarginCollapse, CSSValuePool::singleton().createIdentifierValue(id), important);
         if (m_range.atEnd()) {
-            addProperty(CSSPropertyWebkitMarginAfterCollapse, CSSPropertyWebkitMarginCollapse, beforeCollapse.releaseNonNull(), important);
+            addProperty(CSSPropertyWebkitMarginAfterCollapse, CSSPropertyWebkitMarginCollapse, CSSValuePool::singleton().createIdentifierValue(id), important);
             return true;
         }
         id = m_range.consumeIncludingWhitespace().id();
@@ -4528,13 +4653,6 @@ bool CSSPropertyParser::parseShorthand(CSSPropertyID property, bool important)
         return consumeBorder(important);
     case CSSPropertyBorderImage:
         return consumeBorderImage(property, important);
-    case CSSPropertyPageBreakAfter:
-    case CSSPropertyPageBreakBefore:
-    case CSSPropertyPageBreakInside:
-    case CSSPropertyWebkitColumnBreakAfter:
-    case CSSPropertyWebkitColumnBreakBefore:
-    case CSSPropertyWebkitColumnBreakInside:
-        return consumeLegacyBreakProperty(property, important);
     case CSSPropertyWebkitMaskPosition:
     case CSSPropertyBackgroundPosition: {
         RefPtr<CSSValue> resultX;

@@ -1,3 +1,286 @@
+2016-10-22  Dan Bernstein  <mitz@apple.com>
+
+        [iOS] _webViewWillEndNavigationGesture:withNavigationToBackForwardListItem: is never called
+        https://bugs.webkit.org/show_bug.cgi?id=163758
+
+        Reviewed by Darin Adler.
+
+        * UIProcess/ios/ViewGestureControllerIOS.mm:
+        (WebKit::ViewGestureController::beginSwipeGesture): Don’t reset the interactive update
+          handler.
+
+2016-10-21  David Kilzer  <ddkilzer@apple.com>
+
+        Bug 163762: IntSize::area() should used checked arithmetic
+        <https://webkit.org/b/163762>
+
+        Reviewed by Darin Adler.
+
+        * Shared/ShareableBitmap.cpp:
+        (WebKit::ShareableBitmap::create): Add overflow check and return
+        nullptr on overflow.
+        (WebKit::ShareableBitmap::createShareable): Ditto.
+        (WebKit::ShareableBitmap::create): Change debug assert for
+        adequate buffer size check into release check.
+        * Shared/ShareableBitmap.h:
+        (WebKit::ShareableBitmap::numBytesForSize): Change to return a
+        Checked<unsigned, RecordOverflow> value.
+        (WebKit::ShareableBitmap::sizeInBytes):
+        * Shared/cairo/ShareableBitmapCairo.cpp:
+        (WebKit::ShareableBitmap::numBytesForSize): Ditto.
+        * UIProcess/API/Cocoa/WKWebView.mm:
+        (-[WKWebView _takeViewSnapshot]): Call unsafeGet().
+
+2016-10-21  Eric Carlson  <eric.carlson@apple.com>
+
+        [MediaStream] Dynamically generate media capture sandbox extensions
+        https://bugs.webkit.org/show_bug.cgi?id=154861
+        <rdar://problem/24909411>
+
+        Reviewed by Tim Horton.
+
+        * Shared/SandboxExtension.h:
+        (WebKit::SandboxExtension::createHandleForGenericExtension):
+        * Shared/mac/SandboxExtensionMac.mm:
+        (WebKit::wkSandboxExtensionType): Add case for generic handle.
+        (WebKit::SandboxExtension::createHandleForGenericExtension): New.
+
+        * UIProcess/UserMediaPermissionRequestManagerProxy.cpp:
+        (WebKit::UserMediaPermissionRequestManagerProxy::invalidateRequests): Clear the list of extensions granted.
+        (WebKit::UserMediaPermissionRequestManagerProxy::userMediaAccessWasGranted): Extend the web 
+          process sandbox as necessary.
+        * UIProcess/UserMediaPermissionRequestManagerProxy.h:
+
+        * WebProcess/MediaStream/UserMediaPermissionRequestManager.cpp:
+        (WebKit::UserMediaPermissionRequestManager::~UserMediaPermissionRequestManager): Revoke all
+          sandbox extensions.
+        (WebKit::UserMediaPermissionRequestManager::grantUserMediaDevicesSandboxExtension): Consume
+          sandbox extensions.
+        * WebProcess/MediaStream/UserMediaPermissionRequestManager.h:
+
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::grantUserMediaDevicesSandboxExtension): Pass-through to user media manager.
+        * WebProcess/WebPage/WebPage.h:
+
+        * WebProcess/WebPage/WebPage.messages.in: Add GrantUserMediaDevicesSandboxExtension.
+
+        * WebProcess/com.apple.WebProcess.sb.in: Add rules, defines, and a macro to allow dynamic extensions
+          for media capture devices.
+
+2016-10-21  Gavin Barraclough  <barraclough@apple.com>
+
+        WebPageProxy should not need PageActivityState
+        https://bugs.webkit.org/show_bug.cgi?id=163821
+
+        Reviewed by Geoff Garen.
+
+        The PageActivityState is currently plumbed back from WebCore up to the UI process, to
+        determine whether to enabled process suppression. However the information it contains
+        (whether a page load is ongoing, whether audio is playing) is already available via
+        other means. Remove this use of PageActivityState.
+
+        * UIProcess/PageLoadState.cpp:
+        (WebKit::PageLoadState::commitChanges):
+            - PageLoadState notifies WebPageProxy when loading state changes.
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::updateThrottleState):
+            - Now relies on info from PageLoadState, setMuted, isPlayingMediaDidChange.
+        (WebKit::WebPageProxy::setMuted):
+        (WebKit::WebPageProxy::isPlayingMediaDidChange):
+            - If audio playback state changes we may need to update the throttle state.
+        (WebKit::WebPageProxy::setPageActivityState): Deleted.
+            - removed PageActivityState from WK2.
+        * UIProcess/WebPageProxy.h:
+        (WebKit::WebPageProxy::isLoadingChanged):
+            - PageLoadState notifies WebPageProxy when loading state changes.
+        * UIProcess/WebPageProxy.messages.in:
+            - removed PageActivityState from WK2.
+        * WebProcess/WebCoreSupport/WebChromeClient.cpp:
+        (WebKit::WebChromeClient::setPageActivityState): Deleted.
+            - removed PageActivityState from WK2.
+        * WebProcess/WebCoreSupport/WebChromeClient.h:
+            - removed PageActivityState from WK2.
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::setPageActivityState): Deleted.
+            - removed PageActivityState from WK2.
+        * WebProcess/WebPage/WebPage.h:
+            - removed PageActivityState from WK2.
+
+2016-10-21  Gavin Barraclough  <barraclough@apple.com>
+
+        WebPage should take UserActivity directly for user input
+        https://bugs.webkit.org/show_bug.cgi?id=163813
+
+        Reviewed by Anders Carlsson.
+
+        When we receive mouse/keyboard events in a page, we want to prevent AppNap. We currently do so
+        via the PageThrottler. This patch is to just make the WebPage drive the UserActivity directly.
+
+        Two reasons to do so: (1) to cleanup & simplify for further refactoring. (2) The current code
+        isn't really achieving the desired effect. The page setting the flag in the throttler to get
+        the activity to be set is now a less effective way of achieving this goal, since the
+        PageActivityState bounces back across to the UI process & then messages back to the WebContent
+        process to take the UserActivity. These extra hops defeat the purpose of making sure the boost
+        from the initial message isn't lost.
+
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::m_userActivityHysteresis):
+            - m_userActivityHysteresis triggers updateUserActivity.
+        (WebKit::WebPage::setPageSuppressed):
+            - setPageSuppressed starts/stops m_userActivityHysteresis.
+        (WebKit::WebPage::updateUserActivity):
+            - update UserActivity based on state of m_userActivityHysteresis.
+        (WebKit::WebPage::mouseEvent):
+        (WebKit::WebPage::wheelEvent):
+        (WebKit::WebPage::keyEvent):
+            - input events impulse m_userActivityHysteresis.
+        * WebProcess/WebPage/WebPage.h:
+
+2016-10-21  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        Support (insertFrom|deleteBy)Composition and (insert|delete)CompositionText inputTypes for InputEvents
+        https://bugs.webkit.org/show_bug.cgi?id=163460
+        <rdar://problem/28784142>
+
+        Reviewed by Darin Adler.
+
+        Handle new EditAction types for inserting/deleting pending/final compositions.
+
+        * UIProcess/WebEditCommandProxy.cpp:
+        (WebKit::WebEditCommandProxy::nameForEditAction):
+
+2016-10-21  Jeremy Jones  <jeremyj@apple.com>
+
+        Implement basic pointer lock behavior for WebKit and WebKit2.
+        https://bugs.webkit.org/show_bug.cgi?id=162745
+
+        Reviewed by Simon Fraser.
+
+        Enable basic pointer lock functionality by plumbing requests through WebPage IPC.
+        Pass through mouse movement deltas.
+        Unlock pointer when view is no longer visible.
+
+        * Shared/WebEventConversion.cpp:
+        (WebKit::WebKit2PlatformMouseEvent::WebKit2PlatformMouseEvent): Pass along mouse movement.
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::dispatchViewStateChange): Unlock pointer when page is not visible.
+        (WebKit::WebPageProxy::requestPointerLock): Hide and disassociate pointer.
+        (WebKit::WebPageProxy::requestPointerUnlock): Show and associate pointer.
+        * UIProcess/WebPageProxy.h:
+        * UIProcess/WebPageProxy.messages.in: Add methods.
+        * WebProcess/WebCoreSupport/WebChromeClient.cpp:
+        (WebKit::WebChromeClient::requestPointerLock): Pass along to web page.
+        (WebKit::WebChromeClient::requestPointerUnlock): Ditto.
+        * WebProcess/WebCoreSupport/WebChromeClient.h:
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::didAcquirePointerLock): Forward to PointerLockController.
+        (WebKit::WebPage::didNotAcquirePointerLock): Ditto.
+        (WebKit::WebPage::didLosePointerLock): Ditto.
+        * WebProcess/WebPage/WebPage.h:
+        * WebProcess/WebPage/WebPage.messages.in: Add methods.
+
+2016-10-21  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        Implement InputEvent.getTargetRanges() for the input events spec
+        https://bugs.webkit.org/show_bug.cgi?id=162947
+        <rdar://problem/28853079>
+
+        Reviewed by Darin Adler.
+
+        Boilerplate change to add a runtime guard for InputEvents-related IDL interfaces. See WebCore ChangeLog entry
+        for more details.
+
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::updatePreferences):
+
+2016-10-20  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Configures but fails to link with ENABLE_OPENGL=OFF
+        https://bugs.webkit.org/show_bug.cgi?id=163449
+
+        Reviewed by Michael Catanzaro.
+
+        * UIProcess/API/gtk/WebKitWebViewBase.cpp:
+        (webkitWebViewBaseRealize): Check TEXTURE_MAPPER_GL instead of TEXTURE_MAPPER and also ensure the current
+        display is X11.
+        (webkitWebViewBaseUnrealize): Ditto.
+        (webkitWebViewBaseDidRelaunchWebProcess): Check TEXTURE_MAPPER_GL instead of TEXTURE_MAPPER.
+        (webkitWebViewBasePageClosed): Ditto.
+        * UIProcess/AcceleratedDrawingAreaProxy.cpp:
+        (WebKit::AcceleratedDrawingAreaProxy::didUpdateBackingStoreState): Ditto.
+        (WebKit::AcceleratedDrawingAreaProxy::waitForAndDispatchDidUpdateBackingStoreState): Check EGL is enabled before
+        trying to use the WaylandCompositor.
+        * UIProcess/AcceleratedDrawingAreaProxy.h:
+        * UIProcess/WebProcessPool.cpp:
+        (WebKit::WebProcessPool::createNewWebProcess): Ditto.
+        * UIProcess/gtk/AcceleratedBackingStore.cpp:
+        (WebKit::AcceleratedBackingStore::create): Ditto.
+        * UIProcess/gtk/AcceleratedBackingStoreWayland.cpp:
+        * UIProcess/gtk/WaylandCompositor.cpp:
+        * UIProcess/gtk/WaylandCompositor.h:
+        * WebProcess/WebPage/AcceleratedDrawingArea.cpp:
+        (WebKit::AcceleratedDrawingArea::enterAcceleratedCompositingMode): Check TEXTURE_MAPPER_GL instead of TEXTURE_MAPPER.
+        * WebProcess/WebPage/AcceleratedDrawingArea.h:
+        * WebProcess/WebPage/DrawingArea.h:
+        * WebProcess/WebPage/DrawingArea.messages.in:
+        * WebProcess/WebPage/LayerTreeHost.h:
+
+2016-10-20  Chris Dumez  <cdumez@apple.com>
+
+        "Download Linked File" context menu action should use 'download' attribute as suggested filename
+        https://bugs.webkit.org/show_bug.cgi?id=163742
+        <rdar://problem/28840734>
+
+        Reviewed by Darin Adler.
+
+        Update "Download Linked File" context menu action to use the anchor
+        element's 'download' attribute as suggested filename for the download.
+
+        * NetworkProcess/NetworkProcess.cpp:
+        (WebKit::NetworkProcess::downloadRequest):
+        * NetworkProcess/NetworkProcess.h:
+        * NetworkProcess/NetworkProcess.messages.in:
+        * Shared/WebHitTestResultData.cpp:
+        (WebKit::WebHitTestResultData::WebHitTestResultData):
+        (WebKit::WebHitTestResultData::encode):
+        (WebKit::WebHitTestResultData::decode):
+        * Shared/WebHitTestResultData.h:
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::contextMenuItemSelected):
+        * UIProcess/WebProcessPool.cpp:
+        (WebKit::WebProcessPool::download):
+        * UIProcess/WebProcessPool.h:
+        * WebProcess/InjectedBundle/InjectedBundleHitTestResult.cpp:
+        (WebKit::InjectedBundleHitTestResult::linkSuggestedFilename):
+
+2016-10-19  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        [macOS] [iOS] Disable variation fonts on macOS El Capitan and iOS 9
+        https://bugs.webkit.org/show_bug.cgi?id=163374
+
+        Reviewed by Darin Adler.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2016-10-20  Brady Eidson  <beidson@apple.com>
+
+        IndexedDB 2.0: Support IDBObjectStore name assignment.
+        <rdar://problem/28806931> and https://bugs.webkit.org/show_bug.cgi?id=163749
+
+        Reviewed by Alex Christensen.
+
+        * DatabaseProcess/IndexedDB/WebIDBConnectionToClient.cpp:
+        (WebKit::WebIDBConnectionToClient::didRenameObjectStore):
+        (WebKit::WebIDBConnectionToClient::renameObjectStore):
+        * DatabaseProcess/IndexedDB/WebIDBConnectionToClient.h:
+        * DatabaseProcess/IndexedDB/WebIDBConnectionToClient.messages.in:
+
+        * WebProcess/Databases/IndexedDB/WebIDBConnectionToServer.cpp:
+        (WebKit::WebIDBConnectionToServer::renameObjectStore):
+        (WebKit::WebIDBConnectionToServer::didRenameObjectStore):
+        * WebProcess/Databases/IndexedDB/WebIDBConnectionToServer.h:
+        * WebProcess/Databases/IndexedDB/WebIDBConnectionToServer.messages.in:
+
 2016-10-20  Carlos Garcia Campos  <cgarcia@igalia.com>
 
         [GTK] Avoid strstr() when checking (E)GL extensions

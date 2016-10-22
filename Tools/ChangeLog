@@ -1,3 +1,164 @@
+2016-10-22  Dan Bernstein  <mitz@apple.com>
+
+        Improve MiniBrowser window titles for URLs without paths and with no title
+        <https://webkit.org/b/163843>
+
+        Reviewed by Darin Adler.
+
+        * MiniBrowser/mac/WK1BrowserWindowController.m:
+        (-[WK1BrowserWindowController fetch:]): While we’re here, deploy
+          +[NSURL _webkit_URLWithUserTypedString:] here to match the WK2BrowserWindowController
+          version of this method.
+        (-[WK1BrowserWindowController updateTitle:]): If the URL doesn’t have a lastPathComponent,
+          use the entire URL.
+        (-[WK1BrowserWindowController webView:didCommitLoadForFrame:]): Also while we’re here,
+          deploy +[NSURL _web_userVisibleString] here to match the WK2BrowserWindowController
+          behavior.
+
+        * MiniBrowser/mac/WK2BrowserWindowController.m:
+        (-[WK2BrowserWindowController updateTitle:]): If the URL doesn’t have a lastPathComponent,
+          use the entire URL.
+
+2016-10-21  David Kilzer  <ddkilzer@apple.com>
+
+        Bug 163762: IntSize::area() should used checked arithmetic
+        <https://webkit.org/b/163762>
+
+        Reviewed by Darin Adler.
+
+        * TestWebKitAPI/Tests/WebCore/IntRect.cpp:
+        (TestWebKitAPI::TEST): Call unsafeGet().
+        * TestWebKitAPI/Tests/WebCore/IntSize.cpp:
+        (TestWebKitAPI::TEST): Ditto.
+
+2016-10-21  James Craig  <jcraig@apple.com>
+
+        Unreviewed: Added Aaron Chu <aaron_chu@apple.com> to contributors list.
+
+        * Scripts/webkitpy/common/config/contributors.json:
+
+2016-10-21  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r207582.
+        https://bugs.webkit.org/show_bug.cgi?id=163819
+
+        Not quite ready rdar://problem/28897179 (Requested by
+        alexchristensen on #webkit).
+
+        Reverted changeset:
+
+        "Re-enable URLParser for non-Safari Cocoa apps after r207321"
+        https://bugs.webkit.org/show_bug.cgi?id=163690
+        http://trac.webkit.org/changeset/207582
+
+2016-10-21  Jonathan Bedard  <jbedard@apple.com>
+
+        WebKitTestRunnerApp packages .idl file
+        https://bugs.webkit.org/show_bug.cgi?id=163788
+
+        Reviewed by Darin Adler.
+
+        * WebKitTestRunner/WebKitTestRunner.xcodeproj/project.pbxproj: Removed .idl file from app package, removed bad reference to app icon.
+
+2016-10-21  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [EFL] REGRESSION(r207616): Build is broken due to missing libgeoclue-dev package
+        https://bugs.webkit.org/show_bug.cgi?id=163733
+
+        Reviewed by Gyuyoung Kim.
+
+        * efl/install-dependencies: Added geoclue-2.0 package.
+
+2016-10-21  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r207609.
+        https://bugs.webkit.org/show_bug.cgi?id=163776
+
+        As glib bump was rollout, we need to rollout this too
+        (Requested by rego on #webkit).
+
+        Reverted changeset:
+
+        "[GTK] Cannot build GTK+ with CUPS 2.* versions"
+        https://bugs.webkit.org/show_bug.cgi?id=163591
+        http://trac.webkit.org/changeset/207609
+
+2016-10-20  Chris Dumez  <cdumez@apple.com>
+
+        "Download Linked File" context menu action should use 'download' attribute as suggested filename
+        https://bugs.webkit.org/show_bug.cgi?id=163742
+        <rdar://problem/28840734>
+
+        Reviewed by Darin Adler.
+
+        Add API test coverage.
+
+        * TestWebKitAPI/TestWebKitAPI.xcodeproj/project.pbxproj:
+        * TestWebKitAPI/Tests/WebKit2/link-with-download-attribute.html: Added.
+        * TestWebKitAPI/Tests/WebKit2/mac/ContextMenuDownload.mm: Added.
+        (TestWebKitAPI::didFinishLoadForFrame):
+        (TestWebKitAPI::getContextMenuFromProposedMenu):
+        (TestWebKitAPI::decideDestinationWithSuggestedFilename):
+        (TestWebKitAPI::TEST):
+
+2016-10-20  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r207589.
+        https://bugs.webkit.org/show_bug.cgi?id=163765
+
+        Introduced 17 new layout test failures (Requested by
+        mcatanzaro on #webkit).
+
+        Reverted changeset:
+
+        "[GTK] Bump glib to 2.50.1"
+        https://bugs.webkit.org/show_bug.cgi?id=163689
+        http://trac.webkit.org/changeset/207589
+
+2016-10-19  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        [macOS] [iOS] Disable variation fonts on macOS El Capitan and iOS 9
+        https://bugs.webkit.org/show_bug.cgi?id=163374
+
+        Reviewed by Darin Adler.
+
+        * TestWebKitAPI/Configurations/FeatureDefines.xcconfig:
+
+2016-10-20  Sam Weinig  <sam@webkit.org>
+
+        Add convenience function that combines WTF::visit(...) with WTF::makeVisitor(...)
+        https://bugs.webkit.org/show_bug.cgi?id=163713
+
+        Reviewed by Dan Bernstein.
+
+        * TestWebKitAPI/Tests/WTF/Variant.cpp:
+        Add test for WTF::switchOn()
+
+2016-10-20  Fujii Hironori  <Hironori.Fujii@sony.com>
+
+        [CMake] CMake does not support the dep files for implicit dependency
+        https://bugs.webkit.org/show_bug.cgi?id=161433
+
+        Reviewed by Brent Fulgham.
+
+        Created a Perl script to generate all IDL bindings for CMake.
+        This script can regenerate outdated bindings by based on the
+        supplemental dependency and dep files created by
+        '--write-dependencies' switch of generate-bindings.pl.
+
+        add_custom_target is used to invoke the script instead of
+        add_custom_command because Ninja deletes all output files before
+        executing the command in case of add_custom_command.
+
+        USES_TERMINAL option of add_custom_target has two effects:
+        1) Not buffering output of the command
+        2) Invoking the command in the special Ninja pool which inhibits parallel build
+        One needs to use CMake 3.2 or later to enable this feature.
+
+        * DumpRenderTree/CMakeLists.txt: Specified a target name for
+        GENERATE_BINDINGS. Added dependency for the target.
+        * WebKitTestRunner/CMakeLists.txt: Ditto.
+
 2016-10-20  Manuel Rego Casasnovas  <rego@igalia.com>
 
         [GTK] Cannot build GTK+ with CUPS 2.* versions

@@ -1549,6 +1549,11 @@ void WebPageProxy::dispatchViewStateChange()
     if ((changed & ViewState::IsVisible) && !isViewVisible())
         m_process->responsivenessTimer().stop();
 
+#if ENABLE(POINTER_LOCK)
+    if ((changed & ViewState::IsVisible) && !isViewVisible())
+        requestPointerUnlock();
+#endif
+
     if (changed & ViewState::IsInWindow) {
         if (isInWindow())
             viewDidEnterWindow();
@@ -1564,12 +1569,6 @@ void WebPageProxy::dispatchViewStateChange()
     m_potentiallyChangedViewStateFlags = ViewState::NoFlags;
     m_viewStateChangeWantsSynchronousReply = false;
     m_viewWasEverInWindow |= isNowInWindow;
-}
-
-void WebPageProxy::setPageActivityState(WebCore::PageActivityState::Flags activityState)
-{
-    m_activityState = activityState;
-    updateThrottleState();
 }
 
 bool WebPageProxy::isAlwaysOnLoggingAllowed() const
@@ -1588,7 +1587,9 @@ void WebPageProxy::updateThrottleState()
         m_preventProcessSuppressionCount = nullptr;
 
     // We should suppress if the page is not active, is visually idle, and supression is enabled.
-    bool pageShouldBeSuppressed = !m_activityState && processSuppressionEnabled && (m_viewState & ViewState::IsVisuallyIdle);
+    bool isLoading = m_pageLoadState.isLoading();
+    bool isPlayingAudio = m_mediaState & MediaProducer::IsPlayingAudio && !m_muted;
+    bool pageShouldBeSuppressed = !isLoading && !isPlayingAudio && processSuppressionEnabled && (m_viewState & ViewState::IsVisuallyIdle);
     if (m_pageSuppressed != pageShouldBeSuppressed) {
         m_pageSuppressed = pageShouldBeSuppressed;
         m_process->send(Messages::WebPage::SetPageSuppressed(m_pageSuppressed), m_pageID);
@@ -4162,6 +4163,8 @@ void WebPageProxy::setMuted(bool muted)
         return;
 
     m_process->send(Messages::WebPage::SetMuted(muted), m_pageID);
+
+    updateThrottleState();
 }
 
 #if ENABLE(MEDIA_SESSION)
@@ -4587,7 +4590,8 @@ void WebPageProxy::contextMenuItemSelected(const WebContextMenuItemData& item)
         return;    
     }
     if (item.action() == ContextMenuItemTagDownloadLinkToDisk) {
-        m_process->processPool().download(this, URL(URL(), m_activeContextMenuContextData.webHitTestResultData().absoluteLinkURL));
+        auto& hitTestResult = m_activeContextMenuContextData.webHitTestResultData();
+        m_process->processPool().download(this, URL(URL(), hitTestResult.absoluteLinkURL), hitTestResult.linkSuggestedFilename);
         return;
     }
     if (item.action() == ContextMenuItemTagDownloadMediaToDisk) {
@@ -6347,6 +6351,8 @@ void WebPageProxy::isPlayingMediaDidChange(MediaProducer::MediaStateFlags state,
     MediaProducer::MediaStateFlags oldState = m_mediaState;
     m_mediaState = state;
 
+    updateThrottleState();
+
     playingMediaMask |= MediaProducer::HasActiveMediaCaptureDevice;
     if ((oldState & playingMediaMask) != (m_mediaState & playingMediaMask))
         m_uiClient->isPlayingAudioDidChange(*this);
@@ -6619,5 +6625,37 @@ void WebPageProxy::setUserInterfaceLayoutDirection(WebCore::UserInterfaceLayoutD
 
     m_process->send(Messages::WebPage::SetUserInterfaceLayoutDirection(static_cast<uint32_t>(userInterfaceLayoutDirection)), m_pageID);
 }
+    
+#if ENABLE(POINTER_LOCK)
+void WebPageProxy::requestPointerLock()
+{
+    if (!isViewVisible()) {
+        m_process->send(Messages::WebPage::DidNotAcquirePointerLock(), m_pageID);
+        return;
+    }
+
+    didAllowPointerLock();
+}
+    
+void WebPageProxy::didAllowPointerLock()
+{
+    CGDisplayHideCursor(CGMainDisplayID());
+    CGAssociateMouseAndMouseCursorPosition(false);
+    m_process->send(Messages::WebPage::DidAcquirePointerLock(), m_pageID);
+}
+    
+void WebPageProxy::didDenyPointerLock()
+{
+    m_process->send(Messages::WebPage::DidNotAcquirePointerLock(), m_pageID);
+}
+
+void WebPageProxy::requestPointerUnlock()
+{
+    CGDisplayShowCursor(CGMainDisplayID());
+    CGAssociateMouseAndMouseCursorPosition(true);
+    m_process->send(Messages::WebPage::DidLosePointerLock(), m_pageID);
+}
+#endif
+
 
 } // namespace WebKit

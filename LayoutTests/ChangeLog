@@ -1,3 +1,387 @@
+2016-10-22  Nael Ouedraogo  <nael.ouedraogo@crf.canon.fr>
+
+        Bindings error message for missing required dictionary member should be more explicit
+        https://bugs.webkit.org/show_bug.cgi?id=163665
+
+        Reviewed by Darin Adler.
+
+        Update existing tests.
+
+        * fast/mediastream/MediaStreamTrackEvent-constructor-expected.txt:
+
+2016-10-22  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Upgrading custom element should enqueue attributeChanged and connected callbacks
+        https://bugs.webkit.org/show_bug.cgi?id=163840
+
+        Reviewed by Darin Adler.
+
+        Added a W3C style testharness.js test for making sure upgrading custom custom elements
+        would enqueue attributedChanged and connected reactions.
+
+        * fast/custom-elements/upgrading-enqueue-reactions-expected.txt: Added.
+        * fast/custom-elements/upgrading-enqueue-reactions.html: Added.
+
+2016-10-21  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Update custom elements tests
+        https://bugs.webkit.org/show_bug.cgi?id=163815
+
+        Reviewed by Joseph Pecoraro.
+
+        Removed the tests that have been upstreamed and reimported from web-platform-tests.
+
+        * fast/custom-elements/Document-createElement-expected.txt: Removed.
+        * fast/custom-elements/enqueue-custom-element-upgrade-reaction-expected.txt: Removed.
+        * fast/custom-elements/parser/: Removed.
+        * fast/custom-elements/upgrading/: Removed.
+
+2016-10-21  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        Unreviewed GTK test gardening
+
+        * platform/gtk/TestExpectations:
+        * platform/gtk/svg/W3C-SVG-1.1/struct-dom-03-b-expected.txt: Added.
+        * platform/gtk/svg/W3C-SVG-1.1/struct-dom-04-b-expected.txt: Added.
+        * platform/gtk/svg/W3C-SVG-1.1/struct-dom-05-b-expected.txt: Added.
+        * platform/gtk/svg/custom/dynamic-svg-document-creation-expected.txt:
+        * platform/gtk/svg/custom/simple-text-double-shadow.txt: Added.
+        * platform/gtk/svg/text/repaint-shadow-expected.txt: Added.
+        * platform/gtk/svg/text/text-hkern-on-vertical-text-expected.png:
+        * platform/gtk/svg/text/text-hkern-on-vertical-text-expected.txt: Added.
+        * platform/gtk/svg/text/text-vkern-on-horizontal-text-expected.txt: Added.
+
+2016-10-21  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        Support (insertFrom|deleteBy)Composition and (insert|delete)CompositionText inputTypes for InputEvents
+        https://bugs.webkit.org/show_bug.cgi?id=163460
+        <rdar://problem/28784142>
+
+        Reviewed by Darin Adler.
+
+        Adds 4 new layout tests to verify that composition events are dispatched as expected when using IME, and that
+        input events of type "insertFromComposition" and "deleteByComposition" can be prevented.
+
+        Also rebaselines an existing WK1 editing test (text-input-controller.html) to account for how we now delete the
+        existing composition text before inserting the finalized composition text in Editor::setComposition. This means
+        that there are a few more delegate calls than there were before (as seen in the expected output), although the
+        resulting behavior is still the same.
+
+        * editing/mac/input/text-input-controller-expected.txt:
+        * fast/events/before-input-events-prevent-insert-composition.html: Added.
+        * fast/events/before-input-events-prevent-recomposition.html: Added.
+        * fast/events/input-events-ime-composition.html: Added.
+        * fast/events/input-events-ime-recomposition.html: Added.
+        * platform/ios-simulator/TestExpectations:
+
+2016-10-20  Dean Jackson  <dino@apple.com>
+
+        SVG should not paint selection within a mask
+        https://bugs.webkit.org/show_bug.cgi?id=163772
+        <rdar://problem/28705129>
+
+        Reviewed by Simon Fraser.
+
+        * svg/masking/mask-should-not-paint-selection-expected.html: Added.
+        * svg/masking/mask-should-not-paint-selection.html: Added.
+
+2016-10-21  Zalan Bujtas  <zalan@apple.com>
+
+        Do not mutate the render tree while collecting selection repaint rects.
+        https://bugs.webkit.org/show_bug.cgi?id=163800
+        <rdar://problem/28806886>
+
+        Reviewed by David Hyatt.
+
+        * fast/lists/crash-when-list-marker-is-moved-during-selection-expected.txt: Added.
+        * fast/lists/crash-when-list-marker-is-moved-during-selection.html: Added.
+
+2016-10-21  Miguel Gomez  <magomez@igalia.com>
+
+        [GTK] Unreviewed gardening: update expectations after r207664
+        https://bugs.webkit.org/show_bug.cgi?id=163784
+
+        Unreviewed gardening.
+
+        * platform/gtk/TestExpectations:
+
+2016-10-21  Chris Dumez  <cdumez@apple.com>
+
+        AudioNode.connect(): First parameter should not be nullable
+        https://bugs.webkit.org/show_bug.cgi?id=163773
+
+        Reviewed by Darin Adler.
+
+        Improve test coverage.
+
+        * webaudio/audionode-expected.txt:
+        * webaudio/audionode.html:
+
+2016-10-21  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        Implement InputEvent.getTargetRanges() for the input events spec
+        https://bugs.webkit.org/show_bug.cgi?id=162947
+        <rdar://problem/28853079>
+
+        Reviewed by Darin Adler.
+
+        Adds 3 new layout tests and tweaks some existing unit tests. See WebCore ChangeLog entry for more details.
+        Tests verify the result of getTargetRanges() when breaking out of a list, deleting backwards and forwards at
+        all text granularities, deleting selected text, and spell checking (candidate text replacement).
+
+        * fast/events/before-input-delete-empty-list-target-ranges-expected.txt: Added.
+        * fast/events/before-input-delete-empty-list-target-ranges.html: Added.
+        * fast/events/before-input-delete-text-target-ranges-expected.txt: Added.
+        * fast/events/before-input-delete-text-target-ranges.html: Added.
+        * fast/events/before-input-events-prevent-default-in-textfield.html:
+        * fast/events/before-input-replace-text-target-ranges-expected.txt: Added.
+        * fast/events/before-input-replace-text-target-ranges.html: Added.
+        * fast/events/input-events-fired-when-typing-expected.txt:
+        * fast/events/input-events-fired-when-typing.html:
+        * js/dom/global-constructors-attributes-expected.txt:
+        * platform/ios-simulator/TestExpectations:
+        * platform/mac-wk1/js/dom/global-constructors-attributes-expected.txt:
+        * platform/mac-yosemite/js/dom/global-constructors-attributes-expected.txt:
+        * platform/mac/js/dom/global-constructors-attributes-expected.txt:
+
+2016-10-21  Javier Fernandez  <jfernandez@igalia.com>
+
+        [css-grid] Content Alignment broken with indefinite sized grid container
+        https://bugs.webkit.org/show_bug.cgi?id=163724
+
+        Reviewed by Manuel Rego Casasnovas.
+
+        Added additional test cases to verify we compute properly the
+        available free space for content-alignment, handling correctly the
+        overflow when needed.
+
+        * fast/css-grid-layout/grid-content-alignment-overflow.html:
+
+2016-10-21  Jer Noble  <jer.noble@apple.com>
+
+        [mac-wk2 release] LayoutTest media/media-source/media-source-seek-detach-crash.html is a flaky failure
+        https://bugs.webkit.org/show_bug.cgi?id=163751
+
+        Reviewed by Eric Carlson.
+
+        Don't log when we receive an "error" event; this makes the test non-deterministic.
+
+        * media/media-source/media-source-seek-detach-crash-expected.txt:
+        * media/media-source/media-source-seek-detach-crash.html:
+
+2016-10-21  Jer Noble  <jer.noble@apple.com>
+
+        CRASH in SourceBuffer::sourceBufferPrivateDidReceiveSample + 2169
+        https://bugs.webkit.org/show_bug.cgi?id=163735
+
+        Reviewed by Eric Carlson.
+
+        * media/media-source/media-source-sample-wrong-track-id-expected.txt: Added.
+        * media/media-source/media-source-sample-wrong-track-id.html: Added.
+
+2016-10-20  Zan Dobersek  <zdobersek@igalia.com>
+
+        Import W3C EME tests
+        https://bugs.webkit.org/show_bug.cgi?id=163214
+
+        Reviewed by Youenn Fablet.
+
+        Skip the newly-imported W3C EME tests on all platforms.
+
+        * platform/efl/TestExpectations:
+        * platform/gtk/TestExpectations:
+        * platform/ios-simulator/TestExpectations:
+        * platform/mac/TestExpectations:
+        * platform/win/TestExpectations:
+        * tests-options.json:
+
+2016-10-20  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [JSC] Drop isEnvironmentRecord type info flag and use JSType information instead
+        https://bugs.webkit.org/show_bug.cgi?id=163761
+
+        Reviewed by Keith Miller.
+
+        * js/dom/script-tests/string-prototype-scopes-in-workers.js: Added.
+        (catch):
+        * js/dom/script-tests/string-prototype-scopes.js: Added.
+        (catch):
+        * js/dom/string-prototype-scopes-expected.txt: Added.
+        * js/dom/string-prototype-scopes-in-workers-expected.txt: Added.
+        * js/dom/string-prototype-scopes-in-workers.html: Added.
+        * js/dom/string-prototype-scopes.html: Added.
+
+2016-10-20  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Implement WebGL2 bufferData() and bufferSubData() methods
+        https://bugs.webkit.org/show_bug.cgi?id=163759
+
+        Reviewed by Dean Jackson.
+
+        * fast/canvas/webgl/bufferData-offset-length-expected.txt: Added.
+        * fast/canvas/webgl/bufferData-offset-length.html: Added.
+        * fast/canvas/webgl/resources/webgl-test.js:
+        (create3DContext):
+        (initWebGL):
+
+2016-10-20  Nan Wang  <n_wang@apple.com>
+
+        AX: VoiceOver is not detecting ARIA treeview if it contains role="presentation"
+        https://bugs.webkit.org/show_bug.cgi?id=163763
+
+        Reviewed by Chris Fleizach.
+
+        * accessibility/mac/aria-tree-with-presentation-role-expected.txt: Added.
+        * accessibility/mac/aria-tree-with-presentation-role.html: Added.
+
+2016-10-19  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        [macOS] [iOS] Disable variation fonts on macOS El Capitan and iOS 9
+        https://bugs.webkit.org/show_bug.cgi?id=163374
+
+        Reviewed by Darin Adler.
+
+        Moving animations/font-variation-settings* tests to animations/font-variations
+        in order to make them easier to mark as failing.
+
+        Mark the relevant tests as failing on El Capitan and iOS 9.
+
+        * animations/font-variations/font-variation-settings-expected.html: Renamed from LayoutTests/animations/font-variation-settings-expected.html.
+        * animations/font-variations/font-variation-settings-order-expected.html: Renamed from LayoutTests/animations/font-variation-settings-order-expected.html.
+        * animations/font-variations/font-variation-settings-order.html: Renamed from LayoutTests/animations/font-variation-settings-order.html.
+        * animations/font-variations/font-variation-settings-unlike-expected.html: Renamed from LayoutTests/animations/font-variation-settings-unlike-expected.html.
+        * animations/font-variations/font-variation-settings-unlike.html: Renamed from LayoutTests/animations/font-variation-settings-unlike.html.
+        * animations/font-variations/font-variation-settings.html: Renamed from LayoutTests/animations/font-variation-settings.html.
+        * platform/gtk/TestExpectations:
+        * platform/ios-simulator/TestExpectations:
+        * platform/mac/TestExpectations:
+
+2016-10-20  Brady Eidson  <beidson@apple.com>
+
+        IndexedDB 2.0: Support IDBObjectStore name assignment.
+        <rdar://problem/28806931> and https://bugs.webkit.org/show_bug.cgi?id=163749
+
+        Reviewed by Alex Christensen.
+
+        * storage/indexeddb/modern/objectstore-rename-1-expected.txt: Added.
+        * storage/indexeddb/modern/objectstore-rename-1-private-expected.txt: Added.
+        * storage/indexeddb/modern/objectstore-rename-1-private.html: Added.
+        * storage/indexeddb/modern/objectstore-rename-1.html: Added.
+        * storage/indexeddb/modern/resources/objectstore-rename-1.js: Added.
+
+        * storage/indexeddb/readonly-expected.txt:
+        * storage/indexeddb/readonly-private-expected.txt:
+        * storage/indexeddb/resources/readonly.js: Removed the test that verifies that object store names are
+          readonly as they are no longer readonly.
+
+2016-10-20  Zalan Bujtas  <zalan@apple.com>
+
+        Unreviewed gardening.
+
+        Update expected results.
+
+        * imported/blink/fast/pagination/first-letter-inherit-all-crash-expected.txt:
+
+2016-10-20  Dean Jackson  <dino@apple.com>
+
+        Shapes tests failing on iOS
+        https://bugs.webkit.org/show_bug.cgi?id=163755
+        <rdar://problem/28875780>
+
+        Skip these temporarily on iOS.
+
+        * platform/ios-simulator/TestExpectations:
+
+2016-10-20  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking compositing/iframes/page-cache-layer-tree.html as flaky on mac-wk1.
+        https://bugs.webkit.org/show_bug.cgi?id=163750
+
+        Unreviewed test gardening.
+
+        * platform/mac-wk1/TestExpectations:
+
+2016-10-20  Chris Dumez  <cdumez@apple.com>
+
+        Passing a number as the pixel parameter to texImage2D() doesn't thrown an exception
+        https://bugs.webkit.org/show_bug.cgi?id=163715
+
+        Reviewed by Darin Adler.
+
+        Update existing tests now that we throw a TypeError when passing an unexpected
+        type for a parameter where we expect a typed array.
+
+        * fast/canvas/webgl/script-tests/texImageTest.js:
+        * fast/canvas/webgl/texImageTest-expected.txt:
+        * webgl/1.0.2/resources/webgl_test_files/conformance/textures/tex-image-with-invalid-data.html:
+
+2016-10-20  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking media/modern-media-controls/media-controller/media-controller-resize.html as flaky.
+        https://bugs.webkit.org/show_bug.cgi?id=163636
+
+        Unreviewed test gardening.
+
+        * TestExpectations:
+
+2016-10-20  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Improve error message when passing a null ArrayBuffer to bufferData()
+        https://bugs.webkit.org/show_bug.cgi?id=163745
+
+        Reviewed by Dean Jackson.
+
+        * fast/canvas/webgl/bufferData-nullable-array-buffer-view-expected.txt: Added.
+        * fast/canvas/webgl/bufferData-nullable-array-buffer-view.html: Added.
+
+2016-10-20  Zalan Bujtas  <zalan@apple.com>
+
+        Stop searching for first-letter containers at multi-column boundary.
+        https://bugs.webkit.org/show_bug.cgi?id=163739
+        <rdar://problem/28810750>
+
+        Reviewed by David Hyatt.
+
+        * fast/css-generated-content/first-letter-move-to-multicolumn-crash-expected.txt: Added.
+        * fast/css-generated-content/first-letter-move-to-multicolumn-crash.html: Added.
+
+2016-10-19  Dean Jackson  <dino@apple.com>
+
+        Support CSS Shapes Level 1 without a prefix
+        https://bugs.webkit.org/show_bug.cgi?id=163709
+        <rdar://problem/28859369>
+
+        Reviewed by Myles Maxfield.
+
+        Unskip all but a couple of tests.
+
+        * TestExpectations:
+
+2016-10-20  Jer Noble  <jer.noble@apple.com>
+
+        CRASH in WebCore::MediaSource::seekToTime + 185
+        https://bugs.webkit.org/show_bug.cgi?id=163652
+
+        Reviewed by Eric Carlson.
+
+        * media/media-source/content/test-48kHz.m4a: Added.
+        * media/media-source/content/test-48khz-manifest.json: Added.
+        * media/media-source/media-source-seek-detach-crash-expected.txt: Added.
+        * media/media-source/media-source-seek-detach-crash.html: Added.
+
+2016-10-20  Andreas Kling  <akling@apple.com>
+
+        Drop StyleResolver and SelectorQueryCache when entering PageCache.
+        <https://webkit.org/b/154238>
+
+        Reviewed by Antti Koivisto.
+
+        Progression in compositing/iframes/page-cache-layer-tree.html, when navigating back,
+        the two iframes' dimensions correctly exclude the horizontal scrollbar's height since
+        it's not present after a style recalc.
+
+        * compositing/iframes/page-cache-layer-tree-expected.txt:
+
 2016-10-20  Nael Ouedraogo  <nael.ouedraogo@crf.canon.fr>
 
         WebRTC: The MediaStreamTrackEvent init dictionary needs a required track member

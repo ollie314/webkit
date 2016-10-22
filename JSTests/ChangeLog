@@ -1,3 +1,126 @@
+2016-10-21  Saam Barati  <sbarati@apple.com>
+
+        SpeculativeJIT::compileTryGetById needs to pass in NeedsToSpill along both the cell speculation and untyped speculation path
+        https://bugs.webkit.org/show_bug.cgi?id=163622
+
+        Reviewed by Yusuke Suzuki.
+
+        * stress/try-get-by-id-should-spill-registers-dfg.js: Added.
+        (let.f.createBuiltin):
+
+2016-10-21  Caitlin Potter  <caitp@igalia.com>
+
+        [JSC] don't crash when arguments to `new Function()` produce unexpected AST
+        https://bugs.webkit.org/show_bug.cgi?id=163748
+
+        Reviewed by Mark Lam.
+
+        * stress/regress-163748.js: Added.
+        (assert):
+        (shouldThrowSyntaxError):
+        (GeneratorFunction):
+
+2016-10-20  Keith Miller  <keith_miller@apple.com>
+
+        Add support for WASM calls
+        https://bugs.webkit.org/show_bug.cgi?id=161727
+
+        Reviewed by Filip Pizlo and Michael Saboff.
+
+        Add members of the Call category to the WASMOps special group.
+
+        * wasm/generate-wasmops-header.js:
+
+2016-10-20  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [JSC] Drop isEnvironmentRecord type info flag and use JSType information instead
+        https://bugs.webkit.org/show_bug.cgi?id=163761
+
+        Reviewed by Keith Miller.
+
+        * modules/string-prototype-module-scope.js: Added.
+        (shouldBe):
+        (catch):
+        (refer):
+        * stress/string-prototype-scopes-global-lexical-environment-strict.js: Added.
+        (shouldBe):
+        (catch):
+        * stress/string-prototype-scopes-global-lexical-environment.js: Added.
+        (shouldBe):
+        (catch):
+        * stress/string-prototype-scopes-strict.js: Added.
+        (shouldBe):
+        (catch):
+        (try.refer):
+        (refer):
+        * stress/string-prototype-scopes.js: Added.
+        (shouldBe):
+        (catch):
+        (try.refer):
+        (refer):
+        (object.toString):
+        (with):
+
+2016-10-20  JF Bastien  <jfbastien@apple.com>
+
+        WebAssembly API: implement exception constructors properly
+
+         - Rename WebAssemblyObject to JSWebAssembly for consistency.
+         - WebAssembly object now has its own prototype: add WebAssemblyPrototype, and
+           use it to register JSWebAssembly's function properties through auto-generated
+           .lut.h, instead of manually.
+         - The error constructors used to throw (e.g. `new WebAssembly.CompileError()`).
+         - Register WebAssembly's constructors from the global object, and hold a
+           reference to their structure and prototype so that invoking the constructor
+           can use the structure directly from the global object.
+         - Add a prototype base field to global object creation. Previous ones all had
+           Object's prototype as their base, but WebAssembly's error constructors have
+           Error as their base.
+         - Test for the error object's correctness.
+         - Add missing #if ENABLE(WEBASSEMBLY)
+
+        WebAssembly API: implement exception constructors properly
+        https://bugs.webkit.org/show_bug.cgi?id=163699
+
+        Reviewed by Keith Miller.
+
+        * wasm/js-api/test_basic_api.js:
+        (const.c.in.constructorProperties): more tests
+
+2016-10-20  Caitlin Potter  <caitp@igalia.com>
+
+        [JSC] disallow references to `await` in AsyncFunction formal parameters
+        https://bugs.webkit.org/show_bug.cgi?id=163694
+
+        Reviewed by Saam Barati.
+
+        * stress/async-await-syntax.js:
+
+2016-10-20  Keith Miller  <keith_miller@apple.com>
+
+        Invalid assertion in arguments elimination
+        https://bugs.webkit.org/show_bug.cgi?id=163740
+        <rdar://problem/27911462>
+
+        Reviewed by Michael Saboff.
+
+        * stress/direct-arguments-osr-entry.js: Added.
+        (foo.):
+        (foo):
+
+2016-10-20  Caitlin Potter  <caitp@igalia.com>
+
+        [JSC] throw TypeError when constructing dynamically created JSGeneratorFunction
+        https://bugs.webkit.org/show_bug.cgi?id=163714
+
+        Reviewed by Mark Lam.
+
+        Add missing test coverage that dynamically created
+        JSGeneratorFunctions can not be constructed.
+
+        * stress/generator-function-constructor.js:
+        (shouldThrow):
+
 2016-10-19  JF Bastien  <jfbastien@apple.com>
 
         JavaScript WebAssembly API: baby steps

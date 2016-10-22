@@ -37,6 +37,7 @@
 
 #if USE(EGL)
 #include <EGL/egl.h>
+#include <EGL/eglext.h>
 #endif
 
 namespace WebCore {
@@ -55,8 +56,10 @@ PlatformDisplayX11::PlatformDisplayX11(Display* display)
 
 PlatformDisplayX11::~PlatformDisplayX11()
 {
+#if USE(EGL) || USE(GLX)
     // Clear the sharing context before releasing the display.
     m_sharingGLContext = nullptr;
+#endif
     if (m_ownedDisplay)
         XCloseDisplay(m_display);
 }
@@ -64,10 +67,21 @@ PlatformDisplayX11::~PlatformDisplayX11()
 #if USE(EGL)
 void PlatformDisplayX11::initializeEGLDisplay()
 {
-    m_eglDisplay = eglGetDisplay(m_display);
+#if defined(EGL_KHR_platform_x11)
+    const char* extensions = eglQueryString(nullptr, EGL_EXTENSIONS);
+    if (GLContext::isExtensionSupported(extensions, "EGL_KHR_platform_base")) {
+        if (auto* getPlatformDisplay = reinterpret_cast<PFNEGLGETPLATFORMDISPLAYEXTPROC>(eglGetProcAddress("eglGetPlatformDisplay")))
+            m_eglDisplay = getPlatformDisplay(EGL_PLATFORM_X11_KHR, m_display, nullptr);
+    } else if (GLContext::isExtensionSupported(extensions, "EGL_EXT_platform_base")) {
+        if (auto* getPlatformDisplay = reinterpret_cast<PFNEGLGETPLATFORMDISPLAYEXTPROC>(eglGetProcAddress("eglGetPlatformDisplayEXT")))
+            m_eglDisplay = getPlatformDisplay(EGL_PLATFORM_X11_KHR, m_display, nullptr);
+    } else
+#endif
+        m_eglDisplay = eglGetDisplay(m_display);
+
     PlatformDisplay::initializeEGLDisplay();
 }
-#endif
+#endif // USE(EGL)
 
 bool PlatformDisplayX11::supportsXComposite() const
 {

@@ -4579,6 +4579,11 @@ void HTMLMediaElement::mediaPlayerRenderingModeChanged(MediaPlayer*)
     invalidateStyleAndLayerComposition();
 }
 
+bool HTMLMediaElement::mediaPlayerAcceleratedCompositingEnabled()
+{
+    return document().settings() && document().settings()->acceleratedCompositingEnabled();
+}
+
 #if PLATFORM(WIN) && USE(AVFOUNDATION)
 
 GraphicsDeviceAdapter* HTMLMediaElement::mediaPlayerGraphicsDeviceAdapter(const MediaPlayer*) const
@@ -6986,7 +6991,7 @@ MediaProducer::MediaStateFlags HTMLMediaElement::mediaState() const
     if (!isPlaying())
         return state;
 
-    if (hasAudio && !muted())
+    if (hasAudio && !muted() && volume())
         state |= IsPlayingAudio;
 
     if (hasActiveVideo)
