@@ -1,3 +1,82 @@
+2016-10-23  Zalan Bujtas  <zalan@apple.com>
+
+        Do not update selection rect on dirty lineboxes.
+        https://bugs.webkit.org/show_bug.cgi?id=163862
+        <rdar://problem/28813156>
+
+        Reviewed by Simon Fraser.
+
+        * fast/css-generated-content/dynamic-first-letter-selection-clear-crash-expected.txt: Added.
+        * fast/css-generated-content/dynamic-first-letter-selection-clear-crash.html: Added.
+
+2016-10-22  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        ASSERTION FAILED: m_fonts in &WebCore::FontCascade::primaryFont
+        https://bugs.webkit.org/show_bug.cgi?id=163459
+
+        Reviewed by Darin Adler.
+
+        * fast/text/font-size-calc-expected.txt: Added.
+        * fast/text/font-size-calc.html: Added.
+
+2016-10-22  Dan Bernstein  <mitz@apple.com>
+
+        Dynamically-added backdrop filter to clip-path'd element with 3D transform renders incorrectly (without clip)
+        https://bugs.webkit.org/show_bug.cgi?id=163497
+
+        Reviewed by Simon Fraser.
+
+        Based on the test case from Tim Horton.
+
+        * css3/filters/backdrop/dynamic-with-clip-path-expected.html: Added.
+        * css3/filters/backdrop/dynamic-with-clip-path.html: Added.
+
+2016-10-22  Simon Fraser  <simon.fraser@apple.com>
+
+        Backdrop filter doesn't show if removed then re-added
+        https://bugs.webkit.org/show_bug.cgi?id=163860
+
+        Reviewed by Dan Bernstein.
+
+        * css3/filters/backdrop/add-remove-add-backdrop-filter-expected.html: Added.
+        * css3/filters/backdrop/add-remove-add-backdrop-filter.html: Added.
+
+2016-10-22  Simon Fraser  <simon.fraser@apple.com>
+
+        Fix repainting of slow repaint objects in WK1 when page scale is applied
+        https://bugs.webkit.org/show_bug.cgi?id=163854
+
+        Reviewed by Zalan Bujtas.
+        
+        Test that logs the repaint rect after scrolling a page with an element
+        with a fixed background. The WebKit1 result is the interesting one.
+
+        * fast/repaint/zoomed-fixed-background-expected.txt: Added.
+        * fast/repaint/zoomed-fixed-background.html: Added.
+        * platform/mac-wk1/fast/repaint/zoomed-fixed-background-expected.txt: Added.
+
+2016-10-22  Darin Adler  <darin@apple.com>
+
+        Move HTML canvas and tracks from ExceptionCode to Exception
+        https://bugs.webkit.org/show_bug.cgi?id=163853
+
+        Reviewed by Chris Dumez.
+
+        * media/track/regions-webvtt/vtt-region-constructor-expected.txt:
+        Change expectations to expect the more specific TypeError message
+        that the bindings generate as opposed to the generic ones that the
+        WebVTT DOM code was generating before.
+
+2016-10-22  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        Unreviewed GTK test gardening
+
+        * platform/gtk/TestExpectations:
+        * platform/gtk/imported/w3c/web-platform-tests/touch-events/historical-expected.txt: Added.
+        * platform/gtk/imported/w3c/web-platform-tests/touch-events/touch-globaleventhandler-interface-expected.txt: Added.
+        * platform/gtk/svg/custom/repaint-shadow-expected.txt: Renamed from LayoutTests/platform/gtk/svg/text/repaint-shadow-expected.txt.
+        * platform/gtk/svg/custom/simple-text-double-shadow-expected.txt: Renamed from LayoutTests/platform/gtk/svg/custom/simple-text-double-shadow.txt.
+
 2016-10-22  Nael Ouedraogo  <nael.ouedraogo@crf.canon.fr>
 
         Bindings error message for missing required dictionary member should be more explicit
