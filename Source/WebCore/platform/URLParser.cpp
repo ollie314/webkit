@@ -624,7 +624,7 @@ void URLParser::encodeQuery(const Vector<UChar>& source, const TextEncoding& enc
     }
 }
 
-ALWAYS_INLINE static bool isDefaultPort(StringView scheme, uint16_t port)
+Optional<uint16_t> defaultPortForProtocol(StringView scheme)
 {
     static const uint16_t ftpPort = 21;
     static const uint16_t gopherPort = 70;
@@ -635,53 +635,63 @@ ALWAYS_INLINE static bool isDefaultPort(StringView scheme, uint16_t port)
     
     auto length = scheme.length();
     if (!length)
-        return false;
+        return Nullopt;
     switch (scheme[0]) {
     case 'w':
         switch (length) {
         case 2:
-            return scheme[1] == 's'
-                && port == wsPort;
+            if (scheme[1] == 's')
+                return wsPort;
+            return Nullopt;
         case 3:
-            return scheme[1] == 's'
-                && scheme[2] == 's'
-                && port == wssPort;
+            if (scheme[1] == 's'
+                && scheme[2] == 's')
+                return wssPort;
+            return Nullopt;
         default:
             return false;
         }
     case 'h':
         switch (length) {
         case 4:
-            return scheme[1] == 't'
+            if (scheme[1] == 't'
                 && scheme[2] == 't'
-                && scheme[3] == 'p'
-                && port == httpPort;
+                && scheme[3] == 'p')
+                return httpPort;
+            return Nullopt;
         case 5:
-            return scheme[1] == 't'
+            if (scheme[1] == 't'
                 && scheme[2] == 't'
                 && scheme[3] == 'p'
-                && scheme[4] == 's'
-                && port == httpsPort;
+                && scheme[4] == 's')
+                return httpsPort;
+            return Nullopt;
         default:
-            return false;
+            return Nullopt;
         }
     case 'g':
-        return length == 6
+        if (length == 6
             && scheme[1] == 'o'
             && scheme[2] == 'p'
             && scheme[3] == 'h'
             && scheme[4] == 'e'
-            && scheme[5] == 'r'
-            && port == gopherPort;
+            && scheme[5] == 'r')
+            return gopherPort;
+        return Nullopt;
     case 'f':
-        return length == 3
+        if (length == 3
             && scheme[1] == 't'
-            && scheme[2] == 'p'
-            && port == ftpPort;
-        return false;
+            && scheme[2] == 'p')
+            return ftpPort;
+        return Nullopt;
     default:
-        return false;
+        return Nullopt;
     }
+}
+
+bool isDefaultPortForProtocol(uint16_t port, StringView protocol)
+{
+    return defaultPortForProtocol(protocol) == port;
 }
 
 enum class Scheme {
@@ -881,25 +891,7 @@ void URLParser::copyURLPartsUntil(const URL& base, URLPart part, const CodePoint
     ASSERT_NOT_REACHED();
 }
 
-static const char* dotASCIICode = "2e";
-
-template<typename CharacterType>
-ALWAYS_INLINE bool URLParser::isPercentEncodedDot(CodePointIterator<CharacterType> c)
-{
-    if (c.atEnd())
-        return false;
-    if (*c != '%')
-        return false;
-    advance<CharacterType, ReportSyntaxViolation::No>(c);
-    if (c.atEnd())
-        return false;
-    if (*c != dotASCIICode[0])
-        return false;
-    advance<CharacterType, ReportSyntaxViolation::No>(c);
-    if (c.atEnd())
-        return false;
-    return toASCIILower(*c) == dotASCIICode[1];
-}
+static const char dotASCIICode[2] = {'2', 'e'};
 
 template<typename CharacterType>
 ALWAYS_INLINE bool URLParser::isSingleDotPathSegment(CodePointIterator<CharacterType> c)
@@ -1711,17 +1703,6 @@ void URLParser::parse(const CharacterType* input, const unsigned length, const U
                 m_url.m_pathEnd = currentPosition(c);
                 m_url.m_queryEnd = m_url.m_pathEnd;
                 state = State::Fragment;
-                break;
-            }
-            if (UNLIKELY(isPercentEncodedDot(c))) {
-                syntaxViolation(c);
-                appendToASCIIBuffer('.');
-                ASSERT(*c == '%');
-                advance(c);
-                ASSERT(*c == dotASCIICode[0]);
-                advance(c);
-                ASSERT(toASCIILower(*c) == dotASCIICode[1]);
-                advance(c);
                 break;
             }
             utf8PercentEncode<isInDefaultEncodeSet>(c);
@@ -2589,7 +2570,7 @@ bool URLParser::parsePort(CodePointIterator<CharacterType>& iterator)
     if (!port && digitCount > 1)
         syntaxViolation(colonIterator);
 
-    if (UNLIKELY(isDefaultPort(parsedDataView(0, m_url.m_schemeEnd), port)))
+    if (UNLIKELY(isDefaultPortForProtocol(port, parsedDataView(0, m_url.m_schemeEnd))))
         syntaxViolation(colonIterator);
     else {
         appendToASCIIBuffer(':');
@@ -2641,25 +2622,28 @@ bool URLParser::parseHostAndPort(CodePointIterator<CharacterType> iterator)
             if (isInvalidDomainCharacter(*iterator))
                 return false;
         }
-        if (auto address = parseIPv4Host(CodePointIterator<CharacterType>(hostIterator, iterator))) {
-            serializeIPv4(address.value());
-            m_url.m_hostEnd = currentPosition(iterator);
-            if (iterator.atEnd()) {
-                m_url.m_portEnd = currentPosition(iterator);
-                return true;
+        if (m_urlIsSpecial) {
+            if (auto address = parseIPv4Host(CodePointIterator<CharacterType>(hostIterator, iterator))) {
+                serializeIPv4(address.value());
+                m_url.m_hostEnd = currentPosition(iterator);
+                if (iterator.atEnd()) {
+                    m_url.m_portEnd = currentPosition(iterator);
+                    return true;
+                }
+                return parsePort(iterator);
             }
-            return parsePort(iterator);
         }
         for (; hostIterator != iterator; ++hostIterator) {
-            if (LIKELY(!isTabOrNewline(*hostIterator))) {
-                if (m_urlIsSpecial) {
-                    if (UNLIKELY(isASCIIUpper(*hostIterator)))
-                        syntaxViolation(hostIterator);
-                    appendToASCIIBuffer(toASCIILower(*hostIterator));
-                } else
-                    appendToASCIIBuffer(*hostIterator);
-            } else
+            if (UNLIKELY(isTabOrNewline(*hostIterator))) {
                 syntaxViolation(hostIterator);
+                continue;
+            }
+            if (m_urlIsSpecial) {
+                if (UNLIKELY(isASCIIUpper(*hostIterator)))
+                    syntaxViolation(hostIterator);
+                appendToASCIIBuffer(toASCIILower(*hostIterator));
+            } else
+                appendToASCIIBuffer(*hostIterator);
         }
         m_url.m_hostEnd = currentPosition(iterator);
         if (!hostIterator.atEnd())
@@ -2843,31 +2827,16 @@ bool URLParser::internalValuesConsistent(const URL& url)
     // It should be able to be deduced from m_isValid and m_string.length() to save memory.
 }
 
-enum class URLParserEnabled {
-    Undetermined,
-    Yes,
-    No
-};
-
-static URLParserEnabled urlParserEnabled = URLParserEnabled::Undetermined;
+static bool urlParserEnabled = true;
 
 void URLParser::setEnabled(bool enabled)
 {
-    urlParserEnabled = enabled ? URLParserEnabled::Yes : URLParserEnabled::No;
+    urlParserEnabled = enabled;
 }
 
 bool URLParser::enabled()
 {
-    if (urlParserEnabled == URLParserEnabled::Undetermined) {
-#if PLATFORM(MAC)
-        urlParserEnabled = MacApplication::isSafari() ? URLParserEnabled::Yes : URLParserEnabled::No;
-#elif PLATFORM(IOS)
-        urlParserEnabled = IOSApplication::isMobileSafari() ? URLParserEnabled::Yes : URLParserEnabled::No;
-#else
-        urlParserEnabled = URLParserEnabled::Yes;
-#endif
-    }
-    return urlParserEnabled == URLParserEnabled::Yes;
+    return urlParserEnabled;
 }
 
 } // namespace WebCore

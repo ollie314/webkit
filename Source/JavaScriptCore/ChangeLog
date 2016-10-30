@@ -1,3 +1,2042 @@
+2016-10-29  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [JSC] JSON.stringify should handle Proxy which is non JSArray but isArray is true
+        https://bugs.webkit.org/show_bug.cgi?id=164123
+
+        Reviewed by Mark Lam.
+
+        When JSON.stringify encounter the undefined value, the result depends
+        on the context. If it is produced under the object property context, we ignore
+        that property. On the other hand, if it is produced under the array element
+        context, we produce "null".
+
+        For example,
+            // https://tc39.github.io/ecma262/#sec-serializejsonobject section 8.b.
+            // Skip the property that value is undefined.
+            JSON.stringify({ value: undefined });  // => "{}"
+
+            // https://tc39.github.io/ecma262/#sec-serializejsonarray section 8.b.
+            // Write "null" when the element is undefined.
+            JSON.stringify([undefined]);           // => "[null]"
+
+        At that time, we decide the context based on the `holder->inherits(JSArray::info())`.
+        But it is not correct since we have a holder that creates the array element context
+        but it is not JSArray subtype. ES6 Proxy to an array is one example. In that case,
+        `isArray(exec, proxy)` returns `true`, but `inherits(JSArray::info())` returns false.
+        Since we already have this `isArray()` value in Stringifier::Holder, we should reuse
+        this here. And this is the correct behavior in the ES6 spec.
+
+        * runtime/JSONObject.cpp:
+        (JSC::Stringifier::Holder::isArray):
+        (JSC::Stringifier::stringify):
+        (JSC::Stringifier::appendStringifiedValue):
+        (JSC::Stringifier::Holder::Holder):
+        (JSC::Stringifier::Holder::appendNextProperty):
+
+2016-10-29  Saam Barati  <sbarati@apple.com>
+
+        We should have a way of profiling when a get_by_id is pure and to emit a PureGetById in the DFG/FTL
+        https://bugs.webkit.org/show_bug.cgi?id=163305
+
+        Reviewed by Keith Miller.
+
+        This creates a new GetById node in the DFG called PureGetById. We emit a
+        PureGetById when we profile that a get_by_id in the baseline never does
+        side effects. PureGetById speculates on the fact that it won't do side
+        effects. If it realizes that it must perform side effects, it will perform
+        the side effect, but also invalidate the CodeBlock that compiled it,
+        which will cause us to exit once we return back to the compiled code.
+        This allows us to have stricter clobberize rules for PureGetById which
+        model how getOwnPropertySlot(VMInquiry) behaves. This means that PureGetByIds
+        can be CSEd with each other, and that other things are more likely to
+        be CSEd around a PureGetById. To profile if a get_by_id does side
+        effects, I've added an extra bit into StructureStubInfo that we write
+        to when performing a get_by_id slow path call. If we notice that we
+        never do effects, inside the ByteCodeParser, we will emit a PureGetById
+        instead of a GetById.
+
+        To justify the performance benefit of this patch, I ran the suite of
+        benchmarks with useAccessInlining=false. This meant that we don't compile
+        any (Multi)GetByOffset/(Multi)PutByOffset. This was just to try to see if
+        this patch is worth anything at all in a world where we emit many
+        PureGetByIds. Running the benchmarks under this mode showed a 3.5% octane
+        improvement and a 15% kraken improvement. However, when running benchmarks
+        with useAccessInlining=true (the default JSC state), this patch is neutral.
+        I think the main reason for this is that the DFG is good at knowing when to
+        emit (Multi)GetByOffset, and most benchmarks that would benefit from
+        PureGetById are already emitting (Multi)GetByOffset. However, PureGetById can be
+        profitable when we encounter code that is too polymorphic for (Multi)GetByOffset.
+        It's reasonable to expect that JS code in the wild will fall into this use
+        case even though it might not be represented in some of the major JS benchmarks.
+        I wrote some microbenchmarks to demonstrate the benefits of PureGetById CSE,
+        and they were 30% (eliminating a few PureGetById from an add expression)
+        to 10x faster (eliminating a PureGetById in a loop).
+
+        * bytecode/StructureStubInfo.cpp:
+        (JSC::StructureStubInfo::StructureStubInfo):
+        (JSC::StructureStubInfo::reset):
+        * bytecode/StructureStubInfo.h:
+        * dfg/DFGAbstractInterpreterInlines.h:
+        (JSC::DFG::AbstractInterpreter<AbstractStateType>::executeEffects):
+        * dfg/DFGArrayMode.cpp:
+        (JSC::DFG::canBecomeGetArrayLength):
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::handleGetById):
+        (JSC::DFG::ByteCodeParser::parseBlock):
+        * dfg/DFGClobberize.h:
+        (JSC::DFG::clobberize):
+        * dfg/DFGConstantFoldingPhase.cpp:
+        (JSC::DFG::ConstantFoldingPhase::foldConstants):
+        * dfg/DFGDoesGC.cpp:
+        (JSC::DFG::doesGC):
+        * dfg/DFGFixupPhase.cpp:
+        (JSC::DFG::FixupPhase::fixupNode):
+        * dfg/DFGNode.h:
+        (JSC::DFG::Node::convertToGetByOffset):
+        (JSC::DFG::Node::convertToMultiGetByOffset):
+        (JSC::DFG::Node::hasIdentifier):
+        (JSC::DFG::Node::hasHeapPrediction):
+        * dfg/DFGNodeType.h:
+        * dfg/DFGPredictionPropagationPhase.cpp:
+        * dfg/DFGSafeToExecute.h:
+        (JSC::DFG::safeToExecute):
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::compileTryGetById):
+        (JSC::DFG::SpeculativeJIT::compilePureGetById):
+        * dfg/DFGSpeculativeJIT.h:
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::cachedGetById):
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::cachedGetById):
+        (JSC::DFG::SpeculativeJIT::compile):
+        * ftl/FTLCapabilities.cpp:
+        (JSC::FTL::canCompile):
+        * ftl/FTLLowerDFGToB3.cpp:
+        (JSC::FTL::DFG::LowerDFGToB3::compileNode):
+        (JSC::FTL::DFG::LowerDFGToB3::compileGetById):
+        (JSC::FTL::DFG::LowerDFGToB3::getById):
+        * jit/JITOperations.cpp:
+        (JSC::pureGetByIdCommon):
+        * jit/JITOperations.h:
+        * jit/JITPropertyAccess.cpp:
+        (JSC::JIT::emit_op_try_get_by_id):
+        * jit/JITPropertyAccess32_64.cpp:
+        (JSC::JIT::emit_op_try_get_by_id):
+        * jit/Repatch.cpp:
+        (JSC::appropriateOptimizingGetByIdFunction):
+        (JSC::appropriateGenericGetByIdFunction):
+        (JSC::tryCacheGetByID):
+        * jit/Repatch.h:
+        * profiler/ProfilerJettisonReason.cpp:
+        (WTF::printInternal):
+        * profiler/ProfilerJettisonReason.h:
+
+2016-10-28  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Breakpoints not working in scripts with unicode characters
+        https://bugs.webkit.org/show_bug.cgi?id=164172
+        <rdar://problem/28895862>
+
+        Reviewed by Ryosuke Niwa.
+
+        * parser/Parser.h:
+        (JSC::parse):
+        Ensure we pass the debuggerParseData struct to get populated in the
+        non 8bit string case!
+
+2016-10-28  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [DOMJIT] Include identifier name in CallDOMGetter to dump it
+        https://bugs.webkit.org/show_bug.cgi?id=164161
+
+        Reviewed by Mark Lam.
+
+        This patch adds an identifier number to CallDOMGetterData and use it when dumping the data.
+        CallDOMGetter did not include identifier. It made CallDOMGetter super hard to debug when dumping DFG graph.
+
+        The dump becomes like this.
+
+            CallDOMGetter(Cell:@21, JS|MustGen|UseAsOther, Nonboolint32, id0{customGetter}, domJIT = 0x42f8a0, R:World, W:Heap, Exits, ClobbersExit, bc#15)  predicting Nonboolint32
+
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::handleDOMJITGetter):
+        (JSC::DFG::ByteCodeParser::handleGetById):
+        * dfg/DFGGraph.cpp:
+        (JSC::DFG::Graph::dump):
+        * dfg/DFGNode.h:
+
+2016-10-28  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [DOMJIT] Rename CallDOM to CallDOMGetter
+        https://bugs.webkit.org/show_bug.cgi?id=164157
+
+        Reviewed by Keith Miller.
+
+        Rename CallDOM to CallDOMGetter to represent that
+        this is used for DOMJIT getter explicitly.
+        CallDOM will be used for DOM functions (like element.getAttribute()) later.
+
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * bytecode/PolymorphicAccess.cpp:
+        (JSC::AccessCase::emitDOMJITGetter):
+        * dfg/DFGAbstractInterpreterInlines.h:
+        (JSC::DFG::AbstractInterpreter<AbstractStateType>::executeEffects):
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::blessCallDOMGetter):
+        (JSC::DFG::ByteCodeParser::handleDOMJITGetter):
+        (JSC::DFG::blessCallDOM): Deleted.
+        * dfg/DFGClobberize.h:
+        (JSC::DFG::clobberize):
+        * dfg/DFGDoesGC.cpp:
+        (JSC::DFG::doesGC):
+        * dfg/DFGFixupPhase.cpp:
+        (JSC::DFG::FixupPhase::fixupNode):
+        * dfg/DFGGraph.h:
+        * dfg/DFGNode.h:
+        (JSC::DFG::Node::hasHeapPrediction):
+        (JSC::DFG::Node::hasCallDOMGetterData):
+        (JSC::DFG::Node::callDOMGetterData):
+        (JSC::DFG::Node::hasCallDOMData): Deleted.
+        (JSC::DFG::Node::callDOMData): Deleted.
+        * dfg/DFGNodeType.h:
+        * dfg/DFGPredictionPropagationPhase.cpp:
+        * dfg/DFGSafeToExecute.h:
+        (JSC::DFG::safeToExecute):
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::compileCallDOMGetter):
+        (JSC::DFG::SpeculativeJIT::compileCallDOM): Deleted.
+        * dfg/DFGSpeculativeJIT.h:
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * domjit/DOMJITCallDOMGetterPatchpoint.h: Renamed from Source/JavaScriptCore/domjit/DOMJITCallDOMPatchpoint.h.
+        (JSC::DOMJIT::CallDOMGetterPatchpoint::create):
+        * domjit/DOMJITGetterSetter.h:
+        * ftl/FTLCapabilities.cpp:
+        (JSC::FTL::canCompile):
+        * ftl/FTLLowerDFGToB3.cpp:
+        (JSC::FTL::DFG::LowerDFGToB3::compileNode):
+        (JSC::FTL::DFG::LowerDFGToB3::compileCallDOMGetter):
+        (JSC::FTL::DFG::LowerDFGToB3::compileCallDOM): Deleted.
+        * jsc.cpp:
+
+2016-10-28  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Unreviewed, build fix in CLoop builds after r208063.
+
+        Include required headers.
+
+        * parser/Parser.h:
+        * runtime/Completion.cpp:
+        * runtime/JSGlobalObjectFunctions.cpp:
+
+2016-10-28  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Update reference files for builtins generator tests after r208063.
+
+        Unreviewed test gardening.
+
+        * Scripts/tests/builtins/expected/JavaScriptCore-Builtin.Promise-Combined.js-result:
+        * Scripts/tests/builtins/expected/JavaScriptCore-Builtin.Promise-Separate.js-result:
+        * Scripts/tests/builtins/expected/JavaScriptCore-Builtin.prototype-Combined.js-result:
+        * Scripts/tests/builtins/expected/JavaScriptCore-Builtin.prototype-Separate.js-result:
+        * Scripts/tests/builtins/expected/JavaScriptCore-BuiltinConstructor-Combined.js-result:
+        * Scripts/tests/builtins/expected/JavaScriptCore-BuiltinConstructor-Separate.js-result:
+        * Scripts/tests/builtins/expected/JavaScriptCore-InternalClashingNames-Combined.js-result:
+        * Scripts/tests/builtins/expected/WebCore-AnotherGuardedInternalBuiltin-Separate.js-result:
+        * Scripts/tests/builtins/expected/WebCore-ArbitraryConditionalGuard-Separate.js-result:
+        * Scripts/tests/builtins/expected/WebCore-GuardedBuiltin-Separate.js-result:
+        * Scripts/tests/builtins/expected/WebCore-GuardedInternalBuiltin-Separate.js-result:
+        * Scripts/tests/builtins/expected/WebCore-UnguardedBuiltin-Separate.js-result:
+        * Scripts/tests/builtins/expected/WebCore-xmlCasingTest-Separate.js-result:
+
+2016-10-28  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [JSC] Add wasm/js directory to JSC include directories in CMakeLists.txt
+        https://bugs.webkit.org/show_bug.cgi?id=164145
+
+        Reviewed by Michael Catanzaro.
+
+        Attempt to fix CMake ports. We include a file under wasm/js.
+        But we didn't add it to JSC include directories.
+
+        * CMakeLists.txt:
+
+2016-10-27  Geoffrey Garen  <ggaren@apple.com>
+
+        One file per class for Executable.h/.cpp
+        https://bugs.webkit.org/show_bug.cgi?id=164099
+
+        Reviewed by Saam Barati.
+
+        * CMakeLists.txt:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * Scripts/builtins/builtins_generate_combined_implementation.py:
+        (BuiltinsCombinedImplementationGenerator.generate_secondary_header_includes):
+        * Scripts/builtins/builtins_generate_separate_implementation.py:
+        (BuiltinsSeparateImplementationGenerator.generate_secondary_header_includes):
+        * builtins/BuiltinExecutables.cpp:
+        * bytecode/CallVariant.h:
+        * bytecode/CodeBlock.cpp:
+        * bytecode/CodeBlock.h:
+        (JSC::ScriptExecutable::prepareForExecution):
+        * bytecode/CodeOrigin.cpp:
+        * bytecode/EvalCodeCache.h:
+        * bytecode/InlineCallFrame.cpp:
+        * bytecode/UnlinkedCodeBlock.cpp:
+        * bytecode/UnlinkedFunctionExecutable.cpp:
+        * bytecompiler/StaticPropertyAnalysis.h:
+        * debugger/DebuggerLocation.cpp:
+        * dfg/DFGCapabilities.h:
+        * dfg/DFGOSRExitPreparation.cpp:
+        * dfg/DFGToFTLDeferredCompilationCallback.cpp:
+        * dfg/DFGToFTLForOSREntryDeferredCompilationCallback.cpp:
+        * interpreter/StackVisitor.cpp:
+        * jit/JITThunks.cpp:
+        * jit/JITToDFGDeferredCompilationCallback.cpp:
+        * jit/SpecializedThunkJIT.h:
+        * llint/LLIntOffsetsExtractor.cpp:
+        * parser/Parser.h:
+        * runtime/CallData.cpp:
+        * runtime/ConstructData.cpp:
+        * runtime/EvalExecutable.cpp: Copied from Source/JavaScriptCore/runtime/Executable.cpp.
+        (JSC::ExecutableBase::destroy): Deleted.
+        (JSC::ExecutableBase::clearCode): Deleted.
+        (JSC::NativeExecutable::create): Deleted.
+        (JSC::NativeExecutable::destroy): Deleted.
+        (JSC::NativeExecutable::createStructure): Deleted.
+        (JSC::NativeExecutable::finishCreation): Deleted.
+        (JSC::NativeExecutable::NativeExecutable): Deleted.
+        (JSC::ScriptExecutable::ScriptExecutable): Deleted.
+        (JSC::ScriptExecutable::destroy): Deleted.
+        (JSC::ScriptExecutable::installCode): Deleted.
+        (JSC::ScriptExecutable::newCodeBlockFor): Deleted.
+        (JSC::ScriptExecutable::newReplacementCodeBlockFor): Deleted.
+        (JSC::setupLLInt): Deleted.
+        (JSC::setupJIT): Deleted.
+        (JSC::ScriptExecutable::prepareForExecutionImpl): Deleted.
+        (JSC::ProgramExecutable::ProgramExecutable): Deleted.
+        (JSC::ProgramExecutable::destroy): Deleted.
+        (JSC::ModuleProgramExecutable::ModuleProgramExecutable): Deleted.
+        (JSC::ModuleProgramExecutable::create): Deleted.
+        (JSC::ModuleProgramExecutable::destroy): Deleted.
+        (JSC::FunctionExecutable::FunctionExecutable): Deleted.
+        (JSC::FunctionExecutable::finishCreation): Deleted.
+        (JSC::FunctionExecutable::destroy): Deleted.
+        (JSC::samplingDescription): Deleted.
+        (JSC::ProgramExecutable::checkSyntax): Deleted.
+        (JSC::ProgramExecutable::initializeGlobalProperties): Deleted.
+        (JSC::ProgramExecutable::visitChildren): Deleted.
+        (JSC::ModuleProgramExecutable::visitChildren): Deleted.
+        (JSC::FunctionExecutable::baselineCodeBlockFor): Deleted.
+        (JSC::FunctionExecutable::visitChildren): Deleted.
+        (JSC::FunctionExecutable::fromGlobalCode): Deleted.
+        (JSC::WebAssemblyExecutable::WebAssemblyExecutable): Deleted.
+        (JSC::WebAssemblyExecutable::destroy): Deleted.
+        (JSC::WebAssemblyExecutable::visitChildren): Deleted.
+        (JSC::ExecutableBase::dump): Deleted.
+        (JSC::ExecutableBase::hashFor): Deleted.
+        (JSC::NativeExecutable::hashFor): Deleted.
+        (JSC::ScriptExecutable::hashFor): Deleted.
+        * runtime/EvalExecutable.h: Copied from Source/JavaScriptCore/runtime/Executable.h.
+        (JSC::isCall): Deleted.
+        (JSC::ExecutableBase::ExecutableBase): Deleted.
+        (JSC::ExecutableBase::finishCreation): Deleted.
+        (JSC::ExecutableBase::isEvalExecutable): Deleted.
+        (JSC::ExecutableBase::isFunctionExecutable): Deleted.
+        (JSC::ExecutableBase::isProgramExecutable): Deleted.
+        (JSC::ExecutableBase::isModuleProgramExecutable): Deleted.
+        (JSC::ExecutableBase::isHostFunction): Deleted.
+        (JSC::ExecutableBase::isWebAssemblyExecutable): Deleted.
+        (JSC::ExecutableBase::createStructure): Deleted.
+        (JSC::ExecutableBase::generatedJITCodeForCall): Deleted.
+        (JSC::ExecutableBase::generatedJITCodeForConstruct): Deleted.
+        (JSC::ExecutableBase::generatedJITCodeFor): Deleted.
+        (JSC::ExecutableBase::entrypointFor): Deleted.
+        (JSC::ExecutableBase::offsetOfJITCodeWithArityCheckFor): Deleted.
+        (JSC::ExecutableBase::offsetOfNumParametersFor): Deleted.
+        (JSC::ExecutableBase::hasJITCodeForCall): Deleted.
+        (JSC::ExecutableBase::hasJITCodeForConstruct): Deleted.
+        (JSC::ExecutableBase::hasJITCodeFor): Deleted.
+        (JSC::ExecutableBase::intrinsic): Deleted.
+        (JSC::ExecutableBase::intrinsicFor): Deleted.
+        (JSC::ScriptExecutable::source): Deleted.
+        (JSC::ScriptExecutable::sourceID): Deleted.
+        (JSC::ScriptExecutable::sourceURL): Deleted.
+        (JSC::ScriptExecutable::firstLine): Deleted.
+        (JSC::ScriptExecutable::setOverrideLineNumber): Deleted.
+        (JSC::ScriptExecutable::hasOverrideLineNumber): Deleted.
+        (JSC::ScriptExecutable::overrideLineNumber): Deleted.
+        (JSC::ScriptExecutable::lastLine): Deleted.
+        (JSC::ScriptExecutable::startColumn): Deleted.
+        (JSC::ScriptExecutable::endColumn): Deleted.
+        (JSC::ScriptExecutable::typeProfilingStartOffset): Deleted.
+        (JSC::ScriptExecutable::typeProfilingEndOffset): Deleted.
+        (JSC::ScriptExecutable::usesEval): Deleted.
+        (JSC::ScriptExecutable::usesArguments): Deleted.
+        (JSC::ScriptExecutable::isArrowFunctionContext): Deleted.
+        (JSC::ScriptExecutable::isStrictMode): Deleted.
+        (JSC::ScriptExecutable::derivedContextType): Deleted.
+        (JSC::ScriptExecutable::evalContextType): Deleted.
+        (JSC::ScriptExecutable::ecmaMode): Deleted.
+        (JSC::ScriptExecutable::setNeverInline): Deleted.
+        (JSC::ScriptExecutable::setNeverOptimize): Deleted.
+        (JSC::ScriptExecutable::setNeverFTLOptimize): Deleted.
+        (JSC::ScriptExecutable::setDidTryToEnterInLoop): Deleted.
+        (JSC::ScriptExecutable::setCanUseOSRExitFuzzing): Deleted.
+        (JSC::ScriptExecutable::neverInline): Deleted.
+        (JSC::ScriptExecutable::neverOptimize): Deleted.
+        (JSC::ScriptExecutable::neverFTLOptimize): Deleted.
+        (JSC::ScriptExecutable::didTryToEnterInLoop): Deleted.
+        (JSC::ScriptExecutable::isInliningCandidate): Deleted.
+        (JSC::ScriptExecutable::isOkToOptimize): Deleted.
+        (JSC::ScriptExecutable::canUseOSRExitFuzzing): Deleted.
+        (JSC::ScriptExecutable::addressOfDidTryToEnterInLoop): Deleted.
+        (JSC::ScriptExecutable::features): Deleted.
+        (JSC::ScriptExecutable::recordParse): Deleted.
+        (JSC::ScriptExecutable::finishCreation): Deleted.
+        (JSC::ScriptExecutable::prepareForExecution): Deleted.
+        * runtime/Executable.cpp: Removed.
+        * runtime/Executable.h: Removed.
+        * runtime/ExecutableBase.cpp: Copied from Source/JavaScriptCore/runtime/Executable.cpp.
+        (JSC::NativeExecutable::create): Deleted.
+        (JSC::NativeExecutable::destroy): Deleted.
+        (JSC::NativeExecutable::createStructure): Deleted.
+        (JSC::NativeExecutable::finishCreation): Deleted.
+        (JSC::NativeExecutable::NativeExecutable): Deleted.
+        (JSC::ScriptExecutable::ScriptExecutable): Deleted.
+        (JSC::ScriptExecutable::destroy): Deleted.
+        (JSC::ScriptExecutable::installCode): Deleted.
+        (JSC::ScriptExecutable::newCodeBlockFor): Deleted.
+        (JSC::ScriptExecutable::newReplacementCodeBlockFor): Deleted.
+        (JSC::setupLLInt): Deleted.
+        (JSC::setupJIT): Deleted.
+        (JSC::ScriptExecutable::prepareForExecutionImpl): Deleted.
+        (JSC::EvalExecutable::create): Deleted.
+        (JSC::EvalExecutable::EvalExecutable): Deleted.
+        (JSC::EvalExecutable::destroy): Deleted.
+        (JSC::ProgramExecutable::ProgramExecutable): Deleted.
+        (JSC::ProgramExecutable::destroy): Deleted.
+        (JSC::ModuleProgramExecutable::ModuleProgramExecutable): Deleted.
+        (JSC::ModuleProgramExecutable::create): Deleted.
+        (JSC::ModuleProgramExecutable::destroy): Deleted.
+        (JSC::FunctionExecutable::FunctionExecutable): Deleted.
+        (JSC::FunctionExecutable::finishCreation): Deleted.
+        (JSC::FunctionExecutable::destroy): Deleted.
+        (JSC::samplingDescription): Deleted.
+        (JSC::EvalExecutable::visitChildren): Deleted.
+        (JSC::ProgramExecutable::checkSyntax): Deleted.
+        (JSC::ProgramExecutable::initializeGlobalProperties): Deleted.
+        (JSC::ProgramExecutable::visitChildren): Deleted.
+        (JSC::ModuleProgramExecutable::visitChildren): Deleted.
+        (JSC::FunctionExecutable::baselineCodeBlockFor): Deleted.
+        (JSC::FunctionExecutable::visitChildren): Deleted.
+        (JSC::FunctionExecutable::fromGlobalCode): Deleted.
+        (JSC::WebAssemblyExecutable::WebAssemblyExecutable): Deleted.
+        (JSC::WebAssemblyExecutable::destroy): Deleted.
+        (JSC::WebAssemblyExecutable::visitChildren): Deleted.
+        (JSC::NativeExecutable::hashFor): Deleted.
+        (JSC::ScriptExecutable::hashFor): Deleted.
+        * runtime/ExecutableBase.h: Copied from Source/JavaScriptCore/runtime/Executable.h.
+        (JSC::ScriptExecutable::source): Deleted.
+        (JSC::ScriptExecutable::sourceID): Deleted.
+        (JSC::ScriptExecutable::sourceURL): Deleted.
+        (JSC::ScriptExecutable::firstLine): Deleted.
+        (JSC::ScriptExecutable::setOverrideLineNumber): Deleted.
+        (JSC::ScriptExecutable::hasOverrideLineNumber): Deleted.
+        (JSC::ScriptExecutable::overrideLineNumber): Deleted.
+        (JSC::ScriptExecutable::lastLine): Deleted.
+        (JSC::ScriptExecutable::startColumn): Deleted.
+        (JSC::ScriptExecutable::endColumn): Deleted.
+        (JSC::ScriptExecutable::typeProfilingStartOffset): Deleted.
+        (JSC::ScriptExecutable::typeProfilingEndOffset): Deleted.
+        (JSC::ScriptExecutable::usesEval): Deleted.
+        (JSC::ScriptExecutable::usesArguments): Deleted.
+        (JSC::ScriptExecutable::isArrowFunctionContext): Deleted.
+        (JSC::ScriptExecutable::isStrictMode): Deleted.
+        (JSC::ScriptExecutable::derivedContextType): Deleted.
+        (JSC::ScriptExecutable::evalContextType): Deleted.
+        (JSC::ScriptExecutable::ecmaMode): Deleted.
+        (JSC::ScriptExecutable::setNeverInline): Deleted.
+        (JSC::ScriptExecutable::setNeverOptimize): Deleted.
+        (JSC::ScriptExecutable::setNeverFTLOptimize): Deleted.
+        (JSC::ScriptExecutable::setDidTryToEnterInLoop): Deleted.
+        (JSC::ScriptExecutable::setCanUseOSRExitFuzzing): Deleted.
+        (JSC::ScriptExecutable::neverInline): Deleted.
+        (JSC::ScriptExecutable::neverOptimize): Deleted.
+        (JSC::ScriptExecutable::neverFTLOptimize): Deleted.
+        (JSC::ScriptExecutable::didTryToEnterInLoop): Deleted.
+        (JSC::ScriptExecutable::isInliningCandidate): Deleted.
+        (JSC::ScriptExecutable::isOkToOptimize): Deleted.
+        (JSC::ScriptExecutable::canUseOSRExitFuzzing): Deleted.
+        (JSC::ScriptExecutable::addressOfDidTryToEnterInLoop): Deleted.
+        (JSC::ScriptExecutable::features): Deleted.
+        (JSC::ScriptExecutable::recordParse): Deleted.
+        (JSC::ScriptExecutable::finishCreation): Deleted.
+        (JSC::ScriptExecutable::prepareForExecution): Deleted.
+        * runtime/FunctionExecutable.cpp: Copied from Source/JavaScriptCore/runtime/Executable.cpp.
+        (JSC::ExecutableBase::destroy): Deleted.
+        (JSC::ExecutableBase::clearCode): Deleted.
+        (JSC::NativeExecutable::create): Deleted.
+        (JSC::NativeExecutable::destroy): Deleted.
+        (JSC::NativeExecutable::createStructure): Deleted.
+        (JSC::NativeExecutable::finishCreation): Deleted.
+        (JSC::NativeExecutable::NativeExecutable): Deleted.
+        (JSC::ScriptExecutable::ScriptExecutable): Deleted.
+        (JSC::ScriptExecutable::destroy): Deleted.
+        (JSC::ScriptExecutable::installCode): Deleted.
+        (JSC::ScriptExecutable::newCodeBlockFor): Deleted.
+        (JSC::ScriptExecutable::newReplacementCodeBlockFor): Deleted.
+        (JSC::setupLLInt): Deleted.
+        (JSC::setupJIT): Deleted.
+        (JSC::ScriptExecutable::prepareForExecutionImpl): Deleted.
+        (JSC::EvalExecutable::create): Deleted.
+        (JSC::EvalExecutable::EvalExecutable): Deleted.
+        (JSC::EvalExecutable::destroy): Deleted.
+        (JSC::ProgramExecutable::ProgramExecutable): Deleted.
+        (JSC::ProgramExecutable::destroy): Deleted.
+        (JSC::ModuleProgramExecutable::ModuleProgramExecutable): Deleted.
+        (JSC::ModuleProgramExecutable::create): Deleted.
+        (JSC::ModuleProgramExecutable::destroy): Deleted.
+        (JSC::samplingDescription): Deleted.
+        (JSC::EvalExecutable::visitChildren): Deleted.
+        (JSC::ProgramExecutable::checkSyntax): Deleted.
+        (JSC::ProgramExecutable::initializeGlobalProperties): Deleted.
+        (JSC::ProgramExecutable::visitChildren): Deleted.
+        (JSC::ModuleProgramExecutable::visitChildren): Deleted.
+        (JSC::WebAssemblyExecutable::WebAssemblyExecutable): Deleted.
+        (JSC::WebAssemblyExecutable::destroy): Deleted.
+        (JSC::WebAssemblyExecutable::visitChildren): Deleted.
+        (JSC::ExecutableBase::dump): Deleted.
+        (JSC::ExecutableBase::hashFor): Deleted.
+        (JSC::NativeExecutable::hashFor): Deleted.
+        (JSC::ScriptExecutable::hashFor): Deleted.
+        * runtime/FunctionExecutable.h: Copied from Source/JavaScriptCore/runtime/Executable.h.
+        (JSC::isCall): Deleted.
+        (JSC::ExecutableBase::ExecutableBase): Deleted.
+        (JSC::ExecutableBase::finishCreation): Deleted.
+        (JSC::ExecutableBase::isEvalExecutable): Deleted.
+        (JSC::ExecutableBase::isFunctionExecutable): Deleted.
+        (JSC::ExecutableBase::isProgramExecutable): Deleted.
+        (JSC::ExecutableBase::isModuleProgramExecutable): Deleted.
+        (JSC::ExecutableBase::isHostFunction): Deleted.
+        (JSC::ExecutableBase::isWebAssemblyExecutable): Deleted.
+        (JSC::ExecutableBase::createStructure): Deleted.
+        (JSC::ExecutableBase::generatedJITCodeForCall): Deleted.
+        (JSC::ExecutableBase::generatedJITCodeForConstruct): Deleted.
+        (JSC::ExecutableBase::generatedJITCodeFor): Deleted.
+        (JSC::ExecutableBase::entrypointFor): Deleted.
+        (JSC::ExecutableBase::offsetOfJITCodeWithArityCheckFor): Deleted.
+        (JSC::ExecutableBase::offsetOfNumParametersFor): Deleted.
+        (JSC::ExecutableBase::hasJITCodeForCall): Deleted.
+        (JSC::ExecutableBase::hasJITCodeForConstruct): Deleted.
+        (JSC::ExecutableBase::hasJITCodeFor): Deleted.
+        (JSC::ExecutableBase::intrinsic): Deleted.
+        (JSC::ExecutableBase::intrinsicFor): Deleted.
+        (JSC::ScriptExecutable::source): Deleted.
+        (JSC::ScriptExecutable::sourceID): Deleted.
+        (JSC::ScriptExecutable::sourceURL): Deleted.
+        (JSC::ScriptExecutable::firstLine): Deleted.
+        (JSC::ScriptExecutable::setOverrideLineNumber): Deleted.
+        (JSC::ScriptExecutable::hasOverrideLineNumber): Deleted.
+        (JSC::ScriptExecutable::overrideLineNumber): Deleted.
+        (JSC::ScriptExecutable::lastLine): Deleted.
+        (JSC::ScriptExecutable::startColumn): Deleted.
+        (JSC::ScriptExecutable::endColumn): Deleted.
+        (JSC::ScriptExecutable::typeProfilingStartOffset): Deleted.
+        (JSC::ScriptExecutable::typeProfilingEndOffset): Deleted.
+        (JSC::ScriptExecutable::usesEval): Deleted.
+        (JSC::ScriptExecutable::usesArguments): Deleted.
+        (JSC::ScriptExecutable::isArrowFunctionContext): Deleted.
+        (JSC::ScriptExecutable::isStrictMode): Deleted.
+        (JSC::ScriptExecutable::derivedContextType): Deleted.
+        (JSC::ScriptExecutable::evalContextType): Deleted.
+        (JSC::ScriptExecutable::ecmaMode): Deleted.
+        (JSC::ScriptExecutable::setNeverInline): Deleted.
+        (JSC::ScriptExecutable::setNeverOptimize): Deleted.
+        (JSC::ScriptExecutable::setNeverFTLOptimize): Deleted.
+        (JSC::ScriptExecutable::setDidTryToEnterInLoop): Deleted.
+        (JSC::ScriptExecutable::setCanUseOSRExitFuzzing): Deleted.
+        (JSC::ScriptExecutable::neverInline): Deleted.
+        (JSC::ScriptExecutable::neverOptimize): Deleted.
+        (JSC::ScriptExecutable::neverFTLOptimize): Deleted.
+        (JSC::ScriptExecutable::didTryToEnterInLoop): Deleted.
+        (JSC::ScriptExecutable::isInliningCandidate): Deleted.
+        (JSC::ScriptExecutable::isOkToOptimize): Deleted.
+        (JSC::ScriptExecutable::canUseOSRExitFuzzing): Deleted.
+        (JSC::ScriptExecutable::addressOfDidTryToEnterInLoop): Deleted.
+        (JSC::ScriptExecutable::features): Deleted.
+        (JSC::ScriptExecutable::recordParse): Deleted.
+        (JSC::ScriptExecutable::finishCreation): Deleted.
+        (JSC::ScriptExecutable::prepareForExecution): Deleted.
+        * runtime/FunctionExecutableDump.h:
+        * runtime/JSArray.cpp:
+        * runtime/JSFunctionInlines.h:
+        * runtime/JSModuleRecord.cpp:
+        * runtime/JSObject.cpp:
+        * runtime/Lookup.cpp:
+        * runtime/ModuleProgramExecutable.cpp: Copied from Source/JavaScriptCore/runtime/Executable.cpp.
+        (JSC::ExecutableBase::destroy): Deleted.
+        (JSC::ExecutableBase::clearCode): Deleted.
+        (JSC::NativeExecutable::create): Deleted.
+        (JSC::NativeExecutable::destroy): Deleted.
+        (JSC::NativeExecutable::createStructure): Deleted.
+        (JSC::NativeExecutable::finishCreation): Deleted.
+        (JSC::NativeExecutable::NativeExecutable): Deleted.
+        (JSC::ScriptExecutable::ScriptExecutable): Deleted.
+        (JSC::ScriptExecutable::destroy): Deleted.
+        (JSC::ScriptExecutable::installCode): Deleted.
+        (JSC::ScriptExecutable::newCodeBlockFor): Deleted.
+        (JSC::ScriptExecutable::newReplacementCodeBlockFor): Deleted.
+        (JSC::setupLLInt): Deleted.
+        (JSC::setupJIT): Deleted.
+        (JSC::ScriptExecutable::prepareForExecutionImpl): Deleted.
+        (JSC::EvalExecutable::create): Deleted.
+        (JSC::EvalExecutable::EvalExecutable): Deleted.
+        (JSC::EvalExecutable::destroy): Deleted.
+        (JSC::ProgramExecutable::ProgramExecutable): Deleted.
+        (JSC::ProgramExecutable::destroy): Deleted.
+        (JSC::FunctionExecutable::FunctionExecutable): Deleted.
+        (JSC::FunctionExecutable::finishCreation): Deleted.
+        (JSC::FunctionExecutable::destroy): Deleted.
+        (JSC::samplingDescription): Deleted.
+        (JSC::EvalExecutable::visitChildren): Deleted.
+        (JSC::ProgramExecutable::checkSyntax): Deleted.
+        (JSC::ProgramExecutable::initializeGlobalProperties): Deleted.
+        (JSC::ProgramExecutable::visitChildren): Deleted.
+        (JSC::FunctionExecutable::baselineCodeBlockFor): Deleted.
+        (JSC::FunctionExecutable::visitChildren): Deleted.
+        (JSC::FunctionExecutable::fromGlobalCode): Deleted.
+        (JSC::WebAssemblyExecutable::WebAssemblyExecutable): Deleted.
+        (JSC::WebAssemblyExecutable::destroy): Deleted.
+        (JSC::WebAssemblyExecutable::visitChildren): Deleted.
+        (JSC::ExecutableBase::dump): Deleted.
+        (JSC::ExecutableBase::hashFor): Deleted.
+        (JSC::NativeExecutable::hashFor): Deleted.
+        (JSC::ScriptExecutable::hashFor): Deleted.
+        * runtime/ModuleProgramExecutable.h: Copied from Source/JavaScriptCore/runtime/Executable.h.
+        (JSC::isCall): Deleted.
+        (JSC::ExecutableBase::ExecutableBase): Deleted.
+        (JSC::ExecutableBase::finishCreation): Deleted.
+        (JSC::ExecutableBase::isEvalExecutable): Deleted.
+        (JSC::ExecutableBase::isFunctionExecutable): Deleted.
+        (JSC::ExecutableBase::isProgramExecutable): Deleted.
+        (JSC::ExecutableBase::isModuleProgramExecutable): Deleted.
+        (JSC::ExecutableBase::isHostFunction): Deleted.
+        (JSC::ExecutableBase::isWebAssemblyExecutable): Deleted.
+        (JSC::ExecutableBase::createStructure): Deleted.
+        (JSC::ExecutableBase::generatedJITCodeForCall): Deleted.
+        (JSC::ExecutableBase::generatedJITCodeForConstruct): Deleted.
+        (JSC::ExecutableBase::generatedJITCodeFor): Deleted.
+        (JSC::ExecutableBase::entrypointFor): Deleted.
+        (JSC::ExecutableBase::offsetOfJITCodeWithArityCheckFor): Deleted.
+        (JSC::ExecutableBase::offsetOfNumParametersFor): Deleted.
+        (JSC::ExecutableBase::hasJITCodeForCall): Deleted.
+        (JSC::ExecutableBase::hasJITCodeForConstruct): Deleted.
+        (JSC::ExecutableBase::hasJITCodeFor): Deleted.
+        (JSC::ExecutableBase::intrinsic): Deleted.
+        (JSC::ExecutableBase::intrinsicFor): Deleted.
+        (JSC::ScriptExecutable::source): Deleted.
+        (JSC::ScriptExecutable::sourceID): Deleted.
+        (JSC::ScriptExecutable::sourceURL): Deleted.
+        (JSC::ScriptExecutable::firstLine): Deleted.
+        (JSC::ScriptExecutable::setOverrideLineNumber): Deleted.
+        (JSC::ScriptExecutable::hasOverrideLineNumber): Deleted.
+        (JSC::ScriptExecutable::overrideLineNumber): Deleted.
+        (JSC::ScriptExecutable::lastLine): Deleted.
+        (JSC::ScriptExecutable::startColumn): Deleted.
+        (JSC::ScriptExecutable::endColumn): Deleted.
+        (JSC::ScriptExecutable::typeProfilingStartOffset): Deleted.
+        (JSC::ScriptExecutable::typeProfilingEndOffset): Deleted.
+        (JSC::ScriptExecutable::usesEval): Deleted.
+        (JSC::ScriptExecutable::usesArguments): Deleted.
+        (JSC::ScriptExecutable::isArrowFunctionContext): Deleted.
+        (JSC::ScriptExecutable::isStrictMode): Deleted.
+        (JSC::ScriptExecutable::derivedContextType): Deleted.
+        (JSC::ScriptExecutable::evalContextType): Deleted.
+        (JSC::ScriptExecutable::ecmaMode): Deleted.
+        (JSC::ScriptExecutable::setNeverInline): Deleted.
+        (JSC::ScriptExecutable::setNeverOptimize): Deleted.
+        (JSC::ScriptExecutable::setNeverFTLOptimize): Deleted.
+        (JSC::ScriptExecutable::setDidTryToEnterInLoop): Deleted.
+        (JSC::ScriptExecutable::setCanUseOSRExitFuzzing): Deleted.
+        (JSC::ScriptExecutable::neverInline): Deleted.
+        (JSC::ScriptExecutable::neverOptimize): Deleted.
+        (JSC::ScriptExecutable::neverFTLOptimize): Deleted.
+        (JSC::ScriptExecutable::didTryToEnterInLoop): Deleted.
+        (JSC::ScriptExecutable::isInliningCandidate): Deleted.
+        (JSC::ScriptExecutable::isOkToOptimize): Deleted.
+        (JSC::ScriptExecutable::canUseOSRExitFuzzing): Deleted.
+        (JSC::ScriptExecutable::addressOfDidTryToEnterInLoop): Deleted.
+        (JSC::ScriptExecutable::features): Deleted.
+        (JSC::ScriptExecutable::recordParse): Deleted.
+        (JSC::ScriptExecutable::finishCreation): Deleted.
+        (JSC::ScriptExecutable::prepareForExecution): Deleted.
+        * runtime/NativeExecutable.cpp: Copied from Source/JavaScriptCore/runtime/Executable.cpp.
+        (JSC::ExecutableBase::destroy): Deleted.
+        (JSC::ExecutableBase::clearCode): Deleted.
+        (JSC::ScriptExecutable::ScriptExecutable): Deleted.
+        (JSC::ScriptExecutable::destroy): Deleted.
+        (JSC::ScriptExecutable::installCode): Deleted.
+        (JSC::ScriptExecutable::newCodeBlockFor): Deleted.
+        (JSC::ScriptExecutable::newReplacementCodeBlockFor): Deleted.
+        (JSC::setupLLInt): Deleted.
+        (JSC::setupJIT): Deleted.
+        (JSC::ScriptExecutable::prepareForExecutionImpl): Deleted.
+        (JSC::EvalExecutable::create): Deleted.
+        (JSC::EvalExecutable::EvalExecutable): Deleted.
+        (JSC::EvalExecutable::destroy): Deleted.
+        (JSC::ProgramExecutable::ProgramExecutable): Deleted.
+        (JSC::ProgramExecutable::destroy): Deleted.
+        (JSC::ModuleProgramExecutable::ModuleProgramExecutable): Deleted.
+        (JSC::ModuleProgramExecutable::create): Deleted.
+        (JSC::ModuleProgramExecutable::destroy): Deleted.
+        (JSC::FunctionExecutable::FunctionExecutable): Deleted.
+        (JSC::FunctionExecutable::finishCreation): Deleted.
+        (JSC::FunctionExecutable::destroy): Deleted.
+        (JSC::samplingDescription): Deleted.
+        (JSC::EvalExecutable::visitChildren): Deleted.
+        (JSC::ProgramExecutable::checkSyntax): Deleted.
+        (JSC::ProgramExecutable::initializeGlobalProperties): Deleted.
+        (JSC::ProgramExecutable::visitChildren): Deleted.
+        (JSC::ModuleProgramExecutable::visitChildren): Deleted.
+        (JSC::FunctionExecutable::baselineCodeBlockFor): Deleted.
+        (JSC::FunctionExecutable::visitChildren): Deleted.
+        (JSC::FunctionExecutable::fromGlobalCode): Deleted.
+        (JSC::WebAssemblyExecutable::WebAssemblyExecutable): Deleted.
+        (JSC::WebAssemblyExecutable::destroy): Deleted.
+        (JSC::WebAssemblyExecutable::visitChildren): Deleted.
+        (JSC::ExecutableBase::dump): Deleted.
+        (JSC::ExecutableBase::hashFor): Deleted.
+        (JSC::ScriptExecutable::hashFor): Deleted.
+        * runtime/NativeExecutable.h: Copied from Source/JavaScriptCore/runtime/Executable.h.
+        (JSC::isCall): Deleted.
+        (JSC::ExecutableBase::ExecutableBase): Deleted.
+        (JSC::ExecutableBase::finishCreation): Deleted.
+        (JSC::ExecutableBase::isEvalExecutable): Deleted.
+        (JSC::ExecutableBase::isFunctionExecutable): Deleted.
+        (JSC::ExecutableBase::isProgramExecutable): Deleted.
+        (JSC::ExecutableBase::isModuleProgramExecutable): Deleted.
+        (JSC::ExecutableBase::isHostFunction): Deleted.
+        (JSC::ExecutableBase::isWebAssemblyExecutable): Deleted.
+        (JSC::ExecutableBase::createStructure): Deleted.
+        (JSC::ExecutableBase::generatedJITCodeForCall): Deleted.
+        (JSC::ExecutableBase::generatedJITCodeForConstruct): Deleted.
+        (JSC::ExecutableBase::generatedJITCodeFor): Deleted.
+        (JSC::ExecutableBase::entrypointFor): Deleted.
+        (JSC::ExecutableBase::offsetOfJITCodeWithArityCheckFor): Deleted.
+        (JSC::ExecutableBase::offsetOfNumParametersFor): Deleted.
+        (JSC::ExecutableBase::hasJITCodeForCall): Deleted.
+        (JSC::ExecutableBase::hasJITCodeForConstruct): Deleted.
+        (JSC::ExecutableBase::hasJITCodeFor): Deleted.
+        (JSC::ExecutableBase::intrinsic): Deleted.
+        (JSC::ExecutableBase::intrinsicFor): Deleted.
+        (JSC::ScriptExecutable::source): Deleted.
+        (JSC::ScriptExecutable::sourceID): Deleted.
+        (JSC::ScriptExecutable::sourceURL): Deleted.
+        (JSC::ScriptExecutable::firstLine): Deleted.
+        (JSC::ScriptExecutable::setOverrideLineNumber): Deleted.
+        (JSC::ScriptExecutable::hasOverrideLineNumber): Deleted.
+        (JSC::ScriptExecutable::overrideLineNumber): Deleted.
+        (JSC::ScriptExecutable::lastLine): Deleted.
+        (JSC::ScriptExecutable::startColumn): Deleted.
+        (JSC::ScriptExecutable::endColumn): Deleted.
+        (JSC::ScriptExecutable::typeProfilingStartOffset): Deleted.
+        (JSC::ScriptExecutable::typeProfilingEndOffset): Deleted.
+        (JSC::ScriptExecutable::usesEval): Deleted.
+        (JSC::ScriptExecutable::usesArguments): Deleted.
+        (JSC::ScriptExecutable::isArrowFunctionContext): Deleted.
+        (JSC::ScriptExecutable::isStrictMode): Deleted.
+        (JSC::ScriptExecutable::derivedContextType): Deleted.
+        (JSC::ScriptExecutable::evalContextType): Deleted.
+        (JSC::ScriptExecutable::ecmaMode): Deleted.
+        (JSC::ScriptExecutable::setNeverInline): Deleted.
+        (JSC::ScriptExecutable::setNeverOptimize): Deleted.
+        (JSC::ScriptExecutable::setNeverFTLOptimize): Deleted.
+        (JSC::ScriptExecutable::setDidTryToEnterInLoop): Deleted.
+        (JSC::ScriptExecutable::setCanUseOSRExitFuzzing): Deleted.
+        (JSC::ScriptExecutable::neverInline): Deleted.
+        (JSC::ScriptExecutable::neverOptimize): Deleted.
+        (JSC::ScriptExecutable::neverFTLOptimize): Deleted.
+        (JSC::ScriptExecutable::didTryToEnterInLoop): Deleted.
+        (JSC::ScriptExecutable::isInliningCandidate): Deleted.
+        (JSC::ScriptExecutable::isOkToOptimize): Deleted.
+        (JSC::ScriptExecutable::canUseOSRExitFuzzing): Deleted.
+        (JSC::ScriptExecutable::addressOfDidTryToEnterInLoop): Deleted.
+        (JSC::ScriptExecutable::features): Deleted.
+        (JSC::ScriptExecutable::recordParse): Deleted.
+        (JSC::ScriptExecutable::finishCreation): Deleted.
+        (JSC::ScriptExecutable::prepareForExecution): Deleted.
+        * runtime/ProgramExecutable.cpp: Copied from Source/JavaScriptCore/runtime/Executable.cpp.
+        (JSC::ExecutableBase::destroy): Deleted.
+        (JSC::ExecutableBase::clearCode): Deleted.
+        (JSC::NativeExecutable::create): Deleted.
+        (JSC::NativeExecutable::destroy): Deleted.
+        (JSC::NativeExecutable::createStructure): Deleted.
+        (JSC::NativeExecutable::finishCreation): Deleted.
+        (JSC::NativeExecutable::NativeExecutable): Deleted.
+        (JSC::ScriptExecutable::ScriptExecutable): Deleted.
+        (JSC::ScriptExecutable::destroy): Deleted.
+        (JSC::ScriptExecutable::installCode): Deleted.
+        (JSC::ScriptExecutable::newCodeBlockFor): Deleted.
+        (JSC::ScriptExecutable::newReplacementCodeBlockFor): Deleted.
+        (JSC::setupLLInt): Deleted.
+        (JSC::setupJIT): Deleted.
+        (JSC::ScriptExecutable::prepareForExecutionImpl): Deleted.
+        (JSC::EvalExecutable::create): Deleted.
+        (JSC::EvalExecutable::EvalExecutable): Deleted.
+        (JSC::EvalExecutable::destroy): Deleted.
+        (JSC::ModuleProgramExecutable::ModuleProgramExecutable): Deleted.
+        (JSC::ModuleProgramExecutable::create): Deleted.
+        (JSC::ModuleProgramExecutable::destroy): Deleted.
+        (JSC::FunctionExecutable::FunctionExecutable): Deleted.
+        (JSC::FunctionExecutable::finishCreation): Deleted.
+        (JSC::FunctionExecutable::destroy): Deleted.
+        (JSC::samplingDescription): Deleted.
+        (JSC::EvalExecutable::visitChildren): Deleted.
+        (JSC::ModuleProgramExecutable::visitChildren): Deleted.
+        (JSC::FunctionExecutable::baselineCodeBlockFor): Deleted.
+        (JSC::FunctionExecutable::visitChildren): Deleted.
+        (JSC::FunctionExecutable::fromGlobalCode): Deleted.
+        (JSC::WebAssemblyExecutable::WebAssemblyExecutable): Deleted.
+        (JSC::WebAssemblyExecutable::destroy): Deleted.
+        (JSC::WebAssemblyExecutable::visitChildren): Deleted.
+        (JSC::ExecutableBase::dump): Deleted.
+        (JSC::ExecutableBase::hashFor): Deleted.
+        (JSC::NativeExecutable::hashFor): Deleted.
+        (JSC::ScriptExecutable::hashFor): Deleted.
+        * runtime/ProgramExecutable.h: Copied from Source/JavaScriptCore/runtime/Executable.h.
+        (JSC::isCall): Deleted.
+        (JSC::ExecutableBase::ExecutableBase): Deleted.
+        (JSC::ExecutableBase::finishCreation): Deleted.
+        (JSC::ExecutableBase::isEvalExecutable): Deleted.
+        (JSC::ExecutableBase::isFunctionExecutable): Deleted.
+        (JSC::ExecutableBase::isProgramExecutable): Deleted.
+        (JSC::ExecutableBase::isModuleProgramExecutable): Deleted.
+        (JSC::ExecutableBase::isHostFunction): Deleted.
+        (JSC::ExecutableBase::isWebAssemblyExecutable): Deleted.
+        (JSC::ExecutableBase::createStructure): Deleted.
+        (JSC::ExecutableBase::generatedJITCodeForCall): Deleted.
+        (JSC::ExecutableBase::generatedJITCodeForConstruct): Deleted.
+        (JSC::ExecutableBase::generatedJITCodeFor): Deleted.
+        (JSC::ExecutableBase::entrypointFor): Deleted.
+        (JSC::ExecutableBase::offsetOfJITCodeWithArityCheckFor): Deleted.
+        (JSC::ExecutableBase::offsetOfNumParametersFor): Deleted.
+        (JSC::ExecutableBase::hasJITCodeForCall): Deleted.
+        (JSC::ExecutableBase::hasJITCodeForConstruct): Deleted.
+        (JSC::ExecutableBase::hasJITCodeFor): Deleted.
+        (JSC::ExecutableBase::intrinsic): Deleted.
+        (JSC::ExecutableBase::intrinsicFor): Deleted.
+        (JSC::ScriptExecutable::source): Deleted.
+        (JSC::ScriptExecutable::sourceID): Deleted.
+        (JSC::ScriptExecutable::sourceURL): Deleted.
+        (JSC::ScriptExecutable::firstLine): Deleted.
+        (JSC::ScriptExecutable::setOverrideLineNumber): Deleted.
+        (JSC::ScriptExecutable::hasOverrideLineNumber): Deleted.
+        (JSC::ScriptExecutable::overrideLineNumber): Deleted.
+        (JSC::ScriptExecutable::lastLine): Deleted.
+        (JSC::ScriptExecutable::startColumn): Deleted.
+        (JSC::ScriptExecutable::endColumn): Deleted.
+        (JSC::ScriptExecutable::typeProfilingStartOffset): Deleted.
+        (JSC::ScriptExecutable::typeProfilingEndOffset): Deleted.
+        (JSC::ScriptExecutable::usesEval): Deleted.
+        (JSC::ScriptExecutable::usesArguments): Deleted.
+        (JSC::ScriptExecutable::isArrowFunctionContext): Deleted.
+        (JSC::ScriptExecutable::isStrictMode): Deleted.
+        (JSC::ScriptExecutable::derivedContextType): Deleted.
+        (JSC::ScriptExecutable::evalContextType): Deleted.
+        (JSC::ScriptExecutable::ecmaMode): Deleted.
+        (JSC::ScriptExecutable::setNeverInline): Deleted.
+        (JSC::ScriptExecutable::setNeverOptimize): Deleted.
+        (JSC::ScriptExecutable::setNeverFTLOptimize): Deleted.
+        (JSC::ScriptExecutable::setDidTryToEnterInLoop): Deleted.
+        (JSC::ScriptExecutable::setCanUseOSRExitFuzzing): Deleted.
+        (JSC::ScriptExecutable::neverInline): Deleted.
+        (JSC::ScriptExecutable::neverOptimize): Deleted.
+        (JSC::ScriptExecutable::neverFTLOptimize): Deleted.
+        (JSC::ScriptExecutable::didTryToEnterInLoop): Deleted.
+        (JSC::ScriptExecutable::isInliningCandidate): Deleted.
+        (JSC::ScriptExecutable::isOkToOptimize): Deleted.
+        (JSC::ScriptExecutable::canUseOSRExitFuzzing): Deleted.
+        (JSC::ScriptExecutable::addressOfDidTryToEnterInLoop): Deleted.
+        (JSC::ScriptExecutable::features): Deleted.
+        (JSC::ScriptExecutable::recordParse): Deleted.
+        (JSC::ScriptExecutable::finishCreation): Deleted.
+        (JSC::ScriptExecutable::prepareForExecution): Deleted.
+        * runtime/SamplingProfiler.cpp:
+        * runtime/ScriptExecutable.cpp: Copied from Source/JavaScriptCore/runtime/Executable.cpp.
+        (JSC::ExecutableBase::destroy): Deleted.
+        (JSC::ExecutableBase::clearCode): Deleted.
+        (JSC::NativeExecutable::create): Deleted.
+        (JSC::NativeExecutable::destroy): Deleted.
+        (JSC::NativeExecutable::createStructure): Deleted.
+        (JSC::NativeExecutable::finishCreation): Deleted.
+        (JSC::NativeExecutable::NativeExecutable): Deleted.
+        (JSC::EvalExecutable::create): Deleted.
+        (JSC::EvalExecutable::EvalExecutable): Deleted.
+        (JSC::EvalExecutable::destroy): Deleted.
+        (JSC::ProgramExecutable::ProgramExecutable): Deleted.
+        (JSC::ProgramExecutable::destroy): Deleted.
+        (JSC::ModuleProgramExecutable::ModuleProgramExecutable): Deleted.
+        (JSC::ModuleProgramExecutable::create): Deleted.
+        (JSC::ModuleProgramExecutable::destroy): Deleted.
+        (JSC::FunctionExecutable::FunctionExecutable): Deleted.
+        (JSC::FunctionExecutable::finishCreation): Deleted.
+        (JSC::FunctionExecutable::destroy): Deleted.
+        (JSC::samplingDescription): Deleted.
+        (JSC::EvalExecutable::visitChildren): Deleted.
+        (JSC::ProgramExecutable::checkSyntax): Deleted.
+        (JSC::ProgramExecutable::initializeGlobalProperties): Deleted.
+        (JSC::ProgramExecutable::visitChildren): Deleted.
+        (JSC::ModuleProgramExecutable::visitChildren): Deleted.
+        (JSC::FunctionExecutable::baselineCodeBlockFor): Deleted.
+        (JSC::FunctionExecutable::visitChildren): Deleted.
+        (JSC::FunctionExecutable::fromGlobalCode): Deleted.
+        (JSC::WebAssemblyExecutable::WebAssemblyExecutable): Deleted.
+        (JSC::WebAssemblyExecutable::destroy): Deleted.
+        (JSC::WebAssemblyExecutable::visitChildren): Deleted.
+        (JSC::ExecutableBase::dump): Deleted.
+        (JSC::ExecutableBase::hashFor): Deleted.
+        (JSC::NativeExecutable::hashFor): Deleted.
+        * runtime/ScriptExecutable.h: Copied from Source/JavaScriptCore/runtime/Executable.h.
+        (): Deleted.
+        (JSC::isCall): Deleted.
+        (JSC::ExecutableBase::ExecutableBase): Deleted.
+        (JSC::ExecutableBase::finishCreation): Deleted.
+        (JSC::ExecutableBase::isEvalExecutable): Deleted.
+        (JSC::ExecutableBase::isFunctionExecutable): Deleted.
+        (JSC::ExecutableBase::isProgramExecutable): Deleted.
+        (JSC::ExecutableBase::isModuleProgramExecutable): Deleted.
+        (JSC::ExecutableBase::isHostFunction): Deleted.
+        (JSC::ExecutableBase::isWebAssemblyExecutable): Deleted.
+        (JSC::ExecutableBase::createStructure): Deleted.
+        (JSC::ExecutableBase::generatedJITCodeForCall): Deleted.
+        (JSC::ExecutableBase::generatedJITCodeForConstruct): Deleted.
+        (JSC::ExecutableBase::generatedJITCodeFor): Deleted.
+        (JSC::ExecutableBase::entrypointFor): Deleted.
+        (JSC::ExecutableBase::offsetOfJITCodeWithArityCheckFor): Deleted.
+        (JSC::ExecutableBase::offsetOfNumParametersFor): Deleted.
+        (JSC::ExecutableBase::hasJITCodeForCall): Deleted.
+        (JSC::ExecutableBase::hasJITCodeForConstruct): Deleted.
+        (JSC::ExecutableBase::hasJITCodeFor): Deleted.
+        (JSC::ExecutableBase::intrinsic): Deleted.
+        (JSC::ExecutableBase::intrinsicFor): Deleted.
+        (JSC::ScriptExecutable::prepareForExecution): Deleted.
+        * runtime/StringConstructor.cpp:
+        * runtime/StringPrototype.cpp:
+        * runtime/WebAssemblyExecutable.cpp: Copied from Source/JavaScriptCore/runtime/Executable.cpp.
+        (JSC::ExecutableBase::destroy): Deleted.
+        (JSC::ExecutableBase::clearCode): Deleted.
+        (JSC::NativeExecutable::create): Deleted.
+        (JSC::NativeExecutable::destroy): Deleted.
+        (JSC::NativeExecutable::createStructure): Deleted.
+        (JSC::NativeExecutable::finishCreation): Deleted.
+        (JSC::NativeExecutable::NativeExecutable): Deleted.
+        (JSC::ScriptExecutable::ScriptExecutable): Deleted.
+        (JSC::ScriptExecutable::destroy): Deleted.
+        (JSC::ScriptExecutable::installCode): Deleted.
+        (JSC::ScriptExecutable::newCodeBlockFor): Deleted.
+        (JSC::ScriptExecutable::newReplacementCodeBlockFor): Deleted.
+        (JSC::setupLLInt): Deleted.
+        (JSC::setupJIT): Deleted.
+        (JSC::ScriptExecutable::prepareForExecutionImpl): Deleted.
+        (JSC::EvalExecutable::create): Deleted.
+        (JSC::EvalExecutable::EvalExecutable): Deleted.
+        (JSC::EvalExecutable::destroy): Deleted.
+        (JSC::ProgramExecutable::ProgramExecutable): Deleted.
+        (JSC::ProgramExecutable::destroy): Deleted.
+        (JSC::ModuleProgramExecutable::ModuleProgramExecutable): Deleted.
+        (JSC::ModuleProgramExecutable::create): Deleted.
+        (JSC::ModuleProgramExecutable::destroy): Deleted.
+        (JSC::FunctionExecutable::FunctionExecutable): Deleted.
+        (JSC::FunctionExecutable::finishCreation): Deleted.
+        (JSC::FunctionExecutable::destroy): Deleted.
+        (JSC::samplingDescription): Deleted.
+        (JSC::EvalExecutable::visitChildren): Deleted.
+        (JSC::ProgramExecutable::checkSyntax): Deleted.
+        (JSC::ProgramExecutable::initializeGlobalProperties): Deleted.
+        (JSC::ProgramExecutable::visitChildren): Deleted.
+        (JSC::ModuleProgramExecutable::visitChildren): Deleted.
+        (JSC::FunctionExecutable::baselineCodeBlockFor): Deleted.
+        (JSC::FunctionExecutable::visitChildren): Deleted.
+        (JSC::FunctionExecutable::fromGlobalCode): Deleted.
+        (JSC::ExecutableBase::dump): Deleted.
+        (JSC::ExecutableBase::hashFor): Deleted.
+        (JSC::NativeExecutable::hashFor): Deleted.
+        (JSC::ScriptExecutable::hashFor): Deleted.
+        * runtime/WebAssemblyExecutable.h: Copied from Source/JavaScriptCore/runtime/Executable.h.
+        (JSC::isCall): Deleted.
+        (JSC::ExecutableBase::ExecutableBase): Deleted.
+        (JSC::ExecutableBase::finishCreation): Deleted.
+        (JSC::ExecutableBase::isEvalExecutable): Deleted.
+        (JSC::ExecutableBase::isFunctionExecutable): Deleted.
+        (JSC::ExecutableBase::isProgramExecutable): Deleted.
+        (JSC::ExecutableBase::isModuleProgramExecutable): Deleted.
+        (JSC::ExecutableBase::isHostFunction): Deleted.
+        (JSC::ExecutableBase::isWebAssemblyExecutable): Deleted.
+        (JSC::ExecutableBase::createStructure): Deleted.
+        (JSC::ExecutableBase::generatedJITCodeForCall): Deleted.
+        (JSC::ExecutableBase::generatedJITCodeForConstruct): Deleted.
+        (JSC::ExecutableBase::generatedJITCodeFor): Deleted.
+        (JSC::ExecutableBase::entrypointFor): Deleted.
+        (JSC::ExecutableBase::offsetOfJITCodeWithArityCheckFor): Deleted.
+        (JSC::ExecutableBase::offsetOfNumParametersFor): Deleted.
+        (JSC::ExecutableBase::hasJITCodeForCall): Deleted.
+        (JSC::ExecutableBase::hasJITCodeForConstruct): Deleted.
+        (JSC::ExecutableBase::hasJITCodeFor): Deleted.
+        (JSC::ExecutableBase::intrinsic): Deleted.
+        (JSC::ExecutableBase::intrinsicFor): Deleted.
+        (JSC::ScriptExecutable::source): Deleted.
+        (JSC::ScriptExecutable::sourceID): Deleted.
+        (JSC::ScriptExecutable::sourceURL): Deleted.
+        (JSC::ScriptExecutable::firstLine): Deleted.
+        (JSC::ScriptExecutable::setOverrideLineNumber): Deleted.
+        (JSC::ScriptExecutable::hasOverrideLineNumber): Deleted.
+        (JSC::ScriptExecutable::overrideLineNumber): Deleted.
+        (JSC::ScriptExecutable::lastLine): Deleted.
+        (JSC::ScriptExecutable::startColumn): Deleted.
+        (JSC::ScriptExecutable::endColumn): Deleted.
+        (JSC::ScriptExecutable::typeProfilingStartOffset): Deleted.
+        (JSC::ScriptExecutable::typeProfilingEndOffset): Deleted.
+        (JSC::ScriptExecutable::usesEval): Deleted.
+        (JSC::ScriptExecutable::usesArguments): Deleted.
+        (JSC::ScriptExecutable::isArrowFunctionContext): Deleted.
+        (JSC::ScriptExecutable::isStrictMode): Deleted.
+        (JSC::ScriptExecutable::derivedContextType): Deleted.
+        (JSC::ScriptExecutable::evalContextType): Deleted.
+        (JSC::ScriptExecutable::ecmaMode): Deleted.
+        (JSC::ScriptExecutable::setNeverInline): Deleted.
+        (JSC::ScriptExecutable::setNeverOptimize): Deleted.
+        (JSC::ScriptExecutable::setNeverFTLOptimize): Deleted.
+        (JSC::ScriptExecutable::setDidTryToEnterInLoop): Deleted.
+        (JSC::ScriptExecutable::setCanUseOSRExitFuzzing): Deleted.
+        (JSC::ScriptExecutable::neverInline): Deleted.
+        (JSC::ScriptExecutable::neverOptimize): Deleted.
+        (JSC::ScriptExecutable::neverFTLOptimize): Deleted.
+        (JSC::ScriptExecutable::didTryToEnterInLoop): Deleted.
+        (JSC::ScriptExecutable::isInliningCandidate): Deleted.
+        (JSC::ScriptExecutable::isOkToOptimize): Deleted.
+        (JSC::ScriptExecutable::canUseOSRExitFuzzing): Deleted.
+        (JSC::ScriptExecutable::addressOfDidTryToEnterInLoop): Deleted.
+        (JSC::ScriptExecutable::features): Deleted.
+        (JSC::ScriptExecutable::recordParse): Deleted.
+        (JSC::ScriptExecutable::finishCreation): Deleted.
+        (JSC::ScriptExecutable::prepareForExecution): Deleted.
+
+2016-10-20  Caitlin Potter  <caitp@igalia.com>
+
+        [JSC] implement runtime for async functions
+        https://bugs.webkit.org/show_bug.cgi?id=163760
+
+        Reviewed by Yusuke Suzuki.
+
+        Async functions generate bytecode equivalent to the following, which is
+        highly dependent on the Generator implementation:
+        
+        ```
+        // Before translation:
+        async function asyncfn() {}
+
+        // After translation:
+        function asyncfn() {
+            let generator = {
+                @generatorNext: function(@generator, @generatorState, @generatorValue, @generatorResumeMode, @generatorFrameState) {
+                    // Body of async function
+                },
+                @generatorState: 0,
+                @generatorThis: this,
+                @generatorFrameState: <frame state>,
+            };
+            return @asyncFunctionResume(generator, undefined, GeneratorResumeMode::NormalMode);
+        }
+        ```
+
+        Await Expressions are equivalent to non-delegating Yield expressions, and emit identical bytecode.
+
+        There are some caveats to be addressed later:
+        
+        1) the `op_to_this` is always performed, whether it's used or not, like normal generators. (https://bugs.webkit.org/show_bug.cgi?id=151586)
+        
+        2) for async arrow functions, the home object is always stored on the "body" function, regardless of whether it's needed or
+        not, for the same reason as #1 (and should also be fixed as part of https://bugs.webkit.org/show_bug.cgi?id=151586)
+
+        * CMakeLists.txt:
+        * DerivedSources.make:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * builtins/AsyncFunctionPrototype.js: Added.
+        (asyncFunctionResume):
+        * bytecode/BytecodeList.json:
+        * bytecode/BytecodeUseDef.h:
+        (JSC::computeUsesForBytecodeOffset):
+        (JSC::computeDefsForBytecodeOffset):
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::dumpBytecode):
+        * bytecode/UnlinkedCodeBlock.h:
+        (JSC::UnlinkedCodeBlock::isArrowFunction):
+        * bytecode/UnlinkedFunctionExecutable.h:
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::generate):
+        (JSC::BytecodeGenerator::BytecodeGenerator):
+        (JSC::BytecodeGenerator::emitNewFunctionExpressionCommon):
+        (JSC::BytecodeGenerator::emitNewArrowFunctionExpression):
+        (JSC::BytecodeGenerator::emitNewFunction):
+        * bytecompiler/NodesCodegen.cpp:
+        (JSC::FunctionNode::emitBytecode):
+        * jit/JIT.cpp:
+        (JSC::JIT::privateCompileMainPass):
+        * jit/JIT.h:
+        * jit/JITOpcodes.cpp:
+        (JSC::JIT::emitNewFuncCommon):
+        (JSC::JIT::emit_op_new_async_func):
+        (JSC::JIT::emitNewFuncExprCommon):
+        (JSC::JIT::emit_op_new_async_func_exp):
+        * jit/JITOperations.cpp:
+        * jit/JITOperations.h:
+        * llint/LLIntSlowPaths.cpp:
+        (JSC::LLInt::LLINT_SLOW_PATH_DECL):
+        * llint/LLIntSlowPaths.h:
+        * llint/LowLevelInterpreter.asm:
+        * parser/Parser.cpp:
+        (JSC::Parser<LexerType>::parseInner):
+        (JSC::Parser<LexerType>::parseAsyncFunctionSourceElements):
+        (JSC::Parser<LexerType>::parseFunctionInfo):
+        * parser/Parser.h:
+        (JSC::Scope::setSourceParseMode):
+        * parser/ParserModes.h:
+        (JSC::isGeneratorOrAsyncFunctionBodyParseMode):
+        (JSC::isGeneratorOrAsyncFunctionWrapperParseMode):
+        * runtime/AsyncFunctionConstructor.cpp: Added.
+        (JSC::AsyncFunctionConstructor::AsyncFunctionConstructor):
+        (JSC::AsyncFunctionConstructor::finishCreation):
+        (JSC::callAsyncFunctionConstructor):
+        (JSC::constructAsyncFunctionConstructor):
+        (JSC::AsyncFunctionConstructor::getCallData):
+        (JSC::AsyncFunctionConstructor::getConstructData):
+        * runtime/AsyncFunctionConstructor.h: Added.
+        (JSC::AsyncFunctionConstructor::create):
+        (JSC::AsyncFunctionConstructor::createStructure):
+        * runtime/AsyncFunctionPrototype.cpp: Added.
+        (JSC::AsyncFunctionPrototype::AsyncFunctionPrototype):
+        (JSC::AsyncFunctionPrototype::finishCreation):
+        * runtime/AsyncFunctionPrototype.h: Added.
+        (JSC::AsyncFunctionPrototype::create):
+        (JSC::AsyncFunctionPrototype::createStructure):
+        * runtime/FunctionConstructor.cpp:
+        (JSC::constructFunctionSkippingEvalEnabledCheck):
+        * runtime/FunctionConstructor.h:
+        * runtime/JSAsyncFunction.cpp: Added.
+        (JSC::JSAsyncFunction::JSAsyncFunction):
+        (JSC::JSAsyncFunction::createImpl):
+        (JSC::JSAsyncFunction::create):
+        (JSC::JSAsyncFunction::createWithInvalidatedReallocationWatchpoint):
+        * runtime/JSAsyncFunction.h: Added.
+        (JSC::JSAsyncFunction::allocationSize):
+        (JSC::JSAsyncFunction::createStructure):
+        * runtime/JSGlobalObject.cpp:
+        (JSC::JSGlobalObject::init):
+        * runtime/JSGlobalObject.h:
+        (JSC::JSGlobalObject::lazyAsyncFunctionStructure):
+        (JSC::JSGlobalObject::asyncFunctionPrototype):
+        (JSC::JSGlobalObject::asyncFunctionPrototypeConcurrently):
+        (JSC::JSGlobalObject::asyncFunctionStructure):
+        (JSC::JSGlobalObject::asyncFunctionStructureConcurrently):
+
+2016-10-27  Mark Lam  <mark.lam@apple.com>
+
+        JSFunction::put() should not allow caching of lazily reified properties.
+        https://bugs.webkit.org/show_bug.cgi?id=164081
+
+        Reviewed by Geoffrey Garen.
+
+        It is incorrect for JSFunction::put() to return PutPropertySlots that indicates
+        that its lazily reified properties (e.g. .caller, and .arguments) are cacheable.
+        The reason for this is:
+
+        1. Currently, a cacheable put may only consist of the following types of put
+           operations:
+           a. putting a new property at an offset in the object storage.
+           b. changing the value of an existing property at an offset in the object storage.
+           c. invoking the setter for a property at an offset in the object storage.
+
+           Returning a PutPropertySlot that indicates the property is cacheable means that
+           the property put must be one of the above operations.
+
+           For lazily reified properties, JSFunction::put() implements complex conditional
+           behavior that is different than the set of cacheable put operations above.
+           Hence, it should not claim that the property put is cacheable.
+    
+        2. Cacheable puts are cached on the original structure of the object before the
+           put operation.
+
+           Reifying a lazy property will trigger a structure transition.  Even though
+           subsequent puts to such a property may be cacheable after the structure
+           transition, it is incorrect to indicate that the property put is cacheable
+           because the caching is on the original structure, not the new transitioned
+           structure.
+
+        Also fixed some missing exception checks.
+
+        * jit/JITOperations.cpp:
+        * runtime/JSFunction.cpp:
+        (JSC::JSFunction::put):
+        (JSC::JSFunction::reifyLazyPropertyIfNeeded):
+        (JSC::JSFunction::reifyBoundNameIfNeeded):
+        * runtime/JSFunction.h:
+
+2016-10-27  Caitlin Potter  <caitp@igalia.com>
+
+        [JSC] forbid lexical redeclaration of generator formal parameters
+        https://bugs.webkit.org/show_bug.cgi?id=163930
+
+        Reviewed by Yusuke Suzuki.
+
+        Also forbids "arguments" and "eval" as generator argument names in strict mode.
+
+        * parser/Parser.cpp:
+        (JSC::Parser<LexerType>::declareRestOrNormalParameter):
+        * parser/Parser.h:
+        (JSC::Parser::declareVariable):
+        (JSC::Parser::hasDeclaredParameter):
+        (JSC::Parser::isValidStrictMode):
+
+2016-10-27  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Include ConsoleAgent in Workers - real console.log support
+        https://bugs.webkit.org/show_bug.cgi?id=163844
+        <rdar://problem/28903328>
+
+        Reviewed by Brian Burg.
+
+        * inspector/protocol/Worker.json:
+
+2016-10-27  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Introduce Page WorkerAgent and Worker InspectorController
+        https://bugs.webkit.org/show_bug.cgi?id=163817
+        <rdar://problem/28899063>
+
+        Reviewed by Brian Burg.
+
+        * CMakeLists.txt:
+        * DerivedSources.make:
+        * inspector/protocol/Worker.json: Added.
+        New Worker domain.
+
+2016-10-26  JF Bastien  <jfbastien@apple.com>
+
+        WebAssembly API: implement Instance
+
+        As described in: https://github.com/WebAssembly/design/blob/master/JS.md#webassemblyinstance-objects
+
+         - Take ownership of Wasm::Plan's compilation result when successfully creating a JSWebAssemblyModule object.
+         - Construct a basic Instance with a Module.
+         - Handle second argument (importObject) of WebAssembly.Instance.
+         - Add reference text from the spec to WebAssembly.Module's code.
+         - Expose and test an empty 'exports' ModuleNamespaceObject on WebAssembly.Instance.
+
+        The implementation isn't complete yet: it relies on further work for which I've filed bugs.
+
+        WebAssembly API: implement Instance
+        https://bugs.webkit.org/show_bug.cgi?id=163998
+
+        Reviewed by Keith Miller.
+
+        * wasm/WasmPlan.h:
+        (JSC::Wasm::Plan::getFunctions): allow transfering state out
+        (JSC::Wasm::Plan::getMemory): allow transfering state out
+        * wasm/js/JSWebAssemblyInstance.cpp:
+        (JSC::JSWebAssemblyInstance::create):
+        (JSC::JSWebAssemblyInstance::finishCreation): set the ModuleNamespaceObject, and expose it as "exports"
+        (JSC::JSWebAssemblyInstance::visitChildren): visit the ModuleNamespaceObject child
+        * wasm/js/JSWebAssemblyInstance.h:
+        * wasm/js/JSWebAssemblyModule.cpp:
+        (JSC::JSWebAssemblyModule::create):
+        (JSC::JSWebAssemblyModule::JSWebAssemblyModule): move in the compiled functions and the memory
+        * wasm/js/JSWebAssemblyModule.h:
+        * wasm/js/WebAssemblyInstanceConstructor.cpp:
+        (JSC::constructJSWebAssemblyInstance): take the Module, extract the Plan's results, and create the (empty for now) ModuleNamespaceObject
+        * wasm/js/WebAssemblyModuleConstructor.cpp:
+        (JSC::constructJSWebAssemblyModule): add a few comments from the spec, and pass out the Plan's results
+
+2016-10-26  Brian Burg  <bburg@apple.com>
+
+        Web Inspector: remove unused bool return value from FrontendChannel::sendMessageToFrontend
+        https://bugs.webkit.org/show_bug.cgi?id=164046
+
+        Reviewed by Joseph Pecoraro.
+
+        * inspector/InspectorFrontendChannel.h:
+        * inspector/remote/RemoteConnectionToTarget.h:
+        * inspector/remote/RemoteConnectionToTarget.mm:
+        (Inspector::RemoteConnectionToTarget::sendMessageToFrontend):
+
+2016-10-26  JF Bastien  <jfbastien@apple.com>
+
+        WebAssembly: remove now-dead JSWasmModule
+        https://bugs.webkit.org/show_bug.cgi?id=164044
+
+        Reviewed by Keith Miller.
+
+        * CMakeLists.txt:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * runtime/Executable.cpp:
+        (JSC::WebAssemblyExecutable::WebAssemblyExecutable):
+        (JSC::WebAssemblyExecutable::visitChildren):
+        * runtime/Executable.h:
+        * wasm/JSWasmModule.cpp: Removed.
+        * wasm/JSWasmModule.h: Removed.
+        * wasm/WasmModuleParser.cpp:
+
+2016-10-26  Mark Lam  <mark.lam@apple.com>
+
+        JSGenericTypedArrayView::set() should check for exceptions.
+        https://bugs.webkit.org/show_bug.cgi?id=164007
+        <rdar://problem/28853775>
+
+        Reviewed by Filip Pizlo.
+
+        * runtime/JSGenericTypedArrayViewInlines.h:
+        (JSC::JSGenericTypedArrayView<Adaptor>::set):
+
+2016-10-25  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [DOMJIT] Tell IDL result type to DFG to drop type checks in AI
+        https://bugs.webkit.org/show_bug.cgi?id=163900
+
+        Reviewed by Sam Weinig.
+
+        The IDL tells the conservative result type. While we use the heap prediction
+        for prediction propagation phase in DOMJIT getter (it is offered by get_by_id!),
+        we leverage the type told by IDL to produce the abstract value with the proven type
+        in AI. It effectively drops unnecessary type checks followed by CallDOM operations.
+
+        For example, when you write the code like,
+
+            if (node.nodeType === 9) {
+                // document.
+            }
+
+        Previously, we inserted a Int32 check for the result of node.nodeType.
+        It is dropped now.
+
+        We annotate the DOMJIT getter in jsc.cpp to ensure that the unnecessary type checks
+        are correctly dropped when executing JSTests/stress/domjit-getter.js.
+
+        * dfg/DFGAbstractInterpreterInlines.h:
+        (JSC::DFG::AbstractInterpreter<AbstractStateType>::executeEffects):
+        * domjit/DOMJITGetterSetter.h:
+        (JSC::DOMJIT::GetterSetter::GetterSetter):
+        (JSC::DOMJIT::GetterSetter::resultType):
+        * jsc.cpp:
+        (WTF::DOMJITGetter::DOMJITNodeDOMJIT::DOMJITNodeDOMJIT):
+        (WTF::DOMJITGetterComplex::DOMJITNodeDOMJIT::DOMJITNodeDOMJIT):
+
+2016-10-25  Mark Lam  <mark.lam@apple.com>
+
+        String.prototype.replace() should throw an OutOfMemoryError when using too much memory.
+        https://bugs.webkit.org/show_bug.cgi?id=163996
+        <rdar://problem/28263117>
+
+        Reviewed by Geoffrey Garen.
+
+        String.prototype.replace() uses a Vector internally for bookkeeping work.
+        Currently, if this vector gets too big, we just crash on allocation failure.
+        While this is correct behavior, it is not too friendly.
+
+        We now detect the imminent failure, and throw a OutOfMemoryError instead.
+
+        * runtime/StringPrototype.cpp:
+        (JSC::removeUsingRegExpSearch):
+        (JSC::replaceUsingRegExpSearch):
+        (JSC::operationStringProtoFuncReplaceRegExpEmptyStr):
+        (JSC::stringProtoFuncReplaceUsingRegExp):
+
+2016-10-25  Mark Lam  <mark.lam@apple.com>
+
+        Rename the reject() helper function to something more meaningful.
+        https://bugs.webkit.org/show_bug.cgi?id=163549
+
+        Reviewed by Saam Barati.
+
+        We'll rename reject() to typeError().  The intuition behind this is that all the
+        clients that uses this function will return typeError(..., shouldThrow, ...).
+        In a sense, they are returning a "type" of TypeError (which happened to be the
+        value false).  In addition, it may also throw a JS TypeError if the shouldThrow
+        parameter is true.
+
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * runtime/GetterSetter.cpp:
+        (JSC::callSetter):
+        * runtime/JSArray.cpp:
+        (JSC::JSArray::defineOwnProperty):
+        (JSC::JSArray::setLengthWithArrayStorage):
+        * runtime/JSArrayBuffer.cpp:
+        (JSC::JSArrayBuffer::put):
+        (JSC::JSArrayBuffer::defineOwnProperty):
+        * runtime/JSArrayBufferView.cpp:
+        * runtime/JSCJSValue.cpp:
+        (JSC::JSValue::putToPrimitive):
+        (JSC::JSValue::putToPrimitiveByIndex):
+        * runtime/JSDataView.cpp:
+        (JSC::JSDataView::put):
+        (JSC::JSDataView::defineOwnProperty):
+        * runtime/JSFunction.cpp:
+        (JSC::JSFunction::put):
+        (JSC::JSFunction::defineOwnProperty):
+        * runtime/JSGenericTypedArrayViewInlines.h:
+        (JSC::JSGenericTypedArrayView<Adaptor>::defineOwnProperty):
+        (JSC::JSGenericTypedArrayView<Adaptor>::deleteProperty):
+        * runtime/JSObject.cpp:
+        (JSC::ordinarySetSlow):
+        (JSC::JSObject::putInlineSlow):
+        (JSC::JSObject::setPrototypeWithCycleCheck):
+        (JSC::JSObject::defineOwnIndexedProperty):
+        (JSC::JSObject::putByIndexBeyondVectorLengthWithArrayStorage):
+        (JSC::JSObject::putDirectIndexBeyondVectorLengthWithArrayStorage):
+        (JSC::validateAndApplyPropertyDescriptor):
+        * runtime/JSObjectInlines.h:
+        (JSC::JSObject::putInline):
+        * runtime/JSProxy.cpp:
+        (JSC::JSProxy::setPrototype):
+        * runtime/Lookup.h:
+        (JSC::putEntry):
+        * runtime/RegExpObject.cpp:
+        (JSC::RegExpObject::defineOwnProperty):
+        * runtime/RegExpObject.h:
+        (JSC::RegExpObject::setLastIndex):
+        * runtime/Reject.h: Removed.
+        * runtime/SparseArrayValueMap.cpp:
+        (JSC::SparseArrayValueMap::putEntry):
+        (JSC::SparseArrayValueMap::putDirect):
+        (JSC::SparseArrayEntry::put):
+        * runtime/StringObject.cpp:
+        (JSC::StringObject::put):
+        (JSC::StringObject::putByIndex):
+        * runtime/TypeError.h: Copied from Source/JavaScriptCore/runtime/Reject.h.
+        (JSC::typeError):
+        (JSC::reject): Deleted.
+
+2016-10-25  Filip Pizlo  <fpizlo@apple.com>
+
+        HeapTimer should not hardcode all of its subclasses and USE(CF) shouldn't be a bizarre special case
+        https://bugs.webkit.org/show_bug.cgi?id=163947
+
+        Reviewed by Geoffrey Garen.
+        
+        I want to introduce another HeapTimer. Prior to this change, that would have meant writing
+        exact copies of that timer's logic for each platform that has a HeapTimer (CF, GLIB, and
+        EFL). That logic would in turn be a duplicate of the logic already present in
+        IncrementalSweeper and GCActivityCallback: all of the subclasses of HeapTimer have their
+        own code for scheduling timers, so a new subclass would have to duplicate that code. Then,
+        to add insult to injury, the USE(CF) version of HeapTimer would have to have an extra case
+        for that new subclass since it doesn't use virtual methods effectively.
+        
+        This changes HeapTimer on USE(CF) to know to get its runloop from Heap and to use virtual
+        methods effectively so that it doesn't have to know about all of its subclasses.
+        
+        This also moves IncrementalSweeper's code for scheduling timers into HeapTimer. This means
+        that future subclasses of HeapTimer could simply use that logic.
+        
+        This keeps changes to GCActivityCallback to a minimum. It still has a lot of
+        platform-specific code and I'm not sure that this code can be trivially deduplicated since
+        that code has more quirks. That's fine for now, since I mainly just need a sane way of
+        creating new timers that use IncrementalSweeper-like scheduling logic.
+
+        * heap/EdenGCActivityCallback.cpp:
+        * heap/EdenGCActivityCallback.h:
+        * heap/FullGCActivityCallback.cpp:
+        * heap/FullGCActivityCallback.h:
+        * heap/GCActivityCallback.cpp:
+        (JSC::GCActivityCallback::GCActivityCallback):
+        * heap/GCActivityCallback.h:
+        * heap/Heap.cpp:
+        (JSC::Heap::Heap):
+        * heap/Heap.h:
+        (JSC::Heap::runLoop):
+        * heap/HeapTimer.cpp:
+        (JSC::HeapTimer::HeapTimer):
+        (JSC::HeapTimer::setRunLoop):
+        (JSC::HeapTimer::~HeapTimer):
+        (JSC::HeapTimer::timerDidFire):
+        (JSC::HeapTimer::scheduleTimer):
+        (JSC::HeapTimer::cancelTimer):
+        (JSC::retainAPILock): Deleted.
+        (JSC::releaseAPILock): Deleted.
+        * heap/HeapTimer.h:
+        * heap/IncrementalSweeper.cpp:
+        (JSC::IncrementalSweeper::scheduleTimer):
+        (JSC::IncrementalSweeper::cancelTimer): Deleted.
+        * heap/IncrementalSweeper.h:
+
+2016-10-25  JF Bastien  <jfbastien@apple.com>
+
+        Remove redundant argument count check
+
+        Indexing argument out of bounds already returns jsUndefined().
+
+        Remove redundant argument count check
+        https://bugs.webkit.org/show_bug.cgi?id=163957
+
+        Reviewed by Keith Miller.
+
+        * runtime/ErrorConstructor.cpp:
+        (JSC::Interpreter::constructWithErrorConstructor):
+        (JSC::Interpreter::callErrorConstructor):
+        * wasm/js/WebAssemblyRuntimeErrorConstructor.cpp:
+        (JSC::constructJSWebAssemblyRuntimeError):
+
+2016-10-25  Mark Lam  <mark.lam@apple.com>
+
+        Add ThrowScope::release() calls at all call sites of jsMakeNontrivialString().
+        https://bugs.webkit.org/show_bug.cgi?id=163990
+
+        Reviewed by Geoffrey Garen.
+
+        * runtime/ArrayPrototype.cpp:
+        (JSC::arrayProtoFuncToString):
+        * runtime/ErrorPrototype.cpp:
+        (JSC::errorProtoFuncToString):
+        * runtime/FunctionPrototype.cpp:
+        (JSC::functionProtoFuncToString):
+        * runtime/RegExpPrototype.cpp:
+        (JSC::regExpProtoFuncToString):
+        * runtime/StringPrototype.cpp:
+        (JSC::stringProtoFuncBig):
+        (JSC::stringProtoFuncSmall):
+        (JSC::stringProtoFuncBlink):
+        (JSC::stringProtoFuncBold):
+        (JSC::stringProtoFuncFixed):
+        (JSC::stringProtoFuncItalics):
+        (JSC::stringProtoFuncStrike):
+        (JSC::stringProtoFuncSub):
+        (JSC::stringProtoFuncSup):
+        (JSC::stringProtoFuncFontcolor):
+        (JSC::stringProtoFuncFontsize):
+        (JSC::stringProtoFuncAnchor):
+
+2016-10-25  Mark Lam  <mark.lam@apple.com>
+
+        JSStringJoiner::joinedLength() should limit joined string lengths to INT_MAX.
+        https://bugs.webkit.org/show_bug.cgi?id=163937
+        <rdar://problem/28642990>
+
+        Reviewed by Geoffrey Garen.
+
+        JSStringJoiner::joinedLength() was previously limiting it to UINT_MAX.  This is
+        inconsistent with other parts of string code which expects a max length of INT_MAX.
+        This is now fixed.
+
+        Also fixed jsMakeNontrivialString() to ensure that the resultant string length
+        is valid.  It was previously allowing lengths greater than INT_MAX.  This was
+        caught by the new assertion in JSString::setLength().
+
+        There are already pre-existing assertions in various JSString::finishCreation()
+        which do RELEASE_ASSERTs on the string length.  To be consistent, I'm making the
+        assertion in JSString::setLength() a RELEASE_ASSERT.  If this proves to be a
+        performance issue, I'll change this to a debug ASSERT later.
+
+        * runtime/JSString.cpp:
+        (JSC::JSRopeString::resolveRopeInternal8):
+        (JSC::JSRopeString::resolveRopeInternal8NoSubstring):
+        (JSC::JSRopeString::resolveRopeInternal16):
+        (JSC::JSRopeString::resolveRopeInternal16NoSubstring):
+        (JSC::JSRopeString::resolveRopeToAtomicString):
+        (JSC::JSRopeString::resolveRopeToExistingAtomicString):
+        (JSC::JSRopeString::resolveRope):
+        (JSC::JSRopeString::resolveRopeSlowCase8):
+        (JSC::JSRopeString::resolveRopeSlowCase):
+        (JSC::JSString::getStringPropertyDescriptor):
+        * runtime/JSString.h:
+        (JSC::JSString::finishCreation):
+        (JSC::JSString::length):
+        (JSC::JSString::isValidLength):
+        (JSC::JSString::toBoolean):
+        (JSC::JSString::canGetIndex):
+        (JSC::JSString::setLength):
+        (JSC::JSString::getStringPropertySlot):
+        (JSC::JSRopeString::unsafeView):
+        (JSC::JSRopeString::viewWithUnderlyingString):
+        * runtime/JSStringBuilder.h:
+        (JSC::jsMakeNontrivialString):
+        * runtime/JSStringJoiner.cpp:
+        (JSC::JSStringJoiner::joinedLength):
+
+2016-10-25  JF Bastien  <jfbastien@apple.com>
+
+        WebAssembly: fix unknown section name handling, and check for section size overflow
+        https://bugs.webkit.org/show_bug.cgi?id=163959
+
+        See: https://github.com/WebAssembly/design/blob/master/BinaryEncoding.md#high-level-structure
+
+        Name length and name are already included in the payload length.
+
+        Reviewed by Filip Pizlo.
+
+        * wasm/WasmModuleParser.cpp:
+        (JSC::Wasm::ModuleParser::parse):
+
+2016-10-25  Christopher Reid  <Christopher.Reid@am.sony.com>
+
+        jsc.cpp is leaking memory allocated by readline in runInteractive
+        https://bugs.webkit.org/show_bug.cgi?id=163958
+
+        According to http://web.mit.edu/gnu/doc/html/rlman_2.html,
+        "The line readline returns is allocated with malloc ();
+        you should free () the line when you are done with it."
+        The memory allocated by readline is not being freed when it should.
+
+        Reviewed by Mark Lam.
+
+        * jsc.cpp:
+
+2016-10-25  Konstantin Tokarev  <annulen@yandex.ru>
+
+        [cmake] Check if jscLib and WebKitGUID targets exist before using them
+        https://bugs.webkit.org/show_bug.cgi?id=163945
+
+        Reviewed by Alex Christensen.
+
+        Currently these targets are used under WIN32 condition, however they
+        are defined in PlatformWin.cmake, causing CMake warnings if port
+        supports WIN32 but does not use PlatformWin.cmake
+
+        * shell/CMakeLists.txt:
+
+2016-10-25  JF Bastien  <jfbastien@apple.com>
+
+        WebAssembly JS API: implement Module
+
+        This implementation allows us to:
+         - Syncrhonously create a WebAssembly.Module with a typed array.
+         - Creates a compilation plan.
+         - Parse the Module and creates corresponding code.
+         - Throw WebAssembly.CompileError with mildly helpful [*] error messages on
+           failure.
+
+        Consult the API documentation for expected behavior: https://github.com/WebAssembly/design/blob/master/JS.md#webassemblymodule-constructor
+
+        For now the implementation discards the generated code.
+
+        The next steps will be:
+         - Expose a Module's exports.
+         - Implement WebAssembly.Instance, which allows instantiating and running a
+           compiled Module.
+         - Beef up the testing infrastructure under JSTests/wasm so that more complex
+           modules can be created and tested (instead of writing the bits by hand).
+
+        This patch also:
+         - Adds assert.instanceof in assert.js.
+         - Refactors Wasm::Parser and friends to accept const uint8_t* as well as a
+           Vector, to avoid copying when invoked synchronously.
+         - Remove useless Structure from some of the wasm constructors: they're already
+           on the JSGlobalObject, visited properly and all.
+         - Fix off-by-one error in parsing: Parser::parseUInt32 failed if the integer
+           was exactly at end of file.
+
+         [*] On error messages while parsing: I filed https://bugs.webkit.org/show_bug.cgi?id=163919
+
+        WebAssembly JS API: implement Module
+        https://bugs.webkit.org/show_bug.cgi?id=163903
+
+        Reviewed by Keith Miller.
+
+        * runtime/ExceptionHelpers.cpp:
+        (JSC::defaultSourceAppender): make this public so that WebAssembly can use it: it generates those fancy (evaluating '...') messages at the end
+        * runtime/ExceptionHelpers.h:
+        * runtime/JSGlobalObject.cpp:
+        (JSC::JSGlobalObject::init): remove the useless Structure from the WebAssembly objects (it's already in this file, no need to hold two references and visit them twice)
+        * testWasm.cpp:
+        (runWasmTests): update API
+        * wasm/WasmB3IRGenerator.cpp:
+        (JSC::Wasm::parseAndCompile): use updated API
+        * wasm/WasmB3IRGenerator.h:
+        * wasm/WasmFunctionParser.h:
+        (JSC::Wasm::FunctionParser<Context>::FunctionParser): use updated API
+        (JSC::Wasm::FunctionParser<Context>::parseExpression): use updated API
+        * wasm/WasmModuleParser.cpp:
+        (JSC::Wasm::ModuleParser::parse): generate error messages
+        * wasm/WasmModuleParser.h:
+        (JSC::Wasm::ModuleParser::ModuleParser):
+        (JSC::Wasm::ModuleParser::failed):
+        (JSC::Wasm::ModuleParser::errorMessage):
+        (JSC::Wasm::ModuleParser::functionInformation):
+        (JSC::Wasm::ModuleParser::memory):
+        * wasm/WasmParser.h: use update non-public API
+        (JSC::Wasm::Parser::parseVarUInt32):
+        (JSC::Wasm::Parser::parseVarUInt64):
+        (JSC::Wasm::Parser::source):
+        (JSC::Wasm::Parser::length):
+        (JSC::Wasm::Parser::Parser):
+        (JSC::Wasm::Parser::consumeCharacter):
+        (JSC::Wasm::Parser::consumeString):
+        (JSC::Wasm::Parser::parseUInt32):
+        (JSC::Wasm::Parser::parseUInt7):
+        * wasm/WasmPlan.cpp:
+        (JSC::Wasm::Plan::Plan):
+        (JSC::Wasm::Plan::~Plan):
+        * wasm/WasmPlan.h:
+        (JSC::Wasm::Plan::failed):
+        (JSC::Wasm::Plan::errorMessage):
+        (JSC::Wasm::Plan::resultSize):
+        (JSC::Wasm::Plan::result):
+        (JSC::Wasm::Plan::memory):
+        * wasm/js/JSWebAssemblyCompileError.cpp:
+        (JSC::createWebAssemblyCompileError): makes it easier to throw a WebAssembly.CompileError from Module
+        * wasm/js/JSWebAssemblyCompileError.h:
+        * wasm/js/WebAssemblyCompileErrorConstructor.cpp:
+        (JSC::WebAssemblyCompileErrorConstructor::create):
+        (JSC::WebAssemblyCompileErrorConstructor::finishCreation):
+        * wasm/js/WebAssemblyCompileErrorConstructor.h:
+        * wasm/js/WebAssemblyInstanceConstructor.cpp:
+        (JSC::WebAssemblyInstanceConstructor::create):
+        (JSC::WebAssemblyInstanceConstructor::finishCreation):
+        (JSC::WebAssemblyInstanceConstructor::visitChildren):
+        * wasm/js/WebAssemblyInstanceConstructor.h:
+        * wasm/js/WebAssemblyMemoryConstructor.cpp:
+        (JSC::WebAssemblyMemoryConstructor::create):
+        (JSC::WebAssemblyMemoryConstructor::finishCreation):
+        (JSC::WebAssemblyMemoryConstructor::visitChildren):
+        * wasm/js/WebAssemblyMemoryConstructor.h:
+        * wasm/js/WebAssemblyModuleConstructor.cpp:
+        (JSC::constructJSWebAssemblyModule):
+        (JSC::WebAssemblyModuleConstructor::create):
+        (JSC::WebAssemblyModuleConstructor::finishCreation):
+        (JSC::WebAssemblyModuleConstructor::visitChildren):
+        * wasm/js/WebAssemblyModuleConstructor.h:
+        * wasm/js/WebAssemblyRuntimeErrorConstructor.cpp:
+        (JSC::WebAssemblyRuntimeErrorConstructor::create):
+        (JSC::WebAssemblyRuntimeErrorConstructor::finishCreation):
+        * wasm/js/WebAssemblyRuntimeErrorConstructor.h:
+        * wasm/js/WebAssemblyTableConstructor.cpp:
+        (JSC::WebAssemblyTableConstructor::create):
+        (JSC::WebAssemblyTableConstructor::finishCreation):
+        (JSC::WebAssemblyTableConstructor::visitChildren):
+        * wasm/js/WebAssemblyTableConstructor.h:
+
+2016-10-25  Keith Miller  <keith_miller@apple.com>
+
+        Add trivial Wasm conversion opcodes
+        https://bugs.webkit.org/show_bug.cgi?id=163950
+
+        Reviewed by Filip Pizlo.
+
+        This patch differentiates between Wasm opcodes that are trivially mapped to a B3 opcode and
+        those that are not.  Some of the Wasm opcodes that are currently a non-simple opcode will
+        become simple as we add B3 opcodes for Wasm operations.  The remaining opcodes will need to
+        be added via patchpoints in a later patch.
+
+        * wasm/WasmB3IRGenerator.cpp:
+        * wasm/WasmOps.h:
+        (JSC::Wasm::isSimple):
+
+2016-10-24  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Arrow functions with concise bodies cannot return regular expressions
+        https://bugs.webkit.org/show_bug.cgi?id=163162
+
+        Reviewed by Filip Pizlo.
+
+        When we encounter the RegExp in the parser, we first scan it as / or /=.
+        And if / or /= is parsed under the primary expression context, we rescan it
+        as RegExp. However, we did not update the token record information. So the
+        token record still says "I'm / or /=".
+
+        When we parse the string "() => /hello/", the last token becomes "/", which is
+        the first character of the RegExp, instead of "/hello/". Since the arrow
+        function parsing utilizes the end offset of the last token, we accidentally
+        recognize the range of the above arrow function as "() => /".
+
+        In this patch, we update the token when rescanning under the RegExp context.
+        This logic is similar to parsing Tail Template Literal token.
+
+        We also refine the error message for regular expression literals. And since
+        the REGEXP token is now introduced, the other error messages using that token
+        are improved too.
+
+        Currently, unterminated error messages can be seen in Parser.cpp. However,
+        these messages cannot be shown to users if the lexer has m_error. So these
+        code is meaningless. I'll move these tokenizing errors to the lexer in the
+        subsequent patch[1].
+
+        [1]: https://bugs.webkit.org/show_bug.cgi?id=163928
+
+        * parser/Lexer.cpp:
+        (JSC::Lexer<T>::fillTokenInfo):
+        (JSC::Lexer<T>::lex):
+        (JSC::Lexer<T>::scanRegExp):
+        (JSC::Lexer<T>::scanTrailingTemplateString):
+        (JSC::Lexer<T>::skipRegExp): Deleted.
+        * parser/Lexer.h:
+        (JSC::Lexer::getToken):
+        * parser/Parser.cpp:
+        (JSC::Parser<LexerType>::parseAssignmentExpression):
+        * parser/Parser.h:
+        (JSC::Parser::getToken):
+        * parser/ParserTokens.h:
+
+2016-10-24  Per Arne Vollan  <pvollan@apple.com>
+
+        [Win] CMake build type is not set.
+        https://bugs.webkit.org/show_bug.cgi?id=163917
+
+        Reviewed by Alex Christensen.
+
+        The CMAKE_BUILD_TYPE variable should be set to Debug or Release.
+
+        * JavaScriptCore.vcxproj/JavaScriptCore.proj:
+
+2016-10-24  Chris Dumez  <cdumez@apple.com>
+
+        Reduce special handling for typed arrays in JSDOMConvert.h
+        https://bugs.webkit.org/show_bug.cgi?id=163907
+
+        Reviewed by Sam Weinig.
+
+        Reduce special handling for typed arrays in JSDOMConvert.h by adding a toWrapped() static
+        function on JSGenericTypedArrayView, similarly to other wrapper types.
+
+        * runtime/JSGenericTypedArrayView.h:
+        (JSC::JSGenericTypedArrayView::typedImpl):
+        (JSC::JSGenericTypedArrayView<Adaptor>::toWrapped):
+
+2016-10-24  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [DOMJIT][DFG] CallDOM never writes Stack
+        https://bugs.webkit.org/show_bug.cgi?id=163926
+
+        Reviewed by Filip Pizlo and Saam Barati.
+
+        There is no way to write(Stack) in CallDOM.
+        This worst case (the most clobbering case) scenario
+        should be aligned to the one of Call, read(World) and write(Heap).
+
+        * dfg/DFGClobberize.h:
+        (JSC::DFG::clobberize):
+
+2016-10-23  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [DOMJIT] Add a way for DOMJIT::Patchpoint to express effects
+        https://bugs.webkit.org/show_bug.cgi?id=163657
+
+        Reviewed by Saam Barati.
+
+        This patch introduces DOMJIT::Effect. It describes the side effects of
+        the DOMJIT::CallDOMPatchpoint. DOMJIT::CallDOMPatchpoint can use this
+        feature to teach the compilers about the effects. And the compilers
+        will perform CSE based on the reported effects.
+
+        As the same to B3's HeapRange, the effects are represented as a pair of
+        integers. [begin, end) pair will represents the range of the abstract
+        heap. We encode the abstract heap hierarchy into these pairs. Like,
+
+                                Root: [0, 32)
+                 Child1: [0, 20)             Child2: [20, 32)
+        Child11: [0, 4) Child12: [4, 20)
+
+        This simplifies the representation of the abstract heap. And WebCore
+        just tells pairs of integers and it does not tell any detailed hierarchy.
+        So, DFG and FTL can optimize DOM operations without deep knowledge of
+        the DOM abstract heap hierarchy. For example, WebCore will tell that
+        firstChild will read Node_firstChild abstract heap. But this information
+        is encoded to the pair and DFG does not know the details. But still
+        DFG can understand the abstract heap hierarchy and can query whether the
+        given abstract heap overlaps with some abstract heap.
+
+        The heap range told by the WebCore is represented as DOMJIT::HeapRange.
+        DFG will handle this under the DOMState abstract heap. DOMJIT::HeapRange
+        is stored in DFG::AbstractHeap's Payload. We maintain the hierarchy by
+        DOMJIT::HeapRange in the DOMState abstract heap. We add a necessary
+        handling in DFG's AbstractHeap and ClobberSet.
+
+        And we also introduce DOMStateLoc for HeapLocation. It is combined with
+        DOMState AbstractHeap with DOMJIT::HeapRange. For example, we can
+        represent Node.firstChild as `read(DOMState:Node_firstChild)` and
+        `def(HeapLocation(node, DOMState:Node_firstChild))` thingy. This allows us
+        to perform CSE onto DOM getters that will read some of DOM heap!
+
+        For simplicity, we convert CallDOM from NodeVarArgs to the normal one.
+        CallDOM is now just used for DOMJIT getter. So its children is at most 2.
+        It may have either 1 or 2 children. If the global object is required
+        by CallDOMPatchpoint, it has 2 children. And we changed the order of
+        the children to further simplify the code. Before this change, the order
+        is 1: globalObject 2: base. After this patch, the order becomes 1: base,
+        and 2: globalObject. And the child2 may not exists if the global object
+        is not required. We changed all the existing DOMJIT patchpoint to this
+        form.
+
+        * CMakeLists.txt:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * bytecode/PolymorphicAccess.cpp:
+        (JSC::AccessCase::emitDOMJITGetter):
+        * dfg/DFGAbstractHeap.cpp:
+        (JSC::DFG::AbstractHeap::dump):
+        * dfg/DFGAbstractHeap.h:
+        (JSC::DFG::AbstractHeap::isStrictSubtypeOf):
+        (JSC::DFG::AbstractHeap::overlaps):
+        * dfg/DFGAbstractInterpreterInlines.h:
+        (JSC::DFG::AbstractInterpreter<AbstractStateType>::executeEffects):
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::blessCallDOM):
+        (JSC::DFG::ByteCodeParser::handleDOMJITGetter):
+        * dfg/DFGClobberSet.cpp:
+        (JSC::DFG::ClobberSet::overlaps):
+        * dfg/DFGClobberSet.h:
+        * dfg/DFGClobberize.h:
+        (JSC::DFG::clobberize):
+        * dfg/DFGDoesGC.cpp:
+        (JSC::DFG::doesGC):
+        * dfg/DFGFixupPhase.cpp:
+        (JSC::DFG::FixupPhase::fixupNode):
+        * dfg/DFGGraph.h:
+        * dfg/DFGHeapLocation.cpp:
+        (WTF::printInternal):
+        * dfg/DFGHeapLocation.h:
+        * dfg/DFGNode.h:
+        (JSC::DFG::Node::hasCallDOMData):
+        (JSC::DFG::Node::callDOMData):
+        (JSC::DFG::Node::hasCallDOMPatchpoint): Deleted.
+        (JSC::DFG::Node::callDOMPatchpoint): Deleted.
+        * dfg/DFGNodeType.h:
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::compileCallDOM):
+        * domjit/DOMJITAbstractHeap.cpp: Copied from Source/JavaScriptCore/domjit/DOMJITCallDOMPatchpoint.h.
+        (JSC::DOMJIT::AbstractHeap::compute):
+        (JSC::DOMJIT::AbstractHeap::dump):
+        (JSC::DOMJIT::AbstractHeap::shallowDump):
+        (JSC::DOMJIT::AbstractHeap::deepDump):
+        * domjit/DOMJITAbstractHeap.h: Copied from Source/JavaScriptCore/domjit/DOMJITCallDOMPatchpoint.h.
+        (JSC::DOMJIT::AbstractHeap::AbstractHeap):
+        (JSC::DOMJIT::AbstractHeap::setParent):
+        (JSC::DOMJIT::AbstractHeap::isRoot):
+        (JSC::DOMJIT::AbstractHeap::isComputed):
+        (JSC::DOMJIT::AbstractHeap::range):
+        * domjit/DOMJITCallDOMPatchpoint.h:
+        * domjit/DOMJITEffect.h: Copied from Source/JavaScriptCore/domjit/DOMJITCallDOMPatchpoint.h.
+        (JSC::DOMJIT::Effect::forReadWrite):
+        (JSC::DOMJIT::Effect::forPure):
+        (JSC::DOMJIT::Effect::forDef):
+        (JSC::DOMJIT::Effect::mustGenerate):
+        * domjit/DOMJITHeapRange.cpp: Copied from Source/JavaScriptCore/domjit/DOMJITCallDOMPatchpoint.h.
+        (JSC::DOMJIT::HeapRange::dump):
+        * domjit/DOMJITHeapRange.h: Added.
+        (JSC::DOMJIT::HeapRange::HeapRange):
+        (JSC::DOMJIT::HeapRange::fromRaw):
+        (JSC::DOMJIT::HeapRange::begin):
+        (JSC::DOMJIT::HeapRange::end):
+        (JSC::DOMJIT::HeapRange::rawRepresentation):
+        (JSC::DOMJIT::HeapRange::operator bool):
+        (JSC::DOMJIT::HeapRange::operator==):
+        (JSC::DOMJIT::HeapRange::top):
+        (JSC::DOMJIT::HeapRange::none):
+        (JSC::DOMJIT::HeapRange::isStrictSubtypeOf):
+        (JSC::DOMJIT::HeapRange::isSubtypeOf):
+        (JSC::DOMJIT::HeapRange::overlaps):
+        * ftl/FTLLowerDFGToB3.cpp:
+        (JSC::FTL::DFG::LowerDFGToB3::compileCallDOM):
+        * jsc.cpp:
+
+2016-10-24  Alex Christensen  <achristensen@webkit.org>
+
+        JSONParse should not crash with null Strings
+        https://bugs.webkit.org/show_bug.cgi?id=163918
+        <rdar://problem/28834095>
+
+        Reviewed by Michael Saboff.
+
+        When JSONParse is called with a null String, it calls String::is8bit, which dereferences a null pointer.
+        This is happening with new work in the Fetch API, but callers of JSONParse should not have to check
+        if the String is null.
+
+        * API/tests/JSONParseTest.cpp: Added.
+        (testJSONParse):
+        * API/tests/JSONParseTest.h: Added.
+        * API/tests/testapi.c:
+        (main):
+        Test parsing null Strings.  They should have the same result as parsing empty Strings.
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * runtime/JSONObject.cpp:
+        (JSC::JSONParse):
+        Check for null Strings.
+        * shell/PlatformWin.cmake:
+
+2016-10-24  Devin Rousso  <dcrousso+webkit@gmail.com>
+
+        Web Inspector: Scope chain shouldn't show empty Closure sections
+        https://bugs.webkit.org/show_bug.cgi?id=152348
+
+        Reviewed by Joseph Pecoraro.
+
+        * inspector/InjectedScriptSource.js:
+        (isEmptyObject):
+        (InjectedScript.CallFrameProxy._createScopeJson):
+        If the scope object has no properties, set empty to true.
+
+        * inspector/protocol/Debugger.json:
+        Added empty property to Scope type.
+
+2016-10-24  Keith Miller  <keith_miller@apple.com>
+
+        Wasm should support floating point operations.
+        https://bugs.webkit.org/show_bug.cgi?id=163770
+
+        Reviewed by Michael Saboff.
+
+        Since we now have a Double => Float Trunc in B3, we can now support calls in Wasm
+        that take floating point arguments. This patch also enables most of the Wasm
+        floating point operations, as the associated B3 opcode has been linked via wasm.json.
+        If there is no direct mapping to a B3 opcode the Wasm is not yet implemented. This
+        patch also fixes a bug in calls where the arguments would be reversed.
+
+        * testWasm.cpp:
+        (cast):
+        (invoke):
+        (boxf):
+        (boxd):
+        (runWasmTests):
+        * wasm/WasmB3IRGenerator.cpp:
+        (JSC::Wasm::createJSWrapper):
+        * wasm/WasmCallingConvention.h:
+        (JSC::Wasm::CallingConvention::loadArguments):
+        (JSC::Wasm::CallingConvention::setupCall):
+        * wasm/WasmFunctionParser.h:
+        (JSC::Wasm::FunctionParser<Context>::parseExpression):
+        (JSC::Wasm::FunctionParser<Context>::parseUnreachableExpression):
+        * wasm/WasmOps.h:
+
+2016-10-24  Mark Lam  <mark.lam@apple.com>
+
+        Dumping of op_negate bytecode is broken.
+        https://bugs.webkit.org/show_bug.cgi?id=163896
+
+        Reviewed by Darin Adler.
+
+        It thinks the bytecode consists of only 3 machine words, when it consists of 4.
+        This is now fixed.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::dumpBytecode):
+
+2016-10-24  Youenn Fablet  <youenn@apple.com>
+
+        Activate WEB_RTC compilation flags for Mac bots
+        https://bugs.webkit.org/show_bug.cgi?id=163886
+
+        Reviewed by Eric Carlson.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2016-10-23  Zan Dobersek  <zdobersek@igalia.com>
+
+        Unreviewed. Build fix for Clang and libstdc++ configurations.
+
+        * b3/testb3.cpp:
+        (JSC::B3::testAbsArgWithEffectfulDoubleConversion): Explicitly cast the
+        float-typed return value of fabs(float) to double in order to avoid
+        ambiguous calls to isIdentical().
+        (JSC::B3::testSqrtArgWithEffectfulDoubleConversion): Ditto for sqrt(float).
+
 2016-10-22  Chris Dumez  <cdumez@apple.com>
 
         WebGLRenderingContextBase.bufferData() should use a union instead of overloading

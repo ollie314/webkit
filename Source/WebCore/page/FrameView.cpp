@@ -609,7 +609,7 @@ void FrameView::updateCanHaveScrollbars()
         setCanHaveScrollbars(true);
 }
 
-PassRefPtr<Scrollbar> FrameView::createScrollbar(ScrollbarOrientation orientation)
+Ref<Scrollbar> FrameView::createScrollbar(ScrollbarOrientation orientation)
 {
     if (!frame().settings().allowCustomScrollbarInMainFrame() && frame().isMainFrame())
         return ScrollView::createScrollbar(orientation);
@@ -2845,8 +2845,10 @@ void FrameView::setNeedsLayout()
         return;
     }
 
-    if (RenderView* renderView = this->renderView())
+    if (auto* renderView = this->renderView()) {
+        ASSERT(!renderView->inHitTesting());
         renderView->setNeedsLayout();
+    }
 }
 
 void FrameView::unscheduleRelayout()

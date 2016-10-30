@@ -31,6 +31,7 @@
 #include "CSSPropertySourceData.h"
 #include "CSSValueKeywords.h"
 #include "Color.h"
+#include "ColorSpace.h"
 #include "MediaQuery.h"
 #include "StyleRuleImport.h"
 #include "WebKitCSSFilterValue.h"
@@ -275,6 +276,7 @@ public:
 
     bool parseRGBParameters(CSSParserValue&, int* colorValues, bool parseAlpha);
     bool parseHSLParameters(CSSParserValue&, double* colorValues, bool parseAlpha);
+    Optional<std::pair<std::array<double, 4>, ColorSpace>> parseColorFunctionParameters(CSSParserValue&);
     RefPtr<CSSPrimitiveValue> parseColor(CSSParserValue* = nullptr);
     Color parseColorFromValue(CSSParserValue&);
     void parseSelector(const String&, CSSSelectorList&);
@@ -494,7 +496,7 @@ public:
 
     void setCustomPropertyName(const AtomicString& propertyName) { m_customPropertyName = propertyName; }
 
-    RefPtr<CSSValue> parseVariableDependentValue(CSSPropertyID, const CSSVariableDependentValue&, const CustomPropertyValueMap& customProperties, TextDirection, WritingMode);
+    RefPtr<CSSValue> parseValueWithVariableReferences(CSSPropertyID, const CSSValue&, const CustomPropertyValueMap& customProperties, TextDirection, WritingMode);
 
 private:
     bool is8BitSource() { return m_is8BitSource; }
@@ -708,7 +710,8 @@ private:
     bool validateUnit(ValueWithCalculation&, Units, CSSParserMode);
 
     bool parseBorderImageQuad(Units, RefPtr<CSSPrimitiveValue>&);
-    int colorIntFromValue(ValueWithCalculation&);
+    int parseColorInt(ValueWithCalculation&);
+    double parseColorDouble(ValueWithCalculation&);
     double parsedDouble(ValueWithCalculation&);
     
     friend class TransformOperationInfo;

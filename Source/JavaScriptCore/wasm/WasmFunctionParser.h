@@ -44,7 +44,7 @@ public:
     typedef typename Context::ExpressionType ExpressionType;
     typedef typename Context::ControlType ControlType;
 
-    FunctionParser(Context&, const Vector<uint8_t>& sourceBuffer, const FunctionInformation&, const Vector<FunctionInformation>& functions);
+    FunctionParser(Context&, const uint8_t* functionStart, size_t functionLength, const Signature*, const Vector<FunctionInformation>& functions);
 
     bool WARN_UNUSED_RETURN parse();
 
@@ -59,21 +59,21 @@ private:
     Context& m_context;
     Vector<ExpressionType, 1> m_expressionStack;
     Vector<ControlType> m_controlStack;
-    const Signature& m_signature;
+    const Signature* m_signature;
     const Vector<FunctionInformation>& m_functions;
     unsigned m_unreachableBlocks { 0 };
 };
 
 template<typename Context>
-FunctionParser<Context>::FunctionParser(Context& context, const Vector<uint8_t>& sourceBuffer, const FunctionInformation& info, const Vector<FunctionInformation>& functions)
-    : Parser(sourceBuffer, info.start, info.end)
+FunctionParser<Context>::FunctionParser(Context& context, const uint8_t* functionStart, size_t functionLength, const Signature* signature, const Vector<FunctionInformation>& functions)
+    : Parser(functionStart, functionLength)
     , m_context(context)
-    , m_signature(*info.signature)
+    , m_signature(signature)
     , m_functions(functions)
 {
     if (verbose)
-        dataLogLn("Parsing function starting at: ", info.start, " ending at: ", info.end);
-    m_context.addArguments(m_signature.arguments);
+        dataLogLn("Parsing function starting at: ", (uintptr_t)functionStart, " of length: ", functionLength);
+    m_context.addArguments(m_signature->arguments);
 }
 
 template<typename Context>
@@ -190,6 +190,7 @@ bool FunctionParser<Context>::parseExpression(OpType op)
         return m_context.store(static_cast<StoreOpType>(op), pointer, value, offset);
     }
 
+    case OpType::F32Const:
     case OpType::I32Const: {
         uint32_t constant;
         if (!parseVarUInt32(constant))
@@ -198,6 +199,7 @@ bool FunctionParser<Context>::parseExpression(OpType op)
         return true;
     }
 
+    case OpType::F64Const:
     case OpType::I64Const: {
         uint64_t constant;
         if (!parseVarUInt64(constant))
@@ -236,9 +238,15 @@ bool FunctionParser<Context>::parseExpression(OpType op)
 
         const FunctionInformation& info = m_functions[functionIndex];
 
+        if (info.signature->arguments.size() > m_expressionStack.size())
+            return false;
+
+        size_t firstArgumentIndex = m_expressionStack.size() - info.signature->arguments.size();
         Vector<ExpressionType> args;
-        for (unsigned i = 0; i < info.signature->arguments.size(); ++i)
-            args.append(m_expressionStack.takeLast());
+        args.reserveInitialCapacity(info.signature->arguments.size());
+        for (unsigned i = firstArgumentIndex; i < m_expressionStack.size(); ++i)
+            args.append(m_expressionStack[i]);
+        m_expressionStack.shrink(firstArgumentIndex);
 
         ExpressionType result = Context::emptyExpression;
         if (!m_context.addCall(functionIndex, info, args, result))
@@ -301,7 +309,7 @@ bool FunctionParser<Context>::parseExpression(OpType op)
 
     case OpType::Return: {
         Vector<ExpressionType, 1> returnValues;
-        if (m_signature.returnType != Void)
+        if (m_signature->returnType != Void)
             returnValues.append(m_expressionStack.takeLast());
 
         m_unreachableBlocks = 1;
@@ -318,8 +326,6 @@ bool FunctionParser<Context>::parseExpression(OpType op)
     case OpType::BrTable:
     case OpType::Nop:
     case OpType::Drop:
-    case OpType::F32Const:
-    case OpType::F64Const:
     case OpType::TeeLocal:
     case OpType::GetGlobal:
     case OpType::SetGlobal:
@@ -374,7 +380,10 @@ bool FunctionParser<Context>::parseUnreachableExpression(OpType op)
 
     // one immediate cases
     case OpType::Return:
+    case OpType::F32Const:
     case OpType::I32Const:
+    case OpType::F64Const:
+    case OpType::I64Const:
     case OpType::SetLocal:
     case OpType::GetLocal: {
         uint32_t unused;

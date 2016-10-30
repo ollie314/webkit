@@ -35,6 +35,7 @@
 namespace WebCore {
 
 class EditingStyle;
+class DataTransfer;
 class HTMLElement;
 class StaticRange;
 class StyledElement;
@@ -104,7 +105,7 @@ public:
 
     void apply();
     bool isFirstCommand(EditCommand* command) { return !m_commands.isEmpty() && m_commands.first() == command; }
-    EditCommandComposition* composition() { return m_composition.get(); }
+    EditCommandComposition* composition() const;
     EditCommandComposition* ensureComposition();
 
     virtual bool isCreateLinkCommand() const;
@@ -117,7 +118,9 @@ public:
     virtual String inputEventTypeName() const;
     virtual String inputEventData() const { return { }; }
     virtual bool isBeforeInputEventCancelable() const { return true; }
+    virtual bool shouldDispatchInputEvents() const { return true; }
     Vector<RefPtr<StaticRange>> targetRangesForBindings() const;
+    virtual RefPtr<DataTransfer> inputEventDataTransfer() const;
 
 protected:
     explicit CompositeEditCommand(Document&, EditAction = EditActionUnspecified);

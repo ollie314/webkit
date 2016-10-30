@@ -58,21 +58,26 @@
 #include "CSSPageRule.h"
 #include "CSSParserFastPaths.h"
 #include "CSSParserImpl.h"
+#include "CSSPendingSubstitutionValue.h"
 #include "CSSPrimitiveValue.h"
 #include "CSSPrimitiveValueMappings.h"
+#include "CSSPropertyParser.h"
 #include "CSSPropertySourceData.h"
 #include "CSSReflectValue.h"
 #include "CSSRevertValue.h"
 #include "CSSSelector.h"
+#include "CSSSelectorParser.h"
 #include "CSSShadowValue.h"
 #include "CSSStyleSheet.h"
 #include "CSSTimingFunctionValue.h"
+#include "CSSTokenizer.h"
 #include "CSSUnicodeRangeValue.h"
 #include "CSSUnsetValue.h"
 #include "CSSValueKeywords.h"
 #include "CSSValueList.h"
 #include "CSSValuePool.h"
 #include "CSSVariableDependentValue.h"
+#include "CSSVariableReferenceValue.h"
 #include "Counter.h"
 #include "Document.h"
 #include "FloatConversion.h"
@@ -389,6 +394,8 @@ void CSSParser::parseSheet(StyleSheetContents* sheet, const String& string, cons
 
 RefPtr<StyleRuleBase> CSSParser::parseRule(StyleSheetContents* sheet, const String& string)
 {
+    if (m_context.useNewParser && m_context.mode != UASheetMode)
+        return CSSParserImpl::parseRule(string, m_context, sheet, CSSParserImpl::AllowImportRules);
     setStyleSheet(sheet);
     m_allowNamespaceDeclarations = false;
     setupParser("@-webkit-rule{", string, "} ");
@@ -833,7 +840,7 @@ static inline bool isValidKeywordPropertyAndValue(CSSPropertyID propertyId, int 
         if (valueID == CSSValueAuto || valueID == CSSValueBalance)
             return true;
         break;
-    case CSSPropertyColumnProgression:
+    case CSSPropertyWebkitColumnProgression:
         if (valueID == CSSValueNormal || valueID == CSSValueReverse)
             return true;
         break;
@@ -1013,10 +1020,6 @@ static inline bool isValidKeywordPropertyAndValue(CSSPropertyID propertyId, int 
             return true;
         }
         break;
-    case CSSPropertyWebkitWritingMode:
-        if (valueID >= CSSValueHorizontalTb && valueID <= CSSValueHorizontalBt)
-            return true;
-        break;
     case CSSPropertyWhiteSpace: // normal | pre | nowrap | inherit
         if (valueID == CSSValueNormal || valueID == CSSValuePre || valueID == CSSValuePreWrap || valueID == CSSValuePreLine || valueID == CSSValueNowrap)
             return true;
@@ -1127,7 +1130,9 @@ static inline bool isValidKeywordPropertyAndValue(CSSPropertyID propertyId, int 
             return true;
         break;
     case CSSPropertyWritingMode:
-        if (valueID == CSSValueLrTb || valueID == CSSValueRlTb || valueID == CSSValueTbRl || valueID == CSSValueLr || valueID == CSSValueRl || valueID == CSSValueTb)
+        if ((valueID >= CSSValueHorizontalTb && valueID <= CSSValueHorizontalBt)
+            || valueID == CSSValueLrTb || valueID == CSSValueRlTb || valueID == CSSValueTbRl
+            || valueID == CSSValueLr || valueID == CSSValueRl || valueID == CSSValueTb)
             return true;
         break;
     default:
@@ -1413,8 +1418,14 @@ Color CSSParser::parseSystemColor(const String& string, Document* document)
 
 void CSSParser::parseSelector(const String& string, CSSSelectorList& selectorList)
 {
-    m_selectorListForParseSelector = &selectorList;
+    if (m_context.useNewParser && m_context.mode != UASheetMode) {
+        CSSTokenizer::Scope scope(string);
+        selectorList = CSSSelectorParser::parseSelector(scope.tokenRange(), m_context, nullptr);
+        return;
+    }
 
+    m_selectorListForParseSelector = &selectorList;
+    
     setupParser("@-webkit-selector{", string, "}");
 
     cssyyparse(this);
@@ -1426,6 +1437,10 @@ Ref<ImmutableStyleProperties> CSSParser::parseInlineStyleDeclaration(const Strin
 {
     CSSParserContext context(element->document());
     context.mode = strictToCSSParserMode(element->isHTMLElement() && !element->document().inQuirksMode());
+
+    if (context.useNewParser)
+        return CSSParserImpl::parseInlineStyleDeclaration(string, element);
+
     return CSSParser(context).parseDeclaration(string, nullptr);
 }
 
@@ -1790,23 +1805,68 @@ void CSSParser::addExpandedPropertyForValue(CSSPropertyID propId, Ref<CSSValue>&
         addProperty(longhands[i], value.copyRef(), important);
 }
 
-RefPtr<CSSValue> CSSParser::parseVariableDependentValue(CSSPropertyID propID, const CSSVariableDependentValue& dependentValue, const CustomPropertyValueMap& customProperties, TextDirection direction, WritingMode writingMode)
+RefPtr<CSSValue> CSSParser::parseValueWithVariableReferences(CSSPropertyID propID, const CSSValue& value, const CustomPropertyValueMap& customProperties, TextDirection direction, WritingMode writingMode)
 {
-    m_valueList.reset(new CSSParserValueList());
-    if (!dependentValue.valueList().buildParserValueListSubstitutingVariables(m_valueList.get(), customProperties))
+    if (value.isVariableDependentValue()) {
+        const CSSVariableDependentValue& dependentValue = downcast<CSSVariableDependentValue>(value);
+        m_valueList.reset(new CSSParserValueList());
+        if (!dependentValue.valueList().buildParserValueListSubstitutingVariables(m_valueList.get(), customProperties))
+            return nullptr;
+
+        CSSPropertyID dependentValuePropertyID = dependentValue.propertyID();
+        if (CSSProperty::isDirectionAwareProperty(dependentValuePropertyID))
+            dependentValuePropertyID = CSSProperty::resolveDirectionAwareProperty(dependentValuePropertyID, direction, writingMode);
+
+        if (!parseValue(dependentValuePropertyID, false))
+            return nullptr;
+
+        for (auto& property : m_parsedProperties) {
+            if (property.id() == propID)
+                return property.value();
+        }
+        
         return nullptr;
-
-    CSSPropertyID dependentValuePropertyID = dependentValue.propertyID();
-    if (CSSProperty::isDirectionAwareProperty(dependentValuePropertyID))
-        dependentValuePropertyID = CSSProperty::resolveDirectionAwareProperty(dependentValuePropertyID, direction, writingMode);
-
-    if (!parseValue(dependentValuePropertyID, false))
-        return nullptr;
-
-    for (auto& property : m_parsedProperties) {
-        if (property.id() == propID)
-            return property.value();
     }
+    
+    if (value.isPendingSubstitutionValue()) {
+        // FIXME: Should have a resolvedShorthands cache to stop this from being done
+        // over and over for each longhand value.
+        const CSSPendingSubstitutionValue& pendingSubstitution = downcast<CSSPendingSubstitutionValue>(value);
+        CSSPropertyID shorthandID = pendingSubstitution.shorthandPropertyId();
+        if (CSSProperty::isDirectionAwareProperty(shorthandID))
+            shorthandID = CSSProperty::resolveDirectionAwareProperty(shorthandID, direction, writingMode);
+        CSSVariableReferenceValue* shorthandValue = pendingSubstitution.shorthandValue();
+        const CSSVariableData* variableData = shorthandValue->variableDataValue();
+        ASSERT(variableData);
+        
+        Vector<CSSParserToken> resolvedTokens;
+        if (!variableData->resolveTokenRange(customProperties, variableData->tokens(), resolvedTokens))
+            return nullptr;
+        
+        ParsedPropertyVector parsedProperties;
+        if (!CSSPropertyParser::parseValue(shorthandID, false, resolvedTokens, m_context, parsedProperties, StyleRule::Style))
+            return nullptr;
+        
+        for (auto& property : parsedProperties) {
+            if (property.id() == propID)
+                return property.value();
+        }
+        
+        return nullptr;
+    }
+
+    if (value.isVariableReferenceValue()) {
+        const CSSVariableReferenceValue& valueWithReferences = downcast<CSSVariableReferenceValue>(value);
+        const CSSVariableData* variableData = valueWithReferences.variableDataValue();
+        ASSERT(variableData);
+        
+        Vector<CSSParserToken> resolvedTokens;
+        if (!variableData->resolveTokenRange(customProperties, variableData->tokens(), resolvedTokens))
+            return nullptr;
+        
+        return CSSPropertyParser::parseSingleValue(propID, resolvedTokens, m_context);
+    }
+    
     return nullptr;
 }
 
@@ -7548,21 +7608,22 @@ bool CSSParser::isCalculation(CSSParserValue& value)
             || equalLettersIgnoringASCIICase(value.function->name, "-webkit-calc("));
 }
 
-inline int CSSParser::colorIntFromValue(ValueWithCalculation& valueWithCalculation)
+static bool isPercent(const CSSParser::ValueWithCalculation& valueWithCalculation)
 {
-    bool isPercent;
-    
     if (valueWithCalculation.calculation())
-        isPercent = valueWithCalculation.calculation()->category() == CalcPercent;
-    else
-        isPercent = valueWithCalculation.value().unit == CSSPrimitiveValue::CSS_PERCENTAGE;
+        return valueWithCalculation.calculation()->category() == CalcPercent;
 
-    const double doubleValue = parsedDouble(valueWithCalculation);
+    return valueWithCalculation.value().unit == CSSPrimitiveValue::CSS_PERCENTAGE;
+}
+
+inline int CSSParser::parseColorInt(ValueWithCalculation& valueWithCalculation)
+{
+    double doubleValue = parsedDouble(valueWithCalculation);
     
     if (doubleValue <= 0.0)
         return 0;
 
-    if (isPercent) {
+    if (isPercent(valueWithCalculation)) {
         if (doubleValue >= 100.0)
             return 255;
         return static_cast<int>(doubleValue * 256.0 / 100.0);
@@ -7572,6 +7633,16 @@ inline int CSSParser::colorIntFromValue(ValueWithCalculation& valueWithCalculati
         return 255;
 
     return static_cast<int>(doubleValue);
+}
+
+inline double CSSParser::parseColorDouble(ValueWithCalculation& valueWithCalculation)
+{
+    double doubleValue = parsedDouble(valueWithCalculation);
+
+    if (isPercent(valueWithCalculation))
+        return doubleValue / 100.0;
+
+    return doubleValue;
 }
 
 bool CSSParser::parseRGBParameters(CSSParserValue& value, int* colorArray, bool parseAlpha)
@@ -7587,7 +7658,7 @@ bool CSSParser::parseRGBParameters(CSSParserValue& value, int* colorArray, bool 
     else
         return false;
     
-    colorArray[0] = colorIntFromValue(firstArgumentWithCalculation);
+    colorArray[0] = parseColorInt(firstArgumentWithCalculation);
     for (int i = 1; i < 3; i++) {
         CSSParserValue& operatorArgument = *args->next();
         if (operatorArgument.unit != CSSParserValue::Operator && operatorArgument.iValue != ',')
@@ -7595,7 +7666,7 @@ bool CSSParser::parseRGBParameters(CSSParserValue& value, int* colorArray, bool 
         ValueWithCalculation argumentWithCalculation(*args->next());
         if (!validateUnit(argumentWithCalculation, unitType, HTMLStandardMode))
             return false;
-        colorArray[i] = colorIntFromValue(argumentWithCalculation);
+        colorArray[i] = parseColorInt(argumentWithCalculation);
     }
     if (parseAlpha) {
         CSSParserValue& operatorArgument = *args->next();
@@ -7607,9 +7678,63 @@ bool CSSParser::parseRGBParameters(CSSParserValue& value, int* colorArray, bool 
         double doubleValue = parsedDouble(argumentWithCalculation);
         // Convert the floating pointer number of alpha to an integer in the range [0, 256),
         // with an equal distribution across all 256 values.
-        colorArray[3] = static_cast<int>(std::max<double>(0, std::min<double>(1, doubleValue)) * nextafter(256.0, 0.0));
+        colorArray[3] = static_cast<int>(std::max(0.0, std::min(1.0, doubleValue)) * nextafter(256.0, 0.0));
     }
     return true;
+}
+
+Optional<std::pair<std::array<double, 4>, ColorSpace>> CSSParser::parseColorFunctionParameters(CSSParserValue& value)
+{
+    CSSParserValueList* args = value.function->args.get();
+    if (!args->size())
+        return Nullopt;
+
+    ColorSpace colorSpace;
+    switch (args->current()->id) {
+    case CSSValueSrgb:
+        colorSpace = ColorSpaceSRGB;
+        break;
+    case CSSValueDisplayP3:
+        colorSpace = ColorSpaceDisplayP3;
+        break;
+    default:
+        return Nullopt;
+    }
+
+    std::array<double, 4> colorValues = { { 0, 0, 0, 1 } };
+
+    for (int i = 0; i < 3; ++i) {
+        auto valueOrNull = args->next();
+        if (valueOrNull) {
+            ValueWithCalculation argumentWithCalculation(*valueOrNull);
+            if (!validateUnit(argumentWithCalculation, FNumber))
+                return Nullopt;
+            colorValues[i] = std::max(0.0, std::min(1.0, parsedDouble(argumentWithCalculation)));
+        }
+    }
+
+    auto slashOrNull = args->next();
+    if (!slashOrNull)
+        return { { colorValues, colorSpace } };
+
+    if (!isForwardSlashOperator(*slashOrNull))
+        return Nullopt;
+
+    // Handle alpha.
+
+    ValueWithCalculation argumentWithCalculation(*args->next());
+    if (!validateUnit(argumentWithCalculation, FNumber | FPercent))
+        return Nullopt;
+    colorValues[3] = std::max(0.0, std::min(1.0, parseColorDouble(argumentWithCalculation)));
+
+    // FIXME: Support the comma-separated list of fallback color values.
+    // If there is another argument, it should be a comma.
+
+    auto commaOrNull = args->next();
+    if (commaOrNull && !isComma(commaOrNull))
+        return Nullopt;
+
+    return { { colorValues, colorSpace } };
 }
 
 // The CSS3 specification defines the format of a HSL color as
@@ -7633,7 +7758,7 @@ bool CSSParser::parseHSLParameters(CSSParserValue& value, double* colorArray, bo
         ValueWithCalculation argumentWithCalculation(*args->next());
         if (!validateUnit(argumentWithCalculation, FPercent, HTMLStandardMode))
             return false;
-        colorArray[i] = std::max<double>(0, std::min<double>(100, parsedDouble(argumentWithCalculation))) / 100.0; // needs to be value between 0 and 1.0
+        colorArray[i] = std::max(0.0, std::min(100.0, parsedDouble(argumentWithCalculation))) / 100.0; // needs to be value between 0 and 1.0
     }
     if (parseAlpha) {
         CSSParserValue& operatorArgument = *args->next();
@@ -7642,7 +7767,7 @@ bool CSSParser::parseHSLParameters(CSSParserValue& value, double* colorArray, bo
         ValueWithCalculation argumentWithCalculation(*args->next());
         if (!validateUnit(argumentWithCalculation, FNumber, HTMLStandardMode))
             return false;
-        colorArray[3] = std::max<double>(0, std::min<double>(1, parsedDouble(argumentWithCalculation)));
+        colorArray[3] = std::max(0.0, std::min(1.0, parsedDouble(argumentWithCalculation)));
     }
     return true;
 }
@@ -7698,6 +7823,13 @@ Color CSSParser::parseColorFromValue(CSSParserValue& value)
         if (!parseHSLParameters(value, colorValues, true))
             return Color();
         return Color(makeRGBAFromHSLA(colorValues[0], colorValues[1], colorValues[2], colorValues[3]));
+    } else if (value.unit == CSSParserValue::Function
+        && value.function->args
+        && equalLettersIgnoringASCIICase(value.function->name, "color(")) {
+        Optional<std::pair<std::array<double, 4>, ColorSpace>> colorData = parseColorFunctionParameters(value);
+        if (!colorData)
+            return Color();
+        return Color(colorData.value().first[0], colorData.value().first[1], colorData.value().first[2], colorData.value().first[3], colorData.value().second);
     }
 
     return Color();

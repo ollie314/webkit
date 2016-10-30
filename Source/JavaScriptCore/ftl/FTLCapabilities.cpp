@@ -176,6 +176,7 @@ inline CapabilityLevel canCompile(Node* node)
     case NewArrayWithSize:
     case TryGetById:
     case GetById:
+    case PureGetById:
     case GetByIdFlush:
     case GetByIdWithThis:
     case ToThis:
@@ -271,7 +272,7 @@ inline CapabilityLevel canCompile(Node* node)
     case DefineAccessorProperty:
     case ToLowerCase:
     case CheckDOM:
-    case CallDOM:
+    case CallDOMGetter:
         // These are OK.
         break;
 

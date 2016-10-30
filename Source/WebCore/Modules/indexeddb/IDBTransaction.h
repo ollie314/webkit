@@ -34,6 +34,7 @@
 #include "IDBKeyRangeData.h"
 #include "IDBOpenDBRequest.h"
 #include "IDBTransactionInfo.h"
+#include "IDBTransactionMode.h"
 #include "IndexedDB.h"
 #include "Timer.h"
 #include <wtf/Deque.h>
@@ -42,6 +43,7 @@
 namespace WebCore {
 
 class DOMError;
+class DOMStringList;
 class IDBCursor;
 class IDBCursorInfo;
 class IDBDatabase;
@@ -63,22 +65,14 @@ class TransactionOperation;
 
 class IDBTransaction : public ThreadSafeRefCounted<IDBTransaction>, public EventTargetWithInlineData, public IDBActiveDOMObject {
 public:
-    static const AtomicString& modeReadOnly();
-    static const AtomicString& modeReadWrite();
-    static const AtomicString& modeVersionChange();
-    static const AtomicString& modeReadOnlyLegacy();
-    static const AtomicString& modeReadWriteLegacy();
-
-    static Optional<IndexedDB::TransactionMode> stringToMode(const String&);
-    static const AtomicString& modeToString(IndexedDB::TransactionMode);
-
     static Ref<IDBTransaction> create(IDBDatabase&, const IDBTransactionInfo&);
     static Ref<IDBTransaction> create(IDBDatabase&, const IDBTransactionInfo&, IDBOpenDBRequest&);
 
     ~IDBTransaction() final;
 
     // IDBTransaction IDL
-    const String& mode() const;
+    Ref<DOMStringList> objectStoreNames() const;
+    IDBTransactionMode mode() const { return m_info.mode(); }
     IDBDatabase* db();
     DOMError* error() const;
     ExceptionOr<Ref<IDBObjectStore>> objectStore(const String& name);
@@ -108,13 +102,14 @@ public:
     void didAbort(const IDBError&);
     void didCommit(const IDBError&);
 
-    bool isVersionChange() const { return m_info.mode() == IndexedDB::TransactionMode::VersionChange; }
-    bool isReadOnly() const { return m_info.mode() == IndexedDB::TransactionMode::ReadOnly; }
+    bool isVersionChange() const { return mode() == IDBTransactionMode::Versionchange; }
+    bool isReadOnly() const { return mode() == IDBTransactionMode::Readonly; }
     bool isActive() const;
 
     Ref<IDBObjectStore> createObjectStore(const IDBObjectStoreInfo&);
     void renameObjectStore(IDBObjectStore&, const String& newName);
     std::unique_ptr<IDBIndex> createIndex(IDBObjectStore&, const IDBIndexInfo&);
+    void renameIndex(IDBIndex&, const String& newName);
 
     Ref<IDBRequest> requestPutOrAdd(JSC::ExecState&, IDBObjectStore&, IDBKey*, SerializedScriptValue&, IndexedDB::ObjectStoreOverwriteMode);
     Ref<IDBRequest> requestGetRecord(JSC::ExecState&, IDBObjectStore&, const IDBGetRecordData&);
@@ -177,6 +172,9 @@ private:
 
     void createIndexOnServer(IDBClient::TransactionOperation&, const IDBIndexInfo&);
     void didCreateIndexOnServer(const IDBResultData&);
+
+    void renameIndexOnServer(IDBClient::TransactionOperation&, const uint64_t& objectStoreIdentifier, const uint64_t& indexIdentifier, const String& newName);
+    void didRenameIndexOnServer(const IDBResultData&);
 
     void clearObjectStoreOnServer(IDBClient::TransactionOperation&, const uint64_t& objectStoreIdentifier);
     void didClearObjectStoreOnServer(IDBRequest&, const IDBResultData&);

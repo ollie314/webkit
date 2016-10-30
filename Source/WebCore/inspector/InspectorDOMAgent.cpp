@@ -50,7 +50,6 @@
 #include "DOMPatchSupport.h"
 #include "DOMWindow.h"
 #include "Document.h"
-#include "DocumentFragment.h"
 #include "DocumentType.h"
 #include "Element.h"
 #include "Event.h"
@@ -85,7 +84,6 @@
 #include "RenderStyle.h"
 #include "RenderStyleConstants.h"
 #include "ScriptState.h"
-#include "Settings.h"
 #include "ShadowRoot.h"
 #include "StyleProperties.h"
 #include "StyleResolver.h"
@@ -1289,14 +1287,14 @@ static bool pseudoElementType(PseudoId pseudoId, Inspector::Protocol::DOM::Pseud
     }
 }
 
-static Inspector::Protocol::DOM::ShadowRootType shadowRootType(ShadowRoot::Mode mode)
+static Inspector::Protocol::DOM::ShadowRootType shadowRootType(ShadowRootMode mode)
 {
     switch (mode) {
-    case ShadowRoot::Mode::UserAgent:
+    case ShadowRootMode::UserAgent:
         return Inspector::Protocol::DOM::ShadowRootType::UserAgent;
-    case ShadowRoot::Mode::Closed:
+    case ShadowRootMode::Closed:
         return Inspector::Protocol::DOM::ShadowRootType::Closed;
-    case ShadowRoot::Mode::Open:
+    case ShadowRootMode::Open:
         return Inspector::Protocol::DOM::ShadowRootType::Open;
     }
 
@@ -1501,7 +1499,7 @@ Ref<Inspector::Protocol::DOM::EventListener> InspectorDOMAgent::buildObjectForEv
         handler = scriptListener->jsFunction(&node->document());
         if (handler && state) {
             body = handler->toString(state)->value(state);
-            if (auto function = JSC::jsDynamicCast<JSC::JSFunction*>(handler)) {
+            if (auto function = jsDynamicDowncast<JSC::JSFunction*>(handler)) {
                 if (!function->isHostOrBuiltinFunction()) {
                     if (auto executable = function->jsExecutable()) {
                         lineNumber = executable->firstLine() - 1;
@@ -2172,33 +2170,37 @@ void InspectorDOMAgent::pushNodeByPathToFrontend(ErrorString& errorString, const
 
 void InspectorDOMAgent::pushNodeByBackendIdToFrontend(ErrorString& errorString, BackendNodeId backendNodeId, int* nodeId)
 {
-    if (!m_backendIdToNode.contains(backendNodeId)) {
+    auto iterator = m_backendIdToNode.find(backendNodeId);
+    if (iterator == m_backendIdToNode.end()) {
         errorString = ASCIILiteral("No node with given backend id found");
         return;
     }
 
-    Node* node = m_backendIdToNode.get(backendNodeId).first;
-    String nodeGroup = m_backendIdToNode.get(backendNodeId).second;
+    Node* node = iterator->value.first;
+    String nodeGroup = iterator->value.second;
+
     *nodeId = pushNodePathToFrontend(node);
 
-    if (nodeGroup == "") {
-        m_backendIdToNode.remove(backendNodeId);
+    if (nodeGroup.isEmpty()) {
+        m_backendIdToNode.remove(iterator);
+        // FIXME: We really do the following only when nodeGroup is the empty string? Seems wrong.
+        ASSERT(m_nodeGroupToBackendIdMap.contains(nodeGroup));
         m_nodeGroupToBackendIdMap.find(nodeGroup)->value.remove(node);
     }
 }
 
 RefPtr<Inspector::Protocol::Runtime::RemoteObject> InspectorDOMAgent::resolveNode(Node* node, const String& objectGroup)
 {
-    Frame* frame = node->document().frame();
+    auto* frame = node->document().frame();
     if (!frame)
-        return 0;
+        return nullptr;
 
-    JSC::ExecState* scriptState = mainWorldExecState(frame);
-    InjectedScript injectedScript = m_injectedScriptManager.injectedScriptFor(scriptState);
+    auto& state = *mainWorldExecState(frame);
+    auto injectedScript = m_injectedScriptManager.injectedScriptFor(&state);
     if (injectedScript.hasNoValue())
-        return 0;
+        return nullptr;
 
-    return injectedScript.wrapObject(nodeAsScriptValue(*scriptState, node), objectGroup);
+    return injectedScript.wrapObject(nodeAsScriptValue(state, node), objectGroup);
 }
 
 Node* InspectorDOMAgent::scriptValueAsNode(JSC::JSValue value)
@@ -2210,11 +2212,8 @@ Node* InspectorDOMAgent::scriptValueAsNode(JSC::JSValue value)
 
 JSC::JSValue InspectorDOMAgent::nodeAsScriptValue(JSC::ExecState& state, Node* node)
 {
-    if (!shouldAllowAccessToNode(&state, node))
-        return JSC::jsNull();
-
     JSC::JSLockHolder lock(&state);
-    return toJS(&state, deprecatedGlobalObjectForPrototype(&state), node);
+    return toJS(&state, deprecatedGlobalObjectForPrototype(&state), BindingSecurity::checkSecurityForNode(state, node));
 }
 
 } // namespace WebCore

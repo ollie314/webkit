@@ -89,6 +89,7 @@ JavaScriptCore_BUILTINS_SOURCES = \
     $(JavaScriptCore)/builtins/ArrayConstructor.js \
     $(JavaScriptCore)/builtins/ArrayIteratorPrototype.js \
     $(JavaScriptCore)/builtins/ArrayPrototype.js \
+    $(JavaScriptCore)/builtins/AsyncFunctionPrototype.js \
     $(JavaScriptCore)/builtins/DatePrototype.js \
     $(JavaScriptCore)/builtins/FunctionPrototype.js \
     $(JavaScriptCore)/builtins/GeneratorPrototype.js \
@@ -223,6 +224,7 @@ INSPECTOR_DOMAINS = \
     $(JavaScriptCore)/inspector/protocol/Runtime.json \
     $(JavaScriptCore)/inspector/protocol/ScriptProfiler.json \
     $(JavaScriptCore)/inspector/protocol/Timeline.json \
+    $(JavaScriptCore)/inspector/protocol/Worker.json \
 #
 
 ifeq ($(findstring ENABLE_INDEXED_DATABASE,$(FEATURE_DEFINES)), ENABLE_INDEXED_DATABASE)

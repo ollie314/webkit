@@ -57,17 +57,15 @@
 #include "HTMLCanvasElement.h"
 #include "HTMLCollection.h"
 #include "HTMLDocument.h"
-#include "HTMLEmbedElement.h"
 #include "HTMLHtmlElement.h"
-#include "HTMLIFrameElement.h"
 #include "HTMLLabelElement.h"
 #include "HTMLNameCollection.h"
 #include "HTMLObjectElement.h"
 #include "HTMLParserIdioms.h"
-#include "HTMLSelectElement.h"
 #include "HTMLTemplateElement.h"
 #include "IdChangeInvalidation.h"
 #include "IdTargetObserverRegistry.h"
+#include "InspectorInstrumentation.h"
 #include "JSLazyEventListener.h"
 #include "KeyboardEvent.h"
 #include "KeyframeEffect.h"
@@ -852,7 +850,7 @@ Element* Element::bindingsOffsetParent()
     Element* element = offsetParent();
     if (!element || !element->isInShadowTree())
         return element;
-    return element->containingShadowRoot()->mode() == ShadowRoot::Mode::UserAgent ? nullptr : element;
+    return element->containingShadowRoot()->mode() == ShadowRootMode::UserAgent ? nullptr : element;
 }
 
 Element* Element::offsetParent()
@@ -1778,7 +1776,7 @@ void Element::addShadowRoot(Ref<ShadowRoot>&& newShadowRoot)
 
     InspectorInstrumentation::didPushShadowRoot(*this, shadowRoot);
 
-    if (shadowRoot.mode() == ShadowRoot::Mode::UserAgent)
+    if (shadowRoot.mode() == ShadowRootMode::UserAgent)
         didAddUserAgentShadowRoot(&shadowRoot);
 }
 
@@ -1857,7 +1855,12 @@ RefPtr<ShadowRoot> Element::attachShadow(const ShadowRootInit& init, ExceptionCo
         return nullptr;
     }
 
-    auto shadow = ShadowRoot::create(document(), init.mode == ShadowRootMode::Open ? ShadowRoot::Mode::Open : ShadowRoot::Mode::Closed);
+    if (init.mode == ShadowRootMode::UserAgent) {
+        ec = TypeError;
+        return nullptr;
+    }
+
+    auto shadow = ShadowRoot::create(document(), init.mode);
     addShadowRoot(shadow.copyRef());
     return WTFMove(shadow);
 }
@@ -1868,7 +1871,7 @@ ShadowRoot* Element::shadowRootForBindings(JSC::ExecState& state) const
     if (!root)
         return nullptr;
 
-    if (root->mode() != ShadowRoot::Mode::Open) {
+    if (root->mode() != ShadowRootMode::Open) {
         if (!JSC::jsCast<JSDOMGlobalObject*>(state.lexicalGlobalObject())->world().shadowRootIsAlwaysOpen())
             return nullptr;
     }
@@ -1879,7 +1882,7 @@ ShadowRoot* Element::shadowRootForBindings(JSC::ExecState& state) const
 ShadowRoot* Element::userAgentShadowRoot() const
 {
     if (ShadowRoot* shadowRoot = this->shadowRoot()) {
-        ASSERT(shadowRoot->mode() == ShadowRoot::Mode::UserAgent);
+        ASSERT(shadowRoot->mode() == ShadowRootMode::UserAgent);
         return shadowRoot;
     }
     return nullptr;
@@ -1889,7 +1892,7 @@ ShadowRoot& Element::ensureUserAgentShadowRoot()
 {
     ShadowRoot* shadowRoot = userAgentShadowRoot();
     if (!shadowRoot) {
-        addShadowRoot(ShadowRoot::create(document(), ShadowRoot::Mode::UserAgent));
+        addShadowRoot(ShadowRoot::create(document(), ShadowRootMode::UserAgent));
         shadowRoot = userAgentShadowRoot();
     }
     return *shadowRoot;
@@ -1902,15 +1905,22 @@ void Element::setIsDefinedCustomElement(JSCustomElementInterface& elementInterfa
 {
     clearFlag(IsEditingTextOrUndefinedCustomElementFlag);
     setFlag(IsCustomElement);
-    ensureElementRareData().setCustomElementInterface(elementInterface);
+    auto& data = ensureElementRareData();
+    if (!data.customElementReactionQueue())
+        data.setCustomElementReactionQueue(std::make_unique<CustomElementReactionQueue>(elementInterface));
 }
 
-void Element::setIsFailedCustomElement(JSCustomElementInterface& elementInterface)
+void Element::setIsFailedCustomElement(JSCustomElementInterface&)
 {
     ASSERT(isUndefinedCustomElement());
     ASSERT(getFlag(IsEditingTextOrUndefinedCustomElementFlag));
     clearFlag(IsCustomElement);
-    ensureElementRareData().setCustomElementInterface(elementInterface);
+
+    if (hasRareData()) {
+        // Clear the queue instead of deleting it since this function can be called inside CustomElementReactionQueue::invokeAll during upgrades.
+        if (auto* queue = elementRareData()->customElementReactionQueue())
+            queue->clear();
+    }
 }
 
 void Element::setIsCustomElementUpgradeCandidate()
@@ -1920,12 +1930,25 @@ void Element::setIsCustomElementUpgradeCandidate()
     setFlag(IsEditingTextOrUndefinedCustomElementFlag);
 }
 
-JSCustomElementInterface* Element::customElementInterface() const
+void Element::enqueueToUpgrade(JSCustomElementInterface& elementInterface)
 {
-    ASSERT(isDefinedCustomElement());
+    ASSERT(!isDefinedCustomElement() && !isFailedCustomElement());
+    setFlag(IsCustomElement);
+    setFlag(IsEditingTextOrUndefinedCustomElementFlag);
+
+    auto& data = ensureElementRareData();
+    ASSERT(!data.customElementReactionQueue());
+
+    data.setCustomElementReactionQueue(std::make_unique<CustomElementReactionQueue>(elementInterface));
+    data.customElementReactionQueue()->enqueueElementUpgrade(*this);
+}
+
+CustomElementReactionQueue* Element::reactionQueue() const
+{
+    ASSERT(isDefinedCustomElement() || isCustomElementUpgradeCandidate());
     if (!hasRareData())
         return nullptr;
-    return elementRareData()->customElementInterface();
+    return elementRareData()->customElementReactionQueue();
 }
 
 #endif
@@ -2510,9 +2533,9 @@ void Element::dispatchBlurEvent(RefPtr<Element>&& newFocusedElement)
     EventDispatcher::dispatchEvent(this, FocusEvent::create(eventNames().blurEvent, false, false, document().defaultView(), 0, WTFMove(newFocusedElement)));
 }
 
-#if ENABLE(MOUSE_FORCE_EVENTS)
 bool Element::dispatchMouseForceWillBegin()
 {
+#if ENABLE(MOUSE_FORCE_EVENTS)
     if (!document().hasListenerType(Document::FORCEWILLBEGIN_LISTENER))
         return false;
 
@@ -2520,32 +2543,29 @@ bool Element::dispatchMouseForceWillBegin()
     if (!frame)
         return false;
 
-    PlatformMouseEvent platformMouseEvent(frame->eventHandler().lastKnownMousePosition(), frame->eventHandler().lastKnownMouseGlobalPosition(), NoButton, PlatformEvent::NoType, 1, false, false, false, false, WTF::currentTime(), ForceAtClick, NoTap);
-    Ref<MouseEvent> mouseForceWillBeginEvent =  MouseEvent::create(eventNames().webkitmouseforcewillbeginEvent, document().defaultView(), platformMouseEvent, 0, nullptr);
+    PlatformMouseEvent platformMouseEvent { frame->eventHandler().lastKnownMousePosition(), frame->eventHandler().lastKnownMouseGlobalPosition(), NoButton, PlatformEvent::NoType, 1, false, false, false, false, WTF::currentTime(), ForceAtClick, NoTap };
+    auto mouseForceWillBeginEvent = MouseEvent::create(eventNames().webkitmouseforcewillbeginEvent, document().defaultView(), platformMouseEvent, 0, nullptr);
     mouseForceWillBeginEvent->setTarget(this);
     dispatchEvent(mouseForceWillBeginEvent);
 
     if (mouseForceWillBeginEvent->defaultHandled() || mouseForceWillBeginEvent->defaultPrevented())
         return true;
+#endif
+
     return false;
 }
-#else
-bool Element::dispatchMouseForceWillBegin()
-{
-    return false;
-}
-#endif // #if ENABLE(MOUSE_FORCE_EVENTS)
 
 void Element::mergeWithNextTextNode(Text& node, ExceptionCode& ec)
 {
-    Node* next = node.nextSibling();
+    auto* next = node.nextSibling();
     if (!is<Text>(next))
         return;
+    Ref<Text> textNext { downcast<Text>(*next) };
 
-    Ref<Text> textNode(node);
-    Ref<Text> textNext(downcast<Text>(*next));
-    textNode->appendData(textNext->data());
-    textNext->remove(ec);
+    node.appendData(textNext->data());
+    auto result = textNext->remove();
+    if (result.hasException())
+        ec = result.releaseException().code();
 }
 
 String Element::innerHTML() const
@@ -2569,11 +2589,13 @@ void Element::setOuterHTML(const String& html, ExceptionCode& ec)
     RefPtr<Node> prev = previousSibling();
     RefPtr<Node> next = nextSibling();
 
-    RefPtr<DocumentFragment> fragment = createFragmentForInnerOuterHTML(*parent, html, AllowScriptingContent, ec);
-    if (ec)
+    auto fragment = createFragmentForInnerOuterHTML(*parent, html, AllowScriptingContent);
+    if (fragment.hasException()) {
+        ec = fragment.releaseException().code();
         return;
+    }
     
-    parent->replaceChild(*fragment, *this, ec);
+    parent->replaceChild(fragment.releaseReturnValue().get(), *this, ec);
     RefPtr<Node> node = next ? next->previousSibling() : nullptr;
     if (!ec && is<Text>(node.get()))
         mergeWithNextTextNode(downcast<Text>(*node), ec);
@@ -2584,14 +2606,21 @@ void Element::setOuterHTML(const String& html, ExceptionCode& ec)
 
 void Element::setInnerHTML(const String& html, ExceptionCode& ec)
 {
-    if (RefPtr<DocumentFragment> fragment = createFragmentForInnerOuterHTML(*this, html, AllowScriptingContent, ec)) {
-        ContainerNode* container = this;
-
-        if (is<HTMLTemplateElement>(*this))
-            container = &downcast<HTMLTemplateElement>(*this).content();
-
-        replaceChildrenWithFragment(*container, fragment.releaseNonNull(), ec);
+    auto fragment = createFragmentForInnerOuterHTML(*this, html, AllowScriptingContent);
+    if (fragment.hasException()) {
+        ec = fragment.releaseException().code();
+        return;
     }
+
+    ContainerNode* container;
+    if (!is<HTMLTemplateElement>(*this))
+        container = this;
+    else
+        container = &downcast<HTMLTemplateElement>(*this).content();
+
+    auto result = replaceChildrenWithFragment(*container, fragment.releaseReturnValue());
+    if (result.hasException())
+        ec = fragment.releaseException().code();
 }
 
 String Element::innerText()
@@ -3722,11 +3751,13 @@ void Element::insertAdjacentHTML(const String& where, const String& markup, Exce
     } else
         contextElement = downcast<Element>(contextNode);
     // Step 3.
-    RefPtr<DocumentFragment> fragment = createFragmentForInnerOuterHTML(*contextElement, markup, AllowScriptingContent, ec);
-    if (!fragment)
+    auto fragment = createFragmentForInnerOuterHTML(*contextElement, markup, AllowScriptingContent);
+    if (fragment.hasException()) {
+        ec = fragment.releaseException().code();
         return;
+    }
     // Step 4.
-    insertAdjacent(where, fragment.releaseNonNull(), ec);
+    insertAdjacent(where, fragment.releaseReturnValue(), ec);
 }
 
 void Element::insertAdjacentText(const String& where, const String& text, ExceptionCode& ec)

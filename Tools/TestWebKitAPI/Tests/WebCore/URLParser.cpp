@@ -94,21 +94,21 @@ static void checkURL(const String& urlString, const ExpectedParts& parts, TestTa
     auto oldURL = URL(URL(), urlString);
     URLParser::setEnabled(wasEnabled);
     
-    EXPECT_TRUE(eq(parts.protocol, url.protocol()));
+    EXPECT_TRUE(eq(parts.protocol, url.protocol().toString()));
     EXPECT_TRUE(eq(parts.user, url.user()));
     EXPECT_TRUE(eq(parts.password, url.pass()));
     EXPECT_TRUE(eq(parts.host, url.host()));
-    EXPECT_EQ(parts.port, url.port());
+    EXPECT_EQ(parts.port, url.port().valueOr(0));
     EXPECT_TRUE(eq(parts.path, url.path()));
     EXPECT_TRUE(eq(parts.query, url.query()));
     EXPECT_TRUE(eq(parts.fragment, url.fragmentIdentifier()));
     EXPECT_TRUE(eq(parts.string, url.string()));
     
-    EXPECT_TRUE(eq(parts.protocol, oldURL.protocol()));
+    EXPECT_TRUE(eq(parts.protocol, oldURL.protocol().toString()));
     EXPECT_TRUE(eq(parts.user, oldURL.user()));
     EXPECT_TRUE(eq(parts.password, oldURL.pass()));
     EXPECT_TRUE(eq(parts.host, oldURL.host()));
-    EXPECT_EQ(parts.port, oldURL.port());
+    EXPECT_EQ(parts.port, oldURL.port().valueOr(0));
     EXPECT_TRUE(eq(parts.path, oldURL.path()));
     EXPECT_TRUE(eq(parts.query, oldURL.query()));
     EXPECT_TRUE(eq(parts.fragment, oldURL.fragmentIdentifier()));
@@ -350,21 +350,21 @@ static void checkRelativeURL(const String& urlString, const String& baseURLStrin
     auto oldURL = URL(URL(URL(), baseURLString), urlString);
     URLParser::setEnabled(wasEnabled);
 
-    EXPECT_TRUE(eq(parts.protocol, url.protocol()));
+    EXPECT_TRUE(eq(parts.protocol, url.protocol().toString()));
     EXPECT_TRUE(eq(parts.user, url.user()));
     EXPECT_TRUE(eq(parts.password, url.pass()));
     EXPECT_TRUE(eq(parts.host, url.host()));
-    EXPECT_EQ(parts.port, url.port());
+    EXPECT_EQ(parts.port, url.port().valueOr(0));
     EXPECT_TRUE(eq(parts.path, url.path()));
     EXPECT_TRUE(eq(parts.query, url.query()));
     EXPECT_TRUE(eq(parts.fragment, url.fragmentIdentifier()));
     EXPECT_TRUE(eq(parts.string, url.string()));
 
-    EXPECT_TRUE(eq(parts.protocol, oldURL.protocol()));
+    EXPECT_TRUE(eq(parts.protocol, oldURL.protocol().toString()));
     EXPECT_TRUE(eq(parts.user, oldURL.user()));
     EXPECT_TRUE(eq(parts.password, oldURL.pass()));
     EXPECT_TRUE(eq(parts.host, oldURL.host()));
-    EXPECT_EQ(parts.port, oldURL.port());
+    EXPECT_EQ(parts.port, oldURL.port().valueOr(0));
     EXPECT_TRUE(eq(parts.path, oldURL.path()));
     EXPECT_TRUE(eq(parts.query, oldURL.query()));
     EXPECT_TRUE(eq(parts.fragment, oldURL.fragmentIdentifier()));
@@ -476,21 +476,21 @@ static void checkURLDifferences(const String& urlString, const ExpectedParts& pa
     auto oldURL = URL(URL(), urlString);
     URLParser::setEnabled(wasEnabled);
 
-    EXPECT_TRUE(eq(partsNew.protocol, url.protocol()));
+    EXPECT_TRUE(eq(partsNew.protocol, url.protocol().toString()));
     EXPECT_TRUE(eq(partsNew.user, url.user()));
     EXPECT_TRUE(eq(partsNew.password, url.pass()));
     EXPECT_TRUE(eq(partsNew.host, url.host()));
-    EXPECT_EQ(partsNew.port, url.port());
+    EXPECT_EQ(partsNew.port, url.port().valueOr(0));
     EXPECT_TRUE(eq(partsNew.path, url.path()));
     EXPECT_TRUE(eq(partsNew.query, url.query()));
     EXPECT_TRUE(eq(partsNew.fragment, url.fragmentIdentifier()));
     EXPECT_TRUE(eq(partsNew.string, url.string()));
     
-    EXPECT_TRUE(eq(partsOld.protocol, oldURL.protocol()));
+    EXPECT_TRUE(eq(partsOld.protocol, oldURL.protocol().toString()));
     EXPECT_TRUE(eq(partsOld.user, oldURL.user()));
     EXPECT_TRUE(eq(partsOld.password, oldURL.pass()));
     EXPECT_TRUE(eq(partsOld.host, oldURL.host()));
-    EXPECT_EQ(partsOld.port, oldURL.port());
+    EXPECT_EQ(partsOld.port, oldURL.port().valueOr(0));
     EXPECT_TRUE(eq(partsOld.path, oldURL.path()));
     EXPECT_TRUE(eq(partsOld.query, oldURL.query()));
     EXPECT_TRUE(eq(partsOld.fragment, oldURL.fragmentIdentifier()));
@@ -521,21 +521,21 @@ static void checkRelativeURLDifferences(const String& urlString, const String& b
     auto oldURL = URL(URL(URL(), baseURLString), urlString);
     URLParser::setEnabled(wasEnabled);
 
-    EXPECT_TRUE(eq(partsNew.protocol, url.protocol()));
+    EXPECT_TRUE(eq(partsNew.protocol, url.protocol().toString()));
     EXPECT_TRUE(eq(partsNew.user, url.user()));
     EXPECT_TRUE(eq(partsNew.password, url.pass()));
     EXPECT_TRUE(eq(partsNew.host, url.host()));
-    EXPECT_EQ(partsNew.port, url.port());
+    EXPECT_EQ(partsNew.port, url.port().valueOr(0));
     EXPECT_TRUE(eq(partsNew.path, url.path()));
     EXPECT_TRUE(eq(partsNew.query, url.query()));
     EXPECT_TRUE(eq(partsNew.fragment, url.fragmentIdentifier()));
     EXPECT_TRUE(eq(partsNew.string, url.string()));
     
-    EXPECT_TRUE(eq(partsOld.protocol, oldURL.protocol()));
+    EXPECT_TRUE(eq(partsOld.protocol, oldURL.protocol().toString()));
     EXPECT_TRUE(eq(partsOld.user, oldURL.user()));
     EXPECT_TRUE(eq(partsOld.password, oldURL.pass()));
     EXPECT_TRUE(eq(partsOld.host, oldURL.host()));
-    EXPECT_EQ(partsOld.port, oldURL.port());
+    EXPECT_EQ(partsOld.port, oldURL.port().valueOr(0));
     EXPECT_TRUE(eq(partsOld.path, oldURL.path()));
     EXPECT_TRUE(eq(partsOld.query, oldURL.query()));
     EXPECT_TRUE(eq(partsOld.fragment, oldURL.fragmentIdentifier()));
@@ -632,6 +632,7 @@ TEST_F(URLParserTest, ParserDifferences)
     checkURLDifferences("http://example.com/path1/path2/%2e%2e#fragment",
         {"http", "", "", "example.com", 0, "/path1/", "", "fragment", "http://example.com/path1/#fragment"},
         {"http", "", "", "example.com", 0, "/path1/path2/%2e%2e", "", "fragment", "http://example.com/path1/path2/%2e%2e#fragment"});
+    checkURL("http://example.com/path1/path2/A%2e%2e#fragment", {"http", "", "", "example.com", 0, "/path1/path2/A%2e%2e", "", "fragment", "http://example.com/path1/path2/A%2e%2e#fragment"});
     checkURLDifferences("file://[0:a:0:0:b:c:0:0]/path",
         {"file", "", "", "[0:a::b:c:0:0]", 0, "/path", "", "", "file://[0:a::b:c:0:0]/path"},
         {"file", "", "", "[0:a:0:0:b:c:0:0]", 0, "/path", "", "", "file://[0:a:0:0:b:c:0:0]/path"});
@@ -643,16 +644,16 @@ TEST_F(URLParserTest, ParserDifferences)
         {"https", "", "", "", 0, "/", "", "", "https:/"});
     checkURLDifferences("http://127.0.0.1:65536/path",
         {"", "", "", "", 0, "", "", "", "http://127.0.0.1:65536/path"},
-        {"http", "", "", "127.0.0.1", 65535, "/path", "", "", "http://127.0.0.1:65536/path"});
+        {"http", "", "", "127.0.0.1", 0, "/path", "", "", "http://127.0.0.1:65536/path"});
     checkURLDifferences("http://host:65536",
         {"", "", "", "", 0, "", "", "", "http://host:65536"},
-        {"http", "", "", "host", 65535, "/", "", "", "http://host:65536/"});
+        {"http", "", "", "host", 0, "/", "", "", "http://host:65536/"});
     checkURLDifferences("http://127.0.0.1:65536",
         {"", "", "", "", 0, "", "", "", "http://127.0.0.1:65536"},
-        {"http", "", "", "127.0.0.1", 65535, "/", "", "", "http://127.0.0.1:65536/"});
+        {"http", "", "", "127.0.0.1", 0, "/", "", "", "http://127.0.0.1:65536/"});
     checkURLDifferences("http://[0:f::f:f:0:0]:65536",
         {"", "", "", "", 0, "", "", "", "http://[0:f::f:f:0:0]:65536"},
-        {"http", "", "", "[0:f::f:f:0:0]", 65535, "/", "", "", "http://[0:f::f:f:0:0]:65536/"});
+        {"http", "", "", "[0:f::f:f:0:0]", 0, "/", "", "", "http://[0:f::f:f:0:0]:65536/"});
     checkRelativeURLDifferences(":foo.com\\", "notspecial://example.org/foo/bar",
         {"notspecial", "", "", "example.org", 0, "/foo/:foo.com\\", "", "", "notspecial://example.org/foo/:foo.com\\"},
         {"notspecial", "", "", "example.org", 0, "/foo/:foo.com/", "", "", "notspecial://example.org/foo/:foo.com/"});
@@ -734,9 +735,8 @@ TEST_F(URLParserTest, ParserDifferences)
     checkURLDifferences(utf16String(u"http://０Ｘｃ０．０２５０．０１"),
         {"http", "", "", "192.168.0.1", 0, "/", "", "", "http://192.168.0.1/"},
         {"http", "", "", "0xc0.0250.01", 0, "/", "", "", "http://0xc0.0250.01/"});
-    checkURLDifferences("http://host/path%2e.%2E",
-        {"http", "", "", "host", 0, "/path...", "", "", "http://host/path..."},
-        {"http", "", "", "host", 0, "/path%2e.%2E", "", "", "http://host/path%2e.%2E"});
+
+    checkURL("http://host/path%2e.%2E", {"http", "", "", "host", 0, "/path%2e.%2E", "", "", "http://host/path%2e.%2E"});
 
     checkRelativeURLDifferences(utf16String(u"http://foo:💩@example.com/bar"), "http://other.com/",
         {"http", "foo", utf16String(u"💩"), "example.com", 0, "/bar", "", "", "http://foo:%F0%9F%92%A9@example.com/bar"},
@@ -974,6 +974,14 @@ TEST_F(URLParserTest, ParserDifferences)
     checkURLDifferences("http://[a:b:c:d:e:f::127.0.0.256]",
         {"", "", "", "", 0, "", "", "", "http://[a:b:c:d:e:f::127.0.0.256]"},
         {"http", "", "", "[a:b:c:d:e:f::127.0.0.256]", 0, "/", "", "", "http://[a:b:c:d:e:f::127.0.0.256]/"});
+    checkURLDifferences("http://123456", {"http", "", "", "0.1.226.64", 0, "/", "", "", "http://0.1.226.64/"}, {"http", "", "", "123456", 0, "/", "", "", "http://123456/"});
+    checkURL("asdf://123456", {"asdf", "", "", "123456", 0, "", "", "", "asdf://123456"});
+    checkURLDifferences("http://[0:0:0:0:a:b:c:d]",
+        {"http", "", "", "[::a:b:c:d]", 0, "/", "", "", "http://[::a:b:c:d]/"},
+        {"http", "", "", "[0:0:0:0:a:b:c:d]", 0, "/", "", "", "http://[0:0:0:0:a:b:c:d]/"});
+    checkURLDifferences("asdf://[0:0:0:0:a:b:c:d]",
+        {"asdf", "", "", "[::a:b:c:d]", 0, "", "", "", "asdf://[::a:b:c:d]"},
+        {"asdf", "", "", "[0:0:0:0:a:b:c:d]", 0, "", "", "", "asdf://[0:0:0:0:a:b:c:d]"});
 }
 
 TEST_F(URLParserTest, DefaultPort)
@@ -1130,6 +1138,7 @@ TEST_F(URLParserTest, ParserFailures)
     shouldFail("http://[a:b:c:d:e:f:127.0.0.0x11]"); // Chrome treats this as hex, Firefox and the spec fail
     shouldFail("http://[a:b:c:d:e:f:127.0.-0.1]");
     shouldFail("asdf://space InHost");
+    shouldFail("asdf://[0:0:0:0:a:b:c:d");
 }
 
 // These are in the spec but not in the web platform tests.
@@ -1174,11 +1183,11 @@ static void checkURL(const String& urlString, const TextEncoding& encoding, cons
 {
     URLParser parser(urlString, { }, encoding);
     auto url = parser.result();
-    EXPECT_TRUE(eq(parts.protocol, url.protocol()));
+    EXPECT_TRUE(eq(parts.protocol, url.protocol().toString()));
     EXPECT_TRUE(eq(parts.user, url.user()));
     EXPECT_TRUE(eq(parts.password, url.pass()));
     EXPECT_TRUE(eq(parts.host, url.host()));
-    EXPECT_EQ(parts.port, url.port());
+    EXPECT_EQ(parts.port, url.port().valueOr(0));
     EXPECT_TRUE(eq(parts.path, url.path()));
     EXPECT_TRUE(eq(parts.query, url.query()));
     EXPECT_TRUE(eq(parts.fragment, url.fragmentIdentifier()));
@@ -1200,11 +1209,11 @@ static void checkURL(const String& urlString, const String& baseURLString, const
     URLParser baseParser(baseURLString, { }, encoding);
     URLParser parser(urlString, baseParser.result(), encoding);
     auto url = parser.result();
-    EXPECT_TRUE(eq(parts.protocol, url.protocol()));
+    EXPECT_TRUE(eq(parts.protocol, url.protocol().toString()));
     EXPECT_TRUE(eq(parts.user, url.user()));
     EXPECT_TRUE(eq(parts.password, url.pass()));
     EXPECT_TRUE(eq(parts.host, url.host()));
-    EXPECT_EQ(parts.port, url.port());
+    EXPECT_EQ(parts.port, url.port().valueOr(0));
     EXPECT_TRUE(eq(parts.path, url.path()));
     EXPECT_TRUE(eq(parts.query, url.query()));
     EXPECT_TRUE(eq(parts.fragment, url.fragmentIdentifier()));

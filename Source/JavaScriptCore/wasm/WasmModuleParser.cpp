@@ -28,7 +28,6 @@
 
 #if ENABLE(WEBASSEMBLY)
 
-#include "JSWasmModule.h"
 #include "WasmFormat.h"
 #include "WasmOps.h"
 #include "WasmSections.h"
@@ -41,33 +40,45 @@ static const bool verbose = false;
 
 bool ModuleParser::parse()
 {
-    if (m_sourceLength < 8)
+    const size_t minSize = 8;
+    if (length() < minSize) {
+        m_errorMessage = "Module is " + String::number(length()) + " bytes, expected at least " + String::number(minSize) + " bytes";
         return false;
-    if (!consumeCharacter(0))
+    }
+    if (!consumeCharacter(0) || !consumeString("asm")) {
+        m_errorMessage = "Modules doesn't start with '\\0asm'";
         return false;
-    if (!consumeString("asm"))
-        return false;
+    }
 
     // Skip the version number for now since we don't do anything with it.
     uint32_t versionNumber;
-    if (!parseUInt32(versionNumber))
+    if (!parseUInt32(versionNumber)) {
+        // FIXME improve error message https://bugs.webkit.org/show_bug.cgi?id=163919
+        m_errorMessage = "couldn't parse version number";
         return false;
+    }
 
-    if (versionNumber != magicNumber)
+    if (versionNumber != magicNumber) {
+        // FIXME improve error message https://bugs.webkit.org/show_bug.cgi?id=163919
+        m_errorMessage = "unexpected version number";
         return false;
+    }
 
 
     if (verbose)
         dataLogLn("Passed processing header.");
 
     Sections::Section previousSection = Sections::Unknown;
-    while (m_offset < m_sourceLength) {
+    while (m_offset < length()) {
         if (verbose)
             dataLogLn("Starting to parse next section at offset: ", m_offset);
 
         uint8_t sectionByte;
-        if (!parseUInt7(sectionByte))
+        if (!parseUInt7(sectionByte)) {
+            // FIXME improve error message https://bugs.webkit.org/show_bug.cgi?id=163919
+            m_errorMessage = "couldn't get section byte";
             return false;
+        }
 
         if (verbose)
             dataLogLn("Section byte: ", sectionByte);
@@ -76,60 +87,72 @@ bool ModuleParser::parse()
         if (sectionByte) {
             if (sectionByte < Sections::Unknown)
                 section = static_cast<Sections::Section>(sectionByte);
-        } else {
-            uint32_t sectionNameLength;
-            if (!parseVarUInt32(sectionNameLength))
-                return false;
-
-            // Make sure we can read up to the section's size.
-            if (m_offset + sectionNameLength + WTF::LEBDecoder::max32BitLEBByteLength >= m_sourceLength)
-                return false;
-
-            // We don't support any custom sections yet.
-
-            m_offset += sectionNameLength;
         }
 
-        if (!Sections::validateOrder(previousSection, section))
+        if (!Sections::validateOrder(previousSection, section)) {
+            // FIXME improve error message https://bugs.webkit.org/show_bug.cgi?id=163919
+            m_errorMessage = "invalid section order";
             return false;
+        }
 
         uint32_t sectionLength;
-        if (!parseVarUInt32(sectionLength))
+        if (!parseVarUInt32(sectionLength)) {
+            // FIXME improve error message https://bugs.webkit.org/show_bug.cgi?id=163919
+            m_errorMessage = "couldn't get section length";
             return false;
+        }
 
-        unsigned end = m_offset + sectionLength;
+        if (sectionLength > length() - m_offset) {
+            // FIXME improve error message https://bugs.webkit.org/show_bug.cgi?id=163919
+            m_errorMessage = "section content would overflow Module's size";
+            return false;
+        }
+
+        auto end = m_offset + sectionLength;
 
         switch (section) {
 
         case Sections::Memory: {
             if (verbose)
                 dataLogLn("Parsing Memory.");
-            if (!parseMemory())
+            if (!parseMemory()) {
+                // FIXME improve error message https://bugs.webkit.org/show_bug.cgi?id=163919
+                m_errorMessage = "couldn't parse memory";
                 return false;
+            }
             break;
         }
 
         case Sections::FunctionTypes: {
             if (verbose)
                 dataLogLn("Parsing types.");
-            if (!parseFunctionTypes())
+            if (!parseFunctionTypes()) {
+                // FIXME improve error message https://bugs.webkit.org/show_bug.cgi?id=163919
+                m_errorMessage = "couldn't parse types";
                 return false;
+            }
             break;
         }
 
         case Sections::Signatures: {
             if (verbose)
                 dataLogLn("Parsing function signatures.");
-            if (!parseFunctionSignatures())
+            if (!parseFunctionSignatures()) {
+                // FIXME improve error message https://bugs.webkit.org/show_bug.cgi?id=163919
+                m_errorMessage = "couldn't parse function signatures";
                 return false;
+            }
             break;
         }
 
         case Sections::Definitions: {
             if (verbose)
                 dataLogLn("Parsing function definitions.");
-            if (!parseFunctionDefinitions())
+            if (!parseFunctionDefinitions()) {
+                // FIXME improve error message https://bugs.webkit.org/show_bug.cgi?id=163919
+                m_errorMessage = "couldn't parse function definitions";
                 return false;
+            }
             break;
         }
 
@@ -138,6 +161,7 @@ bool ModuleParser::parse()
         default: {
             if (verbose)
                 dataLogLn("Unknown section, skipping.");
+            // Ignore section's name LEB and bytes: they're already included in sectionLength.
             m_offset += sectionLength;
             break;
         }
@@ -146,13 +170,17 @@ bool ModuleParser::parse()
         if (verbose)
             dataLogLn("Finished parsing section.");
 
-        if (end != m_offset)
+        if (end != m_offset) {
+            // FIXME improve error message https://bugs.webkit.org/show_bug.cgi?id=163919
+            m_errorMessage = "parsing ended before the end of the section";
             return false;
+        }
 
         previousSection = section;
     }
 
     // TODO
+    m_failed = false;
     return true;
 }
 

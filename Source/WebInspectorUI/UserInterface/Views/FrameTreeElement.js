@@ -46,9 +46,6 @@ WebInspector.FrameTreeElement = class FrameTreeElement extends WebInspector.Reso
         frame.domTree.addEventListener(WebInspector.DOMTree.Event.ContentFlowWasRemoved, this._childContentFlowWasRemoved, this);
         frame.domTree.addEventListener(WebInspector.DOMTree.Event.RootDOMNodeInvalidated, this._rootDOMNodeInvalidated, this);
 
-        if (this._frame.isMainFrame())
-            this._downloadingPage = false;
-
         this.shouldRefreshChildren = true;
         this.folderSettingsKey = this._frame.url.hash;
 
@@ -78,7 +75,7 @@ WebInspector.FrameTreeElement = class FrameTreeElement extends WebInspector.Reso
 
         function makeChildCountCallback(frame, resourceType) {
             return function() {
-                return frame.resourcesWithType(resourceType).length;
+                return frame.resourceCollectionForType(resourceType).items.size;
             };
         }
 
@@ -184,8 +181,8 @@ WebInspector.FrameTreeElement = class FrameTreeElement extends WebInspector.Reso
         for (var i = 0; i < this._frame.childFrames.length; ++i)
             this.addChildForRepresentedObject(this._frame.childFrames[i]);
 
-        for (var i = 0; i < this._frame.resources.length; ++i)
-            this.addChildForRepresentedObject(this._frame.resources[i]);
+        for (let resource of this._frame.resourceCollection.items)
+            this.addChildForRepresentedObject(resource);
 
         var sourceMaps = this.resource && this.resource.sourceMaps;
         for (var i = 0; i < sourceMaps.length; ++i) {

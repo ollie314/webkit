@@ -623,7 +623,10 @@ private:
             compilePutStructure();
             break;
         case TryGetById:
-            compileGetById(AccessType::GetPure);
+            compileGetById(AccessType::TryGet);
+            break;
+        case PureGetById:
+            compileGetById(AccessType::PureGet);
             break;
         case GetById:
         case GetByIdFlush:
@@ -1057,8 +1060,8 @@ private:
         case CheckDOM:
             compileCheckDOM();
             break;
-        case CallDOM:
-            compileCallDOM();
+        case CallDOMGetter:
+            compileCallDOMGetter();
             break;
 
         case PhantomLocal:
@@ -2788,7 +2791,7 @@ private:
     
     void compileGetById(AccessType type)
     {
-        ASSERT(type == AccessType::Get || type == AccessType::GetPure);
+        ASSERT(type == AccessType::Get || type == AccessType::TryGet || type == AccessType::PureGet);
         switch (m_node->child1().useKind()) {
         case CellUse: {
             setJSValue(getById(lowCell(m_node->child1()), type));
@@ -2815,6 +2818,8 @@ private:
             J_JITOperation_EJI getByIdFunction;
             if (type == AccessType::Get)
                 getByIdFunction = operationGetByIdGeneric;
+            else if (type == AccessType::PureGet)
+                getByIdFunction = operationPureGetByIdGeneric;
             else
                 getByIdFunction = operationTryGetByIdGeneric;
 
@@ -8838,6 +8843,8 @@ private:
                         J_JITOperation_ESsiJI optimizationFunction;
                         if (type == AccessType::Get)
                             optimizationFunction = operationGetByIdOptimize;
+                        else if (type == AccessType::PureGet)
+                            optimizationFunction = operationPureGetByIdOptimize;
                         else
                             optimizationFunction = operationTryGetByIdOptimize;
 
@@ -9062,27 +9069,26 @@ private:
         patchpoint->effects = Effects::forCheck();
     }
 
-    void compileCallDOM()
+    void compileCallDOMGetter()
     {
-        DOMJIT::CallDOMPatchpoint* domJIT = m_node->callDOMPatchpoint();
-        int childIndex = 0;
+        DOMJIT::CallDOMGetterPatchpoint* domJIT = m_node->callDOMGetterData()->patchpoint;
+
+        Edge& baseEdge = m_node->child1();
+        LValue base = lowCell(baseEdge);
+        JSValue baseConstant = m_state.forNode(baseEdge).value();
 
         LValue globalObject;
         JSValue globalObjectConstant;
         if (domJIT->requireGlobalObject) {
-            Edge& globalObjectEdge = m_graph.varArgChild(m_node, childIndex++);
+            Edge& globalObjectEdge = m_node->child2();
             globalObject = lowCell(globalObjectEdge);
             globalObjectConstant = m_state.forNode(globalObjectEdge).value();
         }
 
-        Edge& baseEdge = m_graph.varArgChild(m_node, childIndex++);
-        LValue base = lowCell(baseEdge);
-        JSValue baseConstant = m_state.forNode(baseEdge).value();
-
         PatchpointValue* patchpoint = m_out.patchpoint(Int64);
+        patchpoint->appendSomeRegister(base);
         if (domJIT->requireGlobalObject)
             patchpoint->appendSomeRegister(globalObject);
-        patchpoint->appendSomeRegister(base);
         patchpoint->append(m_tagMask, ValueRep::reg(GPRInfo::tagMaskRegister));
         patchpoint->append(m_tagTypeNumber, ValueRep::reg(GPRInfo::tagTypeNumberRegister));
         RefPtr<PatchpointExceptionHandle> exceptionHandle = preparePatchpointForExceptions(patchpoint);
@@ -9101,11 +9107,10 @@ private:
                 Vector<FPRReg> fpScratch;
                 Vector<DOMJIT::Value> regs;
 
-                int childIndex = 1;
                 regs.append(JSValueRegs(params[0].gpr()));
+                regs.append(DOMJIT::Value(params[1].gpr(), baseConstant));
                 if (domJIT->requireGlobalObject)
-                    regs.append(DOMJIT::Value(params[childIndex++].gpr(), globalObjectConstant));
-                regs.append(DOMJIT::Value(params[childIndex++].gpr(), baseConstant));
+                    regs.append(DOMJIT::Value(params[2].gpr(), globalObjectConstant));
 
                 for (unsigned i = 0; i < domJIT->numGPScratchRegisters; ++i)
                     gpScratch.append(params.gpScratch(i));

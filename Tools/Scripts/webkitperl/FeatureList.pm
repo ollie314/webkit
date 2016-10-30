@@ -80,6 +80,7 @@ my (
     $dom4EventsConstructor,
     $domIterator,
     $downloadAttributeSupport,
+    $encryptedMediaSupport,
     $fetchAPISupport,
     $fontLoadEventsSupport,
     $ftlJITSupport,
@@ -102,6 +103,7 @@ my (
     $inputTypeWeekSupport,
     $intlSupport,
     $jitSupport,
+    $legacyEncryptedMediaSupport,
     $legacyNotificationsSupport,
     $legacyVendorPrefixSupport,
     $legacyWebAudioSupport,
@@ -251,8 +253,8 @@ my @features = (
     { option => "download-attribute", desc => "Toggle Download Attribute support",
       define => "ENABLE_DOWNLOAD_ATTRIBUTE", default => (isEfl() || isGtk()), value => \$downloadAttributeSupport },
 
-    { option => "encrypted-media", desc => "Toggle EME support",
-      define => "ENABLE_ENCRYPTED_MEDIA", default => 0, value => \$fetchAPISupport },
+    { option => "encrypted-media", desc => "Toggle EME V3 support",
+      define => "ENABLE_ENCRYPTED_MEDIA", default => 0, value => \$encryptedMediaSupport },
 
     { option => "fetch-api", desc => "Toggle Fetch API support",
       define => "ENABLE_FETCH_API", default => 1, value => \$fetchAPISupport },
@@ -318,6 +320,9 @@ my @features = (
     { option => "jit", desc => "Enable just-in-time JavaScript support",
       define => "ENABLE_JIT", default => 1, value => \$jitSupport },
 
+    { option => "legacy-encrypted-media", desc => "Toggle Legacy EME V2 support",
+      define => "ENABLE_LEGACY_ENCRYPTED_MEDIA", default => 0, value => \$legacyEncryptedMediaSupport },
+
     { option => "legacy-notifications", desc => "Toggle Legacy Notifications support",
       define => "ENABLE_LEGACY_NOTIFICATIONS", default => 0, value => \$legacyNotificationsSupport },
 
@@ -337,7 +342,7 @@ my @features = (
       define => "ENABLE_MEDIA_CAPTURE", default => isEfl(), value => \$mediaCaptureSupport },
 
     { option => "media-source", desc => "Toggle Media Source support",
-      define => "ENABLE_MEDIA_SOURCE", default => (isGtk() || isEfl()), value => \$mediaSourceSupport },
+      define => "ENABLE_MEDIA_SOURCE", default => 0, value => \$mediaSourceSupport },
 
     { option => "media-statistics", desc => "Toggle Media Statistics support",
       define => "ENABLE_MEDIA_STATISTICS", default => 0, value => \$mediaStatisticsSupport },
@@ -446,7 +451,7 @@ my @features = (
       define => "ENABLE_WEB_REPLAY", default => isAppleMacWebKit(), value => \$webReplaySupport },
 
     { option => "web-rtc", desc => "Toggle WebRTC support",
-      define => "ENABLE_WEB_RTC", default => (isGtk()), value => \$webRTCSupport },
+      define => "ENABLE_WEB_RTC", default => (isAppleMacWebKit() || isIOSWebKit() || isGtk()), value => \$webRTCSupport },
 
     { option => "web-sockets", desc => "Toggle Web Sockets support",
       define => "ENABLE_WEB_SOCKETS", default => 1, value => \$webSocketsSupport },

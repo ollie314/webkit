@@ -79,7 +79,6 @@
 #include "HTMLFrameSetElement.h"
 #include "HTMLHeadElement.h"
 #include "HTMLHtmlElement.h"
-#include "HTMLIFrameElement.h"
 #include "HTMLImageElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLLinkElement.h"
@@ -1075,8 +1074,7 @@ static Ref<HTMLElement> createFallbackHTMLElement(Document& document, const Qual
         if (UNLIKELY(registry)) {
             if (auto* elementInterface = registry->findInterface(name)) {
                 auto element = HTMLElement::create(name, document);
-                element->setIsCustomElementUpgradeCandidate();
-                CustomElementReactionQueue::enqueueElementUpgrade(element.get(), *elementInterface);
+                element->enqueueToUpgrade(*elementInterface);
                 return element;
             }
         }
@@ -1756,6 +1754,8 @@ void Document::scheduleForcedStyleRecalc()
 
 void Document::scheduleStyleRecalc()
 {
+    ASSERT(!m_renderView || !m_renderView->inHitTesting());
+
     if (m_styleRecalcTimer.isActive() || pageCacheState() != NotInPageCache)
         return;
 

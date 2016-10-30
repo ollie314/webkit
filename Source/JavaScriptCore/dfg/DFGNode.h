@@ -59,8 +59,9 @@
 namespace JSC {
 
 namespace DOMJIT {
+class GetterSetter;
 class Patchpoint;
-class CallDOMPatchpoint;
+class CallDOMGetterPatchpoint;
 }
 
 namespace Profiler {
@@ -229,6 +230,12 @@ struct StackAccessData {
     FlushFormat format;
     
     FlushedAt flushedAt() { return FlushedAt(format, machineLocal); }
+};
+
+struct CallDOMGetterData {
+    DOMJIT::GetterSetter* domJIT { nullptr };
+    DOMJIT::CallDOMGetterPatchpoint* patchpoint { nullptr };
+    unsigned identifierNumber { 0 };
 };
 
 // === Node ===
@@ -525,7 +532,7 @@ public:
     
     void convertToGetByOffset(StorageAccessData& data, Edge storage, Edge base)
     {
-        ASSERT(m_op == GetById || m_op == GetByIdFlush || m_op == MultiGetByOffset);
+        ASSERT(m_op == GetById || m_op == GetByIdFlush || m_op == PureGetById || m_op == MultiGetByOffset);
         m_opInfo = &data;
         children.setChild1(storage);
         children.setChild2(base);
@@ -535,7 +542,7 @@ public:
     
     void convertToMultiGetByOffset(MultiGetByOffsetData* data)
     {
-        ASSERT(m_op == GetById || m_op == GetByIdFlush);
+        ASSERT(m_op == GetById || m_op == GetByIdFlush || m_op == PureGetById);
         m_opInfo = data;
         child1().setUseKind(CellUse);
         m_op = MultiGetByOffset;
@@ -911,6 +918,7 @@ public:
         switch (op()) {
         case TryGetById:
         case GetById:
+        case PureGetById:
         case GetByIdFlush:
         case GetByIdWithThis:
         case PutById:
@@ -1421,6 +1429,7 @@ public:
         case ArithCeil:
         case ArithTrunc:
         case GetDirectPname:
+        case PureGetById:
         case GetById:
         case GetByIdFlush:
         case GetByIdWithThis:
@@ -1453,7 +1462,7 @@ public:
         case StringReplaceRegExp:
         case ToNumber:
         case LoadFromJSMapBucket:
-        case CallDOM:
+        case CallDOMGetter:
             return true;
         default:
             return false;
@@ -2336,15 +2345,15 @@ public:
         return m_opInfo.as<DOMJIT::Patchpoint*>();
     }
 
-    bool hasCallDOMPatchpoint() const
+    bool hasCallDOMGetterData() const
     {
-        return op() == CallDOM;
+        return op() == CallDOMGetter;
     }
 
-    DOMJIT::CallDOMPatchpoint* callDOMPatchpoint()
+    CallDOMGetterData* callDOMGetterData()
     {
-        ASSERT(hasCallDOMPatchpoint());
-        return m_opInfo.as<DOMJIT::CallDOMPatchpoint*>();
+        ASSERT(hasCallDOMGetterData());
+        return m_opInfo.as<CallDOMGetterData*>();
     }
 
     bool hasClassInfo() const

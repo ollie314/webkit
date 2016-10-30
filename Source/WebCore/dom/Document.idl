@@ -29,7 +29,7 @@
 ] interface Document : Node {
     readonly attribute DocumentType? doctype;
     readonly attribute DOMImplementation implementation;
-    readonly attribute Element? documentElement;
+    [DOMJIT] readonly attribute Element? documentElement;
 
     [NewObject, MayThrowLegacyException, ImplementedAs=createElementForBindings] Element createElement(DOMString tagName);
     [NewObject] DocumentFragment createDocumentFragment();
@@ -91,7 +91,7 @@
     boolean queryCommandSupported(DOMString command);
     DOMString queryCommandValue(DOMString command);
 
-    attribute DOMString title;
+    [CEReactions] attribute DOMString title;
     attribute DOMString dir;
     attribute DOMString designMode;
 
@@ -101,7 +101,7 @@
 
     [GetterMayThrowLegacyException, SetterMayThrowLegacyException] attribute USVString cookie;
 
-    [SetterMayThrowLegacyException, ImplementedAs=bodyOrFrameset] attribute HTMLElement? body;
+    [CEReactions, ImplementedAs=bodyOrFrameset, SetterMayThrowLegacyException] attribute HTMLElement? body;
 
     readonly attribute HTMLHeadElement? head;
     readonly attribute HTMLCollection images;

@@ -34,6 +34,7 @@
 #include "ImageBuffer.h"
 #include "Logging.h"
 #include "NotImplemented.h"
+#include "RenderTargetScopedDrawing.h"
 #include "URL.h"
 #include <d2d1.h>
 #include <d2d1effects.h>
@@ -71,7 +72,13 @@ ID2D1Factory* GraphicsContext::systemFactory()
 {
     static ID2D1Factory* direct2DFactory = nullptr;
     if (!direct2DFactory) {
+#ifndef NDEBUG
+        D2D1_FACTORY_OPTIONS options = { };
+        options.debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
+        HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, options, &direct2DFactory);
+#else
         HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, &direct2DFactory);
+#endif
         RELEASE_ASSERT(SUCCEEDED(hr));
     }
 
@@ -92,15 +99,9 @@ ID2D1RenderTarget* GraphicsContext::defaultRenderTarget()
     return defaultRenderTarget;
 }
 
-void GraphicsContext::setDidBeginDraw(bool didBeginDraw)
-{
-    RELEASE_ASSERT(m_data);
-    m_data->m_didBeginDraw = didBeginDraw;
-}
-
 bool GraphicsContext::didBeginDraw() const
 {
-    return m_data->m_didBeginDraw;
+    return m_data->didBeginDraw();
 }
 
 void GraphicsContext::platformInit(HDC hdc, bool hasAlpha)
@@ -108,7 +109,23 @@ void GraphicsContext::platformInit(HDC hdc, bool hasAlpha)
     if (!hdc)
         return;
 
-    COMPtr<ID2D1RenderTarget> renderTarget;
+    HBITMAP bitmap = static_cast<HBITMAP>(GetCurrentObject(hdc, OBJ_BITMAP));
+
+    DIBPixelData pixelData(bitmap);
+
+    auto targetProperties = D2D1::RenderTargetProperties();
+    targetProperties.pixelFormat = D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE);
+
+    COMPtr<ID2D1DCRenderTarget> renderTarget;
+    HRESULT hr = systemFactory()->CreateDCRenderTarget(&targetProperties, &renderTarget);
+    if (!SUCCEEDED(hr))
+        return;
+
+    RECT clientRect = IntRect(IntPoint(), pixelData.size());
+    hr = renderTarget->BindDC(hdc, &clientRect);
+    if (!SUCCEEDED(hr))
+        return;
+
     m_data = new GraphicsContextPlatformPrivate(renderTarget.get());
     m_data->m_hdc = hdc;
     // Make sure the context starts in sync with our state.
@@ -235,6 +252,30 @@ void GraphicsContext::drawNativeImage(const COMPtr<ID2D1Bitmap>& image, const Fl
 
 void GraphicsContext::releaseWindowsContext(HDC hdc, const IntRect& dstRect, bool supportAlphaBlend, bool mayCreateBitmap)
 {
+    bool createdBitmap = mayCreateBitmap && (!m_data->m_hdc || isInTransparencyLayer());
+    if (!createdBitmap) {
+        m_data->restore();
+        return;
+    }
+
+    if (!hdc || dstRect.isEmpty())
+        return;
+
+    auto sourceBitmap = adoptGDIObject(static_cast<HBITMAP>(::GetCurrentObject(hdc, OBJ_BITMAP)));
+
+    DIBPixelData pixelData(sourceBitmap.get());
+    ASSERT(pixelData.bitsPerPixel() == 32);
+
+    auto bitmapProperties = D2D1::BitmapProperties(D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE));
+
+    COMPtr<ID2D1Bitmap> bitmap;
+    HRESULT hr = platformContext()->CreateBitmap(pixelData.size(), pixelData.buffer(), pixelData.bytesPerRow(), &bitmapProperties, &bitmap);
+    ASSERT(SUCCEEDED(hr));
+
+    RenderTargetScopedDrawing scopedDraw(*this);
+    platformContext()->DrawBitmap(bitmap.get(), dstRect);
+
+    ::DeleteDC(hdc);
 }
 
 void GraphicsContext::drawWindowsBitmap(WindowsBitmap* image, const IntPoint& point)
@@ -255,6 +296,19 @@ void GraphicsContext::updateDocumentMarkerResources()
 
 void GraphicsContext::drawLineForDocumentMarker(const FloatPoint& point, float width, DocumentMarkerLineStyle style)
 {
+}
+
+GraphicsContextPlatformPrivate::GraphicsContextPlatformPrivate(ID2D1RenderTarget* renderTarget)
+    : m_renderTarget(renderTarget)
+{
+}
+
+GraphicsContextPlatformPrivate::~GraphicsContextPlatformPrivate()
+{
+    if (!m_renderTarget)
+        return;
+
+    ASSERT(!m_beginDrawCount.unsafeGet());
 }
 
 COMPtr<ID2D1SolidColorBrush> GraphicsContextPlatformPrivate::brushWithColor(const D2D1_COLOR_F& color)
@@ -289,6 +343,10 @@ ID2D1SolidColorBrush* GraphicsContext::brushWithColor(const Color& color)
 
 void GraphicsContextPlatformPrivate::clip(const FloatRect& rect)
 {
+    // In D2D, we can only clip in the context of a 'BeginDraw', and the clip can
+    // only live as long as the draw is happening.
+    beginDrawIfNeeded();
+
     if (m_renderStates.isEmpty())
         save();
 
@@ -303,6 +361,10 @@ void GraphicsContextPlatformPrivate::clip(const Path& path)
 
 void GraphicsContextPlatformPrivate::clip(ID2D1Geometry* path)
 {
+    // In D2D, we can only clip in the context of a 'BeginDraw', and the clip can
+    // only live as long as the draw is happening.
+    beginDrawIfNeeded();
+
     ASSERT(m_renderStates.size());
     if (!m_renderStates.size())
         return;
@@ -338,6 +400,17 @@ void GraphicsContextPlatformPrivate::flush()
     RELEASE_ASSERT(SUCCEEDED(hr));
 }
 
+void GraphicsContextPlatformPrivate::beginDrawIfNeeded()
+{
+    ASSERT(m_renderTarget.get());
+    if (didBeginDraw())
+        return;
+
+    m_renderTarget->BeginDraw();
+
+    ++m_beginDrawCount;
+}
+
 void GraphicsContextPlatformPrivate::endDraw()
 {
     ASSERT(m_renderTarget.get());
@@ -346,6 +419,8 @@ void GraphicsContextPlatformPrivate::endDraw()
 
     if (!SUCCEEDED(hr))
         WTFLogAlways("Failed in GraphicsContextPlatformPrivate::endDraw: hr=%ld, first=%ld, second=%ld", hr, first, second);
+
+    --m_beginDrawCount;
 }
 
 void GraphicsContextPlatformPrivate::restore()
@@ -440,6 +515,19 @@ ID2D1Brush* GraphicsContext::patternStrokeBrush() const
 ID2D1Brush* GraphicsContext::patternFillBrush() const
 {
     return m_data->m_patternFillBrush.get();
+}
+
+bool GraphicsContext::beginDrawIfNeeded()
+{
+    bool neededToBeginDraw = !m_data->didBeginDraw();
+
+    m_data->beginDrawIfNeeded();
+    return neededToBeginDraw;
+}
+
+void GraphicsContext::endDraw()
+{
+    m_data->endDraw();
 }
 
 void GraphicsContext::drawPattern(Image& image, const FloatRect& destRect, const FloatRect& tileRect, const AffineTransform& patternTransform, const FloatPoint& phase, const FloatSize& spacing, CompositeOperator op, BlendMode blendMode)
@@ -671,6 +759,11 @@ ID2D1StrokeStyle* GraphicsContextPlatformPrivate::strokeStyle()
     return m_d2dStrokeStyle.get();
 }
 
+ID2D1StrokeStyle* GraphicsContext::platformStrokeStyle() const
+{
+    return m_data->strokeStyle();
+}
+
 // This is only used to draw borders.
 void GraphicsContext::drawLine(const FloatPoint& point1, const FloatPoint& point2)
 {
@@ -821,19 +914,14 @@ void GraphicsContext::drawPath(const Path& path)
 
 void GraphicsContext::drawWithoutShadow(const FloatRect& /*boundingRect*/, const std::function<void(ID2D1RenderTarget*)>& drawCommands)
 {
-    auto context = platformContext();
-
-    if (!didBeginDraw())
-        context->BeginDraw();
-
-    drawCommands(context);
-
-    if (!didBeginDraw())
-        m_data->endDraw();
+    RenderTargetScopedDrawing scopedDraw(*this);
+    drawCommands(platformContext());
 }
 
 void GraphicsContext::drawWithShadow(const FloatRect& boundingRect, const std::function<void(ID2D1RenderTarget*)>& drawCommands)
 {
+    RenderTargetScopedDrawing scopedDraw(*this);
+
     auto context = platformContext();
 
     // Render the current geometry to a bitmap context
@@ -886,10 +974,7 @@ void GraphicsContext::drawWithShadow(const FloatRect& boundingRect, const std::f
     auto flip = D2D1::Matrix3x2F::Scale(D2D1::SizeF(1.0f, -1.0f));
     deviceContext->SetTransform(ctm * flip * translate);
 
-    deviceContext->BeginDraw();
     deviceContext->DrawImage(compositor.get(), D2D1_INTERPOLATION_MODE_LINEAR);
-    hr = deviceContext->EndDraw();
-    ASSERT(SUCCEEDED(hr));
 }
 
 void GraphicsContext::fillPath(const Path& path)
@@ -1080,9 +1165,8 @@ void GraphicsContext::platformFillRoundedRect(const FloatRoundedRect& rect, cons
         notImplemented();
     }
 
-    if (!didBeginDraw())
-        context->BeginDraw();
-    
+    RenderTargetScopedDrawing scopedDraw(*this);
+
     context->SetTags(1, __LINE__);
 
     const FloatRect& r = rect.rect();
@@ -1102,9 +1186,6 @@ void GraphicsContext::platformFillRoundedRect(const FloatRoundedRect& rect, cons
         fillPath(path);
     }
 
-    if (!didBeginDraw())
-        m_data->endDraw();
-
     if (drawOwnShadow)
         stateSaver.restore();
 }
@@ -1121,8 +1202,7 @@ void GraphicsContext::fillRectWithRoundedHole(const FloatRect& rect, const Float
 
     auto context = platformContext();
 
-    if (!didBeginDraw())
-        context->BeginDraw();
+    RenderTargetScopedDrawing scopedDraw(*this);
 
     context->SetTags(1, __LINE__);
 
@@ -1151,9 +1231,6 @@ void GraphicsContext::fillRectWithRoundedHole(const FloatRect& rect, const Float
     }
 
     fillPath(path);
-
-    if (!didBeginDraw())
-        m_data->endDraw();
 
     if (drawOwnShadow)
         stateSaver.restore();
@@ -1248,14 +1325,13 @@ IntRect GraphicsContext::clipBounds() const
         return IntRect(-2048, -2048, 4096, 4096); // FIXME: display lists.
     }
 
-    D2D1_RECT_F d2dClipBounds = D2D1::InfiniteRect();
-    FloatRect clipBounds(d2dClipBounds.left, d2dClipBounds.top, d2dClipBounds.right - d2dClipBounds.left, d2dClipBounds.bottom - d2dClipBounds.top);
+    D2D1_SIZE_F clipSize;
+    if (auto clipLayer = m_data->clipLayer())
+        clipSize = clipLayer->GetSize();
+    else
+        clipSize = platformContext()->GetSize();
 
-    if (m_data->clipLayer()) {
-        auto clipSize = m_data->clipLayer()->GetSize();
-        clipBounds.setWidth(clipSize.width);
-        clipBounds.setHeight(clipSize.height);
-    }
+    FloatRect clipBounds(IntPoint(), clipSize);
 
     return enclosingIntRect(clipBounds);
 }

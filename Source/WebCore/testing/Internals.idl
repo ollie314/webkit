@@ -417,8 +417,8 @@ enum UserInterfaceLayoutDirection {
     [MayThrowException] MockPageOverlay installMockPageOverlay(PageOverlayType type);
     [MayThrowException] DOMString pageOverlayLayerTreeAsText();
 
-    void setPageMuted(boolean muted);
-    boolean isPagePlayingAudio();
+    void setPageMuted(DOMString mutedState);
+    DOMString pageMediaState();
 
     void setPageDefersLoading(boolean defersLoading);
 

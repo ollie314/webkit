@@ -116,7 +116,6 @@
 #include "JSCoordinates.cpp"
 #include "JSCounter.cpp"
 #include "JSCrypto.cpp"
-#include "JSCSSCharsetRule.cpp"
 #if ENABLE(FONT_LOAD_EVENTS)
 #include "JSCSSFontFaceLoadEvent.cpp"
 #endif
@@ -309,6 +308,7 @@
 #include "JSIDBOpenDBRequest.cpp"
 #include "JSIDBRequest.cpp"
 #include "JSIDBTransaction.cpp"
+#include "JSIDBTransactionMode.cpp"
 #include "JSIDBVersionChangeEvent.cpp"
 #endif
 #include "JSImageData.cpp"
@@ -581,6 +581,7 @@
 #include "JSSVGZoomAndPan.cpp"
 #include "JSSVGZoomEvent.cpp"
 #include "JSShadowRoot.cpp"
+#include "JSShadowRootMode.cpp"
 #include "JSStorage.cpp"
 #if ENABLE(QUOTA)
 #include "JSStorageErrorCallback.cpp"

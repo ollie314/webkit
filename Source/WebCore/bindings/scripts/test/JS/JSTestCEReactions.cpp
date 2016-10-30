@@ -26,11 +26,10 @@
 #include "HTMLNames.h"
 #include "JSDOMBinding.h"
 #include "JSDOMConstructor.h"
+#include "JSDOMConvert.h"
 #include "JSTestCEReactionsStringifier.h"
-#include "URL.h"
 #include <runtime/Error.h>
 #include <runtime/FunctionPrototype.h>
-#include <runtime/JSString.h>
 #include <wtf/GetPtr.h>
 
 using namespace JSC;
@@ -138,12 +137,12 @@ void JSTestCEReactions::destroy(JSC::JSCell* cell)
 
 template<> inline JSTestCEReactions* BindingCaller<JSTestCEReactions>::castForAttribute(ExecState&, EncodedJSValue thisValue)
 {
-    return jsDynamicCast<JSTestCEReactions*>(JSValue::decode(thisValue));
+    return jsDynamicDowncast<JSTestCEReactions*>(JSValue::decode(thisValue));
 }
 
 template<> inline JSTestCEReactions* BindingCaller<JSTestCEReactions>::castForOperation(ExecState& state)
 {
-    return jsDynamicCast<JSTestCEReactions*>(state.thisValue());
+    return jsDynamicDowncast<JSTestCEReactions*>(state.thisValue());
 }
 
 static inline JSValue jsTestCEReactionsAttributeWithCEReactionsGetter(ExecState&, JSTestCEReactions&, ThrowScope& throwScope);
@@ -158,7 +157,7 @@ static inline JSValue jsTestCEReactionsAttributeWithCEReactionsGetter(ExecState&
     UNUSED_PARAM(throwScope);
     UNUSED_PARAM(state);
     auto& impl = thisObject.wrapped();
-    JSValue result = jsStringWithCache(&state, impl.attributeWithCEReactions());
+    JSValue result = toJS<IDLDOMString>(state, impl.attributeWithCEReactions());
     return result;
 }
 
@@ -174,7 +173,7 @@ static inline JSValue jsTestCEReactionsReflectAttributeWithCEReactionsGetter(Exe
     UNUSED_PARAM(throwScope);
     UNUSED_PARAM(state);
     auto& impl = thisObject.wrapped();
-    JSValue result = jsStringWithCache(&state, impl.attributeWithoutSynchronization(WebCore::HTMLNames::reflectattributewithcereactionsAttr));
+    JSValue result = toJS<IDLDOMString>(state, impl.attributeWithoutSynchronization(WebCore::HTMLNames::reflectattributewithcereactionsAttr));
     return result;
 }
 
@@ -198,7 +197,7 @@ EncodedJSValue jsTestCEReactionsConstructor(ExecState* state, EncodedJSValue thi
 {
     VM& vm = state->vm();
     auto throwScope = DECLARE_THROW_SCOPE(vm);
-    JSTestCEReactionsPrototype* domObject = jsDynamicCast<JSTestCEReactionsPrototype*>(JSValue::decode(thisValue));
+    JSTestCEReactionsPrototype* domObject = jsDynamicDowncast<JSTestCEReactionsPrototype*>(JSValue::decode(thisValue));
     if (UNLIKELY(!domObject))
         return throwVMTypeError(state, throwScope);
     return JSValue::encode(JSTestCEReactions::getConstructor(state->vm(), domObject->globalObject()));
@@ -209,7 +208,7 @@ bool setJSTestCEReactionsConstructor(ExecState* state, EncodedJSValue thisValue,
     VM& vm = state->vm();
     auto throwScope = DECLARE_THROW_SCOPE(vm);
     JSValue value = JSValue::decode(encodedValue);
-    JSTestCEReactionsPrototype* domObject = jsDynamicCast<JSTestCEReactionsPrototype*>(JSValue::decode(thisValue));
+    JSTestCEReactionsPrototype* domObject = jsDynamicDowncast<JSTestCEReactionsPrototype*>(JSValue::decode(thisValue));
     if (UNLIKELY(!domObject)) {
         throwVMTypeError(state, throwScope);
         return false;
@@ -233,7 +232,7 @@ static inline bool setJSTestCEReactionsAttributeWithCEReactionsFunction(ExecStat
     CustomElementReactionStack customElementReactionStack;
 #endif
     auto& impl = thisObject.wrapped();
-    auto nativeValue = value.toWTFString(&state);
+    auto nativeValue = convert<IDLDOMString>(state, value, StringConversionConfiguration::Normal);
     RETURN_IF_EXCEPTION(throwScope, false);
     impl.setAttributeWithCEReactions(WTFMove(nativeValue));
     return true;
@@ -255,7 +254,7 @@ static inline bool setJSTestCEReactionsReflectAttributeWithCEReactionsFunction(E
     CustomElementReactionStack customElementReactionStack;
 #endif
     auto& impl = thisObject.wrapped();
-    auto nativeValue = value.toWTFString(&state);
+    auto nativeValue = convert<IDLDOMString>(state, value, StringConversionConfiguration::Normal);
     RETURN_IF_EXCEPTION(throwScope, false);
     impl.setAttributeWithoutSynchronization(WebCore::HTMLNames::reflectattributewithcereactionsAttr, WTFMove(nativeValue));
     return true;
@@ -278,7 +277,7 @@ static inline bool setJSTestCEReactionsStringifierAttributeFunction(ExecState& s
 #endif
     Ref<TestCEReactionsStringifier> forwardedImpl = thisObject.wrapped().stringifierAttribute();
     auto& impl = forwardedImpl.get();
-    auto nativeValue = value.toWTFString(&state);
+    auto nativeValue = convert<IDLDOMString>(state, value, StringConversionConfiguration::Normal);
     RETURN_IF_EXCEPTION(throwScope, false);
     impl.setValue(WTFMove(nativeValue));
     return true;
@@ -363,7 +362,7 @@ JSC::JSValue toJS(JSC::ExecState* state, JSDOMGlobalObject* globalObject, TestCE
 
 TestCEReactions* JSTestCEReactions::toWrapped(JSC::JSValue value)
 {
-    if (auto* wrapper = jsDynamicCast<JSTestCEReactions*>(value))
+    if (auto* wrapper = jsDynamicDowncast<JSTestCEReactions*>(value))
         return &wrapper->wrapped();
     return nullptr;
 }

@@ -348,9 +348,6 @@ CSSParserSelector* CSSParserSelector::parsePseudoClassAndCompatibilityElementSel
 
 CSSParserSelector* CSSParserSelector::parsePseudoClassSelectorFromStringView(StringView& pseudoTypeString)
 {
-    if (pseudoTypeString.length() && pseudoTypeString[pseudoTypeString.length() - 1] == '(')
-        return nullptr;
-    
     PseudoClassOrCompatibilityPseudoElement pseudoType = parsePseudoClassAndCompatibilityElementString(pseudoTypeString);
     if (pseudoType.pseudoClass != CSSSelector::PseudoClassUnknown) {
         auto selector = std::make_unique<CSSParserSelector>();
@@ -410,7 +407,13 @@ void CSSParserSelector::setLangArgumentList(const Vector<CSSParserString>& strin
         argumentList->append(languageArgument);
     m_selector->setLangArgumentList(WTFMove(argumentList));
 }
-    
+
+void CSSParserSelector::setLangArgumentList(std::unique_ptr<Vector<AtomicString>> argumentList)
+{
+    ASSERT_WITH_MESSAGE(!argumentList->isEmpty(), "No CSS Selector takes an empty argument list.");
+    m_selector->setLangArgumentList(WTFMove(argumentList));
+}
+
 void CSSParserSelector::setSelectorList(std::unique_ptr<CSSSelectorList> selectorList)
 {
     m_selector->setSelectorList(WTFMove(selectorList));

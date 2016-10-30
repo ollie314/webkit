@@ -2119,6 +2119,7 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         forNode(node).makeHeapTop();
         break;
 
+    case PureGetById:
     case GetById:
     case GetByIdFlush: {
         if (!node->prediction()) {
@@ -2150,7 +2151,10 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
             }
         }
 
-        clobberWorld(node->origin.semantic, clobberLimit);
+        if (node->op() == PureGetById)
+            clobberStructures(clobberLimit);
+        else
+            clobberWorld(node->origin.semantic, clobberLimit);
         forNode(node).makeHeapTop();
         break;
     }
@@ -2289,10 +2293,14 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         filterClassInfo(value, node->classInfo());
         break;
     }
-    case CallDOM:
-        clobberWorld(node->origin.semantic, clobberLimit);
-        forNode(node).makeBytecodeTop();
+    case CallDOMGetter: {
+        CallDOMGetterData* callDOMGetterData = node->callDOMGetterData();
+        DOMJIT::CallDOMGetterPatchpoint* patchpoint = callDOMGetterData->patchpoint;
+        if (patchpoint->effect.writes)
+            clobberWorld(node->origin.semantic, clobberLimit);
+        forNode(node).setType(m_graph, callDOMGetterData->domJIT->resultType());
         break;
+    }
     case CheckArray: {
         if (node->arrayMode().alreadyChecked(m_graph, node, forNode(node->child1()))) {
             m_state.setFoundConstants(true);

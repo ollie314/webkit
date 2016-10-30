@@ -31,13 +31,6 @@ namespace WebCore {
 
 namespace IndexedDB {
 
-enum class TransactionMode {
-    ReadOnly = 0,
-    ReadWrite = 1,
-    VersionChange = 2,
-};
-const unsigned TransactionModeMaximum = 2;
-
 enum class TransactionState {
     Active,
     Inactive,

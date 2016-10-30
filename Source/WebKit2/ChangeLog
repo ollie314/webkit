@@ -1,3 +1,686 @@
+2016-10-30  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [DOM] Introduce WebCore::jsDynamicDowncast
+        https://bugs.webkit.org/show_bug.cgi?id=164137
+
+        Reviewed by Darin Adler.
+
+        * WebProcess/Automation/WebAutomationSessionProxy.cpp:
+        (WebKit::WebAutomationSessionProxy::elementForNodeHandle):
+
+2016-10-29  Darin Adler  <darin@apple.com>
+
+        Convert more of DOM from ExceptionCode to Exception
+        https://bugs.webkit.org/show_bug.cgi?id=164173
+
+        Reviewed by Ryosuke Niwa.
+
+        * WebProcess/InjectedBundle/API/gtk/DOM/WebKitDOMCharacterData.cpp:
+        (webkit_dom_character_data_substring_data): Updated since this
+        now uses ExceptionOr.
+        (webkit_dom_character_data_insert_data): Ditto.
+        (webkit_dom_character_data_delete_data): Ditto.
+        (webkit_dom_character_data_replace_data): Ditto.
+        * WebProcess/InjectedBundle/API/gtk/DOM/WebKitDOMDeprecated.cpp:
+        (webkit_dom_text_replace_whole_text): Ditto.
+        * WebProcess/InjectedBundle/API/gtk/DOM/WebKitDOMText.cpp:
+        (webkit_dom_text_split_text): Ditto.
+
+2016-10-28  Darin Adler  <darin@apple.com>
+
+        Move all classes in the HTML directory from ExceptionCode to Exception
+        https://bugs.webkit.org/show_bug.cgi?id=163876
+
+        Reviewed by Sam Weinig.
+
+        * WebProcess/InjectedBundle/API/gtk/DOM/WebKitDOMDOMTokenList.cpp:
+        (webkit_dom_dom_token_list_add): Updated exception handling.
+        (webkit_dom_dom_token_list_remove): Ditto.
+        (webkit_dom_dom_token_list_toggle): Ditto.
+        (webkit_dom_dom_token_list_replace): Ditto.
+        * WebProcess/InjectedBundle/API/gtk/DOM/WebKitDOMElement.cpp:
+        (webkit_dom_element_remove): Ditto.
+        * WebProcess/InjectedBundle/API/gtk/DOM/WebKitDOMHTMLElement.cpp:
+        (webkit_dom_html_element_set_inner_text): Ditto.
+        (webkit_dom_html_element_set_outer_text): Ditto.
+        (webkit_dom_html_element_set_content_editable): Ditto.
+        * WebProcess/InjectedBundle/API/gtk/DOM/WebKitDOMHTMLInputElement.cpp:
+        (webkit_dom_html_input_element_set_max_length): Ditto.
+        (webkit_dom_html_input_element_set_size): Ditto.
+        * WebProcess/InjectedBundle/API/gtk/DOM/WebKitDOMHTMLSelectElement.cpp:
+        (webkit_dom_html_select_element_set_length): Ditto.
+        * WebProcess/InjectedBundle/API/gtk/DOM/WebKitDOMHTMLTableElement.cpp:
+        (webkit_dom_html_table_element_insert_row): Ditto.
+        (webkit_dom_html_table_element_delete_row): Ditto.
+        (webkit_dom_html_table_element_set_caption): Ditto.
+        (webkit_dom_html_table_element_set_t_head): Ditto.
+        (webkit_dom_html_table_element_set_t_foot): Ditto.
+        * WebProcess/InjectedBundle/API/gtk/DOM/WebKitDOMHTMLTableRowElement.cpp:
+        (webkit_dom_html_table_row_element_insert_cell): Ditto.
+        (webkit_dom_html_table_row_element_delete_cell): Ditto.
+        * WebProcess/InjectedBundle/API/gtk/DOM/WebKitDOMHTMLTableSectionElement.cpp:
+        (webkit_dom_html_table_section_element_insert_row): Ditto.
+        (webkit_dom_html_table_section_element_delete_row): Ditto.
+
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::editorState): Removed ASSERT_NO_EXCEPTION.
+
+        * WebProcess/WebPage/ios/WebPageIOS.mm:
+        (WebKit::WebPage::setAssistedNodeValueAsNumber): Removed ASSERT_NO_EXCEPTION.
+
+        * WebProcess/cocoa/WebPlaybackSessionManager.mm:
+        (WebKit::WebPlaybackSessionManager::seekableRangesChanged):
+        Changed the code to use a different interface to TimeRange that does
+        not involve exceptions.
+
+2016-10-28  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        iOS autocorrection does not trigger an input event of inputType "insertReplacementText"
+        https://bugs.webkit.org/show_bug.cgi?id=164077
+        <rdar://problem/28987810>
+
+        Reviewed by Simon Fraser.
+
+        Small tweak to mark text insertion when autocorrecting as such, as opposed to regular keyboard input.
+
+        * WebProcess/WebPage/ios/WebPageIOS.mm:
+        (WebKit::WebPage::syncApplyAutocorrection):
+
+2016-10-28  Megan Gardner  <megan_gardner@apple.com>
+
+        Rename SharedMemoryMac to SharedMemoryCocoa
+        https://bugs.webkit.org/show_bug.cgi?id=164156
+
+        Reviewed by Alex Christensen.
+
+        Renamed SharedMemoryMac to SharedMemoryCocoa, as it runs on all cocoa platforms, not exclusively just mac, and
+        thus should be named to reflect that reality.
+
+        * Platform/cocoa: Added.
+        * Platform/cocoa/SharedMemoryCocoa.cpp: Copied from Source/WebKit2/Platform/mac/SharedMemoryMac.cpp.
+        * Platform/mac/SharedMemoryMac.cpp: Removed.
+        * WebKit2.xcodeproj/project.pbxproj:
+
+2016-10-28  Antti Koivisto  <antti@apple.com>
+
+        Enable CFNetwork connection cache fast lane for WebKit2
+        https://bugs.webkit.org/show_bug.cgi?id=164129
+
+        Reviewed by Andreas Kling.
+
+        The idea of this feature is keep a connection free for higher priority requests so low-priority
+        image loads can't take all the available connections.
+
+        We have this enabled on WK1 but not on WK2. See what enabling it does for performance in bots.
+
+        * NetworkProcess/cocoa/NetworkProcessCocoa.mm:
+        (WebKit::initializeNetworkSettings):
+
+            Based on code inspection setting kHTTPMinimumFastLanePriority is not sufficient to enable this feature,
+            kHTTPNumFastLanes needs also be set to a non-zero value. Use the same constants as WK1.
+            Also enable this on Mac to unify behavior.
+
+2016-10-27  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK] New stable DOM API headers should be included from webkitdom.h
+        https://bugs.webkit.org/show_bug.cgi?id=164069
+
+        Reviewed by Carlos Garcia Campos.
+
+        * WebProcess/InjectedBundle/API/gtk/DOM/webkitdom.h:
+
+2016-10-27  Simon Fraser  <simon.fraser@apple.com>
+
+        Fix when building against the MacOSX10.12.sdk where "macos" is not recognized
+        in the availability macros.
+
+        * UIProcess/API/Cocoa/WKWebViewPrivate.h:
+
+2016-10-27  Megan Gardner  <megan_gardner@apple.com>
+
+        Add support for wide gamut for ShareableBitmap for image popovers
+        https://bugs.webkit.org/show_bug.cgi?id=164001
+
+        Reviewed by Simon Fraser.
+
+        Added suppport for wide gamut in ShareableBitmap. SharableBitmaps now know the size of their pixels,
+        and that data is passed back and forth between the processes. The callers of SharedBitmap will determine
+        if their image should support wide gamut, but ShareableBitmap will override a set flag on a device that
+        is incapbable of supporting a wide gamut image.
+        This makes it possible to show wide gamut images in image popovers on iOS.
+        This is currently untestable, so no tests added.
+
+        * Platform/IPC/Decoder.cpp:
+        (IPC::Decoder::decode):
+        * Platform/IPC/Decoder.h:
+        * Platform/IPC/Encoder.cpp:
+        (IPC::Encoder::encode):
+        * Platform/IPC/Encoder.h:
+        * Shared/ShareableBitmap.cpp:
+        (WebKit::bytesPerPixel):
+        (WebKit::ShareableBitmap::Handle::encode):
+        (WebKit::ShareableBitmap::Handle::decode):
+        (WebKit::ShareableBitmap::Handle::clear):
+        (WebKit::ShareableBitmap::create):
+        (WebKit::ShareableBitmap::createShareable):
+        (WebKit::ShareableBitmap::createHandle):
+        (WebKit::ShareableBitmap::ShareableBitmap):
+        * Shared/ShareableBitmap.h:
+        (WebKit::ShareableBitmap::numBytesForSize):
+        (WebKit::ShareableBitmap::sizeInBytes):
+        * Shared/cg/ShareableBitmapCG.cpp:
+        (WebKit::bitmapInfo):
+        (WebKit::ShareableBitmap::createGraphicsContext):
+        (WebKit::ShareableBitmap::createCGImage):
+        * WebProcess/WebPage/ios/WebPageIOS.mm:
+        (WebKit::WebPage::getPositionInformation):
+
+2016-10-27  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        Support "insertFromDrop" and "deleteByDrag" for the InputEvent spec
+        https://bugs.webkit.org/show_bug.cgi?id=163948
+        <rdar://problem/28921433>
+
+        Reviewed by Darin Adler.
+
+        Add support for new drag and drop-related EditAction enum values.
+
+        * UIProcess/WebEditCommandProxy.cpp:
+        (WebKit::WebEditCommandProxy::nameForEditAction):
+
+2016-10-26  Chris Dumez  <cdumez@apple.com>
+
+        Replace IDBKeyPath with a WTF::Variant
+        https://bugs.webkit.org/show_bug.cgi?id=163909
+
+        Reviewed by Darin Adler.
+
+        Add coders to encode / decode IDBKeyPath type for IPC.
+
+        * Shared/Databases/IndexedDB/WebIDBResult.cpp:
+        * Shared/WebCoreArgumentCoders.cpp:
+        (IPC::ArgumentCoder<IDBKeyPath>::encode):
+        (IPC::ArgumentCoder<IDBKeyPath>::decode):
+        * Shared/WebCoreArgumentCoders.h:
+        * WebProcess/Databases/IndexedDB/WebIDBConnectionToServer.cpp:
+
+2016-10-26  Brian Burg  <bburg@apple.com>
+
+        Web Inspector: remove unused bool return value from FrontendChannel::sendMessageToFrontend
+        https://bugs.webkit.org/show_bug.cgi?id=164046
+
+        Reviewed by Joseph Pecoraro.
+
+        * WebProcess/WebPage/WebInspector.cpp:
+        (WebKit::WebInspector::sendMessageToFrontend):
+        * WebProcess/WebPage/WebInspector.h:
+
+2016-10-26  Eric Carlson  <eric.carlson@apple.com>
+
+        [MediaStream] Add "has capture device" bit to media state flags
+        https://bugs.webkit.org/show_bug.cgi?id=163952
+
+        Unreviewed fix after r207839.
+
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::setMuted): Take an MutedStateFlags, not a bool.
+        * WebProcess/WebPage/WebPage.h:
+
+2016-10-26  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update OptionsGTK.cmake and NEWS for 2.15.1 release.
+
+        * gtk/NEWS: Add release notes for 2.15.1.
+
+2016-10-26  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        REGRESSION(r206505) [GTK] Build broken with GTK+ 3.14
+        https://bugs.webkit.org/show_bug.cgi?id=162776
+
+        Reviewed by Xabier Rodriguez-Calvar.
+
+        Do not use gtk_widget_get_action_group() when GTK+ < 3.16, use g_object_set instead to attach the action group
+        to the menu widget.
+
+        * UIProcess/gtk/WebContextMenuProxyGtk.cpp:
+        (WebKit::WebContextMenuProxyGtk::append):
+        (WebKit::WebContextMenuProxyGtk::WebContextMenuProxyGtk):
+        (WebKit::WebContextMenuProxyGtk::~WebContextMenuProxyGtk):
+
+2016-10-25  Alex Christensen  <achristensen@webkit.org>
+
+        CMake build fix.
+
+        * PlatformMac.cmake:
+        * Shared/WebHitTestResultData.cpp:
+        (WebKit::WebHitTestResultData::WebHitTestResultData):
+        Explicitly call AtomicString::string to make the String constructor no longer ambiguous.
+        It couldn't decide whether to use operator const String& or operator NSString*.
+
+2016-10-25  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [SOUP] Network process assertion in NetworkDataTask::continueHTTPRedirection
+        https://bugs.webkit.org/show_bug.cgi?id=163941
+
+        Reviewed by Michael Catanzaro.
+
+        equalLettersIgnoringASCIICase() expects the second argument to be the letters to compare in lowercase, so use
+        "get" instead of "GET".
+
+        * NetworkProcess/soup/NetworkDataTaskSoup.cpp:
+        (WebKit::NetworkDataTaskSoup::continueHTTPRedirection):
+
+2016-10-25  Eric Carlson  <eric.carlson@apple.com>
+
+        [MediaStream] Add "has capture device" bit to media state flags
+        https://bugs.webkit.org/show_bug.cgi?id=163952
+
+        Reviewed by Sam Weinig.
+
+        * UIProcess/API/C/WKPage.cpp:
+        (WKPageGetMediaState): Support MediaProducer::HasMediaCaptureDevice.
+        * UIProcess/API/C/WKPagePrivate.h: Define kWKMediaHasCaptureDevice.
+
+2016-10-25  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r207827 and r207828.
+        https://bugs.webkit.org/show_bug.cgi?id=163965
+
+        Caused LayoutTest webaudio/web-audio-is-playing.html to time
+        out on macOS. (Requested by ryanhaddad on #webkit).
+
+        Reverted changesets:
+
+        "[MediaStream] Add "has capture device" bit to media state
+        flags"
+        https://bugs.webkit.org/show_bug.cgi?id=163952
+        http://trac.webkit.org/changeset/207827
+
+        "[MediaStream] Add "has capture device" bit to media state
+        flags"
+        https://bugs.webkit.org/show_bug.cgi?id=163952
+        http://trac.webkit.org/changeset/207828
+
+2016-10-25  Eric Carlson  <eric.carlson@apple.com>
+
+        [MediaStream] Add "has capture device" bit to media state flags
+        https://bugs.webkit.org/show_bug.cgi?id=163952
+
+        Reviewed by Sam Weinig.
+
+        * UIProcess/API/C/WKPage.cpp:
+        (WKPageGetMediaState): Support MediaProducer::HasMediaCaptureDevice.
+        * UIProcess/API/C/WKPagePrivate.h: Define kWKMediaHasCaptureDevice.
+
+2016-10-25  Chris Dumez  <cdumez@apple.com>
+
+        Unreviewed, rolling out r207494.
+
+        iOS SDK has been updated on the bots now so rollout the
+        rollout
+
+        Reverted changeset:
+
+        "Unreviewed, rolling out r207413."
+        https://bugs.webkit.org/show_bug.cgi?id=163547
+        http://trac.webkit.org/changeset/207494
+
+2016-10-25  Jonathan Bedard  <jbedard@apple.com>
+
+        Unreviewed build fix.
+
+        * UIProcess/API/Cocoa/WKWebView.mm:
+        (-[WKWebView _fullscreenDelegate]): Removed unneeded parenthesis.
+
+2016-10-19  Jer Noble  <jer.noble@apple.com>
+
+        Add WKWebView fullscreen delegate SPI
+        https://bugs.webkit.org/show_bug.cgi?id=163674
+
+        Reviewed by Anders Carlsson.
+
+        Add a new SPI property to WKWebView allowing clients to be notified when fullscreen mode enters and exits.
+
+        * UIProcess/API/APIFullscreenClient.h: Added.
+        (API::FullscreenClient::~FullscreenClient):
+        (API::FullscreenClient::willEnterFullscreen):
+        (API::FullscreenClient::didEnterFullscreen):
+        (API::FullscreenClient::willExitFullscreen):
+        (API::FullscreenClient::didExitFullscreen):
+        * UIProcess/API/Cocoa/WKWebView.mm:
+        (-[WKWebView _initializeWithConfiguration:]):
+        (-[WKWebView _setFullscreenDelegate:]):
+        (-[WKWebView _fullscreenDelegate]):
+        (-[WKWebView _isInFullscreen]):
+        * UIProcess/API/Cocoa/WKWebViewPrivate.h:
+        * UIProcess/API/Cocoa/_WKFullscreenDelegate.h: Added.
+        * UIProcess/Cocoa/FullscreenClient.h: Added.
+        (WebKit::FullscreenClient::~FullscreenClient):
+        * UIProcess/Cocoa/FullscreenClient.mm: Added.
+        (WebKit::FullscreenClient::FullscreenClient):
+        (WebKit::FullscreenClient::delegate):
+        (WebKit::FullscreenClient::setDelegate):
+        (WebKit::FullscreenClient::willEnterFullscreen):
+        (WebKit::FullscreenClient::didEnterFullscreen):
+        (WebKit::FullscreenClient::willExitFullscreen):
+        (WebKit::FullscreenClient::didExitFullscreen):
+        * UIProcess/WebFullScreenManagerProxy.cpp:
+        (WebKit::WebFullScreenManagerProxy::willEnterFullScreen):
+        (WebKit::WebFullScreenManagerProxy::didEnterFullScreen):
+        (WebKit::WebFullScreenManagerProxy::willExitFullScreen):
+        (WebKit::WebFullScreenManagerProxy::didExitFullScreen):
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::WebPageProxy):
+        (WebKit::WebPageProxy::setFullscreenClient):
+        (WebKit::WebPageProxy::fullScreenManager): Deleted.
+        * UIProcess/WebPageProxy.h:
+        (WebKit::WebPageProxy::fullscreenClient):
+        * WebKit2.xcodeproj/project.pbxproj:
+
+2016-10-25  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Fix timeouts in 12 GTK+ unit tests after r207812.
+
+        * NetworkProcess/NetworkProcessCreationParameters.h: Initialize loadThrottleLatency.
+
+2016-10-25  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Fix Soup based ports debug build after r207813.
+
+        * NetworkProcess/soup/NetworkDataTaskSoup.cpp:
+        (WebKit::NetworkDataTaskSoup::authenticateCallback):
+        (WebKit::NetworkDataTaskSoup::requestStartedCallback):
+
+2016-10-25  Andreas Kling  <akling@apple.com>
+
+        More PassRefPtr purging in WebCore.
+        <https://webkit.org/b/163895>
+
+        Reviewed by Antti Koivisto.
+
+        * WebProcess/Plugins/PDF/DeprecatedPDFPlugin.h:
+        * WebProcess/Plugins/PDF/DeprecatedPDFPlugin.mm:
+        (WebKit::PDFPlugin::createScrollbar):
+
+2016-10-25  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        NetworkSession: switch to use subclasses for NetworkSession and NetworkDataTask implementations
+        https://bugs.webkit.org/show_bug.cgi?id=163777
+
+        Reviewed by Alex Christensen.
+
+        The subclass model allows us to choose the implementation at run time, so we could add other implementations
+        like a mock network class to measure performance, and even one for blobs and finally get rid of ResourceHandle
+        in WebKit2.
+
+        * CMakeLists.txt: Add new files to compilation.
+        * NetworkProcess/NetworkDataTask.cpp: Added.
+        (WebKit::NetworkDataTask::create): Create a NetworkDataTaskCocoa or NetworkDataTaskSoup.
+        (WebKit::NetworkDataTask::NetworkDataTask): Move common code from NetworkDataTaskCocoa and NetworkDataTaskSoup
+        here to handle the early failures.
+        (WebKit::NetworkDataTask::~NetworkDataTask):
+        (WebKit::NetworkDataTask::scheduleFailure):
+        (WebKit::NetworkDataTask::failureTimerFired):
+        * NetworkProcess/NetworkDataTask.h: Remove platform specific members.
+        (WebKit::NetworkDataTask::setPendingDownloadLocation): Make it virtual and set the m_pendingDownloadLocation.
+        (WebKit::NetworkDataTask::suggestedFilename): Make it virtual and const with a default implementation.
+        (WebKit::NetworkDataTask::setSuggestedFilename): Ditto.
+        (WebKit::NetworkDataTask::allowsSpecificHTTPSCertificateForHost): Ditto.
+        * NetworkProcess/NetworkLoad.cpp: Include NetworkDataTaskCocoa.h.
+        * NetworkProcess/NetworkLoad.h: Include NetworkDataTask.h instead of NetworkSession.h.
+        * NetworkProcess/NetworkProcess.cpp:
+        (WebKit::NetworkProcess::NetworkProcess): Use NetworkSessionCocoa.
+        * NetworkProcess/NetworkSession.cpp:
+        (WebKit::NetworkSession::create): Create a NetworkSessionCocoa or NetworkSessionSoup.
+        (WebKit::NetworkSession::defaultSession): In case of cocoa use NetworkSessionCocoa::defaultSession() because of
+        the custom protocol manager, otherwise simply create a default session.
+        (WebKit::NetworkSession::networkStorageSession): Move common code from NetworkSessionCocoa and
+        NetworkSessionSoup here.
+        (WebKit::NetworkSession::NetworkSession):
+        (WebKit::NetworkSession::~NetworkSession):
+        * NetworkProcess/NetworkSession.h: Remove platform specific members.
+        (WebKit::NetworkSession::invalidateAndCancel): Make it virtual.
+        (WebKit::NetworkSession::clearCredentials): Ditto.
+        * NetworkProcess/cache/NetworkCacheSpeculativeLoad.cpp: Include NetworkSession.h.
+        * NetworkProcess/cocoa/NetworkDataTaskCocoa.h: Added.
+        * NetworkProcess/cocoa/NetworkDataTaskCocoa.mm:
+        (WebKit::NetworkDataTaskCocoa::NetworkDataTaskCocoa):
+        (WebKit::NetworkDataTaskCocoa::~NetworkDataTaskCocoa):
+        (WebKit::NetworkDataTaskCocoa::didSendData):
+        (WebKit::NetworkDataTaskCocoa::didReceiveChallenge):
+        (WebKit::NetworkDataTaskCocoa::didCompleteWithError):
+        (WebKit::NetworkDataTaskCocoa::didReceiveResponse):
+        (WebKit::NetworkDataTaskCocoa::didReceiveData):
+        (WebKit::NetworkDataTaskCocoa::didBecomeDownload):
+        (WebKit::NetworkDataTaskCocoa::willPerformHTTPRedirection):
+        (WebKit::NetworkDataTaskCocoa::setPendingDownloadLocation):
+        (WebKit::NetworkDataTaskCocoa::tryPasswordBasedAuthentication):
+        (WebKit::NetworkDataTaskCocoa::transferSandboxExtensionToDownload):
+        (WebKit::NetworkDataTaskCocoa::allowsSpecificHTTPSCertificateForHost):
+        (WebKit::NetworkDataTaskCocoa::suggestedFilename):
+        (WebKit::NetworkDataTaskCocoa::cancel):
+        (WebKit::NetworkDataTaskCocoa::resume):
+        (WebKit::NetworkDataTaskCocoa::suspend):
+        (WebKit::NetworkDataTaskCocoa::state):
+        * NetworkProcess/cocoa/NetworkProcessCocoa.mm:
+        (WebKit::NetworkProcess::platformInitializeNetworkProcessCocoa):
+        * NetworkProcess/cocoa/NetworkSessionCocoa.h: Added.
+        * NetworkProcess/cocoa/NetworkSessionCocoa.mm:
+        (-[WKNetworkSessionDelegate initWithNetworkSession:withCredentials:]):
+        (-[WKNetworkSessionDelegate URLSession:dataTask:didBecomeDownloadTask:]):
+        (WebKit::configurationForSessionID):
+        (WebKit::NetworkSessionCocoa::setCustomProtocolManager):
+        (WebKit::NetworkSessionCocoa::setSourceApplicationAuditTokenData):
+        (WebKit::NetworkSessionCocoa::setSourceApplicationBundleIdentifier):
+        (WebKit::NetworkSessionCocoa::setSourceApplicationSecondaryIdentifier):
+        (WebKit::NetworkSessionCocoa::setCTDataConnectionServiceType):
+        (WebKit::NetworkSessionCocoa::create):
+        (WebKit::NetworkSessionCocoa::defaultSession):
+        (WebKit::NetworkSessionCocoa::NetworkSessionCocoa):
+        (WebKit::NetworkSessionCocoa::~NetworkSessionCocoa):
+        (WebKit::NetworkSessionCocoa::invalidateAndCancel):
+        (WebKit::NetworkSessionCocoa::clearCredentials):
+        (WebKit::NetworkSessionCocoa::dataTaskForIdentifier):
+        (WebKit::NetworkSessionCocoa::addDownloadID):
+        (WebKit::NetworkSessionCocoa::downloadID):
+        (WebKit::NetworkSessionCocoa::takeDownloadID):
+        * NetworkProcess/mac/RemoteNetworkingContext.mm:
+        (WebKit::RemoteNetworkingContext::ensurePrivateBrowsingSession):
+        * NetworkProcess/soup/NetworkDataTaskSoup.cpp:
+        (WebKit::NetworkDataTaskSoup::NetworkDataTaskSoup):
+        (WebKit::NetworkDataTaskSoup::~NetworkDataTaskSoup):
+        (WebKit::NetworkDataTaskSoup::suggestedFilename):
+        (WebKit::NetworkDataTaskSoup::setPendingDownloadLocation):
+        (WebKit::NetworkDataTaskSoup::createRequest):
+        (WebKit::NetworkDataTaskSoup::clearRequest):
+        (WebKit::NetworkDataTaskSoup::resume):
+        (WebKit::NetworkDataTaskSoup::suspend):
+        (WebKit::NetworkDataTaskSoup::cancel):
+        (WebKit::NetworkDataTaskSoup::invalidateAndCancel):
+        (WebKit::NetworkDataTaskSoup::state):
+        (WebKit::NetworkDataTaskSoup::timeoutFired):
+        (WebKit::NetworkDataTaskSoup::startTimeout):
+        (WebKit::NetworkDataTaskSoup::stopTimeout):
+        (WebKit::NetworkDataTaskSoup::sendRequestCallback):
+        (WebKit::NetworkDataTaskSoup::didSendRequest):
+        (WebKit::NetworkDataTaskSoup::didReceiveResponse):
+        (WebKit::NetworkDataTaskSoup::tlsErrorsChangedCallback):
+        (WebKit::NetworkDataTaskSoup::tlsErrorsChanged):
+        (WebKit::NetworkDataTaskSoup::applyAuthenticationToRequest):
+        (WebKit::NetworkDataTaskSoup::authenticateCallback):
+        (WebKit::NetworkDataTaskSoup::authenticate):
+        (WebKit::NetworkDataTaskSoup::continueAuthenticate):
+        (WebKit::NetworkDataTaskSoup::skipInputStreamForRedirectionCallback):
+        (WebKit::NetworkDataTaskSoup::skipInputStreamForRedirection):
+        (WebKit::NetworkDataTaskSoup::didFinishSkipInputStreamForRedirection):
+        (WebKit::NetworkDataTaskSoup::shouldStartHTTPRedirection):
+        (WebKit::NetworkDataTaskSoup::continueHTTPRedirection):
+        (WebKit::NetworkDataTaskSoup::readCallback):
+        (WebKit::NetworkDataTaskSoup::read):
+        (WebKit::NetworkDataTaskSoup::didRead):
+        (WebKit::NetworkDataTaskSoup::didFinishRead):
+        (WebKit::NetworkDataTaskSoup::requestNextPartCallback):
+        (WebKit::NetworkDataTaskSoup::requestNextPart):
+        (WebKit::NetworkDataTaskSoup::didRequestNextPart):
+        (WebKit::NetworkDataTaskSoup::didFinishRequestNextPart):
+        (WebKit::NetworkDataTaskSoup::gotHeadersCallback):
+        (WebKit::NetworkDataTaskSoup::didGetHeaders):
+        (WebKit::NetworkDataTaskSoup::wroteBodyDataCallback):
+        (WebKit::NetworkDataTaskSoup::didWriteBodyData):
+        (WebKit::NetworkDataTaskSoup::download):
+        (WebKit::NetworkDataTaskSoup::writeDownloadCallback):
+        (WebKit::NetworkDataTaskSoup::writeDownload):
+        (WebKit::NetworkDataTaskSoup::didWriteDownload):
+        (WebKit::NetworkDataTaskSoup::didFinishDownload):
+        (WebKit::NetworkDataTaskSoup::didFailDownload):
+        (WebKit::NetworkDataTaskSoup::cleanDownloadFiles):
+        (WebKit::NetworkDataTaskSoup::didFail):
+        (WebKit::NetworkDataTaskSoup::networkEventCallback):
+        (WebKit::NetworkDataTaskSoup::networkEvent):
+        (WebKit::NetworkDataTaskSoup::startingCallback):
+        (WebKit::NetworkDataTaskSoup::requestStartedCallback):
+        (WebKit::NetworkDataTaskSoup::didStartRequest):
+        (WebKit::NetworkDataTaskSoup::restartedCallback):
+        (WebKit::NetworkDataTaskSoup::didRestart):
+        * NetworkProcess/soup/NetworkDataTaskSoup.h: Added.
+        * NetworkProcess/soup/NetworkSessionSoup.cpp:
+        (WebKit::NetworkSessionSoup::NetworkSessionSoup):
+        (WebKit::NetworkSessionSoup::~NetworkSessionSoup):
+        (WebKit::NetworkSessionSoup::soupSession):
+        (WebKit::NetworkSessionSoup::invalidateAndCancel):
+        * NetworkProcess/soup/NetworkSessionSoup.h: Added.
+        * NetworkProcess/soup/RemoteNetworkingContextSoup.cpp:
+        (WebKit::RemoteNetworkingContext::ensurePrivateBrowsingSession): Update to new NetworkSession::create() API.
+        * PlatformEfl.cmake: Add new files to compilation.
+        * PlatformGTK.cmake: Ditto.
+        * WebKit2.xcodeproj/project.pbxproj: Ditto.
+        * WebProcess/WebCoreSupport/mac/WebFrameNetworkingContext.mm:
+        (WebKit::WebFrameNetworkingContext::ensurePrivateBrowsingSession): Update to new NetworkSession::create() API.
+        * WebProcess/WebCoreSupport/soup/WebFrameNetworkingContext.cpp:
+        (WebKit::WebFrameNetworkingContext::ensurePrivateBrowsingSession): Ditto.
+
+2016-10-25  Antti Koivisto  <antti@apple.com>
+
+        Add support for introducing simulated latency in network process
+        https://bugs.webkit.org/show_bug.cgi?id=163902
+
+        Reviewed by Alex Christensen.
+
+        For testing purposes it is useful to have a mechanism for simulating high latency.
+        This patch adds a basic mechanism that introduces a delay to each response in network
+        process. In Safari it can be used with
+
+             defaults write com.apple.Safari WebKitNetworkLoadThrottleLatencyMilliseconds 200
+
+        Setting the delay to 0 disables the feature.
+
+        * NetworkProcess/NetworkLoad.cpp:
+        (WebKit::NetworkLoad::Throttle::Throttle):
+        (WebKit::NetworkLoad::didReceiveResponseNetworkSession):
+        (WebKit::NetworkLoad::notifyDidReceiveResponse):
+        (WebKit::NetworkLoad::didReceiveData):
+        (WebKit::NetworkLoad::didCompleteWithError):
+        (WebKit::NetworkLoad::throttleDelayCompleted):
+        * NetworkProcess/NetworkLoad.h:
+        * NetworkProcess/NetworkProcess.cpp:
+        (WebKit::NetworkProcess::initializeNetworkProcess):
+        * NetworkProcess/NetworkProcess.h:
+        (WebKit::NetworkProcess::loadThrottleLatency):
+        * NetworkProcess/NetworkProcessCreationParameters.cpp:
+        (WebKit::NetworkProcessCreationParameters::encode):
+        (WebKit::NetworkProcessCreationParameters::decode):
+        * NetworkProcess/NetworkProcessCreationParameters.h:
+        * UIProcess/Cocoa/WebProcessPoolCocoa.mm:
+        (WebKit::WebProcessPool::platformInitializeNetworkProcess):
+
+2016-10-24  Dan Bernstein  <mitz@apple.com>
+
+        REGRESSION (r206410): Sandbox violations beneath WebProcessProxy::platformIsBeingDebugged
+        https://bugs.webkit.org/show_bug.cgi?id=163879
+        <rdar://problem/28728735>
+
+        Reviewed by Darin Adler.
+
+        * UIProcess/Cocoa/WebProcessProxyCocoa.mm:
+        (WebKit::WebProcessProxy::platformIsBeingDebugged): Check if the current process, which is
+          the UI process, is sandboxed before trying to find out if the Web process is being
+          debugged.
+
+2016-10-21  Alex Christensen  <achristensen@webkit.org>
+
+        URL::port should return Optional<uint16_t>
+        https://bugs.webkit.org/show_bug.cgi?id=163806
+
+        Reviewed by Darin Adler.
+
+        * NetworkProcess/mac/NetworkProcessMac.mm:
+        (WebKit::overrideSystemProxies):
+        * Shared/API/APISecurityOrigin.h:
+        (API::SecurityOrigin::create):
+        * Shared/API/APIURL.h:
+        (API::URL::protocol):
+        * Shared/API/c/WKSecurityOriginRef.cpp:
+        (WKSecurityOriginGetPort):
+        * UIProcess/API/Cocoa/WKSecurityOrigin.mm:
+        (-[WKSecurityOrigin port]):
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::canHandleRequest):
+        * WebProcess/cocoa/WebProcessCocoa.mm:
+        (WebKit::origin):
+
+2016-10-24  Eric Carlson  <eric.carlson@apple.com>
+
+        [MediaStream] Separate media capture and audio playback muting
+        https://bugs.webkit.org/show_bug.cgi?id=163855
+        <rdar://problem/28827186>
+
+        Reviewed by Darin Adler.
+
+        * Shared/WebPageCreationParameters.h: Change 'muted' from bool to MutedStateFlags.
+
+        * UIProcess/API/C/WKPage.cpp: Change parameter from bool to WKMediaMutedState.
+        (WKPageSetMuted):
+        * UIProcess/API/C/WKPagePrivate.h: Define WKMediaMutedState.
+
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::WebPageProxy):
+        (WebKit::WebPageProxy::setMuted): m_muted -> m_mutedState.
+        (WebKit::WebPageProxy::creationParameters): Ditto.
+        * UIProcess/WebPageProxy.h:
+
+        * WebProcess/Plugins/PluginView.cpp:
+        (WebKit::PluginView::isMuted): page.isMuted -> page.mutedState.
+
+        * WebProcess/WebPage/WebPage.messages.in: Change SetMuted parameter.
+
+2016-10-24  Youenn Fablet  <youenn@apple.com>
+
+        Activate WEB_RTC compilation flags for Mac bots
+        https://bugs.webkit.org/show_bug.cgi?id=163886
+
+        Reviewed by Eric Carlson.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2016-10-24  Brady Eidson  <beidson@apple.com>
+
+        IndexedDB 2.0: Support IDBIndex name assignment.
+        <rdar://problem/28806932> and https://bugs.webkit.org/show_bug.cgi?id=163805
+
+        Reviewed by Alex Christensen.
+
+        * DatabaseProcess/IndexedDB/WebIDBConnectionToClient.cpp:
+        (WebKit::WebIDBConnectionToClient::didRenameIndex):
+        (WebKit::WebIDBConnectionToClient::renameIndex):
+        * DatabaseProcess/IndexedDB/WebIDBConnectionToClient.h:
+        * DatabaseProcess/IndexedDB/WebIDBConnectionToClient.messages.in:
+
+        * WebProcess/Databases/IndexedDB/WebIDBConnectionToServer.cpp:
+        (WebKit::WebIDBConnectionToServer::renameIndex):
+        (WebKit::WebIDBConnectionToServer::didRenameIndex):
+        * WebProcess/Databases/IndexedDB/WebIDBConnectionToServer.h:
+        * WebProcess/Databases/IndexedDB/WebIDBConnectionToServer.messages.in:
+
 2016-10-23  Michael Catanzaro  <mcatanzaro@igalia.com>
 
         [GTK] Remove DO NOT MODIFY headers from files that are no longer autogenerated

@@ -893,7 +893,7 @@ EditorState WebPage::editorState(IncludePostLayoutDataHint shouldIncludePostLayo
                     postLayoutData.enclosingListType = NoList;
 
                 if (nodeToRemove)
-                    nodeToRemove->remove(ASSERT_NO_EXCEPTION);
+                    nodeToRemove->remove();
             }
         }
     }
@@ -4389,9 +4389,9 @@ void WebPage::setMediaVolume(float volume)
     m_page->setMediaVolume(volume);
 }
 
-void WebPage::setMuted(bool muted)
+void WebPage::setMuted(MediaProducer::MutedStateFlags state)
 {
-    m_page->setMuted(muted);
+    m_page->setMuted(state);
 }
 
 #if ENABLE(MEDIA_SESSION)
@@ -4434,7 +4434,7 @@ void WebPage::runModal()
 
 bool WebPage::canHandleRequest(const WebCore::ResourceRequest& request)
 {
-    if (SchemeRegistry::shouldLoadURLSchemeAsEmptyDocument(request.url().protocol()))
+    if (SchemeRegistry::shouldLoadURLSchemeAsEmptyDocument(request.url().protocol().toStringWithoutCopying()))
         return true;
 
     if (request.url().protocolIsBlob())

@@ -52,6 +52,7 @@
 #include "InspectorNetworkAgent.h"
 #include "InspectorPageAgent.h"
 #include "InspectorTimelineAgent.h"
+#include "InspectorWorkerAgent.h"
 #include "InstrumentingAgents.h"
 #include "MainFrame.h"
 #include "Page.h"
@@ -64,6 +65,7 @@
 #include "StyleResolver.h"
 #include "StyleRule.h"
 #include "WebConsoleAgent.h"
+#include "WorkerInspectorController.h"
 #include "XMLHttpRequest.h"
 #include <inspector/ConsoleMessage.h>
 #include <inspector/ScriptArguments.h>
@@ -882,12 +884,24 @@ void InspectorInstrumentation::startConsoleTimingImpl(InstrumentingAgents& instr
         consoleAgent->startTiming(title);
 }
 
+void InspectorInstrumentation::startConsoleTimingImpl(InstrumentingAgents& instrumentingAgents, const String& title)
+{
+    if (WebConsoleAgent* consoleAgent = instrumentingAgents.webConsoleAgent())
+        consoleAgent->startTiming(title);
+}
+
 void InspectorInstrumentation::stopConsoleTimingImpl(InstrumentingAgents& instrumentingAgents, Frame& frame, const String& title, RefPtr<ScriptCallStack>&& stack)
 {
     if (WebConsoleAgent* consoleAgent = instrumentingAgents.webConsoleAgent())
         consoleAgent->stopTiming(title, stack);
     if (InspectorTimelineAgent* timelineAgent = instrumentingAgents.inspectorTimelineAgent())
         timelineAgent->timeEnd(frame, title);
+}
+
+void InspectorInstrumentation::stopConsoleTimingImpl(InstrumentingAgents& instrumentingAgents, const String& title, RefPtr<ScriptCallStack>&& stack)
+{
+    if (WebConsoleAgent* consoleAgent = instrumentingAgents.webConsoleAgent())
+        consoleAgent->stopTiming(title, stack);
 }
 
 void InspectorInstrumentation::consoleTimeStampImpl(InstrumentingAgents& instrumentingAgents, Frame& frame, RefPtr<ScriptArguments>&& arguments)
@@ -923,6 +937,25 @@ void InspectorInstrumentation::didDispatchDOMStorageEventImpl(InstrumentingAgent
 {
     if (InspectorDOMStorageAgent* domStorageAgent = instrumentingAgents.inspectorDOMStorageAgent())
         domStorageAgent->didDispatchDOMStorageEvent(key, oldValue, newValue, storageType, securityOrigin, page);
+}
+
+bool InspectorInstrumentation::shouldWaitForDebuggerOnStartImpl(InstrumentingAgents& instrumentingAgents)
+{
+    if (InspectorWorkerAgent* workerAgent = instrumentingAgents.inspectorWorkerAgent())
+        return workerAgent->shouldWaitForDebuggerOnStart();
+    return false;
+}
+
+void InspectorInstrumentation::workerStartedImpl(InstrumentingAgents& instrumentingAgents, WorkerInspectorProxy* proxy, const URL& url)
+{
+    if (InspectorWorkerAgent* workerAgent = instrumentingAgents.inspectorWorkerAgent())
+        workerAgent->workerStarted(proxy, url);
+}
+
+void InspectorInstrumentation::workerTerminatedImpl(InstrumentingAgents& instrumentingAgents, WorkerInspectorProxy* proxy)
+{
+    if (InspectorWorkerAgent* workerAgent = instrumentingAgents.inspectorWorkerAgent())
+        workerAgent->workerTerminated(proxy);
 }
 
 #if ENABLE(WEB_SOCKETS)
@@ -1187,6 +1220,11 @@ InstrumentingAgents& InspectorInstrumentation::instrumentingAgentsForPage(Page& 
 InstrumentingAgents* InspectorInstrumentation::instrumentingAgentsForRenderer(RenderObject* renderer)
 {
     return instrumentingAgentsForFrame(renderer->frame());
+}
+
+InstrumentingAgents* InspectorInstrumentation::instrumentingAgentsForWorkerGlobalScope(WorkerGlobalScope* workerGlobalScope)
+{
+    return workerGlobalScope ? &workerGlobalScope->inspectorController().m_instrumentingAgents.get() : nullptr;
 }
 
 void InspectorInstrumentation::layerTreeDidChangeImpl(InstrumentingAgents& instrumentingAgents)

@@ -44,10 +44,19 @@ public:
         HasPlaybackTargetAvailabilityListener = 1 << 9,
         HasAudioOrVideo = 1 << 10,
         HasActiveMediaCaptureDevice = 1 << 11,
+        HasMediaCaptureDevice = 1 << 12,
     };
     typedef unsigned MediaStateFlags;
 
     virtual MediaStateFlags mediaState() const = 0;
+
+    enum MutedState {
+        NoneMuted = 0,
+        AudioIsMuted = 1 << 0,
+        CaptureDevicesAreMuted = 1 << 1,
+    };
+    typedef unsigned MutedStateFlags;
+
     virtual void pageMutedStateDidChange() = 0;
 
 protected:

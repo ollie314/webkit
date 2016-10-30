@@ -32,6 +32,7 @@
 #include "DatabaseToWebProcessConnectionMessages.h"
 #include "NetworkConnectionToWebProcessMessages.h"
 #include "NetworkProcessConnection.h"
+#include "WebCoreArgumentCoders.h"
 #include "WebIDBConnectionToClientMessages.h"
 #include "WebIDBResult.h"
 #include "WebProcess.h"
@@ -136,6 +137,11 @@ void WebIDBConnectionToServer::createIndex(const IDBRequestData& requestData, co
 void WebIDBConnectionToServer::deleteIndex(const IDBRequestData& requestData, uint64_t objectStoreIdentifier, const String& indexName)
 {
     send(Messages::WebIDBConnectionToClient::DeleteIndex(requestData, objectStoreIdentifier, indexName));
+}
+
+void WebIDBConnectionToServer::renameIndex(const IDBRequestData& requestData, uint64_t objectStoreIdentifier, uint64_t indexIdentifier, const String& newName)
+{
+    send(Messages::WebIDBConnectionToClient::RenameIndex(requestData, objectStoreIdentifier, indexIdentifier, newName));
 }
 
 void WebIDBConnectionToServer::putOrAdd(const IDBRequestData& requestData, const IDBKeyData& keyData, const IDBValue& value, const IndexedDB::ObjectStoreOverwriteMode mode)
@@ -251,6 +257,11 @@ void WebIDBConnectionToServer::didCreateIndex(const IDBResultData& result)
 void WebIDBConnectionToServer::didDeleteIndex(const IDBResultData& result)
 {
     m_connectionToServer->didDeleteIndex(result);
+}
+
+void WebIDBConnectionToServer::didRenameIndex(const IDBResultData& result)
+{
+    m_connectionToServer->didRenameIndex(result);
 }
 
 void WebIDBConnectionToServer::didPutOrAdd(const IDBResultData& result)

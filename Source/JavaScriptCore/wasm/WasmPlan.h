@@ -36,13 +36,52 @@
 namespace JSC { namespace Wasm {
 class Memory;
 
-// TODO: This should create a Wasm Module not a list of functions.
 class Plan {
 public:
-    JS_EXPORT_PRIVATE Plan(VM&, Vector<uint8_t> source);
+    typedef Vector<std::unique_ptr<FunctionCompilation>> CompiledFunctions;
 
-    Vector<std::unique_ptr<FunctionCompilation>> result;
-    std::unique_ptr<Memory> memory;
+    JS_EXPORT_PRIVATE Plan(VM&, Vector<uint8_t>);
+    JS_EXPORT_PRIVATE Plan(VM&, const uint8_t*, size_t);
+    JS_EXPORT_PRIVATE ~Plan();
+
+    bool WARN_UNUSED_RETURN failed() const { return m_failed; }
+    const String& errorMessage() const
+    {
+        RELEASE_ASSERT(failed());
+        return m_errorMessage;
+    }
+    size_t resultSize() const
+    {
+        RELEASE_ASSERT(!failed());
+        return m_result.size();
+    }
+    const FunctionCompilation* result(size_t n) const
+    {
+        RELEASE_ASSERT(!failed());
+        return m_result.at(n).get();
+    }
+    const Memory* memory() const
+    {
+        RELEASE_ASSERT(!failed());
+        return m_memory.get();
+    }
+    
+    CompiledFunctions* getFunctions()
+    {
+        RELEASE_ASSERT(!failed());
+        return &m_result;
+    }
+    std::unique_ptr<Memory>* getMemory()
+    {
+        RELEASE_ASSERT(!failed());
+        return &m_memory;
+    }
+
+private:
+    CompiledFunctions m_result;
+    std::unique_ptr<Memory> m_memory;
+    bool m_failed { true };
+    String m_errorMessage;
 };
 
 } } // namespace JSC::Wasm

@@ -52,6 +52,7 @@ VPATH = \
     $(WebCore)/bindings/generic \
     $(WebCore)/bindings/js \
     $(WebCore)/crypto \
+    $(WebCore)/crypto/parameters \
     $(WebCore)/css \
     $(WebCore)/dom \
     $(WebCore)/editing \
@@ -114,6 +115,7 @@ JS_BINDING_IDLS = \
     $(WebCore)/Modules/indexeddb/IDBOpenDBRequest.idl \
     $(WebCore)/Modules/indexeddb/IDBRequest.idl \
     $(WebCore)/Modules/indexeddb/IDBTransaction.idl \
+    $(WebCore)/Modules/indexeddb/IDBTransactionMode.idl \
     $(WebCore)/Modules/indexeddb/IDBVersionChangeEvent.idl \
     $(WebCore)/Modules/indexeddb/WorkerGlobalScopeIndexedDatabase.idl \
     $(WebCore)/Modules/indieui/UIRequestEvent.idl \
@@ -158,6 +160,7 @@ JS_BINDING_IDLS = \
     $(WebCore)/Modules/mediastream/RTCPeerConnection.idl \
     $(WebCore)/Modules/mediastream/RTCRtpReceiver.idl \
     $(WebCore)/Modules/mediastream/RTCRtpSender.idl \
+    $(WebCore)/Modules/mediastream/RTCRtpTransceiver.idl \
     $(WebCore)/Modules/mediastream/RTCSessionDescription.idl \
     $(WebCore)/Modules/mediastream/RTCStatsReport.idl \
     $(WebCore)/Modules/mediastream/RTCStatsResponse.idl \
@@ -236,11 +239,15 @@ JS_BINDING_IDLS = \
     $(WebCore)/animation/DocumentTimeline.idl \
     $(WebCore)/animation/KeyframeEffect.idl \
     $(WebCore)/animation/WebAnimation.idl \
+    $(WebCore)/crypto/CryptoAlgorithmParameters.idl \
     $(WebCore)/crypto/CryptoKey.idl \
     $(WebCore)/crypto/CryptoKeyPair.idl \
+    $(WebCore)/crypto/parameters/AesKeyGenParams.idl \
+    $(WebCore)/crypto/parameters/HmacKeyGenParams.idl \
+    $(WebCore)/crypto/parameters/RsaHashedKeyGenParams.idl \
+    $(WebCore)/crypto/parameters/RsaKeyGenParams.idl \
     $(WebCore)/crypto/SubtleCrypto.idl \
     $(WebCore)/crypto/WebKitSubtleCrypto.idl \
-    $(WebCore)/css/CSSCharsetRule.idl \
     $(WebCore)/css/CSSFontFaceLoadEvent.idl \
     $(WebCore)/css/CSSFontFaceRule.idl \
     $(WebCore)/css/CSSImportRule.idl \
@@ -349,6 +356,7 @@ JS_BINDING_IDLS = \
     $(WebCore)/dom/RequestAnimationFrameCallback.idl \
     $(WebCore)/dom/SecurityPolicyViolationEvent.idl \
     $(WebCore)/dom/ShadowRoot.idl \
+    $(WebCore)/dom/ShadowRootMode.idl \
     $(WebCore)/dom/Slotable.idl \
     $(WebCore)/dom/StaticRange.idl \
     $(WebCore)/dom/StringCallback.idl \
@@ -996,6 +1004,23 @@ XPathGrammar.cpp : xml/XPathGrammar.y $(PROJECT_FILE)
 
 # --------
 
+# WebRTC scripts
+
+WEBCORE_SDP_PROCESSOR_SCRIPTS = 
+
+ifeq ($(OS),MACOS)
+    WEBCORE_SDP_PROCESSOR_SCRIPTS := $(WEBCORE_SDP_PROCESSOR_SCRIPTS) $(WebCore)/Modules/mediastream/sdp.js
+endif
+
+ifdef WEBCORE_SDP_PROCESSOR_SCRIPTS
+all : SDPProcessorScriptsData.h
+
+SDPProcessorScriptsData.h : Scripts/make-js-file-arrays.py $(WEBCORE_SDP_PROCESSOR_SCRIPTS)
+	PYTHONPATH=$(JavaScriptCore_SCRIPTS_DIR) $(PYTHON) $< $@ SDPProcessorScriptsData.cpp $(WEBCORE_SDP_PROCESSOR_SCRIPTS)
+endif
+
+# --------
+
 # user agent style sheets
 
 USER_AGENT_STYLE_SHEETS = $(WebCore)/css/html.css $(WebCore)/css/quirks.css $(WebCore)/css/plugIns.css
@@ -1210,6 +1235,7 @@ IDL_INCLUDES = \
     $(WebCore)/Modules \
     $(WebCore)/animation \
     $(WebCore)/css \
+    $(WebCore)/crypto \
     $(WebCore)/dom \
     $(WebCore)/fileapi \
     $(WebCore)/html \

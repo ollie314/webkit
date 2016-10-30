@@ -34,6 +34,7 @@
 #include "ComposedTreeAncestorIterator.h"
 #include "ContainerNodeAlgorithms.h"
 #include "ContextMenuController.h"
+#include "DataTransfer.h"
 #include "DocumentType.h"
 #include "ElementIterator.h"
 #include "ElementRareData.h"
@@ -62,7 +63,6 @@
 #include "RenderTextControl.h"
 #include "RenderView.h"
 #include "ScopedEventQueue.h"
-#include "Settings.h"
 #include "StorageEvent.h"
 #include "StyleResolver.h"
 #include "StyleSheetContents.h"
@@ -550,10 +550,16 @@ void Node::replaceWith(Vector<NodeOrString>&& nodeOrStringVector, ExceptionCode&
         parent->insertBefore(*node, viableNextSibling.get(), ec);
 }
 
-void Node::remove(ExceptionCode& ec)
+ExceptionOr<void> Node::remove()
 {
-    if (ContainerNode* parent = parentNode())
-        parent->removeChild(*this, ec);
+    auto* parent = parentNode();
+    if (!parent)
+        return { };
+    ExceptionCode ec = 0;
+    parent->removeChild(*this, ec);
+    if (ec)
+        return Exception { ec };
+    return { };
 }
 
 void Node::normalize()
@@ -583,7 +589,7 @@ void Node::normalize()
         if (!text->length()) {
             // Care must be taken to get the next node before removing the current node.
             node = NodeTraversal::nextPostOrder(*node);
-            text->remove(IGNORE_EXCEPTION);
+            text->remove();
             continue;
         }
 
@@ -595,7 +601,7 @@ void Node::normalize()
 
             // Remove empty text nodes.
             if (!nextText->length()) {
-                nextText->remove(IGNORE_EXCEPTION);
+                nextText->remove();
                 continue;
             }
 
@@ -603,7 +609,7 @@ void Node::normalize()
             unsigned offset = text->length();
             text->appendData(nextText->data());
             document().textNodesMerged(nextText.get(), offset);
-            nextText->remove(IGNORE_EXCEPTION);
+            nextText->remove();
         }
 
         node = NodeTraversal::nextPostOrder(*node);
@@ -1085,7 +1091,7 @@ bool Node::isUnclosedNode(const Node& otherNode) const
                 return true; // treeScopeThatCanAccessOtherNode is a shadow-including inclusive ancestor of this node.
         }
         auto& root = treeScopeThatCanAccessOtherNode->rootNode();
-        if (is<ShadowRoot>(root) && downcast<ShadowRoot>(root).mode() != ShadowRoot::Mode::Open)
+        if (is<ShadowRoot>(root) && downcast<ShadowRoot>(root).mode() != ShadowRootMode::Open)
             break;
     }
 
@@ -1109,7 +1115,7 @@ HTMLSlotElement* Node::assignedSlot() const
 HTMLSlotElement* Node::assignedSlotForBindings() const
 {
     auto* shadowRoot = parentShadowRoot(*this);
-    if (shadowRoot && shadowRoot->mode() == ShadowRoot::Mode::Open)
+    if (shadowRoot && shadowRoot->mode() == ShadowRootMode::Open)
         return shadowRoot->findAssignedSlot(*this);
     return nullptr;
 }
@@ -1127,7 +1133,7 @@ ContainerNode* Node::parentInComposedTree() const
 bool Node::isInUserAgentShadowTree() const
 {
     auto* shadowRoot = containingShadowRoot();
-    return shadowRoot && shadowRoot->mode() == ShadowRoot::Mode::UserAgent;
+    return shadowRoot && shadowRoot->mode() == ShadowRootMode::UserAgent;
 }
 
 Node* Node::nonBoundaryShadowTreeRootNode()
@@ -1474,26 +1480,26 @@ String Node::textContent(bool convertBRsToNewlines) const
 void Node::setTextContent(const String& text, ExceptionCode& ec)
 {           
     switch (nodeType()) {
-        case TEXT_NODE:
-        case CDATA_SECTION_NODE:
-        case COMMENT_NODE:
-        case PROCESSING_INSTRUCTION_NODE:
-            setNodeValue(text, ec);
-            return;
-        case ELEMENT_NODE:
-        case ATTRIBUTE_NODE:
-        case DOCUMENT_FRAGMENT_NODE: {
-            auto container = makeRef(downcast<ContainerNode>(*this));
-            ChildListMutationScope mutation(container);
-            container->removeChildren();
-            if (!text.isEmpty())
-                container->appendChild(document().createTextNode(text), ec);
-            return;
-        }
-        case DOCUMENT_NODE:
-        case DOCUMENT_TYPE_NODE:
-            // Do nothing.
-            return;
+    case ATTRIBUTE_NODE:
+    case TEXT_NODE:
+    case CDATA_SECTION_NODE:
+    case COMMENT_NODE:
+    case PROCESSING_INSTRUCTION_NODE:
+        setNodeValue(text, ec);
+        return;
+    case ELEMENT_NODE:
+    case DOCUMENT_FRAGMENT_NODE: {
+        auto container = makeRef(downcast<ContainerNode>(*this));
+        ChildListMutationScope mutation(container);
+        container->removeChildren();
+        if (!text.isEmpty())
+            container->appendChild(document().createTextNode(text), ec);
+        return;
+    }
+    case DOCUMENT_NODE:
+    case DOCUMENT_TYPE_NODE:
+        // Do nothing.
+        return;
     }
     ASSERT_NOT_REACHED();
 }

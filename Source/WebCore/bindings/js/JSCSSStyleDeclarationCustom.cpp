@@ -283,9 +283,9 @@ static CSSPropertyInfo parseJavaScriptCSSPropertyName(PropertyName propertyName)
 static inline JSValue stylePropertyGetter(ExecState& state, JSCSSStyleDeclaration& thisObject, CSSPropertyID propertyID, const RefPtr<CSSValue>& value)
 {
     if (value)
-        return jsStringOrNull(&state, value->cssText());
+        return toJS<IDLNullable<IDLDOMString>>(state, value->cssText());
     // If the property is a shorthand property (such as "padding"), it can only be accessed using getPropertyValue.
-    return jsStringWithCache(&state, thisObject.wrapped().getPropertyValueInternal(propertyID));
+    return toJS<IDLDOMString>(state, thisObject.wrapped().getPropertyValueInternal(propertyID));
 }
 
 static inline JSValue stylePropertyGetter(ExecState& state, JSCSSStyleDeclaration& thisObject, CSSPropertyID propertyID)
@@ -326,7 +326,7 @@ bool JSCSSStyleDeclaration::putDelegate(ExecState* state, PropertyName propertyN
     if (!propertyInfo.propertyID)
         return false;
 
-    auto propertyValue = valueToStringTreatingNullAsEmptyString(state, value);
+    auto propertyValue = convert<IDLDOMString>(*state, value, StringConversionConfiguration::TreatNullAsEmptyString);
     if (propertyInfo.hadPixelOrPosPrefix)
         propertyValue.append("px");
 

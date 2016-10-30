@@ -37,7 +37,6 @@
 #include "CSSCrossfadeValue.h"
 #include "CSSCursorImageValue.h"
 #include "CSSCustomIdentValue.h"
-#include "CSSCustomPropertyDeclaration.h"
 #include "CSSCustomPropertyValue.h"
 #include "CSSFilterImageValue.h"
 #include "CSSFontFaceSrcValue.h"
@@ -246,6 +245,10 @@ bool CSSValue::equals(const CSSValue& other) const
             return compareCSSValues<CSSContentDistributionValue>(*this, other);
         case CustomPropertyClass:
             return compareCSSValues<CSSCustomPropertyValue>(*this, other);
+        case VariableReferenceClass:
+            return compareCSSValues<CSSVariableReferenceValue>(*this, other);
+        case PendingSubstitutionValueClass:
+            return compareCSSValues<CSSPendingSubstitutionValue>(*this, other);
         case VariableDependentClass:
             return compareCSSValues<CSSVariableDependentValue>(*this, other);
         case VariableClass:
@@ -360,8 +363,6 @@ String CSSValue::cssText() const
         return downcast<CSSVariableDependentValue>(*this).customCSSText();
     case VariableClass:
         return downcast<CSSVariableValue>(*this).customCSSText();
-    case CustomPropertyDeclarationClass:
-        return downcast<CSSCustomPropertyDeclaration>(*this).customCSSText();
     case CustomIdentClass:
         return downcast<CSSCustomIdentValue>(*this).customCSSText();
     case VariableReferenceClass:
@@ -516,9 +517,6 @@ void CSSValue::destroy()
     case VariableClass:
         delete downcast<CSSVariableValue>(this);
         return;
-    case CustomPropertyDeclarationClass:
-        delete downcast<CSSCustomPropertyDeclaration>(this);
-        return;
     case CustomIdentClass:
         delete downcast<CSSCustomIdentValue>(this);
         return;
@@ -556,11 +554,6 @@ RefPtr<CSSValue> CSSValue::cloneForCSSOM() const
         ASSERT(!isSubtypeExposedToCSSOM());
         return TextCloneCSSValue::create(classType(), cssText());
     }
-}
-
-bool CSSValue::isInvalidCustomPropertyValue() const
-{
-    return isCustomPropertyValue() && downcast<CSSCustomPropertyValue>(*this).isInvalid();
 }
 
 bool CSSValue::treatAsInheritedValue(CSSPropertyID propertyID) const

@@ -57,6 +57,7 @@
 #include "ExceptionCode.h"
 #include "FontTaggedSettings.h"
 #include "HTMLFrameOwnerElement.h"
+#include "NodeRenderStyle.h"
 #include "Pair.h"
 #include "PseudoElement.h"
 #include "Rect.h"
@@ -288,7 +289,7 @@ static const CSSPropertyID computedProperties[] = {
     CSSPropertyColumnCount,
     CSSPropertyColumnFill,
     CSSPropertyColumnGap,
-    CSSPropertyColumnProgression,
+    CSSPropertyWebkitColumnProgression,
     CSSPropertyColumnRuleColor,
     CSSPropertyColumnRuleStyle,
     CSSPropertyColumnRuleWidth,
@@ -406,7 +407,6 @@ static const CSSPropertyID computedProperties[] = {
     CSSPropertyWebkitUserDrag,
     CSSPropertyWebkitUserModify,
     CSSPropertyWebkitUserSelect,
-    CSSPropertyWebkitWritingMode,
 #if ENABLE(CSS_REGIONS)
     CSSPropertyWebkitFlowInto,
     CSSPropertyWebkitFlowFrom,
@@ -732,8 +732,8 @@ RefPtr<CSSPrimitiveValue> ComputedStyleExtractor::currentColorOrValidColor(const
 {
     // This function does NOT look at visited information, so that computed style doesn't expose that.
     if (!color.isValid())
-        return CSSValuePool::singleton().createColorValue(style->color().rgb());
-    return CSSValuePool::singleton().createColorValue(color.rgb());
+        return CSSValuePool::singleton().createColorValue(style->color());
+    return CSSValuePool::singleton().createColorValue(color);
 }
 
 static Ref<CSSPrimitiveValue> percentageOrZoomAdjustedValue(Length length, const RenderStyle& style)
@@ -901,7 +901,7 @@ Ref<CSSValue> ComputedStyleExtractor::valueForShadow(const ShadowData* shadow, C
         auto blur = adjustLengthForZoom(currShadowData->radius(), style, adjust);
         auto spread = propertyID == CSSPropertyTextShadow ? RefPtr<CSSPrimitiveValue>() : adjustLengthForZoom(currShadowData->spread(), style, adjust);
         auto style = propertyID == CSSPropertyTextShadow || currShadowData->style() == Normal ? RefPtr<CSSPrimitiveValue>() : cssValuePool.createIdentifierValue(CSSValueInset);
-        auto color = cssValuePool.createColorValue(currShadowData->color().rgb());
+        auto color = cssValuePool.createColorValue(currShadowData->color());
         list->prepend(CSSShadowValue::create(WTFMove(x), WTFMove(y), WTFMove(blur), WTFMove(spread), WTFMove(style), WTFMove(color)));
     }
     return WTFMove(list);
@@ -1861,7 +1861,7 @@ static Ref<CSSValueList> contentToCSSValue(const RenderStyle* style)
         if (is<CounterContentData>(*contentData))
             list.get().append(cssValuePool.createValue(downcast<CounterContentData>(*contentData).counter().identifier(), CSSPrimitiveValue::CSS_COUNTER_NAME));
         else if (is<ImageContentData>(*contentData))
-            list.get().append(*downcast<ImageContentData>(*contentData).image().cssValue());
+            list.get().append(downcast<ImageContentData>(*contentData).image().cssValue());
         else if (is<TextContentData>(*contentData))
             list.get().append(cssValuePool.createValue(downcast<TextContentData>(*contentData).text(), CSSPrimitiveValue::CSS_STRING));
     }
@@ -2337,6 +2337,23 @@ static StyleSelfAlignmentData resolveAlignSelfAuto(const StyleSelfAlignmentData&
     return parent->computedStyle()->alignItems();
 }
 
+static bool isImplicitlyInheritedGridOrFlexProperty(CSSPropertyID propertyID)
+{
+    // It would be nice if grid and flex worked within normal CSS mechanisms and not invented their own inheritance system.
+    switch (propertyID) {
+    case CSSPropertyAlignSelf:
+#if ENABLE(CSS_GRID_LAYOUT)
+    case CSSPropertyJustifySelf:
+    case CSSPropertyJustifyItems:
+#endif
+    // FIXME: In StyleResolver::adjustRenderStyle z-index is adjusted based on the parent display property for grid/flex.
+    case CSSPropertyZIndex:
+        return true;
+    default:
+        return false;
+    }
+}
+
 RefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropertyID propertyID, EUpdateLayout updateLayout) const
 {
     return ComputedStyleExtractor(m_element.ptr(), m_allowVisitedStyle, m_pseudoElementSpecifier).propertyValue(propertyID, updateLayout);
@@ -2347,35 +2364,47 @@ Ref<MutableStyleProperties> CSSComputedStyleDeclaration::copyProperties() const
     return ComputedStyleExtractor(m_element.ptr(), m_allowVisitedStyle, m_pseudoElementSpecifier).copyProperties();
 }
 
-static inline bool elementOrItsAncestorNeedsStyleRecalc(Element& element)
+static inline bool hasValidStyleForProperty(Element& element, CSSPropertyID propertyID)
 {
-    if (element.needsStyleRecalc())
-        return true;
-    if (element.document().hasPendingForcedStyleRecalc())
-        return true;
-    if (!element.document().childNeedsStyleRecalc())
+    if (element.styleValidity() != Style::Validity::Valid)
         return false;
+    if (element.document().hasPendingForcedStyleRecalc())
+        return false;
+    if (!element.document().childNeedsStyleRecalc())
+        return true;
+
+    bool isInherited = CSSProperty::isInheritedProperty(propertyID) || isImplicitlyInheritedGridOrFlexProperty(propertyID);
+    bool maybeExplicitlyInherited = !isInherited;
 
     const auto* currentElement = &element;
     for (auto& ancestor : composedTreeAncestors(element)) {
-        if (ancestor.needsStyleRecalc())
-            return true;
+        if (ancestor.styleValidity() >= Style::Validity::SubtreeInvalid)
+            return false;
+
+        if (maybeExplicitlyInherited) {
+            auto* style = currentElement->renderStyle();
+            maybeExplicitlyInherited = !style || style->hasExplicitlyInheritedProperties();
+        }
+
+        if ((isInherited || maybeExplicitlyInherited) && ancestor.styleValidity() == Style::Validity::ElementInvalid)
+            return false;
 
         if (ancestor.directChildNeedsStyleRecalc() && currentElement->styleIsAffectedByPreviousSibling())
-            return true;
+            return false;
 
         currentElement = &ancestor;
     }
-    return false;
+
+    return true;
 }
 
-static bool updateStyleIfNeededForElement(Element& element)
+static bool updateStyleIfNeededForProperty(Element& element, CSSPropertyID propertyID)
 {
     auto& document = element.document();
 
     document.styleScope().flushPendingUpdate();
 
-    if (!elementOrItsAncestorNeedsStyleRecalc(element))
+    if (hasValidStyleForProperty(element, propertyID))
         return false;
 
     document.updateStyleIfNeeded();
@@ -2408,7 +2437,7 @@ static Ref<CSSValue> shapePropertyValue(const RenderStyle& style, const ShapeVal
 
     if (shapeValue->type() == ShapeValue::Type::Image) {
         if (shapeValue->image())
-            return *shapeValue->image()->cssValue();
+            return shapeValue->image()->cssValue();
         return CSSValuePool::singleton().createIdentifierValue(CSSValueNone);
     }
 
@@ -2468,7 +2497,7 @@ RefPtr<CSSValue> ComputedStyleExtractor::customPropertyValue(const String& prope
     if (!styledElement)
         return nullptr;
     
-    if (updateStyleIfNeededForElement(*styledElement)) {
+    if (updateStyleIfNeededForProperty(*styledElement, CSSPropertyCustom)) {
         // Style update may change styledElement() to PseudoElement or back.
         styledElement = this->styledElement();
     }
@@ -2500,7 +2529,7 @@ RefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propertyID,
     if (updateLayout) {
         Document& document = m_element->document();
 
-        if (updateStyleIfNeededForElement(*styledElement)) {
+        if (updateStyleIfNeededForProperty(*styledElement, propertyID)) {
             // Style update may change styledElement() to PseudoElement or back.
             styledElement = this->styledElement();
         }
@@ -2538,7 +2567,7 @@ RefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propertyID,
             break;
 
         case CSSPropertyBackgroundColor:
-            return cssValuePool.createColorValue(m_allowVisitedStyle? style->visitedDependentColor(CSSPropertyBackgroundColor).rgb() : style->backgroundColor().rgb());
+            return cssValuePool.createColorValue(m_allowVisitedStyle? style->visitedDependentColor(CSSPropertyBackgroundColor) : style->backgroundColor());
         case CSSPropertyBackgroundImage:
         case CSSPropertyWebkitMaskImage: {
             const FillLayer* layers = propertyID == CSSPropertyWebkitMaskImage ? style->maskLayers() : style->backgroundLayers();
@@ -2555,7 +2584,7 @@ RefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propertyID,
             RefPtr<CSSValueList> list = CSSValueList::createCommaSeparated();
             for (const FillLayer* currLayer = layers; currLayer; currLayer = currLayer->next()) {
                 if (currLayer->image())
-                    list->append(*currLayer->image()->cssValue());
+                    list->append(currLayer->image()->cssValue());
                 else
                     list->append(cssValuePool.createIdentifierValue(CSSValueNone));
             }
@@ -2699,13 +2728,13 @@ RefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propertyID,
                 return style->borderImageSource()->cssValue();
             return cssValuePool.createIdentifierValue(CSSValueNone);
         case CSSPropertyBorderTopColor:
-            return m_allowVisitedStyle ? cssValuePool.createColorValue(style->visitedDependentColor(CSSPropertyBorderTopColor).rgb()) : currentColorOrValidColor(style, style->borderTopColor());
+            return m_allowVisitedStyle ? cssValuePool.createColorValue(style->visitedDependentColor(CSSPropertyBorderTopColor)) : currentColorOrValidColor(style, style->borderTopColor());
         case CSSPropertyBorderRightColor:
-            return m_allowVisitedStyle ? cssValuePool.createColorValue(style->visitedDependentColor(CSSPropertyBorderRightColor).rgb()) : currentColorOrValidColor(style, style->borderRightColor());
+            return m_allowVisitedStyle ? cssValuePool.createColorValue(style->visitedDependentColor(CSSPropertyBorderRightColor)) : currentColorOrValidColor(style, style->borderRightColor());
         case CSSPropertyBorderBottomColor:
-            return m_allowVisitedStyle ? cssValuePool.createColorValue(style->visitedDependentColor(CSSPropertyBorderBottomColor).rgb()) : currentColorOrValidColor(style, style->borderBottomColor());
+            return m_allowVisitedStyle ? cssValuePool.createColorValue(style->visitedDependentColor(CSSPropertyBorderBottomColor)) : currentColorOrValidColor(style, style->borderBottomColor());
         case CSSPropertyBorderLeftColor:
-            return m_allowVisitedStyle ? cssValuePool.createColorValue(style->visitedDependentColor(CSSPropertyBorderLeftColor).rgb()) : currentColorOrValidColor(style, style->borderLeftColor());
+            return m_allowVisitedStyle ? cssValuePool.createColorValue(style->visitedDependentColor(CSSPropertyBorderLeftColor)) : currentColorOrValidColor(style, style->borderLeftColor());
         case CSSPropertyBorderTopStyle:
             return cssValuePool.createValue(style->borderTopStyle());
         case CSSPropertyBorderRightStyle:
@@ -2756,7 +2785,7 @@ RefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propertyID,
         case CSSPropertyClear:
             return cssValuePool.createValue(style->clear());
         case CSSPropertyColor:
-            return cssValuePool.createColorValue(m_allowVisitedStyle ? style->visitedDependentColor(CSSPropertyColor).rgb() : style->color().rgb());
+            return cssValuePool.createColorValue(m_allowVisitedStyle ? style->visitedDependentColor(CSSPropertyColor) : style->color());
         case CSSPropertyWebkitPrintColorAdjust:
             return cssValuePool.createValue(style->printColorAdjust());
         case CSSPropertyWebkitColumnAxis:
@@ -2771,10 +2800,10 @@ RefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propertyID,
             if (style->hasNormalColumnGap())
                 return cssValuePool.createIdentifierValue(CSSValueNormal);
             return zoomAdjustedPixelValue(style->columnGap(), *style);
-        case CSSPropertyColumnProgression:
+        case CSSPropertyWebkitColumnProgression:
             return cssValuePool.createValue(style->columnProgression());
         case CSSPropertyColumnRuleColor:
-            return m_allowVisitedStyle ? cssValuePool.createColorValue(style->visitedDependentColor(CSSPropertyOutlineColor).rgb()) : currentColorOrValidColor(style, style->columnRuleColor());
+            return m_allowVisitedStyle ? cssValuePool.createColorValue(style->visitedDependentColor(CSSPropertyOutlineColor)) : currentColorOrValidColor(style, style->columnRuleColor());
         case CSSPropertyColumnRuleStyle:
             return cssValuePool.createValue(style->columnRuleStyle());
         case CSSPropertyColumnRuleWidth:
@@ -2808,7 +2837,7 @@ RefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propertyID,
                 list = CSSValueList::createCommaSeparated();
                 for (unsigned i = 0; i < cursors->size(); ++i)
                     if (StyleImage* image = cursors->at(i).image())
-                        list->append(*image->cssValue());
+                        list->append(image->cssValue());
             }
             auto value = cssValuePool.createValue(style->cursor());
             if (list) {
@@ -3116,7 +3145,7 @@ RefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propertyID,
                 return cssValuePool.createIdentifierValue(CSSValueAuto);
             return cssValuePool.createValue(style->orphans(), CSSPrimitiveValue::CSS_NUMBER);
         case CSSPropertyOutlineColor:
-            return m_allowVisitedStyle ? cssValuePool.createColorValue(style->visitedDependentColor(CSSPropertyOutlineColor).rgb()) : currentColorOrValidColor(style, style->outlineColor());
+            return m_allowVisitedStyle ? cssValuePool.createColorValue(style->visitedDependentColor(CSSPropertyOutlineColor)) : currentColorOrValidColor(style, style->outlineColor());
         case CSSPropertyOutlineOffset:
             return zoomAdjustedPixelValue(style->outlineOffset(), *style);
         case CSSPropertyOutlineStyle:
@@ -3654,7 +3683,7 @@ RefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propertyID,
             return CSSPrimitiveValue::create(style->lineSnap());
         case CSSPropertyWebkitLineAlign:
             return CSSPrimitiveValue::create(style->lineAlign());
-        case CSSPropertyWebkitWritingMode:
+        case CSSPropertyWritingMode:
             return cssValuePool.createValue(style->writingMode());
         case CSSPropertyWebkitTextCombine:
             return cssValuePool.createValue(style->textCombine());
@@ -3955,7 +3984,6 @@ RefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propertyID,
         case CSSPropertyKerning:
         case CSSPropertyTextAnchor:
         case CSSPropertyVectorEffect:
-        case CSSPropertyWritingMode:
         case CSSPropertyWebkitSvgShadow:
             return svgPropertyValue(propertyID, DoNotUpdateLayout);
         case CSSPropertyCustom:
@@ -3977,7 +4005,7 @@ String CSSComputedStyleDeclaration::getPropertyValue(CSSPropertyID propertyID) c
 
 unsigned CSSComputedStyleDeclaration::length() const
 {
-    updateStyleIfNeededForElement(m_element.get());
+    updateStyleIfNeededForProperty(m_element.get(), CSSPropertyCustom);
 
     auto* style = m_element->computedStyle(m_pseudoElementSpecifier);
     if (!style)

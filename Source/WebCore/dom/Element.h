@@ -32,6 +32,7 @@
 #include "RegionOversetState.h"
 #include "ScrollToOptions.h"
 #include "ScrollTypes.h"
+#include "ShadowRootMode.h"
 #include "SimulatedClickOptions.h"
 #include "StyleChange.h"
 
@@ -39,6 +40,7 @@ namespace WebCore {
 
 class ClientRect;
 class ClientRectList;
+class CustomElementReactionQueue;
 class DatasetDOMStringMap;
 class Dictionary;
 class DOMTokenList;
@@ -269,7 +271,6 @@ public:
     WEBCORE_EXPORT ShadowRoot* shadowRoot() const;
     WEBCORE_EXPORT ShadowRoot* createShadowRoot(ExceptionCode&);
 
-    enum class ShadowRootMode { Open, Closed };
     struct ShadowRootInit {
         ShadowRootMode mode;
     };
@@ -284,7 +285,8 @@ public:
     void setIsDefinedCustomElement(JSCustomElementInterface&);
     void setIsFailedCustomElement(JSCustomElementInterface&);
     void setIsCustomElementUpgradeCandidate();
-    JSCustomElementInterface* customElementInterface() const;
+    void enqueueToUpgrade(JSCustomElementInterface&);
+    CustomElementReactionQueue* reactionQueue() const;
 #endif
 
     // FIXME: this should not be virtual, do not override this.

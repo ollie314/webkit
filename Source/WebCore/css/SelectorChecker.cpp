@@ -35,17 +35,10 @@
 #include "ElementTraversal.h"
 #include "Frame.h"
 #include "FrameSelection.h"
-#include "HTMLAnchorElement.h"
 #include "HTMLDocument.h"
-#include "HTMLFrameElementBase.h"
-#include "HTMLInputElement.h"
 #include "HTMLNames.h"
-#include "HTMLOptGroupElement.h"
-#include "HTMLOptionElement.h"
 #include "HTMLParserIdioms.h"
-#include "HTMLProgressElement.h"
 #include "HTMLSlotElement.h"
-#include "HTMLStyleElement.h"
 #include "InspectorInstrumentation.h"
 #include "Page.h"
 #include "RenderElement.h"
@@ -292,7 +285,7 @@ SelectorChecker::MatchResult SelectorChecker::matchRecursively(CheckingContext& 
                 if (context.element->shadowPseudoId() != context.selector->value())
                     return MatchResult::fails(Match::SelectorFailsLocally);
 
-                if (context.selector->isWebKitCustomPseudoElement() && root->mode() != ShadowRoot::Mode::UserAgent)
+                if (context.selector->isWebKitCustomPseudoElement() && root->mode() != ShadowRootMode::UserAgent)
                     return MatchResult::fails(Match::SelectorFailsLocally);
             } else
                 return MatchResult::fails(Match::SelectorFailsLocally);

@@ -37,7 +37,6 @@
 #include "GeometryUtilities.h"
 #include "GraphicsContext.h"
 #include "HTMLElement.h"
-#include "HTMLImageElement.h"
 #include "HTMLNames.h"
 #include "HTMLTableCellElement.h"
 #include "HTMLTableElement.h"
@@ -65,7 +64,6 @@
 #include "RenderView.h"
 #include "RenderWidget.h"
 #include "SVGRenderSupport.h"
-#include "Settings.h"
 #include "StyleResolver.h"
 #include "TransformState.h"
 #include "htmlediting.h"
@@ -1421,7 +1419,7 @@ void RenderObject::insertedIntoTree()
         parent()->dirtyLinesFromChangedChild(*this);
 
     if (RenderFlowThread* flowThread = flowThreadContainingBlock())
-        flowThread->flowThreadDescendantInserted(this);
+        flowThread->flowThreadDescendantInserted(*this);
 }
 
 void RenderObject::willBeRemovedFromTree()
@@ -1778,14 +1776,8 @@ bool RenderObject::canUpdateSelectionOnRootLineBoxes()
     if (needsLayout())
         return false;
 
-    if (preferredLogicalWidthsDirty())
-        return false;
-
     RenderBlock* containingBlock = this->containingBlock();
-    if (!containingBlock)
-        return true;
-
-    return !containingBlock->needsLayout() && !containingBlock->preferredLogicalWidthsDirty();
+    return containingBlock ? !containingBlock->needsLayout() : true;
 }
 
 // We only create "generated" child renderers like one for first-letter if:

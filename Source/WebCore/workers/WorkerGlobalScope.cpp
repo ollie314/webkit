@@ -32,19 +32,21 @@
 #include "Crypto.h"
 #include "ExceptionCode.h"
 #include "IDBConnectionProxy.h"
-#include "InspectorConsoleInstrumentation.h"
+#include "InspectorInstrumentation.h"
 #include "ScheduledAction.h"
 #include "ScriptSourceCode.h"
 #include "SecurityOrigin.h"
 #include "SecurityOriginPolicy.h"
 #include "SocketProvider.h"
+#include "WorkerInspectorController.h"
 #include "WorkerLoaderProxy.h"
 #include "WorkerLocation.h"
 #include "WorkerNavigator.h"
 #include "WorkerReportingProxy.h"
 #include "WorkerScriptLoader.h"
 #include "WorkerThread.h"
-#include <inspector/ConsoleMessage.h>
+#include <inspector/ScriptArguments.h>
+#include <inspector/ScriptCallStack.h>
 
 using namespace Inspector;
 
@@ -53,8 +55,9 @@ namespace WebCore {
 WorkerGlobalScope::WorkerGlobalScope(const URL& url, const String& userAgent, WorkerThread& thread, bool shouldBypassMainWorldContentSecurityPolicy, RefPtr<SecurityOrigin>&& topOrigin, IDBClient::IDBConnectionProxy* connectionProxy, SocketProvider* socketProvider)
     : m_url(url)
     , m_userAgent(userAgent)
-    , m_script(std::make_unique<WorkerScriptController>(this))
     , m_thread(thread)
+    , m_script(std::make_unique<WorkerScriptController>(this))
+    , m_inspectorController(std::make_unique<WorkerInspectorController>(*this))
     , m_shouldBypassMainWorldContentSecurityPolicy(shouldBypassMainWorldContentSecurityPolicy)
     , m_eventQueue(*this)
     , m_topOrigin(topOrigin)
@@ -255,7 +258,6 @@ void WorkerGlobalScope::addConsoleMessage(std::unique_ptr<Inspector::ConsoleMess
         return;
     }
 
-    thread().workerReportingProxy().postConsoleMessageToWorkerObject(message->source(), message->level(), message->message(), message->line(), message->column(), message->url());
     InspectorInstrumentation::addMessageToConsole(this, WTFMove(message));
 }
 
@@ -270,8 +272,6 @@ void WorkerGlobalScope::addMessage(MessageSource source, MessageLevel level, con
         postTask(AddConsoleMessageTask(source, level, messageText));
         return;
     }
-
-    thread().workerReportingProxy().postConsoleMessageToWorkerObject(source, level, messageText, lineNumber, columnNumber, sourceURL);
 
     std::unique_ptr<Inspector::ConsoleMessage> message;
     if (callStack)

@@ -57,9 +57,8 @@ class EmptyMediaEndpoint : public MediaEndpoint {
 public:
     EmptyMediaEndpoint(MediaEndpointClient&) { }
 
-    void setConfiguration(RefPtr<MediaEndpointConfiguration>&&) override { }
+    void setConfiguration(MediaEndpointConfiguration&&) override { }
 
-    void generateDtlsInfo() override { }
     MediaPayloadVector getDefaultAudioPayloads() override { return MediaPayloadVector(); }
     MediaPayloadVector getDefaultVideoPayloads() override { return MediaPayloadVector(); }
     MediaPayloadVector filterPayloads(const MediaPayloadVector&, const MediaPayloadVector&) override { return MediaPayloadVector(); }
@@ -67,7 +66,7 @@ public:
     UpdateResult updateReceiveConfiguration(MediaEndpointSessionConfiguration*, bool) override { return UpdateResult::Failed; }
     UpdateResult updateSendConfiguration(MediaEndpointSessionConfiguration*, const RealtimeMediaSourceMap&, bool) override { return UpdateResult::Failed; }
 
-    void addRemoteCandidate(IceCandidate&, const String&, const String&, const String&) override { }
+    void addRemoteCandidate(const IceCandidate&, const String&, const String&, const String&) override { }
 
     Ref<RealtimeMediaSource> createMutedRemoteSource(const String&, RealtimeMediaSource::Type) override { return EmptyRealtimeMediaSource::create(); }
     void replaceSendSource(RealtimeMediaSource&, const String&) override { }

@@ -440,8 +440,8 @@ public:
     ExceptionOr<Ref<MockPageOverlay>> installMockPageOverlay(PageOverlayType);
     ExceptionOr<String> pageOverlayLayerTreeAsText() const;
 
-    void setPageMuted(bool);
-    bool isPagePlayingAudio();
+    void setPageMuted(const String&);
+    String pageMediaState();
 
     void setPageDefersLoading(bool);
 
