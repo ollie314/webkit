@@ -1895,6 +1895,8 @@ fast/dom/rtl-scroll-to-leftmost-and-resize.html
 fast/dynamic/paused-event-dispatch.html
 fast/events/anchor-image-scrolled-x-y.html
 fast/events/autoscroll-should-not-stop-on-keypress.html [ Skip ]
+fast/events/before-input-prevent-insert-replacement.html
+fast/events/input-event-insert-replacement.html
 fast/events/input-image-scrolled-x-y.html
 fast/events/mouse-cursor-image-set.html
 fast/events/recorded-keydown-event.html
@@ -2706,6 +2708,7 @@ webkit.org/b/164088 media/modern-media-controls/scrubber-support/scrubber-suppor
 webkit.org/b/164088 media/modern-media-controls/scrubber-support/scrubber-support-drag.html [ Skip ]
 webkit.org/b/164160 media/modern-media-controls/volume-support/volume-support-click.html [ Skip ]
 webkit.org/b/164160 media/modern-media-controls/volume-support/volume-support-drag.html [ Skip ]
+webkit.org/b/164250 media/modern-media-controls/volume-support/volume-support-media-api.html [ Skip ]
 
 # This variation font test requires Skia which isn't available on iOS.
 webkit.org/b/163093 fast/text/variations/advances.html [ Failure ]

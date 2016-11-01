@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005, 2006, 2007, 2008 Apple Inc.  All rights reserved.
+ * Copyright (C) 2005-2008, 2016 Apple Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,6 +28,7 @@
 
 #include "AXObjectCache.h"
 #include "BreakBlockquoteCommand.h"
+#include "DataTransfer.h"
 #include "DeleteSelectionCommand.h"
 #include "Document.h"
 #include "Editor.h"
@@ -39,6 +40,7 @@
 #include "InsertParagraphSeparatorCommand.h"
 #include "InsertTextCommand.h"
 #include "Logging.h"
+#include "MarkupAccumulator.h"
 #include "MathMLElement.h"
 #include "RenderElement.h"
 #include "StaticRange.h"
@@ -406,13 +408,24 @@ String TypingCommand::inputEventData() const
 {
     switch (m_currentTypingEditAction) {
     case EditActionTypingInsertText:
-    case EditActionInsertReplacement:
     case EditActionTypingInsertPendingComposition:
     case EditActionTypingInsertFinalComposition:
         return m_currentTextToInsert;
+    case EditActionInsertReplacement:
+        return isEditingTextAreaOrTextInput() ? m_currentTextToInsert : String();
     default:
         return CompositeEditCommand::inputEventData();
     }
+}
+
+RefPtr<DataTransfer> TypingCommand::inputEventDataTransfer() const
+{
+    if (m_currentTypingEditAction != EditActionInsertReplacement || isEditingTextAreaOrTextInput())
+        return nullptr;
+
+    StringBuilder htmlText;
+    MarkupAccumulator::appendCharactersReplacingEntities(htmlText, m_currentTextToInsert, 0, m_currentTextToInsert.length(), EntityMaskInHTMLPCDATA);
+    return DataTransfer::createForInputEvent(m_currentTextToInsert, htmlText.toString());
 }
 
 void TypingCommand::didApplyCommand()
@@ -630,6 +643,7 @@ bool TypingCommand::makeEditableRootEmpty()
 void TypingCommand::deleteKeyPressed(TextGranularity granularity, bool shouldAddToKillRing)
 {
     Frame& frame = this->frame();
+    Ref<Frame> protector(frame);
 
     frame.editor().updateMarkersForWordsAffectedByEditing(false);
 
@@ -750,6 +764,7 @@ void TypingCommand::deleteKeyPressed(TextGranularity granularity, bool shouldAdd
 void TypingCommand::forwardDeleteKeyPressed(TextGranularity granularity, bool shouldAddToKillRing)
 {
     Frame& frame = this->frame();
+    Ref<Frame> protector(frame);
 
     frame.editor().updateMarkersForWordsAffectedByEditing(false);
 

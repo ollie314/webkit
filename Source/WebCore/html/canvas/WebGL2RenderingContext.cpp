@@ -59,12 +59,12 @@
 
 namespace WebCore {
 
-WebGL2RenderingContext::WebGL2RenderingContext(HTMLCanvasElement* passedCanvas, GraphicsContext3D::Attributes attributes)
+WebGL2RenderingContext::WebGL2RenderingContext(HTMLCanvasElement& passedCanvas, GraphicsContext3D::Attributes attributes)
     : WebGLRenderingContextBase(passedCanvas, attributes)
 {
 }
 
-WebGL2RenderingContext::WebGL2RenderingContext(HTMLCanvasElement* passedCanvas, RefPtr<GraphicsContext3D>&& context, GraphicsContext3D::Attributes attributes)
+WebGL2RenderingContext::WebGL2RenderingContext(HTMLCanvasElement& passedCanvas, RefPtr<GraphicsContext3D>&& context, GraphicsContext3D::Attributes attributes)
     : WebGLRenderingContextBase(passedCanvas, WTFMove(context), attributes)
 {
     initializeShaderExtensions();
@@ -94,7 +94,7 @@ void WebGL2RenderingContext::bufferData(GC3Denum target, ArrayBufferView& data, 
         synthesizeGLError(GraphicsContext3D::INVALID_VALUE, "bufferData", "srcOffset or length is out of bounds");
         return;
     }
-    auto slice = Uint8Array::create(data.buffer(), data.byteOffset() + srcOffset, length);
+    auto slice = Uint8Array::create(data.unsharedBuffer(), data.byteOffset() + srcOffset, length);
     if (!slice) {
         synthesizeGLError(GraphicsContext3D::OUT_OF_MEMORY, "bufferData", "Could not create intermediate ArrayBufferView");
         return;
@@ -108,7 +108,7 @@ void WebGL2RenderingContext::bufferSubData(GC3Denum target, long long offset, Ar
         synthesizeGLError(GraphicsContext3D::INVALID_VALUE, "bufferData", "srcOffset or length is out of bounds");
         return;
     }
-    auto slice = Uint8Array::create(data.buffer(), data.byteOffset() + srcOffset, length);
+    auto slice = Uint8Array::create(data.unsharedBuffer(), data.byteOffset() + srcOffset, length);
     if (!slice) {
         synthesizeGLError(GraphicsContext3D::OUT_OF_MEMORY, "bufferData", "Could not create intermediate ArrayBufferView");
         return;

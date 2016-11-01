@@ -149,6 +149,14 @@ unsigned extractCompoundFlags(const CSSParserSelector& simpleSelector, CSSParser
 
 } // namespace
 
+static bool isDescendantCombinator(CSSSelector::RelationType relation)
+{
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+    return relation == CSSSelector::DescendantSpace || relation == CSSSelector::DescendantDoubleChild;
+#else
+    return relation == CSSSelector::DescendantSpace;
+#endif
+}
 std::unique_ptr<CSSParserSelector> CSSSelectorParser::consumeComplexSelector(CSSParserTokenRange& range)
 {
     std::unique_ptr<CSSParserSelector> selector = consumeCompoundSelector(range);
@@ -163,7 +171,7 @@ std::unique_ptr<CSSParserSelector> CSSSelectorParser::consumeComplexSelector(CSS
     while (auto combinator = consumeCombinator(range)) {
         std::unique_ptr<CSSParserSelector> nextSelector = consumeCompoundSelector(range);
         if (!nextSelector)
-            return combinator == CSSSelector::Descendant ? WTFMove(selector) : nullptr;
+            return isDescendantCombinator(combinator) ? WTFMove(selector) : nullptr;
         if (previousCompoundFlags & HasPseudoElementForRightmostCompound)
             return nullptr;
         CSSParserSelector* end = nextSelector.get();
@@ -412,6 +420,9 @@ std::unique_ptr<CSSParserSelector> CSSSelectorParser::consumeAttribute(CSSParser
 {
     ASSERT(range.peek().type() == LeftBracketToken);
     CSSParserTokenRange block = range.consumeBlock();
+    if (block.end() == range.end())
+        return nullptr; // No ] was found. Be strict about this.
+
     block.consumeWhitespace();
 
     AtomicString namespacePrefix;
@@ -532,7 +543,9 @@ std::unique_ptr<CSSParserSelector> CSSSelectorParser::consumePseudo(CSSParserTok
     block.consumeWhitespace();
     if (token.type() != FunctionToken)
         return nullptr;
-
+    
+    const auto& argumentStart = block.peek();
+    
     if (selector->match() == CSSSelector::PseudoClass) {
         switch (selector->pseudoClassType()) {
         case CSSSelector::PseudoClassNot: {
@@ -552,11 +565,17 @@ std::unique_ptr<CSSParserSelector> CSSSelectorParser::consumePseudo(CSSParserTok
             if (!consumeANPlusB(block, ab))
                 return nullptr;
             block.consumeWhitespace();
+            const auto& argumentEnd = block.peek();
+            auto rangeOfANPlusB = block.makeSubRange(&argumentStart, &argumentEnd);
+            auto argument = rangeOfANPlusB.serialize();
+            selector->setArgument(argument.stripWhiteSpace());
             if (!block.atEnd()) {
                 if (block.peek().type() != IdentToken)
                     return nullptr;
                 const CSSParserToken& ident = block.consume();
                 if (!equalIgnoringASCIICase(ident.value(), "of"))
+                    return nullptr;
+                if (block.peek().type() != WhitespaceToken)
                     return nullptr;
                 DisallowPseudoElementsScope scope(this);
                 block.consumeWhitespace();
@@ -600,7 +619,7 @@ std::unique_ptr<CSSParserSelector> CSSSelectorParser::consumePseudo(CSSParserTok
         case CSSSelector::PseudoClassDir:
         case CSSSelector::PseudoClassRole: {
             const CSSParserToken& ident = block.consumeIncludingWhitespace();
-            if (ident.type() != IdentToken)
+            if (ident.type() != IdentToken || !block.atEnd())
                 return nullptr;
             selector->setArgument(ident.value().toAtomicString());
             return selector;
@@ -648,7 +667,7 @@ CSSSelector::RelationType CSSSelectorParser::consumeCombinator(CSSParserTokenRan
     auto fallbackResult = CSSSelector::Subselector;
     while (range.peek().type() == WhitespaceToken) {
         range.consume();
-        fallbackResult = CSSSelector::Descendant;
+        fallbackResult = CSSSelector::DescendantSpace;
     }
 
     if (range.peek().type() != DelimiterToken)
@@ -657,17 +676,25 @@ CSSSelector::RelationType CSSSelectorParser::consumeCombinator(CSSParserTokenRan
     UChar delimiter = range.peek().delimiter();
 
     if (delimiter == '+' || delimiter == '~' || delimiter == '>') {
-        range.consumeIncludingWhitespace();
-        if (delimiter == '+')
-            return CSSSelector::DirectAdjacent;
-        if (delimiter == '~')
-            return CSSSelector::IndirectAdjacent;
-#if ENABLE_CSS_SELECTORS_LEVEL4
-        // FIXME-NEWPARSER: Need to set that this was a >> so serialization is correct
-        if (delimiter == '>' && range.peek().type() == DelimiterToken && range.peek().delimiter() == '>') {
+        if (delimiter == '+') {
             range.consumeIncludingWhitespace();
-            return CSSSelector::Descendant;
+            return CSSSelector::DirectAdjacent;
         }
+        
+        if (delimiter == '~') {
+            range.consumeIncludingWhitespace();
+            return CSSSelector::IndirectAdjacent;
+        }
+        
+#if ENABLE_CSS_SELECTORS_LEVEL4
+        range.consume();
+        if (range.peek().type() == DelimiterToken && range.peek().delimiter() == '>') {
+            range.consumeIncludingWhitespace();
+            return CSSSelector::DescendantDoubleChild;
+        }
+        range.consumeWhitespace();
+#else
+        range.consumeIncludingWhitespace();
 #endif
         return CSSSelector::Child;
     }

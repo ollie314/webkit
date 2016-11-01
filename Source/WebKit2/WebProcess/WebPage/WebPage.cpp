@@ -4625,11 +4625,15 @@ void WebPage::insertTextAsync(const String& text, const EditingRange& replacemen
 {
     Frame& frame = m_page->focusController().focusedOrMainFrame();
 
+    Ref<Frame> protector(frame);
+
+    bool replacesText = false;
     if (replacementEditingRange.location != notFound) {
         RefPtr<Range> replacementRange = rangeFromEditingRange(frame, replacementEditingRange, static_cast<EditingRangeIsRelativeTo>(editingRangeIsRelativeTo));
         if (replacementRange) {
             TemporaryChange<bool> isSelectingTextWhileInsertingAsynchronously(m_isSelectingTextWhileInsertingAsynchronously, suppressSelectionUpdate);
             frame.selection().setSelection(VisibleSelection(*replacementRange, SEL_DEFAULT_AFFINITY));
+            replacesText = true;
         }
     }
     
@@ -4639,7 +4643,7 @@ void WebPage::insertTextAsync(const String& text, const EditingRange& replacemen
     if (!frame.editor().hasComposition()) {
         // An insertText: might be handled by other responders in the chain if we don't handle it.
         // One example is space bar that results in scrolling down the page.
-        frame.editor().insertText(text, nullptr);
+        frame.editor().insertText(text, nullptr, replacesText ? TextEventInputAutocompletion : TextEventInputKeyboard);
     } else
         frame.editor().confirmComposition(text);
 }
@@ -4789,6 +4793,8 @@ void WebPage::setComposition(const String& text, const Vector<CompositionUnderli
         return;
     }
 
+    Ref<Frame> protector(*targetFrame);
+
     if (replacementLength > 0) {
         // The layout needs to be uptodate before setting a selection
         targetFrame->document()->updateLayout();
@@ -4849,10 +4855,11 @@ static bool needsPlainTextQuirk(bool needsQuirks, const URL& url)
 
 void WebPage::didChangeSelection()
 {
+    Frame& frame = m_page->focusController().focusedOrMainFrame();
     // The act of getting Dictionary Popup info can make selection changes that we should not propagate to the UIProcess.
     // Specifically, if there is a caret selection, it will change to a range selection of the word around the caret. And
     // then it will change back.
-    if (m_isGettingDictionaryPopupInfo)
+    if (frame.editor().isGettingDictionaryPopupInfo())
         return;
 
     // Similarly, we don't want to propagate changes to the web process when inserting text asynchronously, since we will
@@ -4860,7 +4867,6 @@ void WebPage::didChangeSelection()
     if (m_isSelectingTextWhileInsertingAsynchronously)
         return;
 
-    Frame& frame = m_page->focusController().focusedOrMainFrame();
     FrameView* view = frame.view();
 
     // If there is a layout pending, we should avoid populating EditorState that require layout to be done or it will

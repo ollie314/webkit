@@ -2360,6 +2360,13 @@ void CodeBlock::finishCreation(VM& vm, ScriptExecutable* ownerExecutable, Unlink
             break;
         }
 
+        case op_create_rest: {
+            int numberOfArgumentsToSkip = instructions[i + 3].u.operand;
+            ASSERT_UNUSED(numberOfArgumentsToSkip, numberOfArgumentsToSkip >= 0);
+            ASSERT_WITH_MESSAGE(numberOfArgumentsToSkip == numParameters() - 1, "We assume that this is true when rematerializing the rest parameter during OSR exit in the FTL JIT.");
+            break;
+        }
+
         default:
             break;
         }
@@ -2522,7 +2529,7 @@ CodeBlock* CodeBlock::specialOSREntryBlockOrNull()
 
 void CodeBlock::visitWeakly(SlotVisitor& visitor)
 {
-    bool setByMe = m_visitWeaklyHasBeenCalled.compareExchangeStrong(false, true);
+    bool setByMe = !m_visitWeaklyHasBeenCalled.compareExchangeStrong(false, true);
     if (!setByMe)
         return;
 

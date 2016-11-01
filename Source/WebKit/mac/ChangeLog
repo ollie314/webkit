@@ -1,3 +1,104 @@
+2016-10-29  Filip Pizlo  <fpizlo@apple.com>
+
+        JSC should support SharedArrayBuffer
+        https://bugs.webkit.org/show_bug.cgi?id=163986
+
+        Reviewed by Keith Miller.
+        
+        Support the RuntimeFlag.
+
+        * WebView/WebPreferencesPrivate.h:
+
+2016-10-31  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        [WK1] Candidate visibility should not update as a result of selection during a dictionary lookup
+        https://bugs.webkit.org/show_bug.cgi?id=164236
+        <rdar://problem/28747712>
+
+        Reviewed by Beth Dakin.
+
+        See WebCore ChangeLog for more detail. Sets the Editor's isGettingDictionaryPopupInfo state to true during a
+        dictionary lookup.
+
+        * WebCoreSupport/WebEditorClient.mm:
+        (WebEditorClient::respondToChangedSelection):
+        * WebView/WebImmediateActionController.mm:
+        (+[WebImmediateActionController _dictionaryPopupInfoForRange:inFrame:withLookupOptions:indicatorOptions:transition:]):
+
+2016-10-31  Darin Adler  <darin@apple.com>
+
+        Move ChildNode and ParentNode from ExceptionCode to Exception, add support for ExceptionOr<T&>
+        https://bugs.webkit.org/show_bug.cgi?id=164214
+
+        Reviewed by Alex Christensen.
+
+        * DOM/DOMCSSPrimitiveValue.mm:
+        (-[DOMCSSPrimitiveValue getCounterValue]): Updated since return value
+        is a reference now.
+        (-[DOMCSSPrimitiveValue getRectValue]): Ditto.
+
+        * DOM/DOMDocument.mm:
+        (-[DOMDocument querySelector:]): Updated exception handling.
+        (-[DOMDocument querySelectorAll:]): Ditto.
+        * DOM/DOMDocumentFragment.mm:
+        (-[DOMDocumentFragment querySelector:]): Ditto.
+        (-[DOMDocumentFragment querySelectorAll:]): Ditto.
+        * DOM/DOMElement.mm:
+        (-[DOMElement querySelector:]): Ditto.
+        (-[DOMElement querySelectorAll:]): Ditto.
+
+2016-10-31  Darin Adler  <darin@apple.com>
+
+        Convert Document from ExceptionCode to Exception
+        https://bugs.webkit.org/show_bug.cgi?id=164212
+
+        Reviewed by Alex Christensen.
+
+        * DOM/DOMDocument.mm:
+        (-[DOMDocument setXmlVersion:]): Updated exception handling.
+        (-[DOMDocument cookie]): Ditto.
+        (-[DOMDocument setCookie:]): Ditto.
+        (-[DOMDocument setBody:]): Ditto.
+        (-[DOMDocument createElement:]): Ditto.
+        (-[DOMDocument createCDATASection:]): Ditto.
+        (-[DOMDocument createProcessingInstruction:data:]): Ditto.
+        (-[DOMDocument createAttribute:]): Ditto.
+        (-[DOMDocument createEntityReference:]): Ditto.
+        (-[DOMDocument importNode:deep:]): Ditto.
+        (-[DOMDocument createElementNS:qualifiedName:]): Ditto.
+        (-[DOMDocument createAttributeNS:qualifiedName:]): Ditto.
+        (-[DOMDocument getElementsByTagNameNS:localName:]): Ditto.
+        (-[DOMDocument adoptNode:]): Ditto.
+        (-[DOMDocument createEvent:]): Ditto.
+
+2016-10-30  Darin Adler  <darin@apple.com>
+
+        Move Element, NamedNodeMap, and DOMStringMap from ExceptionCode to Exception
+        https://bugs.webkit.org/show_bug.cgi?id=164206
+
+        Reviewed by Chris Dumez.
+
+        * DOM/DOMElement.mm:
+        (-[DOMElement setInnerHTML:]): Updated exception handling.
+        (-[DOMElement setOuterHTML:]): Ditto.
+        (-[DOMElement setAttribute:value:]): Ditto.
+        (-[DOMElement setAttributeNode:]): Ditto.
+        (-[DOMElement removeAttributeNode:]): Ditto.
+        (-[DOMElement setAttributeNS:qualifiedName:value:]): Ditto.
+        (-[DOMElement setAttributeNodeNS:]): Ditto.
+        (-[DOMElement matches:]): Ditto.
+        (-[DOMElement closest:]): Ditto.
+        (-[DOMElement webkitMatchesSelector:]): Ditto.
+        * DOM/DOMHTMLElement.mm:
+        (-[DOMHTMLElement insertAdjacentElement:element:]): Ditto.
+        (-[DOMHTMLElement insertAdjacentHTML:html:]): Ditto.
+        (-[DOMHTMLElement insertAdjacentText:text:]): Ditto.
+        * DOM/DOMNamedNodeMap.mm:
+        (-[DOMNamedNodeMap setNamedItem:]): Ditto.
+        (-[DOMNamedNodeMap removeNamedItem:]): Ditto.
+        (-[DOMNamedNodeMap setNamedItemNS:]): Ditto.
+        (-[DOMNamedNodeMap removeNamedItemNS:localName:]): Ditto.
+
 2016-10-29  Darin Adler  <darin@apple.com>
 
         Convert more of DOM from ExceptionCode to Exception

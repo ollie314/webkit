@@ -780,30 +780,9 @@ RefPtr<CSSComputedStyleDeclaration> Internals::computedStyleIncludingVisitedInfo
     return CSSComputedStyleDeclaration::create(element, allowVisitedStyle);
 }
 
-ExceptionOr<Node*> Internals::ensureShadowRoot(Element& host)
-{
-    if (ShadowRoot* shadowRoot = host.shadowRoot())
-        return shadowRoot;
-
-    ExceptionCode ec = 0;
-    auto result = host.createShadowRoot(ec);
-    if (ec)
-        return Exception { ec };
-    return result;
-}
-
 Node* Internals::ensureUserAgentShadowRoot(Element& host)
 {
     return &host.ensureUserAgentShadowRoot();
-}
-
-ExceptionOr<Node*> Internals::createShadowRoot(Element& host)
-{
-    ExceptionCode ec = 0;
-    auto result = host.createShadowRoot(ec);
-    if (ec)
-        return Exception { ec };
-    return result;
 }
 
 Node* Internals::shadowRoot(Element& host)
@@ -2038,6 +2017,15 @@ ExceptionOr<String> Internals::pageSizeAndMarginsInPixels(int pageNumber, int wi
     return PrintContext::pageSizeAndMarginsInPixels(frame(), pageNumber, width, height, marginTop, marginRight, marginBottom, marginLeft);
 }
 
+ExceptionOr<float> Internals::pageScaleFactor() const
+{
+    Document* document = contextDocument();
+    if (!document || !document->page())
+        return Exception { INVALID_ACCESS_ERR };
+
+    return document->page()->pageScaleFactor();
+}
+
 ExceptionOr<void> Internals::setPageScaleFactor(float scaleFactor, int x, int y)
 {
     Document* document = contextDocument();
@@ -2703,6 +2691,8 @@ ExceptionOr<void> Internals::setMediaSessionRestrictions(const String& mediaType
         mediaType = PlatformMediaSession::Video;
     else if (equalLettersIgnoringASCIICase(mediaTypeString, "audio"))
         mediaType = PlatformMediaSession::Audio;
+    else if (equalLettersIgnoringASCIICase(mediaTypeString, "videoaudio"))
+        mediaType = PlatformMediaSession::VideoAudio;
     else if (equalLettersIgnoringASCIICase(mediaTypeString, "webaudio"))
         mediaType = PlatformMediaSession::WebAudio;
     else

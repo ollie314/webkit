@@ -584,6 +584,9 @@ set(WebCore_NON_SVG_IDL_FILES
     page/EventSource.idl
     page/GlobalCrypto.idl
     page/History.idl
+    page/IntersectionObserver.idl
+    page/IntersectionObserverCallback.idl
+    page/IntersectionObserverEntry.idl
     page/Location.idl
     page/Navigator.idl
     page/NavigatorConcurrentHardware.idl
@@ -821,6 +824,7 @@ set(WebCore_SOURCES
     Modules/indexeddb/IDBDatabaseIdentifier.cpp
     Modules/indexeddb/IDBEventDispatcher.cpp
     Modules/indexeddb/IDBFactory.cpp
+    Modules/indexeddb/IDBGetAllResult.cpp
     Modules/indexeddb/IDBGetResult.cpp
     Modules/indexeddb/IDBIndex.cpp
     Modules/indexeddb/IDBKey.cpp
@@ -864,6 +868,7 @@ set(WebCore_SOURCES
     Modules/indexeddb/shared/IDBCursorInfo.cpp
     Modules/indexeddb/shared/IDBDatabaseInfo.cpp
     Modules/indexeddb/shared/IDBError.cpp
+    Modules/indexeddb/shared/IDBGetAllRecordsData.cpp
     Modules/indexeddb/shared/IDBGetRecordData.cpp
     Modules/indexeddb/shared/IDBIndexInfo.cpp
     Modules/indexeddb/shared/IDBObjectStoreInfo.cpp
@@ -914,7 +919,6 @@ set(WebCore_SOURCES
     Modules/mediastream/RTCDataChannelEvent.cpp
     Modules/mediastream/RTCIceCandidate.cpp
     Modules/mediastream/RTCIceCandidateEvent.cpp
-    Modules/mediastream/RTCOfferAnswerOptions.cpp
     Modules/mediastream/RTCPeerConnection.cpp
     Modules/mediastream/RTCRtpReceiver.cpp
     Modules/mediastream/RTCRtpSender.cpp
@@ -2040,6 +2044,8 @@ set(WebCore_SOURCES
     page/FrameTree.cpp
     page/FrameView.cpp
     page/History.cpp
+    page/IntersectionObserver.cpp
+    page/IntersectionObserverEntry.cpp
     page/Location.cpp
     page/MainFrame.cpp
     page/MouseEventWithHitTestResults.cpp

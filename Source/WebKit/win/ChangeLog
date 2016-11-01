@@ -1,3 +1,58 @@
+2016-10-29  Filip Pizlo  <fpizlo@apple.com>
+
+        JSC should support SharedArrayBuffer
+        https://bugs.webkit.org/show_bug.cgi?id=163986
+
+        Reviewed by Keith Miller.
+
+        Support the RuntimeFlag.
+
+        * Interfaces/IWebPreferencesPrivate.idl:
+
+2016-10-31  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Use #pragma once in WebCore
+        https://bugs.webkit.org/show_bug.cgi?id=164194
+
+        Rubber-stamped by Sam Weinig.
+
+        * WebCoreSupport/WebContextMenuClient.cpp:
+        (WebContextMenuClient::isSpeaking):
+        (WebContextMenuClient::shareMenuItem): Deleted.
+        * WebCoreSupport/WebContextMenuClient.h:
+        Remove this dead code since r192333.
+
+2016-10-31  Darin Adler  <darin@apple.com>
+
+        Convert Document from ExceptionCode to Exception
+        https://bugs.webkit.org/show_bug.cgi?id=164212
+
+        Reviewed by Alex Christensen.
+
+        * DOMCoreClasses.cpp:
+        (DOMDocument::createElement): Updated exception handling.
+        (DOMDocument::createEvent): Ditto.
+
+2016-10-30  Darin Adler  <darin@apple.com>
+
+        Move Element, NamedNodeMap, and DOMStringMap from ExceptionCode to Exception
+        https://bugs.webkit.org/show_bug.cgi?id=164206
+
+        Reviewed by Chris Dumez.
+
+        * DOMCoreClasses.cpp:
+        (DOMElement::setAttribute): Updated exception handling.
+        * DOMHTMLClasses.cpp:
+        (DOMHTMLElement::setInnerHTML): Ditto.
+
+2016-10-30  Brent Fulgham  <bfulgham@apple.com>
+
+        Unreviewed build fix (Direct2D)
+
+        * WebView.cpp:
+        (WebView::paintWithDirect2D): Update for revised GraphicsContext
+        begin/end draw behavior.
+
 2016-10-28  Darin Adler  <darin@apple.com>
 
         Move all classes in the HTML directory from ExceptionCode to Exception

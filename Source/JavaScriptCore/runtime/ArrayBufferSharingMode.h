@@ -20,41 +20,40 @@
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
 #pragma once
 
-#include "GraphicsContext.h"
+#include <wtf/PrintStream.h>
 
-namespace WebCore {
+namespace JSC {
 
-class RenderTargetScopedDrawing {
-    WTF_MAKE_NONCOPYABLE(RenderTargetScopedDrawing);
-public:
-    RenderTargetScopedDrawing(GraphicsContext& context)
-        : m_context(context)
-    {
-        m_drawIsScoped = context.beginDrawIfNeeded();
-    }
-
-    ~RenderTargetScopedDrawing()
-    {
-        endDraw();
-    }
-
-    void endDraw()
-    {
-        if (!m_drawIsScoped)
-            return;
-            
-        m_context.endDraw();
-        m_drawIsScoped = false;
-    }
-
-private:
-    GraphicsContext& m_context;
-    bool m_drawIsScoped;
+enum class ArrayBufferSharingMode {
+    Default,
+    Shared
 };
 
-} // namespace WebCore
+inline const char* arrayBufferSharingModeName(ArrayBufferSharingMode sharingMode)
+{
+    switch (sharingMode) {
+    case ArrayBufferSharingMode::Default:
+        return "ArrayBuffer";
+    case ArrayBufferSharingMode::Shared:
+        return "SharedArrayBuffer";
+    }
+    RELEASE_ASSERT_NOT_REACHED();
+    return nullptr;
+}
+
+} // namespace JSC
+
+namespace WTF {
+
+inline void printInternal(PrintStream& out, JSC::ArrayBufferSharingMode mode)
+{
+    out.print(JSC::arrayBufferSharingModeName(mode));
+}
+
+} // namespace WTF
+

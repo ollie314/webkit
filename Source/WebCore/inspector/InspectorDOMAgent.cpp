@@ -198,13 +198,18 @@ void RevalidateStyleAttributeTask::timerFired()
     m_elements.clear();
 }
 
-String InspectorDOMAgent::toErrorString(const ExceptionCode& ec)
+String InspectorDOMAgent::toErrorString(ExceptionCode ec)
 {
     if (ec) {
         ExceptionCodeDescription description(ec);
         return description.name;
     }
     return emptyString();
+}
+
+String InspectorDOMAgent::toErrorString(Exception&& exception)
+{
+    return ExceptionCodeDescription { exception.code() }.name;
 }
 
 InspectorDOMAgent::InspectorDOMAgent(WebAgentContext& context, InspectorPageAgent* pageAgent, InspectorOverlay* overlay)
@@ -528,15 +533,14 @@ void InspectorDOMAgent::querySelector(ErrorString& errorString, int nodeId, cons
         return;
     }
 
-    ExceptionCode ec = 0;
-    RefPtr<Element> element = downcast<ContainerNode>(*node).querySelector(selectors, ec);
-    if (ec) {
+    auto queryResult = downcast<ContainerNode>(*node).querySelector(selectors);
+    if (queryResult.hasException()) {
         errorString = ASCIILiteral("DOM Error while querying");
         return;
     }
 
-    if (element)
-        *elementId = pushNodePathToFrontend(element.get());
+    if (auto* element = queryResult.releaseReturnValue())
+        *elementId = pushNodePathToFrontend(element);
 }
 
 void InspectorDOMAgent::querySelectorAll(ErrorString& errorString, int nodeId, const String& selectors, RefPtr<Inspector::Protocol::Array<int>>& result)
@@ -549,15 +553,14 @@ void InspectorDOMAgent::querySelectorAll(ErrorString& errorString, int nodeId, c
         return;
     }
 
-    ExceptionCode ec = 0;
-    RefPtr<NodeList> nodes = downcast<ContainerNode>(*node).querySelectorAll(selectors, ec);
-    if (ec) {
+    auto queryResult = downcast<ContainerNode>(*node).querySelectorAll(selectors);
+    if (queryResult.hasException()) {
         errorString = ASCIILiteral("DOM Error while querying");
         return;
     }
 
+    auto nodes = queryResult.releaseReturnValue();
     result = Inspector::Protocol::Array<int>::create();
-
     for (unsigned i = 0; i < nodes->length(); ++i)
         result->addItem(pushNodePathToFrontend(nodes->item(i)));
 }
@@ -660,11 +663,10 @@ void InspectorDOMAgent::setAttributesAsText(ErrorString& errorString, int elemen
     if (!element)
         return;
 
-    RefPtr<HTMLElement> parsedElement = createHTMLElement(element->document(), spanTag);
-    ExceptionCode ec = 0;
-    parsedElement.get()->setInnerHTML("<span " + text + "></span>", ec);
-    if (ec) {
-        errorString = toErrorString(ec);
+    auto parsedElement = createHTMLElement(element->document(), spanTag);
+    auto result = parsedElement.get().setInnerHTML("<span " + text + "></span>");
+    if (result.hasException()) {
+        errorString = toErrorString(result.releaseException());
         return;
     }
 
@@ -724,10 +726,10 @@ void InspectorDOMAgent::setNodeName(ErrorString& errorString, int nodeId, const 
     if (!is<Element>(oldNode.get()))
         return;
 
-    ExceptionCode ec = 0;
-    auto newElement = oldNode->document().createElementForBindings(tagName, ec);
-    if (ec)
+    auto createElementResult = oldNode->document().createElementForBindings(tagName);
+    if (createElementResult.hasException())
         return;
+    auto newElement = createElementResult.releaseReturnValue();
 
     // Copy over the original node's attributes.
     newElement->cloneAttributesFromElement(downcast<Element>(*oldNode));
@@ -735,18 +737,18 @@ void InspectorDOMAgent::setNodeName(ErrorString& errorString, int nodeId, const 
     // Copy over the original node's children.
     RefPtr<Node> child;
     while ((child = oldNode->firstChild())) {
-        if (!m_domEditor->insertBefore(*newElement, *child, 0, errorString))
+        if (!m_domEditor->insertBefore(newElement, *child, 0, errorString))
             return;
     }
 
     // Replace the old node with the new node
     RefPtr<ContainerNode> parent = oldNode->parentNode();
-    if (!m_domEditor->insertBefore(*parent, *newElement, oldNode->nextSibling(), errorString))
+    if (!m_domEditor->insertBefore(*parent, newElement.copyRef(), oldNode->nextSibling(), errorString))
         return;
     if (!m_domEditor->removeChild(*parent, *oldNode, errorString))
         return;
 
-    *newId = pushNodePathToFrontend(newElement.get());
+    *newId = pushNodePathToFrontend(newElement.ptr());
     if (m_childrenRequested.contains(nodeId))
         pushChildNodesToFrontend(*newId);
 }
@@ -901,7 +903,7 @@ void InspectorDOMAgent::performSearch(ErrorString& errorString, const String& wh
             }
             finder.performSearch(node);
         }
-    } else if (m_document) {
+    } else {
         // There's no need to iterate the frames tree because
         // the search helper will go inside the frame owner elements.
         finder.performSearch(m_document.get());
@@ -1111,19 +1113,18 @@ void InspectorDOMAgent::highlightSelector(ErrorString& errorString, const Inspec
         return;
     }
 
-    ExceptionCode ec = 0;
-    RefPtr<NodeList> nodes = document->querySelectorAll(selectorString, ec);
+    auto queryResult = document->querySelectorAll(selectorString);
     // FIXME: <https://webkit.org/b/146161> Web Inspector: DOM.highlightSelector should work for "a:visited"
-    if (ec) {
+    if (queryResult.hasException()) {
         errorString = ASCIILiteral("DOM Error while querying");
         return;
     }
 
-    std::unique_ptr<HighlightConfig> highlightConfig = highlightConfigFromInspectorObject(errorString, &highlightInspectorObject);
+    auto highlightConfig = highlightConfigFromInspectorObject(errorString, &highlightInspectorObject);
     if (!highlightConfig)
         return;
 
-    m_overlay->highlightNodeList(WTFMove(nodes), *highlightConfig);
+    m_overlay->highlightNodeList(queryResult.releaseReturnValue(), *highlightConfig);
 }
 
 void InspectorDOMAgent::highlightNode(ErrorString& errorString, const InspectorObject& highlightInspectorObject, const int* nodeId, const String* objectId)

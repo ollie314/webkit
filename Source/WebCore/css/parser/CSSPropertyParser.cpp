@@ -364,7 +364,11 @@ bool CSSPropertyParser::consumeTransformOrigin(bool important)
     RefPtr<CSSPrimitiveValue> resultX;
     RefPtr<CSSPrimitiveValue> resultY;
     if (consumeOneOrTwoValuedPosition(m_range, m_context.mode, UnitlessQuirk::Forbid, resultX, resultY)) {
+        m_range.consumeWhitespace();
+        bool atEnd = m_range.atEnd();
         RefPtr<CSSPrimitiveValue> resultZ = consumeLength(m_range, m_context.mode, ValueRangeAll);
+        if (!resultZ && !atEnd)
+            return false;
         if (!resultZ)
             resultZ = CSSValuePool::singleton().createValue(0, CSSPrimitiveValue::UnitTypes::CSS_PX);
         addProperty(CSSPropertyTransformOriginX, CSSPropertyTransformOrigin, resultX.releaseNonNull(), important);
@@ -1099,7 +1103,8 @@ static RefPtr<CSSValue> consumeAnimationName(CSSParserTokenRange& range)
         const CSSParserToken& token = range.consumeIncludingWhitespace();
         if (equalIgnoringASCIICase(token.value(), "none"))
             return CSSValuePool::singleton().createIdentifierValue(CSSValueNone);
-        return CSSCustomIdentValue::create(token.value().toString());
+        // FIXME-NEWPARSER: Want to use a CSSCustomIdentValue here eventually.
+        return CSSValuePool::singleton().createValue(token.value().toString(), CSSPrimitiveValue::UnitTypes::CSS_STRING);
     }
 
     return consumeCustomIdent(range);
@@ -1115,7 +1120,9 @@ static RefPtr<CSSValue> consumeTransitionProperty(CSSParserTokenRange& range)
 
     if (CSSPropertyID property = token.parseAsCSSPropertyID()) {
         range.consumeIncludingWhitespace();
-        return CSSCustomIdentValue::create(property);
+        
+        // FIXME-NEWPARSER: Want to use a CSSCustomIdentValue here eventually.
+        return CSSValuePool::singleton().createIdentifierValue(property);
     }
     return consumeCustomIdent(range);
 }
@@ -1914,9 +1921,10 @@ static RefPtr<CSSValue> consumeAttr(CSSParserTokenRange args, CSSParserContext c
     if (!args.atEnd())
         return nullptr;
 
-    RefPtr<CSSFunctionValue> attrValue = CSSFunctionValue::create(CSSValueAttr);
-    attrValue->append(CSSCustomIdentValue::create(attrName));
-    return attrValue;
+    // FIXME-NEWPARSER: We want to use a CSSCustomIdentValue here eventually for the attrName.
+    // FIXME-NEWPARSER: We want to use a CSSFunctionValue rather than relying on a custom
+    // attr() primitive value.
+    return CSSValuePool::singleton().createValue(attrName, CSSPrimitiveValue::CSS_ATTR);
 }
 
 static RefPtr<CSSValue> consumeCounterContent(CSSParserTokenRange args, bool counters)
@@ -2558,16 +2566,18 @@ static RefPtr<CSSPrimitiveValue> consumeBackgroundSize(CSSPropertyID property, C
     if (identMatches<CSSValueContain, CSSValueCover>(range.peek().id()))
         return consumeIdent(range);
 
+    // FIXME: We're allowing the unitless quirk on this property because our
+    // tests assume that. Other browser engines don't allow it though.
     RefPtr<CSSPrimitiveValue> horizontal = consumeIdent<CSSValueAuto>(range);
     if (!horizontal)
-        horizontal = consumeLengthOrPercent(range, cssParserMode, ValueRangeAll, UnitlessQuirk::Forbid);
+        horizontal = consumeLengthOrPercent(range, cssParserMode, ValueRangeAll, UnitlessQuirk::Allow);
 
     RefPtr<CSSPrimitiveValue> vertical;
     if (!range.atEnd()) {
         if (range.peek().id() == CSSValueAuto) // `auto' is the default
             range.consumeIncludingWhitespace();
         else
-            vertical = consumeLengthOrPercent(range, cssParserMode, ValueRangeAll, UnitlessQuirk::Forbid);
+            vertical = consumeLengthOrPercent(range, cssParserMode, ValueRangeAll, UnitlessQuirk::Allow);
     } else if (!vertical && property == CSSPropertyWebkitBackgroundSize) {
         // Legacy syntax: "-webkit-background-size: 10px" is equivalent to "background-size: 10px 10px".
         vertical = horizontal;
@@ -3508,7 +3518,8 @@ RefPtr<CSSValue> CSSPropertyParser::parseSingleValue(CSSPropertyID property, CSS
         return consumeZIndex(m_range);
     case CSSPropertyTextShadow: // CSS2 property, dropped in CSS2.1, back in CSS3, so treat as CSS3
     case CSSPropertyBoxShadow:
-        return consumeShadow(m_range, m_context.mode, property == CSSPropertyBoxShadow);
+    case CSSPropertyWebkitBoxShadow:
+        return consumeShadow(m_range, m_context.mode, property == CSSPropertyBoxShadow || property == CSSPropertyWebkitBoxShadow);
     case CSSPropertyFilter:
 #if ENABLE(FILTERS_LEVEL_2)
     case CSSPropertyWebkitBackdropFilter:
@@ -3650,6 +3661,7 @@ RefPtr<CSSValue> CSSPropertyParser::parseSingleValue(CSSPropertyID property, CSS
     case CSSPropertyWebkitBackgroundClip:
     case CSSPropertyWebkitBackgroundOrigin:
     case CSSPropertyWebkitBackgroundComposite:
+    case CSSPropertyWebkitBackgroundSize:
     case CSSPropertyWebkitMaskClip:
     case CSSPropertyWebkitMaskComposite:
     case CSSPropertyWebkitMaskImage:
