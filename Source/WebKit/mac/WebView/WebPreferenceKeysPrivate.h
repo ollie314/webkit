@@ -140,6 +140,7 @@
 #define WebKitSuppressesIncrementalRenderingKey @"WebKitSuppressesIncrementalRendering"
 #define WebKitSubpixelCSSOMElementMetricsEnabledPreferenceKey @"WebKitSubpixelCSSOMElementMetricsEnabled"
 #define WebKitResourceLoadStatisticsEnabledPreferenceKey @"WebKitResourceLoadStatisticsEnabled"
+#define WebKitAsyncImageDecodingEnabledPreferenceKey @"WebKitAsyncImageDecodingEnabledEnabled"
 #if TARGET_OS_IPHONE
 #define WebKitAudioSessionCategoryOverride @"WebKitAudioSessionCategoryOverride"
 #define WebKitAVKitEnabled @"WebKitAVKitEnabled"
@@ -211,6 +212,7 @@
 #define WebKitEnableInheritURIQueryComponentPreferenceKey @"WebKitEnableInheritURIQueryComponent"
 #define WebKitMediaDataLoadsAutomaticallyPreferenceKey @"WebKitMediaDataLoadsAutomatically"
 #define WebKitMockCaptureDevicesEnabledPreferenceKey @"WebKitMockCaptureDevicesEnabled"
+#define WebKitMediaCaptureRequiresSecureConnectionPreferenceKey @"WebKitMediaCaptureRequiresSecureConnection"
 
 #define WebKitAttachmentElementEnabledPreferenceKey @"WebKitAttachmentElementEnabled"
 

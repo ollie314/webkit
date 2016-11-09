@@ -448,13 +448,6 @@ SelectorChecker::MatchResult SelectorChecker::matchRecursively(CheckingContext& 
 
             return MatchResult::updateWithMatchType(result, matchType);
         }
-    
-    case CSSSelector::ShadowPseudo:
-    case CSSSelector::ShadowDeep:
-    case CSSSelector::ShadowSlot:
-        // FIXME-NEWPARSER: Have to implement these.
-        // ASSERT_NOT_REACHED();
-        return MatchResult::fails(Match::SelectorFailsCompletely);
     }
 
 
@@ -1054,10 +1047,8 @@ bool SelectorChecker::checkOne(CheckingContext& checkingContext, const LocalCont
             specificity = CSSSelector::addSpecificities(specificity, hostSpecificity);
             return true;
         }
-#if ENABLE(CUSTOM_ELEMENTS)
         case CSSSelector::PseudoClassDefined:
             return isDefinedElement(element);
-#endif
         case CSSSelector::PseudoClassWindowInactive:
             return isWindowInactive(element);
 

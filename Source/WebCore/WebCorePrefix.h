@@ -163,13 +163,20 @@
 #if PLATFORM(IOS)
 #import <Foundation/Foundation.h>
 #else
+#if USE(APPKIT)
 #import <Cocoa/Cocoa.h>
+#import <wtf/mac/AppKitCompatibilityDeclarations.h>
+#endif
 #endif // PLATFORM(IOS)
 #endif
 
 #ifdef __cplusplus
 #define new ("if you use new/delete make sure to include config.h at the top of the file"()) 
 #define delete ("if you use new/delete make sure to include config.h at the top of the file"()) 
+#endif
+
+#if USE(APPLE_INTERNAL_SDK)
+#include <WebKitAdditions/ApplePayWebCorePrefixAdditions.h>
 #endif
 
 /* When C++ exceptions are disabled, the C++ library defines |try| and |catch|

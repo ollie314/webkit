@@ -59,7 +59,6 @@
 #include <WebCore/NetscapePlugInStreamLoader.h>
 #include <WebCore/NetworkingContext.h>
 #include <WebCore/Page.h>
-#include <WebCore/PageThrottler.h>
 #include <WebCore/PlatformMouseEvent.h>
 #include <WebCore/ProtectionSpace.h>
 #include <WebCore/ProxyServer.h>
@@ -535,29 +534,17 @@ void PluginView::webPageDestroyed()
     m_webPage = 0;
 }
 
-void PluginView::viewStateDidChange(ViewState::Flags changed)
+void PluginView::activityStateDidChange(ActivityState::Flags changed)
 {
     if (!m_plugin || !m_isInitialized)
         return;
 
-    if (changed & ViewState::IsVisibleOrOccluded)
+    if (changed & ActivityState::IsVisibleOrOccluded)
         m_plugin->windowVisibilityChanged(m_webPage->isVisibleOrOccluded());
-    if (changed & ViewState::WindowIsActive)
+    if (changed & ActivityState::WindowIsActive)
         m_plugin->windowFocusChanged(m_webPage->windowIsFocused());
 }
 
-WebCore::AudioHardwareActivityType PluginView::audioHardwareActivity() const
-{
-    if (!m_isInitialized || !m_plugin)
-        return AudioHardwareActivityType::IsInactive;
-    
-#if PLATFORM(COCOA)
-    return m_plugin->audioHardwareActivity();
-#else
-    return AudioHardwareActivityType::Unknown;
-#endif
-}
-    
 #if PLATFORM(COCOA)
 void PluginView::setDeviceScaleFactor(float scaleFactor)
 {

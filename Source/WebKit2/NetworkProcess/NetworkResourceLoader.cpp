@@ -40,6 +40,7 @@
 #include "WebResourceLoaderMessages.h"
 #include <WebCore/BlobDataFileReference.h>
 #include <WebCore/CertificateInfo.h>
+#include <WebCore/DiagnosticLoggingKeys.h>
 #include <WebCore/HTTPHeaderNames.h>
 #include <WebCore/ProtectionSpace.h>
 #include <WebCore/SharedBuffer.h>
@@ -97,10 +98,13 @@ NetworkResourceLoader::NetworkResourceLoader(const NetworkResourceLoadParameters
         }
     }
 
+#if !USE(NETWORK_SESSION)
     if (originalRequest().url().protocolIsBlob()) {
         ASSERT(!m_parameters.resourceSandboxExtension);
         m_fileReferences.appendVector(NetworkBlobRegistry::singleton().filesInBlob(connection, originalRequest().url()));
     }
+#endif
+
 
     if (synchronousReply)
         m_synchronousLoadData = std::make_unique<SynchronousLoadData>(WTFMove(synchronousReply));
@@ -218,10 +222,14 @@ void NetworkResourceLoader::startNetworkLoad(const ResourceRequest& request)
     parameters.request = request;
 
 #if USE(NETWORK_SESSION)
+    if (request.url().protocolIsBlob())
+        parameters.blobFileReferences = NetworkBlobRegistry::singleton().filesInBlob(m_connection, originalRequest().url());
+
     auto* networkSession = SessionTracker::networkSession(parameters.sessionID);
     if (!networkSession) {
         WTFLogAlways("Attempted to create a NetworkLoad with a session (id=%" PRIu64 ") that does not exist.", parameters.sessionID.sessionID());
         RELEASE_LOG_ERROR_IF_ALLOWED("startNetworkLoad: Attempted to create a NetworkLoad with a session that does not exist (pageID = %" PRIu64 ", frameID = %" PRIu64 ", resourceID = %" PRIu64 ", sessionID=%" PRIu64 ")", m_parameters.webPageID, m_parameters.webFrameID, m_parameters.identifier, parameters.sessionID.sessionID());
+        NetworkProcess::singleton().logDiagnosticMessage(m_parameters.webPageID, WebCore::DiagnosticLoggingKeys::internalErrorKey(), WebCore::DiagnosticLoggingKeys::invalidSessionIDKey(), WebCore::ShouldSample::No);
         didFailLoading(internalError(request.url()));
         return;
     }

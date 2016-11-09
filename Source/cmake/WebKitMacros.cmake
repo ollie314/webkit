@@ -45,6 +45,8 @@ macro(ADD_PRECOMPILED_HEADER _header _cpp _source)
     #FIXME: Add support for Xcode.
 endmacro()
 
+option(SHOW_BINDINGS_GENERATION_PROGRESS "Show progress of generating bindings" OFF)
+
 # Helper macro which wraps generate-bindings-all.pl script.
 #   target is a new target name to be added
 #   OUTPUT_SOURCE is a list name which will contain generated sources.(eg. WebCore_SOURCES)
@@ -129,13 +131,16 @@ function(GENERATE_BINDINGS target)
     endforeach ()
     set(${arg_OUTPUT_SOURCE} ${${arg_OUTPUT_SOURCE}} ${gen_sources} PARENT_SCOPE)
     set(act_args)
+    if (SHOW_BINDINGS_GENERATION_PROGRESS)
+        list(APPEND args --showProgress)
+    endif ()
     if (${CMAKE_VERSION} VERSION_LESS 3.2)
         set_source_files_properties(${gen_sources} ${gen_headers} PROPERTIES GENERATED 1)
     else ()
-        list(APPEND act_args
-            BYPRODUCTS ${gen_sources} ${gen_headers}
-            USES_TERMINAL
-        )
+        list(APPEND act_args BYPRODUCTS ${gen_sources} ${gen_headers})
+        if (SHOW_BINDINGS_GENERATION_PROGRESS)
+            list(APPEND act_args USES_TERMINAL)
+        endif ()
     endif ()
     add_custom_target(${target}
         COMMAND ${PERL_EXECUTABLE} ${binding_generator} ${args}
@@ -309,7 +314,7 @@ macro(WEBKIT_FRAMEWORK _target)
         add_custom_command(TARGET ${_target} POST_BUILD COMMAND ${${_target}_POST_BUILD_COMMAND} VERBATIM)
     endif ()
 
-    if (APPLE AND NOT PORT STREQUAL "GTK" AND NOT ${_target} STREQUAL "WTF")
+    if (APPLE AND NOT PORT STREQUAL "GTK" AND NOT ${${_target}_LIBRARY_TYPE} MATCHES STATIC)
         set_target_properties(${_target} PROPERTIES FRAMEWORK TRUE)
         install(TARGETS ${_target} FRAMEWORK DESTINATION ${LIB_INSTALL_DIR})
     endif ()

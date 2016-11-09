@@ -136,9 +136,7 @@
 #include "JSCSSValue.cpp"
 #include "JSCSSValueList.cpp"
 #include "JSClipboardEvent.cpp"
-#if ENABLE(CUSTOM_ELEMENTS)
 #include "JSCustomElementRegistry.cpp"
-#endif
 #include "JSCustomEvent.cpp"
 #include "JSDatabase.cpp"
 #include "JSDatabaseCallback.cpp"
@@ -353,7 +351,6 @@
 #include "JSMutationRecord.cpp"
 #include "JSNamedNodeMap.cpp"
 #include "JSNavigator.cpp"
-#include "JSNavigatorBattery.cpp"
 #include "JSNavigatorContentUtils.cpp"
 #include "JSNavigatorGeolocation.cpp"
 #include "JSNavigatorMediaDevices.cpp"
@@ -391,11 +388,10 @@
 #include "JSProgressEvent.cpp"
 #include "JSRadioNodeList.cpp"
 #include "JSRange.cpp"
-#if ENABLE(READABLE_STREAM_API)
+#include "JSReadableByteStreamController.cpp"
 #include "JSReadableStream.cpp"
 #include "JSReadableStreamDefaultController.cpp"
 #include "JSReadableStreamDefaultReader.cpp"
-#endif
 #include "JSRect.cpp"
 #include "JSRequestAnimationFrameCallback.cpp"
 #include "JSRGBColor.cpp"
@@ -639,7 +635,6 @@
 #include "JSVoidCallback.cpp"
 #include "JSWaveShaperNode.cpp"
 #include "JSWebKitAnimationEvent.cpp"
-#include "JSWebKitCSSFilterValue.cpp"
 #include "JSWebKitCSSTransformValue.cpp"
 #include "JSWebKitCSSMatrix.cpp"
 #include "JSWebKitCSSRegionRule.cpp"

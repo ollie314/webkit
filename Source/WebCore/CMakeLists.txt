@@ -6,7 +6,6 @@ set(WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}"
     "${WEBCORE_DIR}/Modules/airplay"
     "${WEBCORE_DIR}/Modules/applepay"
-    "${WEBCORE_DIR}/Modules/battery"
     "${WEBCORE_DIR}/Modules/encryptedmedia"
     "${WEBCORE_DIR}/Modules/encryptedmedia/legacy"
     "${WEBCORE_DIR}/Modules/fetch"
@@ -139,7 +138,6 @@ set(WebCore_IDL_INCLUDES
     xml
 
     Modules/airplay
-    Modules/battery
     Modules/encryptedmedia/legacy
     Modules/fetch
     Modules/geolocation
@@ -169,9 +167,6 @@ set(WebCore_IDL_INCLUDES
 
 set(WebCore_NON_SVG_IDL_FILES
     Modules/airplay/WebKitPlaybackTargetAvailabilityEvent.idl
-
-    Modules/battery/BatteryManager.idl
-    Modules/battery/NavigatorBattery.idl
 
     Modules/fetch/DOMWindowFetch.idl
     Modules/fetch/FetchBody.idl
@@ -268,6 +263,7 @@ set(WebCore_NON_SVG_IDL_FILES
 
     Modules/streams/ByteLengthQueuingStrategy.idl
     Modules/streams/CountQueuingStrategy.idl
+    Modules/streams/ReadableByteStreamController.idl
     Modules/streams/ReadableStream.idl
     Modules/streams/ReadableStreamDefaultController.idl
     Modules/streams/ReadableStreamDefaultReader.idl
@@ -368,7 +364,6 @@ set(WebCore_NON_SVG_IDL_FILES
     css/StyleMedia.idl
     css/StyleSheet.idl
     css/StyleSheetList.idl
-    css/WebKitCSSFilterValue.idl
     css/WebKitCSSMatrix.idl
     css/WebKitCSSRegionRule.idl
     css/WebKitCSSTransformValue.idl
@@ -794,11 +789,6 @@ endif ()
 set(WebCore_SOURCES
     Modules/airplay/WebKitPlaybackTargetAvailabilityEvent.cpp
 
-    Modules/battery/BatteryController.cpp
-    Modules/battery/BatteryManager.cpp
-    Modules/battery/BatteryStatus.cpp
-    Modules/battery/NavigatorBattery.cpp
-
     Modules/fetch/DOMWindowFetch.cpp
     Modules/fetch/FetchBody.cpp
     Modules/fetch/FetchBodyConsumer.cpp
@@ -912,6 +902,7 @@ set(WebCore_SOURCES
     Modules/mediastream/MediaTrackConstraintSet.cpp
     Modules/mediastream/MediaTrackConstraints.cpp
     Modules/mediastream/NavigatorMediaDevices.cpp
+    Modules/mediastream/PeerConnectionBackend.cpp
     Modules/mediastream/RTCConfiguration.cpp
     Modules/mediastream/RTCDTMFSender.cpp
     Modules/mediastream/RTCDTMFToneChangeEvent.cpp
@@ -1370,7 +1361,6 @@ set(WebCore_SOURCES
     css/StyleSheetList.cpp
     css/TransformFunctions.cpp
     css/ViewportStyleResolver.cpp
-    css/WebKitCSSFilterValue.cpp
     css/WebKitCSSMatrix.cpp
     css/WebKitCSSRegionRule.cpp
     css/WebKitCSSTransformValue.cpp
@@ -1548,7 +1538,6 @@ set(WebCore_SOURCES
 
     dom/default/PlatformMessagePortChannel.cpp
 
-    domjit/DOMJITAbstractHeapRepository.cpp
     domjit/DOMJITHelpers.cpp
     domjit/JSDocumentDOMJIT.cpp
     domjit/JSNodeDOMJIT.cpp
@@ -1914,6 +1903,7 @@ set(WebCore_SOURCES
     inspector/WebInjectedScriptHost.cpp
     inspector/WebInjectedScriptManager.cpp
     inspector/WorkerConsoleAgent.cpp
+    inspector/WorkerDebuggerAgent.cpp
     inspector/WorkerInspectorController.cpp
     inspector/WorkerRuntimeAgent.cpp
     inspector/WorkerScriptDebugServer.cpp
@@ -2060,7 +2050,6 @@ set(WebCore_SOURCES
     page/PageOverlay.cpp
     page/PageOverlayController.cpp
     page/PageSerializer.cpp
-    page/PageThrottler.cpp
     page/PageVisibilityState.cpp
     page/Performance.cpp
     page/PerformanceEntry.cpp
@@ -2170,6 +2159,7 @@ set(WebCore_SOURCES
     platform/ScrollbarThemeComposite.cpp
     platform/SharedBuffer.cpp
     platform/SharedBufferChunkReader.cpp
+    platform/StaticPasteboard.cpp
     platform/SystemSleepListener.cpp
     platform/Theme.cpp
     platform/ThreadGlobalData.cpp
@@ -3520,6 +3510,15 @@ MAKE_HASH_TOOLS(${WEBCORE_DIR}/platform/ColorData)
 list(APPEND WebCore_DERIVED_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/ColorData.cpp)
 
 
+# Generate DOMJITAbstractHeapRepository.h
+add_custom_command(
+    OUTPUT ${DERIVED_SOURCES_WEBCORE_DIR}/DOMJITAbstractHeapRepository.h
+    MAIN_DEPENDENCY domjit/DOMJITAbstractHeapRepository.yaml
+    DEPENDS ${WEBCORE_DIR}/domjit/generate-abstract-heap.rb
+    COMMAND ${RUBY_EXECUTABLE} ${WEBCORE_DIR}/domjit/generate-abstract-heap.rb ${WEBCORE_DIR}/domjit/DOMJITAbstractHeapRepository.yaml ${DERIVED_SOURCES_WEBCORE_DIR}/DOMJITAbstractHeapRepository.h
+    VERBATIM)
+list(APPEND WebCore_DERIVED_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/DOMJITAbstractHeapRepository.h)
+
 # Generate XMLViewerCSS.h
 add_custom_command(
     OUTPUT ${DERIVED_SOURCES_WEBCORE_DIR}/XMLViewerCSS.h ${DERIVED_SOURCES_WEBCORE_DIR}/XMLViewer.min.css
@@ -3703,6 +3702,8 @@ set(WebCore_BUILTINS_SOURCES
     ${WEBCORE_DIR}/Modules/mediastream/RTCPeerConnectionInternals.js
     ${WEBCORE_DIR}/Modules/streams/ByteLengthQueuingStrategy.js
     ${WEBCORE_DIR}/Modules/streams/CountQueuingStrategy.js
+    ${WEBCORE_DIR}/Modules/streams/ReadableByteStreamController.js
+    ${WEBCORE_DIR}/Modules/streams/ReadableByteStreamInternals.js
     ${WEBCORE_DIR}/Modules/streams/ReadableStream.js
     ${WEBCORE_DIR}/Modules/streams/ReadableStreamDefaultController.js
     ${WEBCORE_DIR}/Modules/streams/ReadableStreamInternals.js

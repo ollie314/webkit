@@ -160,6 +160,10 @@ public:
     void invalidateFontCache();
 
     ExceptionOr<void> setScrollViewPosition(int x, int y);
+    
+    ExceptionOr<Ref<ClientRect>> layoutViewportRect();
+    ExceptionOr<Ref<ClientRect>> visualViewportRect();
+    
     ExceptionOr<void> setViewBaseBackgroundColor(const String& colorValue);
 
     ExceptionOr<void> setPagination(const String& mode, int gap, int pageLength);
@@ -232,7 +236,6 @@ public:
     InternalSettings* settings() const;
     unsigned workerThreadCount() const;
 
-    ExceptionOr<void> setBatteryStatus(const String& eventType, bool charging, double chargingTime, double dischargingTime, double level);
     ExceptionOr<void> setDeviceProximity(const String& eventType, double value, double min, double max);
 
     enum {
@@ -493,6 +496,8 @@ public:
     void setUserInterfaceLayoutDirection(UserInterfaceLayoutDirection);
 
     bool userPrefersReducedMotion() const;
+    
+    void reportBacktrace();
 
 private:
     explicit Internals(Document&);

@@ -1,3 +1,549 @@
+2016-11-09  Nikita Vasilyev  <nvasilyev@apple.com>
+
+        Web Inspector: Settings tab: Checkbox labels should be clickable
+        https://bugs.webkit.org/show_bug.cgi?id=164470
+        <rdar://problem/29133787>
+
+        Reviewed by Matt Baker.
+
+        * UserInterface/Views/SettingsTabContentView.js:
+        (WebInspector.SettingsTabContentView.prototype.initialLayout):
+        Add a label element to make checkboxes clickable.
+
+2016-11-09  Devin Rousso  <dcrousso+webkit@gmail.com>
+
+        Web Inspector: Allow FolderTreeElement to display content when selected
+        https://bugs.webkit.org/show_bug.cgi?id=164407
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Main.html:
+        Add CollectionContentView and TitleView.
+
+        * UserInterface/Base/Main.js:
+        * UserInterface/Views/ContentView.js:
+        (WebInspector.ContentView.createFromRepresentedObject):
+        (WebInspector.ContentView.isViewable):
+        Add support for Collection as the representedObject of a content view.
+
+        * UserInterface/Views/CollectionContentView.css: Added.
+        (.content-view.collection):
+        (.content-view.collection > .content-view):
+        * UserInterface/Views/CollectionContentView.js: Added.
+        (WebInspector.CollectionContentView):
+        (WebInspector.CollectionContentView.prototype.initialLayout):
+        (WebInspector.CollectionContentView.prototype._addContentViewForItem):
+        (WebInspector.CollectionContentView.prototype._removeContentViewForItem):
+        (WebInspector.CollectionContentView.prototype._handleItemAdded):
+        (WebInspector.CollectionContentView.prototype._handleItemRemoved):
+        (WebInspector.CollectionContentView.prototype._handleContentError):
+        Takes in a Collection when constructed, and attempts to display a sub-ContentView for each
+        item in the collection if the type of the collection is viewable en masse.  Currently, this
+        is only supported for WebInspector.Resource.Type.Image collections.
+
+        * UserInterface/Views/ResourceContentView.js:
+        (WebInspector.ResourceContentView.prototype._contentError):
+        Dispatch an event whenever the content fails to load.
+
+        * UserInterface/Views/ResourceSidebarPanel.js:
+        (WebInspector.ResourceSidebarPanel.prototype._treeSelectionDidChange):
+        * UserInterface/Views/ResourcesTabContentView.js:
+        (WebInspector.ResourcesTabContentView.prototype.canShowRepresentedObject):
+        Allow FolderTreeElements to be selected.
+
+        * UserInterface/Views/TitleView.css: Added.
+        (.title-view):
+        * UserInterface/Views/TitleView.js: Added.
+        (WebInspector.TitleView):
+        Basic view that displays the given text in the center of the viewable area.
+
+2016-11-03  Nikita Vasilyev  <nvasilyev@apple.com>
+
+        Web Inspector: Stack overflow when searching a timeline recording for JS function names
+        https://bugs.webkit.org/show_bug.cgi?id=161784
+        <rdar://problem/28219498>
+
+        Reviewed by Timothy Hatcher.
+
+        _populate method of ProfileNodeDataGridNode and ProfileDataGridNode traverses
+        all children of a given node. makeVisible function of DataGrid#_applyFiltersToNode
+        traverses all its parents to expand them. This creates an infinite recursion.
+        Remove "populate" event before appending child nodes to prevent it.
+
+        * UserInterface/Views/ProfileDataGridNode.js:
+        (WebInspector.ProfileDataGridNode.prototype._populate):
+        (WebInspector.ProfileDataGridNode):
+        * UserInterface/Views/ProfileNodeDataGridNode.js:
+        (WebInspector.ProfileNodeDataGridNode.prototype._populate):
+        (WebInspector.ProfileNodeDataGridNode):
+
+2016-11-03  Devin Rousso  <dcrousso+webkit@gmail.com>
+
+        Web Inspector: Modify FolderTreeElement to have a Collection as a its represented object
+        https://bugs.webkit.org/show_bug.cgi?id=164349
+
+        Reviewed by Matt Baker.
+
+        * UserInterface/Views/FolderTreeElement.js:
+        (WebInspector.FolderTreeElement):
+        Now accepts a representedObject parameter, which must be a WebInspector.Collection.
+
+        * UserInterface/Views/FolderizedTreeElement.js:
+        (WebInspector.FolderizedTreeElement.prototype.registerFolderizeSettings):
+        (WebInspector.FolderizedTreeElement.prototype.updateParentStatus):
+        (WebInspector.FolderizedTreeElement.prototype._parentTreeElementForRepresentedObject):
+        (WebInspector.FolderizedTreeElement.prototype._settingsForRepresentedObject):
+        (WebInspector.FolderizedTreeElement.prototype._shouldGroupIntoFolders):
+        (WebInspector.FolderizedTreeElement):
+        Rework the logic for creating WebInspector.FolderTreeElement so that items for the
+        representedObject parameter may be passed in via registerFolderizeSettings.
+
+        * UserInterface/Views/FrameTreeElement.js:
+        (WebInspector.FrameTreeElement):
+        (WebInspector.FrameTreeElement.): Deleted.
+        (WebInspector.FrameTreeElement.makeChildCountCallback): Deleted.
+        Rework logic for calling registerFolderizeSettings to support the representedObject
+        parameter.  Also changed calls to WebInspector.Frame to support the
+        WebInspector.Collection class.
+
+        * UserInterface/Views/ResourceSidebarPanel.js:
+        (WebInspector.ResourceSidebarPanel.prototype.treeElementForRepresentedObject):
+        (WebInspector.ResourceSidebarPanel.prototype._scriptWasAdded):
+        (WebInspector.ResourceSidebarPanel.prototype._scriptsCleared):
+        Create WebInspector.Collection instances of Script model objects for additional folders
+        created by the Resources sidebar:
+         - Anonymous Scripts
+         - Extension Scripts
+         - Extra Scripts
+
+2016-11-02  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Include DebuggerAgent in Workers - see, pause, and step through scripts
+        https://bugs.webkit.org/show_bug.cgi?id=164136
+        <rdar://problem/29028462>
+
+        Reviewed by Brian Burg.
+        
+        By implementing DebuggerAgent, Workers will inform the frontend about
+        Scripts that evaluate in the Worker's VM and the Worker VM can pause
+        and send the pausing CallFrames to the frontend. This means that
+        WebInspector.Script and WebInspector.CallFrame will need to be made
+        target aware. This also means that each Target will have its own
+        set of debugger data, such as the list of scripts and pause data
+        like the pause reason / call frames. Previously all this data was
+        managed by DebuggerManager.
+
+        With this change we split that data out of DebuggerManager to be
+        per-target DebuggerData. DebuggerManager keeps `activeCallFrame`
+        but the list of scripts and pause data have moved into `DebuggerData`
+        which is per-target, accessed through DebuggerManager's new
+        dataForTarget(target) method.
+
+        Finally we make a few changes to the UserInterface to make Workers
+        and their scripts, appear grouped together. The Resources sidebar
+        previously had a single top level item for the Main Frame, which
+        has all its resources as its children (potentially grouped into
+        folders). With this change, each Worker gets its own top level
+        item as well, and the Worker's subresources (imported scripts)
+        become its children.
+
+        We also now associate a single mainResource with Targets. In the
+        case of Workers, we assume and assert that this is a Script. If
+        this were to ever change we would need to adjust the assumptions.
+
+        * UserInterface/Main.html:
+        * UserInterface/Test.html:
+        New files.
+
+        * UserInterface/Base/Main.js:
+        * UserInterface/Test/Test.js:
+        Add WebInspector.assumingMainTarget to fill in all the places where
+        we assume the main target right now, but would need to handle non-main
+        targets as other agents are implemented in workers. For example profile
+        data that assumes the main target right now could be worker targets
+        when we implement ScriptProfiler / Heap agents.
+
+        * UserInterface/Protocol/Connection.js:
+        (InspectorBackend.WorkerConnection):
+        * UserInterface/Protocol/Target.js:
+        (WebInspector.Target):
+        (WebInspector.Target.prototype.get DebuggerAgent):
+        (WebInspector.Target.prototype.get mainResource):
+        (WebInspector.Target.prototype.set mainResource):
+        (WebInspector.WorkerTarget.prototype.initialize):
+        (WebInspector.WorkerTarget):
+        Include DebuggerAgent in Targets.
+        Include a mainResource for Worker Targets.
+
+        * UserInterface/Protocol/DebuggerObserver.js:
+        (WebInspector.DebuggerObserver.prototype.scriptParsed):
+        (WebInspector.DebuggerObserver.prototype.breakpointResolved):
+        (WebInspector.DebuggerObserver.prototype.paused):
+        (WebInspector.DebuggerObserver.prototype.resumed):
+        Pass the target on to managers when necessary.
+
+        * UserInterface/Models/DebuggerData.js: Added.
+        (WebInspector.DebuggerData):
+        (WebInspector.DebuggerData.prototype.get target):
+        (WebInspector.DebuggerData.prototype.get callFrames):
+        (WebInspector.DebuggerData.prototype.get pauseReason):
+        (WebInspector.DebuggerData.prototype.get pauseData):
+        (WebInspector.DebuggerData.prototype.get scripts):
+        (WebInspector.DebuggerData.prototype.scriptForIdentifier):
+        (WebInspector.DebuggerData.prototype.scriptsForURL):
+        (WebInspector.DebuggerData.prototype.reset):
+        (WebInspector.DebuggerData.prototype.addScript):
+        (WebInspector.DebuggerData.prototype.pause):
+        (WebInspector.DebuggerData.prototype.unpause):
+        Extract per-target data from DebuggerManager. This includes the list
+        of scripts evaluated in a Target, and any pause data for this target
+        such as the pause reason and call frames.
+
+        * UserInterface/Controllers/DebuggerManager.js:
+        (WebInspector.DebuggerManager.prototype.dataForTarget):
+        (WebInspector.DebuggerManager.prototype.get pauseReason): Deleted.
+        (WebInspector.DebuggerManager.prototype.get pauseData): Deleted.
+        (WebInspector.DebuggerManager.prototype.get callFrames): Deleted.
+        (WebInspector.DebuggerManager.prototype.reset):
+        New way to access per-target debugger data.
+
+        (WebInspector.DebuggerManager.prototype.initializeTarget):
+        When a new Target is created, synchronize frontend state with the target.
+        Things like the list of breakpoints and global breakpoint states.
+
+        (WebInspector.DebuggerManager.prototype.scriptForIdentifier):
+        (WebInspector.DebuggerManager.prototype.scriptsForURL):
+        Convenience accessors for scripts must now provide a Target.
+
+        (WebInspector.DebuggerManager.prototype.get knownNonResourceScripts):
+        This is a convenience accessors for a list of all scripts across all targets
+        so this handles getting the list across all targets.
+
+        (WebInspector.DebuggerManager.prototype.pause):
+        (WebInspector.DebuggerManager.prototype.resume):
+        (WebInspector.DebuggerManager.prototype.stepOver):
+        (WebInspector.DebuggerManager.prototype.stepInto):
+        (WebInspector.DebuggerManager.prototype.stepOut):
+        (WebInspector.DebuggerManager.prototype.continueToLocation):
+        Stepping commands affect the current target with the active call frame.
+        Eventually we will change Pause and Resume behavior to affect all targets.
+        
+        (WebInspector.DebuggerManager.prototype.addBreakpoint):
+        (WebInspector.DebuggerManager.prototype.breakpointResolved):
+        (WebInspector.DebuggerManager.prototype._setBreakpoint.didSetBreakpoint):
+        (WebInspector.DebuggerManager.prototype._setBreakpoint):
+        (WebInspector.DebuggerManager.prototype._removeBreakpoint):
+        Breakpoints should be set on all targets, but we need a way
+        to set them on a specific target, when initializing an
+        individual target when we want to inform that single target
+        of all of the breakpoints.
+
+        (WebInspector.DebuggerManager.prototype._breakpointDisabledStateDidChange):
+        (WebInspector.DebuggerManager.prototype._updateBreakOnExceptionsState):
+        Changing global breakpoint state should inform all targets.
+
+        (WebInspector.DebuggerManager.prototype.scriptDidParse):
+        Associate Scripts with a Target. Identify the main resource of a
+        Worker Target and set it as soon as we can.
+
+        (WebInspector.DebuggerManager.prototype.debuggerDidPause):
+        (WebInspector.DebuggerManager.prototype.debuggerDidResume):
+        (WebInspector.DebuggerManager.prototype._sourceCodeLocationFromPayload):
+        (WebInspector.DebuggerManager.prototype._scopeChainFromPayload):
+        (WebInspector.DebuggerManager.prototype._scopeChainNodeFromPayload):
+        (WebInspector.DebuggerManager.prototype._mainResourceDidChange):
+        (WebInspector.DebuggerManager.prototype._didResumeInternal):
+        Pausing and resuming now happens per-target, so associate
+        created model objects (CallFrame, ScopeChain objects) and any
+        other necessary data with the target.
+
+        * UserInterface/Models/Breakpoint.js:
+        (WebInspector.Breakpoint):
+        (WebInspector.Breakpoint.prototype.get target):
+        (WebInspector.Breakpoint.prototype.get info):
+        * UserInterface/Models/CallFrame.js:
+        (WebInspector.CallFrame):
+        (WebInspector.CallFrame.prototype.get target):
+        (WebInspector.CallFrame.fromDebuggerPayload):
+        (WebInspector.CallFrame.fromPayload):
+        * UserInterface/Models/ConsoleMessage.js:
+        (WebInspector.ConsoleMessage):
+        * UserInterface/Models/Script.js:
+        (WebInspector.Script):
+        (WebInspector.Script.prototype.get target):
+        (WebInspector.Script.prototype.isMainResource):
+        (WebInspector.Script.prototype.requestContentFromBackend):
+        (WebInspector.Script.prototype._resolveResource):
+        * UserInterface/Models/StackTrace.js:
+        (WebInspector.StackTrace.fromPayload):
+        (WebInspector.StackTrace.fromString):
+        * UserInterface/Models/ProbeManager.js:
+        (WebInspector.ProbeManager.prototype.didSampleProbe):
+        * UserInterface/Models/Probe.js:
+        (WebInspector.ProbeSample):
+        * UserInterface/Views/ConsoleMessageView.js:
+        (WebInspector.ConsoleMessageView.prototype._appendLocationLink):
+        (WebInspector.ConsoleMessageView.prototype._formatParameterAsString):
+        Associate model objects with a specific target where necessary.
+
+        * UserInterface/Views/ObjectTreeBaseTreeElement.js:
+        (WebInspector.ObjectTreeBaseTreeElement.prototype._appendMenusItemsForObject):
+        * UserInterface/Controllers/RuntimeManager.js:
+        (WebInspector.RuntimeManager.prototype.evaluateInInspectedWindow):
+        * UserInterface/Protocol/RemoteObject.js:
+        (WebInspector.RemoteObject.prototype.findFunctionSourceCodeLocation):
+        Use target specific DebuggerAgent where necessary.
+
+        * UserInterface/Controllers/JavaScriptRuntimeCompletionProvider.js:
+        * UserInterface/Controllers/TimelineManager.js:
+        (WebInspector.TimelineManager.prototype._callFramesFromPayload):
+        * UserInterface/Models/ScriptTimelineRecord.js:
+        (WebInspector.ScriptTimelineRecord.prototype._initializeProfileFromPayload.profileNodeFromPayload):
+        * UserInterface/Views/EventListenerSectionGroup.js:
+        (WebInspector.EventListenerSectionGroup.prototype._functionTextOrLink):
+        (WebInspector.EventListenerSectionGroup):
+        * UserInterface/Views/HeapSnapshotInstanceDataGridNode.js:
+        (WebInspector.HeapSnapshotInstanceDataGridNode.logHeapSnapshotNode.node.shortestGCRootPath.):
+        (WebInspector.HeapSnapshotInstanceDataGridNode.logHeapSnapshotNode):
+        (WebInspector.HeapSnapshotInstanceDataGridNode.prototype._populateWindowPreview):
+        (WebInspector.HeapSnapshotInstanceDataGridNode.prototype._populatePreview):
+        (WebInspector.HeapSnapshotInstanceDataGridNode.prototype._mouseoverHandler.appendPathRow):
+        * UserInterface/Views/ProfileDataGridNode.js:
+        (WebInspector.ProfileDataGridNode.prototype.iconClassName):
+        (WebInspector.ProfileDataGridNode.prototype.filterableDataForColumn):
+        (WebInspector.ProfileDataGridNode.prototype._displayContent):
+        Use assumed main target and audit these when the Worker gets more Agents.
+
+        * UserInterface/Controllers/FrameResourceManager.js:
+        (WebInspector.FrameResourceManager.prototype._initiatorSourceCodeLocationFromPayload):
+        This will always be the main target because only the main target
+        has access to the DOM.
+
+        * UserInterface/Views/SourceCodeTextEditor.js:
+        (WebInspector.SourceCodeTextEditor.prototype.get target):
+        (WebInspector.SourceCodeTextEditor.prototype.customPerformSearch):
+        (WebInspector.SourceCodeTextEditor.prototype.textEditorGutterContextMenu):
+        (WebInspector.SourceCodeTextEditor.prototype._tokenTrackingControllerHighlightedJavaScriptExpression.populate):
+        (WebInspector.SourceCodeTextEditor.prototype._tokenTrackingControllerHighlightedJavaScriptExpression):
+        (WebInspector.SourceCodeTextEditor.prototype._showPopoverForFunction.didGetDetails):
+        (WebInspector.SourceCodeTextEditor.prototype._showPopoverForFunction):
+        Update target specific actions to use the proper target's agents.
+
+        * UserInterface/Views/TargetTreeElement.js: Added.
+        (WebInspector.TargetTreeElement):
+        (WebInspector.TargetTreeElement.prototype.get target):
+        (WebInspector.TargetTreeElement.prototype.onexpand):
+        (WebInspector.TargetTreeElement.prototype.oncollapse):
+        Add a new tree element for a Target. We currently assume that the
+        main resource for a Target will be a Script right now, as is the
+        case for Web Workers. This simply remembers its expanded or
+        collapsed state and has a better icon.
+
+        * UserInterface/Views/ResourceIcons.css:
+        (body:matches(.mac-platform, .windows-platform) .script.worker-icon .icon):
+        (body:matches(.mac-platform, .windows-platform) .large .script.worker-icon .icon):
+        * UserInterface/Images/WorkerScript.png: Renamed from Source/WebInspectorUI/UserInterface/Images/WorkerDocument.png.
+        * UserInterface/Images/WorkerScript@2x.png: Renamed from Source/WebInspectorUI/UserInterface/Images/WorkerDocument@2x.png.
+        * UserInterface/Images/WorkerScriptLarge.png: Renamed from Source/WebInspectorUI/UserInterface/Images/WorkerDocumentLarge.png.
+        * UserInterface/Images/WorkerScriptLarge@2x.png: Renamed from Source/WebInspectorUI/UserInterface/Images/WorkerDocumentLarge@2x.png.
+        Improve icon for a Worker's main resource script.
+
+        * UserInterface/Views/ResourceSidebarPanel.js:
+        (WebInspector.ResourceSidebarPanel):
+        (WebInspector.ResourceSidebarPanel.prototype._scriptWasAdded):
+        (WebInspector.ResourceSidebarPanel.prototype._scriptsCleared):
+        (WebInspector.ResourceSidebarPanel.prototype._addScriptForNonMainTarget):
+        (WebInspector.ResourceSidebarPanel.prototype._addTargetWithMainResource):
+        (WebInspector.ResourceSidebarPanel.prototype._targetRemoved):
+        * UserInterface/Views/SearchSidebarPanel.js:
+        (WebInspector.SearchSidebarPanel.prototype.performSearch.searchScripts):
+        (WebInspector.SearchSidebarPanel.prototype._searchTreeElementForScript):
+        * UserInterface/Views/OpenResourceDialog.js:
+        (WebInspector.OpenResourceDialog.prototype._populateResourceTreeOutline.createTreeElement):
+        (WebInspector.OpenResourceDialog.prototype._populateResourceTreeOutline):
+        (WebInspector.OpenResourceDialog.prototype.didDismissDialog):
+        (WebInspector.OpenResourceDialog.prototype.didPresentDialog):
+        (WebInspector.OpenResourceDialog.prototype._addResourcesForFrame):
+        (WebInspector.OpenResourceDialog.prototype._addScriptsForTarget):
+        (WebInspector.OpenResourceDialog.prototype._scriptAdded):
+        (WebInspector.OpenResourceDialog):
+        * UserInterface/Views/DebuggerSidebarPanel.js:
+        (WebInspector.DebuggerSidebarPanel.prototype._addTreeElementForSourceCodeToTreeOutline):
+        (WebInspector.DebuggerSidebarPanel.prototype._debuggerCallFramesDidChange):
+        (WebInspector.DebuggerSidebarPanel.prototype._debuggerActiveCallFrameDidChange):
+        (WebInspector.DebuggerSidebarPanel.prototype._updatePauseReasonSection):
+        Include scripts from non-main targets in sidebars.
+
+2016-11-01  Devin Rousso  <dcrousso+webkit@gmail.com>
+
+        Web Inspector: Creating a new pseudo-selector in the Styles sidebar doesn't work on first attempt
+        https://bugs.webkit.org/show_bug.cgi?id=164092
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Views/CSSStyleDeclarationSection.css:
+        (.style-declaration-section:not(.invalid-selector).rule-disabled > .header > .icon):
+        (.style-declaration-section.invalid-selector > .header > .icon):
+        (.style-declaration-section.invalid-selector > .header > .selector,):
+        (.style-declaration-section.rule-disabled > .header > .icon): Deleted.
+
+        * UserInterface/Views/CSSStyleDeclarationSection.js:
+        (WebInspector.CSSStyleDeclarationSection):
+        (WebInspector.CSSStyleDeclarationSection.prototype.refresh):
+        (WebInspector.CSSStyleDeclarationSection.prototype._handleIconElementClicked):
+        (WebInspector.CSSStyleDeclarationSection.prototype._updateSelectorIcon): Added.
+        Re-add logic removed by https://webkit.org/b/159734 for handling invalid selectors.  Instead
+        of just refreshing the section whenever the represented CSSRule changes selectors, we only
+        need to refresh if the selector no longer applies to the current element.
+
+        (WebInspector.CSSStyleDeclarationSection.prototype._handleMouseMove): Added.
+        Fix another issue discovered while adding the invalid selector warnings, where the title
+        attribute of each individual selector was no longer visible.  To fix this, whenever the user
+        moves their mouse over the selector input, the position is compared to each selector to find
+        the first one that matches, whose title is then applied to the input element.
+
+2016-11-01  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Improve debugger highlight in some exception cases
+        https://bugs.webkit.org/show_bug.cgi?id=164300
+
+        Reviewed by Matt Baker.
+
+        * UserInterface/Views/SourceCodeTextEditor.js:
+        (WebInspector.SourceCodeTextEditor.prototype.textEditorExecutionHighlightRange):
+        When walking up AST nodes and reach a throw statement, use that.
+
+2016-11-01  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Cleanup stale code in NetworkSidebarPanel
+        https://bugs.webkit.org/show_bug.cgi?id=164295
+
+        Reviewed by Matt Baker.
+
+        * UserInterface/Views/NetworkSidebarPanel.js:
+        (WebInspector.NetworkSidebarPanel.prototype.closed): Deleted.
+        This doesn't appear to be needed since NetworkSidebarPanel never
+        registered any event listeners.
+
+2016-11-01  Devin Rousso  <dcrousso+webkit@gmail.com>
+
+        REGRESSION (r191419): Web Inspector: Autocomplete is broken
+        https://bugs.webkit.org/show_bug.cgi?id=150493
+
+        Reviewed by Timothy Hatcher.
+
+        Fixed CodeMirror.undo() logic rolled out by r191539 <https://webkit.org/b/150537>
+
+        Added calls to CodeMirror.changeGeneration(true) which tells the history stack to "close"
+        the current event, preventing it from being consolidated with new changes.  If the user
+        typed fast enough, non-completion changes (like adding ":" in CSS) would get merged with
+        completion changes, causing calls to CodeMirror.undo() to undo those changes as well.  To
+        prevent this, a boolean variable is set to true whenever a completion "activity" is in
+        progress, defined by a sequence of completion related events.  When this "activity" first
+        starts, call CodeMirror.changeGeneration(true) to freeze the current history.
+
+        See original bug for more information <https://webkit.org/b/147720>.
+
+        * UserInterface/Controllers/CodeMirrorCompletionController.js:
+        (WebInspector.CodeMirrorCompletionController):
+        (WebInspector.CodeMirrorCompletionController.prototype.updateCompletions):
+        (WebInspector.CodeMirrorCompletionController.prototype.isCompletionChange):
+        (WebInspector.CodeMirrorCompletionController.prototype.hideCompletions):
+        (WebInspector.CodeMirrorCompletionController.prototype.close):
+        (WebInspector.CodeMirrorCompletionController.prototype.completionSuggestionsSelectedCompletion):
+        (WebInspector.CodeMirrorCompletionController.prototype._applyCompletionHint.update):
+        (WebInspector.CodeMirrorCompletionController.prototype._applyCompletionHint):
+        (WebInspector.CodeMirrorCompletionController.prototype._commitCompletionHint.update):
+        (WebInspector.CodeMirrorCompletionController.prototype._commitCompletionHint):
+        (WebInspector.CodeMirrorCompletionController.prototype._removeCompletionHint.update):
+        (WebInspector.CodeMirrorCompletionController.prototype._removeCompletionHint):
+        (WebInspector.CodeMirrorCompletionController.prototype._completeAtCurrentPosition):
+        (WebInspector.CodeMirrorCompletionController.prototype._handleBeforeChange):
+        (WebInspector.CodeMirrorCompletionController.prototype._createCompletionHintMarker): Deleted.
+        (WebInspector.CodeMirrorCompletionController.prototype._removeLastChangeFromHistory): Deleted.
+        (WebInspector.CodeMirrorCompletionController.prototype._removeCompletionHint.clearMarker): Deleted.
+
+2016-11-01  Devin Rousso  <dcrousso+webkit@gmail.com>
+
+        Web Inspector: Replace sublists inside DOM-related model objects with WI.Collection
+        https://bugs.webkit.org/show_bug.cgi?id=164098
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Models/DOMTree.js:
+        * UserInterface/Models/Frame.js:
+        Add support for WebInspector.Collection.
+
+        * UserInterface/Models/Script.js:
+        (WebInspector.Script):
+        * UserInterface/Views/DebuggerSidebarPanel.js:
+        (WebInspector.DebuggerSidebarPanel.prototype._addResourcesRecursivelyForFrame):
+        * UserInterface/Views/FrameTreeElement.js:
+        (WebInspector.FrameTreeElement):
+        (WebInspector.FrameTreeElement.prototype.onpopulate):
+        * UserInterface/Views/OpenResourceDialog.js:
+        (WebInspector.OpenResourceDialog.prototype._addResourcesForFrame):
+        Use new functions defined by changing to WebInspector.Collection.
+
+2016-11-01  Devin Rousso  <dcrousso+webkit@gmail.com>
+
+        Web Inspector: Fix double remove of ResourceCollection if type changes
+        https://bugs.webkit.org/show_bug.cgi?id=164268
+
+        Reviewed by Joseph Pecoraro.
+
+        * UserInterface/Models/ResourceCollection.js:
+        (WebInspector.ResourceCollection.prototype._resourceTypeDidChange):
+        Change logic so that a non-typed collection will not try to remove a resource that has
+        changed types from the sub-collection of its old type, since the sub-collection itself will
+        handle the removal inside its own event listener for the type change.
+
+2016-11-01  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Web Inspector: Add the support for custom elements
+        https://bugs.webkit.org/show_bug.cgi?id=164266
+        <rdar://problem/29038883>
+
+        Reviewed by Joseph Pecoraro.
+
+        Show the custom element state in DOM node's details pane:
+         - "Element" for all builtin elements.
+         - "Element (Custom)" for any upgraded custom elements.
+         - "Element (Waiting to be upgraded)" for any element waiting to be upgraded.
+         - "Element (Failed to upgrade)" for any custom element that failed during construction or an upgrade.
+
+        And add "Jump to Definition" to the context menu of an node to find the custom element's definition.
+
+        * Localizations/en.lproj/localizedStrings.js: Added localized strings.
+        * UserInterface/Controllers/DOMTreeManager.js:
+        (WebInspector.DOMTreeManager.prototype._customElementStateChanged): Added. Update the state and fire
+        WebInspector.DOMTreeManager.Event.CustomElementStateChanged to update the node's details pane.
+        * UserInterface/Models/DOMNode.js:
+        (WebInspector.DOMNode): Set the custom element state or default to "builtin". Use null when the node
+        is not an element.
+        (WebInspector.DOMNode.prototype.isCustomElement): Added. Returns true if this is a successfully
+        constructed or upgraded custom element.
+        (WebInspector.DOMNode.prototype.customElementState): Added.
+        (WebInspector.DOMNode.CustomElementState): Added.
+        * UserInterface/Protocol/DOMObserver.js:
+        (WebInspector.DOMObserver.prototype.customElementStateChanged): Added.
+        * UserInterface/Protocol/RemoteObject.js:
+        (WebInspector.RemoteObject.prototype.getProperty): Added. Retrieves the property of a given name from
+        the remote backend.
+        * UserInterface/Views/DOMNodeDetailsSidebarPanel.js:
+        (WebInspector.DOMNodeDetailsSidebarPanel): Call _customElementStateChanged when the custom element
+        state changes by listening to WebInspector.DOMTreeManager.Event.CustomElementStateChanged.
+        (WebInspector.DOMNodeDetailsSidebarPanel.prototype.layout):
+        (WebInspector.DOMNodeDetailsSidebarPanel.prototype._refreshIdentity): Extracted from layout.
+        (WebInspector.DOMNodeDetailsSidebarPanel.prototype._customElementStateChanged): Added. 
+        (WebInspector.DOMNodeDetailsSidebarPanel.prototype._nodeTypeDisplayName): Include the custom element
+        state when it's not a builtin element (_customElementState returns null in that case).
+        (WebInspector.DOMNodeDetailsSidebarPanel.prototype._customElementState): Get the localized string for
+        each custom element state.
+        * UserInterface/Views/DOMTreeElement.js:
+        (WebInspector.DOMTreeElement.prototype._populateNodeContextMenu): Add "Jump to Definition" item in the
+        context menu of an element when it's a successfully constructed or upgraded custom element.
+
 2016-10-31  Joseph Pecoraro  <pecoraro@apple.com>
 
         Web Inspector: Shadow DOM scoped styles are missing

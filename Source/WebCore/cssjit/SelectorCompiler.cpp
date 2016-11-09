@@ -414,9 +414,6 @@ static inline FragmentRelation fragmentRelationForSelectorRelation(CSSSelector::
         return FragmentRelation::IndirectAdjacent;
     case CSSSelector::Subselector:
     case CSSSelector::ShadowDescendant:
-    case CSSSelector::ShadowPseudo:
-    case CSSSelector::ShadowDeep:
-    case CSSSelector::ShadowSlot:
         ASSERT_NOT_REACHED();
     }
     ASSERT_NOT_REACHED();
@@ -550,11 +547,9 @@ static inline FunctionType addPseudoClassType(const CSSSelector& selector, Selec
     case CSSSelector::PseudoClassEnabled:
         fragment.unoptimizedPseudoClasses.append(JSC::FunctionPtr(matchesEnabledPseudoClass));
         return FunctionType::SimpleSelectorChecker;
-#if ENABLE(CUSTOM_ELEMENTS)
     case CSSSelector::PseudoClassDefined:
         fragment.unoptimizedPseudoClasses.append(JSC::FunctionPtr(isDefinedElement));
         return FunctionType::SimpleSelectorChecker;
-#endif
     case CSSSelector::PseudoClassFocus:
         fragment.unoptimizedPseudoClasses.append(JSC::FunctionPtr(SelectorChecker::matchesFocusPseudoClass));
         return FunctionType::SimpleSelectorChecker;

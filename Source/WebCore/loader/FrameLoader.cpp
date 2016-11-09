@@ -87,7 +87,6 @@
 #include "MemoryCache.h"
 #include "Page.h"
 #include "PageCache.h"
-#include "PageThrottler.h"
 #include "PageTransitionEvent.h"
 #include "PlatformStrategies.h"
 #include "PluginData.h"
@@ -593,7 +592,7 @@ void FrameLoader::clear(Document* newDocument, bool clearWindowProperties, bool 
 
     // Do this after detaching the document so that the unload event works.
     if (clearWindowProperties) {
-        InspectorInstrumentation::frameWindowDiscarded(&m_frame, m_frame.document()->domWindow());
+        InspectorInstrumentation::frameWindowDiscarded(m_frame, m_frame.document()->domWindow());
         m_frame.document()->domWindow()->resetUnlessSuspendedForDocumentSuspension();
         m_frame.script().clearWindowShell(newDocument->domWindow(), m_frame.document()->pageCacheState() == Document::AboutToEnterPageCache);
     }
@@ -866,7 +865,8 @@ void FrameLoader::loadURLIntoChildFrame(const URL& url, const String& referer, F
     ASSERT(childFrame);
 
 #if ENABLE(WEB_ARCHIVE) || ENABLE(MHTML)
-    auto subframeArchive = activeDocumentLoader()->popArchiveForSubframe(childFrame->tree().uniqueName(), url);
+    auto activeLoader = activeDocumentLoader();
+    auto subframeArchive = activeLoader ? activeLoader->popArchiveForSubframe(childFrame->tree().uniqueName(), url) : nullptr;
     if (subframeArchive) {
         childFrame->loader().loadArchive(WTFMove(subframeArchive));
         return;
@@ -1077,13 +1077,10 @@ void FrameLoader::completed()
 
     if (m_frame.view())
         m_frame.view()->maintainScrollPositionAtAnchor(nullptr);
-    m_activityAssertion = nullptr;
 }
 
 void FrameLoader::started()
 {
-    if (m_frame.page())
-        m_activityAssertion = m_frame.page()->pageThrottler().pageLoadActivityToken();
     for (Frame* frame = &m_frame; frame; frame = frame->tree().parent())
         frame->loader().m_isComplete = false;
 }

@@ -53,7 +53,6 @@ my (
     $allInOneBuild,
     $asyncfunctionSyntax,
     $attachmentElementSupport,
-    $batteryStatusSupport,
     $canvasPathSupport,
     $canvasProxySupport,
     $channelMessagingSupport,
@@ -129,6 +128,7 @@ my (
     $proximityEventsSupport,
     $quotaSupport,
     $readableStreamAPISupport,
+    $readableByteStreamAPISupport,
     $registerProtocolHandlerSupport,
     $requestAnimationFrameSupport,
     $resolutionMediaQuerySupport,
@@ -183,9 +183,6 @@ my @features = (
 
     { option => "attachment-element", desc => "Toggle Attachment Element support",
       define => "ENABLE_ATTACHMENT_ELEMENT", default => 0, value => \$attachmentElementSupport },
-
-    { option => "battery-status", desc => "Toggle Battery Status support",
-      define => "ENABLE_BATTERY_STATUS", default => isEfl(), value => \$batteryStatusSupport },
 
     { option => "canvas-path", desc => "Toggle Canvas Path support",
       define => "ENABLE_CANVAS_PATH", default => 1, value => \$canvasPathSupport },
@@ -398,6 +395,9 @@ my @features = (
 
     { option => "readableStreamAPI", desc => "Toggle ReadableStream API support",
       define => "ENABLE_READABLE_STREAM_API", default => 1, value => \$readableStreamAPISupport },
+
+    { option => "readableByteStreamAPI", desc => "Toggle support of ByteStream part of ReadableStream API",
+      define => "ENABLE_READABLE_BYTE_STREAM_API", default => 1, value => \$readableByteStreamAPISupport },
 
     { option => "resolution-media-query", desc => "Toggle resolution media query support",
       define => "ENABLE_RESOLUTION_MEDIA_QUERY", default => isEfl(), value => \$resolutionMediaQuerySupport },

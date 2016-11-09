@@ -84,7 +84,6 @@ fast/events/wheelevent-in-text-node.html [ Skip ]
 fast/events/continuous-platform-wheelevent-in-scrolling-div.html [ Skip ]
 
 # Not supported on iOS
-batterystatus
 fast/mediastream
 fast/speechsynthesis
 gamepad
@@ -1201,6 +1200,7 @@ fast/events/focus-change-crash2.html [ Failure ]
 fast/events/frame-scroll-fake-mouse-move.html [ Failure ]
 fast/events/frame-tab-focus.html [ Failure ]
 fast/events/ime-composition-events-001.html [ Failure ]
+fast/events/ime-compositionend-on-selection-change.html [ Failure ]
 fast/events/inputText-never-fired-on-keydown-cancel.html [ Failure ]
 fast/events/input-events-drag-and-drop.html [ Failure ]
 fast/events/input-events-insert-by-drop.html [ Failure ]
@@ -1212,6 +1212,7 @@ fast/events/input-events-ime-recomposition.html [ Failure ]
 fast/events/input-events-ime-composition.html [ Failure ]
 fast/events/input-events-paste-rich-datatransfer.html [ Failure ]
 fast/events/input-events-spell-checking-datatransfer.html [ Failure ]
+fast/events/input-events-selection-forecolor-data.html [ Failure ]
 fast/events/before-input-events-prevent-default.html [ Failure ]
 fast/events/before-input-events-prevent-default-in-textfield.html [ Failure ]
 fast/events/before-input-events-different-start-end-elements.html [ Failure ]
@@ -2709,6 +2710,7 @@ webkit.org/b/164088 media/modern-media-controls/scrubber-support/scrubber-suppor
 webkit.org/b/164160 media/modern-media-controls/volume-support/volume-support-click.html [ Skip ]
 webkit.org/b/164160 media/modern-media-controls/volume-support/volume-support-drag.html [ Skip ]
 webkit.org/b/164250 media/modern-media-controls/volume-support/volume-support-media-api.html [ Skip ]
+webkit.org/b/164314 media/modern-media-controls/fullscreen-support/fullscreen-support-click.html [ Skip ]
 
 # This variation font test requires Skia which isn't available on iOS.
 webkit.org/b/163093 fast/text/variations/advances.html [ Failure ]
@@ -2741,3 +2743,8 @@ webkit.org/b/158836 imported/w3c/web-platform-tests/encrypted-media [ Skip ]
 
 # Only Mac has implemented DictionaryLookup
 fast/layers/prevent-hit-test-during-layout.html [ Skip ]
+
+# Internal APIs to test PiP and AirPlay are not available on iOS.
+media/modern-media-controls/airplay-support/airplay-support.html [ Skip ]
+media/modern-media-controls/pip-support [ Skip ]
+media/modern-media-controls/placard-support [ Skip ]

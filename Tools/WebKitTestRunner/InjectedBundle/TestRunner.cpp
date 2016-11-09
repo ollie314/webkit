@@ -56,9 +56,9 @@
 
 namespace WTR {
 
-PassRefPtr<TestRunner> TestRunner::create()
+Ref<TestRunner> TestRunner::create()
 {
-    return adoptRef(new TestRunner);
+    return adoptRef(*new TestRunner);
 }
 
 TestRunner::TestRunner()
@@ -1018,6 +1018,13 @@ void TestRunner::setNavigationGesturesEnabled(bool value)
 void TestRunner::setIgnoresViewportScaleLimits(bool value)
 {
     WKRetainPtr<WKStringRef> messageName(AdoptWK, WKStringCreateWithUTF8CString("SetIgnoresViewportScaleLimits"));
+    WKRetainPtr<WKBooleanRef> messageBody(AdoptWK, WKBooleanCreate(value));
+    WKBundlePagePostMessage(InjectedBundle::singleton().page()->page(), messageName.get(), messageBody.get());
+}
+
+void TestRunner::setShouldDownloadUndisplayableMIMETypes(bool value)
+{
+    WKRetainPtr<WKStringRef> messageName(AdoptWK, WKStringCreateWithUTF8CString("SetShouldDownloadUndisplayableMIMETypes"));
     WKRetainPtr<WKBooleanRef> messageBody(AdoptWK, WKBooleanCreate(value));
     WKBundlePagePostMessage(InjectedBundle::singleton().page()->page(), messageName.get(), messageBody.get());
 }

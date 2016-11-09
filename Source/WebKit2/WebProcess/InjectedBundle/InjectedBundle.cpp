@@ -202,10 +202,8 @@ void InjectedBundle::overrideBoolPreferenceForTestRunner(WebPageGroupProxy* page
         RuntimeEnabledFeatures::sharedFeatures().setCSSGridLayoutEnabled(enabled);
 #endif
 
-#if ENABLE(CUSTOM_ELEMENTS)
     if (preference == "WebKitCustomElementsEnabled")
         RuntimeEnabledFeatures::sharedFeatures().setCustomElementsEnabled(enabled);
-#endif
 
     if (preference == "WebKitInteractiveFormValidationEnabled")
         RuntimeEnabledFeatures::sharedFeatures().setInteractiveFormValidationEnabled(enabled);
@@ -238,7 +236,9 @@ void InjectedBundle::overrideBoolPreferenceForTestRunner(WebPageGroupProxy* page
     macro(WebKitDisplayImagesKey, LoadsImagesAutomatically, loadsImagesAutomatically) \
     macro(WebKitMediaStreamEnabled, MediaStreamEnabled, mediaStreamEnabled) \
     macro(WebKitHTTPEquivEnabled, HttpEquivEnabled, httpEquivEnabled) \
-    macro(WebKitVisualViewportEnabled, VisualViewportEnabled, visualViewportEnabled)
+    macro(WebKitVisualViewportEnabled, VisualViewportEnabled, visualViewportEnabled) \
+    macro(WebKitAsyncImageDecodingEnabled, AsyncImageDecodingEnabled, asyncImageDecodingEnabled) \
+    \
 
 #define OVERRIDE_PREFERENCE_AND_SET_IN_EXISTING_PAGES(TestRunnerName, SettingsName, WebPreferencesName) \
     if (preference == #TestRunnerName) { \

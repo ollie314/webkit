@@ -177,16 +177,40 @@ void RenderObject::setFlowThreadStateIncludingDescendants(FlowThreadState state)
     }
 }
 
+void RenderObject::initializeFlowThreadStateOnInsertion()
+{
+    ASSERT(parent());
+
+    if (flowThreadState() == parent()->flowThreadState())
+        return;
+
+    // A RenderFlowThread is always considered to be inside itself, so it never has to change its state in response to parent changes.
+    if (isRenderFlowThread())
+        return;
+
+    setFlowThreadStateIncludingDescendants(parent()->flowThreadState());
+}
+
+void RenderObject::resetFlowThreadStateOnRemoval()
+{
+    if (flowThreadState() == NotInsideFlowThread)
+        return;
+
+    if (!documentBeingDestroyed() && is<RenderElement>(*this)) {
+        downcast<RenderElement>(*this).removeFromRenderFlowThread();
+        return;
+    }
+
+    // A RenderFlowThread is always considered to be inside itself, so it never has to change its state in response to parent changes.
+    if (isRenderFlowThread())
+        return;
+
+    setFlowThreadStateIncludingDescendants(NotInsideFlowThread);
+}
+
 void RenderObject::setParent(RenderElement* parent)
 {
     m_parent = parent;
-
-    // Only update if our flow thread state is different from our new parent and if we're not a RenderFlowThread.
-    // A RenderFlowThread is always considered to be inside itself, so it never has to change its state
-    // in response to parent changes.
-    FlowThreadState newState = parent ? parent->flowThreadState() : NotInsideFlowThread;
-    if (newState != flowThreadState() && !isRenderFlowThread())
-        setFlowThreadStateIncludingDescendants(newState);
 }
 
 void RenderObject::removeFromParent()
@@ -604,10 +628,22 @@ void RenderObject::addPDFURLRect(PaintInfo& paintInfo, const LayoutPoint& paintO
     Node* node = this->node();
     if (!is<Element>(node) || !node->isLink())
         return;
-    const AtomicString& href = downcast<Element>(*node).getAttribute(hrefAttr);
+    Element& element = downcast<Element>(*node);
+    const AtomicString& href = element.getAttribute(hrefAttr);
     if (href.isNull())
         return;
-    paintInfo.context().setURLForRect(node->document().completeURL(href), snappedIntRect(urlRect));
+
+    if (paintInfo.context().supportsInternalLinks()) {
+        String outAnchorName;
+        Element* linkTarget = element.findAnchorElementForLink(outAnchorName);
+        if (linkTarget) {
+            paintInfo.context().setDestinationForRect(outAnchorName, urlRect);
+            return;
+        }
+    }
+
+    paintInfo.context().setURLForRect(node->document().completeURL(href), urlRect);
+
 }
 
 #if PLATFORM(IOS)
@@ -1129,6 +1165,19 @@ void RenderObject::showRenderObject(bool mark, int depth) const
             fprintf(stderr, " continuation->(%p)", renderer.continuation());
     }
     showRegionsInformation();
+    if (needsLayout()) {
+        fprintf(stderr, " layout->");
+        if (selfNeedsLayout())
+            fprintf(stderr, "[self]");
+        if (normalChildNeedsLayout())
+            fprintf(stderr, "[normal child]");
+        if (posChildNeedsLayout())
+            fprintf(stderr, "[positioned child]");
+        if (needsSimplifiedNormalFlowLayout())
+            fprintf(stderr, "[simplified]");
+        if (needsPositionedMovementLayout())
+            fprintf(stderr, "[positioned movement]");
+    }
     fprintf(stderr, "\n");
 }
 
@@ -1425,9 +1474,6 @@ void RenderObject::insertedIntoTree()
 void RenderObject::willBeRemovedFromTree()
 {
     // FIXME: We should ASSERT(isRooted()) but we have some out-of-order removals which would need to be fixed first.
-
-    setFlowThreadState(NotInsideFlowThread);
-
     // Update cached boundaries in SVG renderers, if a child is removed.
     parent()->setNeedsBoundariesUpdate();
 }

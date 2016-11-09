@@ -476,6 +476,9 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 - (void)setMockCaptureDevicesEnabled:(BOOL)flag;
 - (BOOL)mockCaptureDevicesEnabled;
 
+- (void)setMediaCaptureRequiresSecureConnection:(BOOL)flag;
+- (BOOL)mediaCaptureRequiresSecureConnection;
+
 - (void)setShadowDOMEnabled:(BOOL)flag;
 - (BOOL)shadowDOMEnabled;
 
@@ -501,6 +504,7 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 - (BOOL)modernMediaControlsEnabled;
 
 @property (nonatomic) BOOL visualViewportEnabled;
+@property (nonatomic) BOOL asyncImageDecodingEnabled;
 @property (nonatomic) BOOL javaScriptMarkupEnabled;
 @property (nonatomic) BOOL mediaDataLoadsAutomatically;
 @property (nonatomic) BOOL attachmentElementEnabled;

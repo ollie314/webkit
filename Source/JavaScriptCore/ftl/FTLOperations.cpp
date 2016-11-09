@@ -364,30 +364,30 @@ extern "C" JSCell* JIT_OPERATION operationMaterializeObjectInOSR(
                 array->initializeIndex(vm, arrayIndex, JSValue::decode(values[i]));
             }
 
-            if (!ASSERT_DISABLED) {
-                // We avoid this O(n^2) loop when asserts are disabled, but the condition checked here
-                // must hold to ensure the correctness of the above loop because of how we allocate the array.
-                for (unsigned targetIndex = 0; targetIndex < arraySize; ++targetIndex) {
-                    bool found = false;
-                    for (unsigned i = materialization->properties().size(); i--;) {
-                        const ExitPropertyValue& property = materialization->properties()[i];
-                        if (property.location().kind() != ArgumentPLoc)
-                            continue;
+#if !ASSERT_DISABLED
+            // We avoid this O(n^2) loop when asserts are disabled, but the condition checked here
+            // must hold to ensure the correctness of the above loop because of how we allocate the array.
+            for (unsigned targetIndex = 0; targetIndex < arraySize; ++targetIndex) {
+                bool found = false;
+                for (unsigned i = materialization->properties().size(); i--;) {
+                    const ExitPropertyValue& property = materialization->properties()[i];
+                    if (property.location().kind() != ArgumentPLoc)
+                        continue;
 
-                        unsigned argIndex = property.location().info();
-                        if (numberOfArgumentsToSkip > argIndex)
-                            continue;
-                        unsigned arrayIndex = argIndex - numberOfArgumentsToSkip;
-                        if (arrayIndex >= arraySize)
-                            continue;
-                        if (arrayIndex == targetIndex) {
-                            found = true;
-                            break;
-                        }
+                    unsigned argIndex = property.location().info();
+                    if (numberOfArgumentsToSkip > argIndex)
+                        continue;
+                    unsigned arrayIndex = argIndex - numberOfArgumentsToSkip;
+                    if (arrayIndex >= arraySize)
+                        continue;
+                    if (arrayIndex == targetIndex) {
+                        found = true;
+                        break;
                     }
-                    ASSERT_UNUSED(found, found);
                 }
+                ASSERT(found);
             }
+#endif
 
             return array;
         }

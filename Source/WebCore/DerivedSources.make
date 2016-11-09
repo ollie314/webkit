@@ -186,6 +186,7 @@ JS_BINDING_IDLS = \
     $(WebCore)/Modules/speech/SpeechSynthesisVoice.idl \
     $(WebCore)/Modules/streams/ByteLengthQueuingStrategy.idl \
     $(WebCore)/Modules/streams/CountQueuingStrategy.idl \
+    $(WebCore)/Modules/streams/ReadableByteStreamController.idl \
     $(WebCore)/Modules/streams/ReadableStream.idl \
     $(WebCore)/Modules/streams/ReadableStreamDefaultController.idl \
     $(WebCore)/Modules/streams/ReadableStreamDefaultReader.idl \
@@ -277,7 +278,6 @@ JS_BINDING_IDLS = \
     $(WebCore)/css/StyleMedia.idl \
     $(WebCore)/css/StyleSheet.idl \
     $(WebCore)/css/StyleSheetList.idl \
-    $(WebCore)/css/WebKitCSSFilterValue.idl \
     $(WebCore)/css/WebKitCSSMatrix.idl \
     $(WebCore)/css/WebKitCSSRegionRule.idl \
     $(WebCore)/css/WebKitCSSTransformValue.idl \
@@ -747,6 +747,7 @@ JS_BINDING_IDLS = \
 
 PYTHON = python
 PERL = perl
+RUBY = ruby
 
 ifeq ($(OS),Windows_NT)
     DELETE = cmd //C del
@@ -814,6 +815,8 @@ ADDITIONAL_EVENT_TARGET_FACTORY =
 
 -include WebCoreDerivedSourcesAdditions.make
 
+-include ApplePayWebCoreDerivedSourcesAdditions.make
+
 JS_BINDING_IDLS += $(ADDITIONAL_BINDING_IDLS)
 
 all : $(ADDITIONAL_BINDING_IDLS:%.idl=JS%.h)
@@ -853,6 +856,7 @@ all : \
     CSSValueKeywords.cpp \
     CSSValueKeywords.h \
     ColorData.cpp \
+    DOMJITAbstractHeapRepository.h \
     EventInterfaces.h \
     EventTargetInterfaces.h \
     ExceptionCodeDescription.cpp \
@@ -917,6 +921,7 @@ endif
 WEBCORE_CSS_PROPERTY_NAMES := $(WebCore)/css/CSSPropertyNames.in
 WEBCORE_CSS_VALUE_KEYWORDS := $(WebCore)/css/CSSValueKeywords.in
 WEBCORE_CSS_VALUE_KEYWORDS := $(WEBCORE_CSS_VALUE_KEYWORDS) $(WebCore)/css/SVGCSSValueKeywords.in
+WEBCORE_CSS_VALUE_KEYWORDS_DEFINES := $(FEATURE_DEFINES) $(ADDITIONAL_CSS_VALUE_KEYWORDS_DEFINES)
 
 CSSPropertyNames.h CSSPropertyNames.cpp StyleBuilder.cpp StylePropertyShorthandFunctions.h StylePropertyShorthandFunctions.cpp : makeprop.intermediate
 .INTERMEDIATE : makeprop.intermediate
@@ -928,7 +933,7 @@ CSSValueKeywords.h CSSValueKeywords.cpp : makevalues.intermediate
 .INTERMEDIATE : makevalues.intermediate
 makevalues.intermediate : $(WEBCORE_CSS_VALUE_KEYWORDS) css/makevalues.pl bindings/scripts/preprocessor.pm $(PLATFORM_FEATURE_DEFINES)
 	$(PERL) -pe '' $(WEBCORE_CSS_VALUE_KEYWORDS) > CSSValueKeywords.in
-	$(PERL) "$(WebCore)/css/makevalues.pl" --defines "$(FEATURE_DEFINES)"
+	$(PERL) "$(WebCore)/css/makevalues.pl" --defines "$(WEBCORE_CSS_VALUE_KEYWORDS_DEFINES)"
 
 # --------
 
@@ -939,6 +944,15 @@ SelectorPseudoClassAndCompatibilityElementMap.cpp : $(WebCore)/css/makeSelectorP
 
 SelectorPseudoElementTypeMap.cpp : $(WebCore)/css/makeSelectorPseudoElementsMap.py $(WebCore)/css/SelectorPseudoElementTypeMap.in
 	$(PYTHON) "$(WebCore)/css/makeSelectorPseudoElementsMap.py" $(WebCore)/css/SelectorPseudoElementTypeMap.in gperf "$(FEATURE_DEFINES)"
+
+# --------
+
+# DOMJIT Abstract Heap
+
+all : DOMJITAbstractHeapRepository.h
+
+DOMJITAbstractHeapRepository.h : $(WebCore)/domjit/generate-abstract-heap.rb $(WebCore)/domjit/DOMJITAbstractHeapRepository.yaml
+	$(RUBY) "$(WebCore)/domjit/generate-abstract-heap.rb" $(WebCore)/domjit/DOMJITAbstractHeapRepository.yaml ./DOMJITAbstractHeapRepository.h
 
 # --------
 
@@ -1333,6 +1347,8 @@ WebCore_BUILTINS_SOURCES = \
     $(WebCore)/Modules/mediastream/RTCPeerConnectionInternals.js \
     $(WebCore)/Modules/streams/ByteLengthQueuingStrategy.js \
     $(WebCore)/Modules/streams/CountQueuingStrategy.js \
+    $(WebCore)/Modules/streams/ReadableByteStreamController.js \
+    $(WebCore)/Modules/streams/ReadableByteStreamInternals.js \
     $(WebCore)/Modules/streams/ReadableStream.js \
     $(WebCore)/Modules/streams/ReadableStreamDefaultController.js \
     $(WebCore)/Modules/streams/ReadableStreamInternals.js \

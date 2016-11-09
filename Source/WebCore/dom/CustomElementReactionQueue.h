@@ -25,8 +25,6 @@
 
 #pragma once
 
-#if ENABLE(CUSTOM_ELEMENTS)
-
 #include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/Vector.h>
@@ -91,6 +89,9 @@ private:
 
     private:
         Vector<Ref<Element>> m_elements;
+#if !ASSERT_DISABLED
+        bool m_invoking { false };
+#endif
     };
 
     WEBCORE_EXPORT void processQueue();
@@ -105,5 +106,3 @@ private:
 };
 
 }
-
-#endif

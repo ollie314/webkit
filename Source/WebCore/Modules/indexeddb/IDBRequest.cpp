@@ -63,12 +63,12 @@ Ref<IDBRequest> IDBRequest::create(ScriptExecutionContext& context, IDBCursor& c
     return adoptRef(*new IDBRequest(context, cursor, transaction));
 }
 
-Ref<IDBRequest> IDBRequest::createCount(ScriptExecutionContext& context, IDBIndex& index, IDBTransaction& transaction)
+Ref<IDBRequest> IDBRequest::create(ScriptExecutionContext& context, IDBIndex& index, IDBTransaction& transaction)
 {
     return adoptRef(*new IDBRequest(context, index, transaction));
 }
 
-Ref<IDBRequest> IDBRequest::createGet(ScriptExecutionContext& context, IDBIndex& index, IndexedDB::IndexRecordType requestedRecordType, IDBTransaction& transaction)
+Ref<IDBRequest> IDBRequest::createIndexGet(ScriptExecutionContext& context, IDBIndex& index, IndexedDB::IndexRecordType requestedRecordType, IDBTransaction& transaction)
 {
     return adoptRef(*new IDBRequest(context, index, requestedRecordType, transaction));
 }
@@ -228,7 +228,7 @@ bool IDBRequest::canSuspendForDocumentSuspension() const
 
 bool IDBRequest::hasPendingActivity() const
 {
-    ASSERT(currentThread() == originThreadID());
+    ASSERT(currentThread() == originThreadID() || mayBeGCThread());
     return m_hasPendingActivity;
 }
 

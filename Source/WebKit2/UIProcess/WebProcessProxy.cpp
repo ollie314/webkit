@@ -715,7 +715,7 @@ void WebProcessProxy::releasePageCache()
 void WebProcessProxy::windowServerConnectionStateChanged()
 {
     for (const auto& page : m_pageMap.values())
-        page->viewStateDidChange(ViewState::IsVisuallyIdle);
+        page->activityStateDidChange(ActivityState::IsVisuallyIdle);
 }
 
 void WebProcessProxy::fetchWebsiteData(SessionID sessionID, OptionSet<WebsiteDataType> dataTypes, Function<void (WebsiteData)> completionHandler)
@@ -906,7 +906,7 @@ void WebProcessProxy::sendProcessWillSuspendImminently()
         return;
 
     bool handled = false;
-    sendSync(Messages::WebProcess::ProcessWillSuspendImminently(), Messages::WebProcess::ProcessWillSuspendImminently::Reply(handled), 0, std::chrono::seconds(1));
+    sendSync(Messages::WebProcess::ProcessWillSuspendImminently(), Messages::WebProcess::ProcessWillSuspendImminently::Reply(handled), 0, Seconds(1));
 }
 
 void WebProcessProxy::sendPrepareToSuspend()

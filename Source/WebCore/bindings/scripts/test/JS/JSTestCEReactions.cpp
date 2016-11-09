@@ -189,7 +189,7 @@ static inline JSValue jsTestCEReactionsStringifierAttributeGetter(ExecState& sta
     UNUSED_PARAM(throwScope);
     UNUSED_PARAM(state);
     auto& impl = thisObject.wrapped();
-    JSValue result = toJS(&state, thisObject.globalObject(), impl.stringifierAttribute());
+    JSValue result = toJS<IDLInterface<TestCEReactionsStringifier>>(state, *thisObject.globalObject(), impl.stringifierAttribute());
     return result;
 }
 
@@ -228,9 +228,7 @@ static inline bool setJSTestCEReactionsAttributeWithCEReactionsFunction(ExecStat
 {
     UNUSED_PARAM(state);
     UNUSED_PARAM(throwScope);
-#if ENABLE(CUSTOM_ELEMENTS)
     CustomElementReactionStack customElementReactionStack;
-#endif
     auto& impl = thisObject.wrapped();
     auto nativeValue = convert<IDLDOMString>(state, value, StringConversionConfiguration::Normal);
     RETURN_IF_EXCEPTION(throwScope, false);
@@ -250,9 +248,7 @@ static inline bool setJSTestCEReactionsReflectAttributeWithCEReactionsFunction(E
 {
     UNUSED_PARAM(state);
     UNUSED_PARAM(throwScope);
-#if ENABLE(CUSTOM_ELEMENTS)
     CustomElementReactionStack customElementReactionStack;
-#endif
     auto& impl = thisObject.wrapped();
     auto nativeValue = convert<IDLDOMString>(state, value, StringConversionConfiguration::Normal);
     RETURN_IF_EXCEPTION(throwScope, false);
@@ -272,9 +268,7 @@ static inline bool setJSTestCEReactionsStringifierAttributeFunction(ExecState& s
 {
     UNUSED_PARAM(state);
     UNUSED_PARAM(throwScope);
-#if ENABLE(CUSTOM_ELEMENTS)
     CustomElementReactionStack customElementReactionStack;
-#endif
     Ref<TestCEReactionsStringifier> forwardedImpl = thisObject.wrapped().stringifierAttribute();
     auto& impl = forwardedImpl.get();
     auto nativeValue = convert<IDLDOMString>(state, value, StringConversionConfiguration::Normal);
@@ -293,9 +287,7 @@ static inline JSC::EncodedJSValue jsTestCEReactionsPrototypeFunctionMethodWithCE
 
 EncodedJSValue JSC_HOST_CALL jsTestCEReactionsPrototypeFunctionMethodWithCEReactions(ExecState* state)
 {
-#if ENABLE(CUSTOM_ELEMENTS)
     CustomElementReactionStack customElementReactionStack;
-#endif
     return BindingCaller<JSTestCEReactions>::callOperation<jsTestCEReactionsPrototypeFunctionMethodWithCEReactionsCaller>(state, "methodWithCEReactions");
 }
 

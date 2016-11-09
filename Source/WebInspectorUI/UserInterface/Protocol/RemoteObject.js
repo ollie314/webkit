@@ -418,6 +418,15 @@ WebInspector.RemoteObject = class RemoteObject
             callback(0);
     }
 
+    getProperty(propertyName, callback)
+    {
+        function inspectedPage_object_getProperty(property) {
+            return this[property];
+        }
+
+        this.callFunction(inspectedPage_object_getProperty, [propertyName], true, callback);
+    }
+
     callFunction(functionDeclaration, args, generatePreview, callback)
     {
         function mycallback(error, result, wasThrown)
@@ -511,14 +520,14 @@ WebInspector.RemoteObject = class RemoteObject
             return result.promise;
         }
 
-        DebuggerAgent.getFunctionDetails(this._objectId, function(error, response) {
+        this._target.DebuggerAgent.getFunctionDetails(this._objectId, (error, response) => {
             if (error) {
                 result.reject(error);
                 return;
             }
 
             var location = response.location;
-            var sourceCode = WebInspector.debuggerManager.scriptForIdentifier(location.scriptId);
+            var sourceCode = WebInspector.debuggerManager.scriptForIdentifier(location.scriptId, this._target);
 
             if (!sourceCode || (!WebInspector.isDebugUIEnabled() && isWebKitInternalScript(sourceCode.sourceURL))) {
                 result.resolve(WebInspector.RemoteObject.SourceCodeLocationPromise.NoSourceFound);

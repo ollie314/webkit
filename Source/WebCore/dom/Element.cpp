@@ -1333,10 +1333,8 @@ void Element::attributeChanged(const QualifiedName& name, const AtomicString& ol
 
     document().incDOMTreeVersion();
 
-#if ENABLE(CUSTOM_ELEMENTS)
     if (UNLIKELY(isDefinedCustomElement()))
         CustomElementReactionQueue::enqueueAttributeChangedCallbackIfNeeded(*this, name, oldValue, newValue);
-#endif
 
     if (valueIsSameAsBefore)
         return;
@@ -1553,10 +1551,8 @@ void Element::didMoveToNewDocument(Document* oldDocument)
             attributeChanged(classAttr, nullAtom, getAttribute(classAttr));
     }
 
-#if ENABLE(CUSTOM_ELEMENTS)
     if (UNLIKELY(isDefinedCustomElement()))
         CustomElementReactionQueue::enqueueAdoptedCallbackIfNeeded(*this, *oldDocument, document());
-#endif
 }
 
 bool Element::hasAttributes() const
@@ -1664,15 +1660,12 @@ Node::InsertionNotificationRequest Element::insertedInto(ContainerNode& insertio
             updateLabel(*newScope, nullAtom, attributeWithoutSynchronization(forAttr));
     }
 
-#if ENABLE(CUSTOM_ELEMENTS)
     if (becomeConnected) {
         if (UNLIKELY(isCustomElementUpgradeCandidate()))
             CustomElementReactionQueue::enqueueElementUpgradeIfDefined(*this);
         if (UNLIKELY(isDefinedCustomElement()))
             CustomElementReactionQueue::enqueueConnectedCallbackIfNeeded(*this);
     }
-
-#endif
 
     return InsertionDone;
 }
@@ -1721,10 +1714,8 @@ void Element::removedFrom(ContainerNode& insertionPoint)
                 updateLabel(*oldScope, attributeWithoutSynchronization(forAttr), nullAtom);
         }
 
-#if ENABLE(CUSTOM_ELEMENTS)
         if (becomeDisconnected && UNLIKELY(isDefinedCustomElement()))
             CustomElementReactionQueue::enqueueDisconnectedCallbackIfNeeded(*this);
-#endif
     }
 
     if (!parentNode()) {
@@ -1793,8 +1784,6 @@ void Element::removeShadowRoot()
 
     oldRoot->setHost(nullptr);
     oldRoot->setParentTreeScope(&document());
-
-    notifyChildNodeRemoved(*this, *oldRoot);
 }
 
 static bool canAttachAuthorShadowRoot(const Element& element)
@@ -1874,8 +1863,6 @@ ShadowRoot& Element::ensureUserAgentShadowRoot()
     return shadow;
 }
 
-#if ENABLE(CUSTOM_ELEMENTS)
-
 void Element::setIsDefinedCustomElement(JSCustomElementInterface& elementInterface)
 {
     clearFlag(IsEditingTextOrUndefinedCustomElementFlag);
@@ -1883,6 +1870,7 @@ void Element::setIsDefinedCustomElement(JSCustomElementInterface& elementInterfa
     auto& data = ensureElementRareData();
     if (!data.customElementReactionQueue())
         data.setCustomElementReactionQueue(std::make_unique<CustomElementReactionQueue>(elementInterface));
+    InspectorInstrumentation::didChangeCustomElementState(*this);
 }
 
 void Element::setIsFailedCustomElement(JSCustomElementInterface&)
@@ -1896,6 +1884,7 @@ void Element::setIsFailedCustomElement(JSCustomElementInterface&)
         if (auto* queue = elementRareData()->customElementReactionQueue())
             queue->clear();
     }
+    InspectorInstrumentation::didChangeCustomElementState(*this);
 }
 
 void Element::setIsCustomElementUpgradeCandidate()
@@ -1903,6 +1892,7 @@ void Element::setIsCustomElementUpgradeCandidate()
     ASSERT(!getFlag(IsCustomElement));
     setFlag(IsCustomElement);
     setFlag(IsEditingTextOrUndefinedCustomElementFlag);
+    InspectorInstrumentation::didChangeCustomElementState(*this);
 }
 
 void Element::enqueueToUpgrade(JSCustomElementInterface& elementInterface)
@@ -1910,6 +1900,7 @@ void Element::enqueueToUpgrade(JSCustomElementInterface& elementInterface)
     ASSERT(!isDefinedCustomElement() && !isFailedCustomElement());
     setFlag(IsCustomElement);
     setFlag(IsEditingTextOrUndefinedCustomElementFlag);
+    InspectorInstrumentation::didChangeCustomElementState(*this);
 
     auto& data = ensureElementRareData();
     ASSERT(!data.customElementReactionQueue());
@@ -1925,8 +1916,6 @@ CustomElementReactionQueue* Element::reactionQueue() const
         return nullptr;
     return elementRareData()->customElementReactionQueue();
 }
-
-#endif
 
 const AtomicString& Element::shadowPseudoId() const
 {
@@ -3753,6 +3742,28 @@ ExceptionOr<void> Element::insertAdjacentText(const String& where, const String&
     if (result.hasException())
         return result.releaseException();
     return { };
+}
+
+Element* Element::findAnchorElementForLink(String& outAnchorName)
+{
+    if (!isLink())
+        return nullptr;
+
+    const AtomicString& href = attributeWithoutSynchronization(HTMLNames::hrefAttr);
+    if (href.isNull())
+        return nullptr;
+
+    Document& document = this->document();
+    URL url = document.completeURL(href);
+    if (!url.isValid())
+        return nullptr;
+
+    if (url.hasFragmentIdentifier() && equalIgnoringFragmentIdentifier(url, document.baseURL())) {
+        outAnchorName = url.fragmentIdentifier();
+        return document.findAnchor(outAnchorName);
+    }
+
+    return nullptr;
 }
 
 } // namespace WebCore

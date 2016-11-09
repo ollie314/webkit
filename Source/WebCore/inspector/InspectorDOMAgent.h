@@ -168,9 +168,10 @@ public:
     void didInvalidateStyleAttr(Node&);
     void didPushShadowRoot(Element& host, ShadowRoot&);
     void willPopShadowRoot(Element& host, ShadowRoot&);
+    void didChangeCustomElementState(Element&);
     bool handleTouchEvent(Node&);
     void didCommitLoad(Document*);
-    void frameDocumentUpdated(Frame*);
+    void frameDocumentUpdated(Frame&);
     void pseudoElementCreated(PseudoElement&);
     void pseudoElementDestroyed(PseudoElement&);
 

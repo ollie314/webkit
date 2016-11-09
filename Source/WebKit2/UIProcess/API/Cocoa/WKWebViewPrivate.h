@@ -52,6 +52,7 @@ typedef NS_ENUM(NSInteger, _WKImmediateActionType) {
 
 #endif
 
+@class AVFunctionBarScrubber;
 @class WKBrowsingContextHandle;
 @class _WKFrameHandle;
 @class _WKHitTestResult;
@@ -202,6 +203,12 @@ typedef NS_ENUM(NSInteger, _WKImmediateActionType) {
 - (NSPrintOperation *)_printOperationWithPrintInfo:(NSPrintInfo *)printInfo;
 - (NSPrintOperation *)_printOperationWithPrintInfo:(NSPrintInfo *)printInfo forFrame:(_WKFrameHandle *)frameHandle WK_API_AVAILABLE(macosx(10.12), ios(10.0));
 
+// FIXME: This SPI should become a part of the WKUIDelegate. rdar://problem/26561537
+@property (nonatomic, readwrite, setter=_setWantsMediaPlaybackControlsView:) BOOL _wantsMediaPlaybackControlsView WK_API_AVAILABLE(macosx(WK_MAC_TBA));
+@property (nonatomic, readonly) AVFunctionBarScrubber *_mediaPlaybackControlsView WK_API_AVAILABLE(macosx(WK_MAC_TBA));
+- (void)_addMediaPlaybackControlsView:(AVFunctionBarScrubber *)mediaPlaybackControlsView WK_API_AVAILABLE(macosx(WK_MAC_TBA));
+- (void)_removeMediaPlaybackControlsView WK_API_AVAILABLE(macosx(WK_MAC_TBA));
+
 #endif
 
 - (WKNavigation *)_reloadWithoutContentBlockers WK_API_AVAILABLE(macosx(10.12), ios(10.0));
@@ -257,6 +264,8 @@ typedef NS_ENUM(NSInteger, _WKImmediateActionType) {
 
 @interface WKWebView (WKTesting)
 
+- (NSDictionary *)_contentsOfUserInterfaceItem:(NSString *)userInterfaceItem WK_API_AVAILABLE(macosx(WK_MAC_TBA), ios(WK_IOS_TBA));
+
 #if TARGET_OS_IPHONE
 
 @property (nonatomic, readonly) CGRect _contentVisibleRect WK_API_AVAILABLE(ios(10.0));
@@ -267,7 +276,6 @@ typedef NS_ENUM(NSInteger, _WKImmediateActionType) {
 - (void)keyboardAccessoryBarPrevious WK_API_AVAILABLE(ios(10.0));
 - (void)dismissFormAccessoryView WK_API_AVAILABLE(ios(WK_IOS_TBA));
 - (void)selectFormAccessoryPickerRow:(int)rowIndex WK_API_AVAILABLE(ios(WK_IOS_TBA));
-- (NSDictionary *)_contentsOfUserInterfaceItem:(NSString *)userInterfaceItem WK_API_AVAILABLE(ios(WK_IOS_TBA));
 
 - (void)didStartFormControlInteraction WK_API_AVAILABLE(ios(WK_IOS_TBA));
 - (void)didEndFormControlInteraction WK_API_AVAILABLE(ios(WK_IOS_TBA));
