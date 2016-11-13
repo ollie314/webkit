@@ -682,7 +682,6 @@ private:
         case RegExpTest:
         case StringReplace:
         case StringReplaceRegExp:
-        case PureGetById:
         case GetById:
         case GetByIdFlush:
         case GetByIdWithThis:
@@ -710,6 +709,7 @@ private:
         case GetFromArguments:
         case LoadFromJSMapBucket:
         case ToNumber:
+        case GetArgument:
         case CallDOMGetter: {
             setPrediction(m_currentNode->getHeapPrediction());
             break;
@@ -859,6 +859,7 @@ private:
             break;
         }
             
+        case NewArrayWithSpread:
         case NewArray:
         case NewArrayWithSize:
         case CreateRest:
@@ -866,6 +867,10 @@ private:
             setPrediction(SpecArray);
             break;
         }
+
+        case Spread:
+            setPrediction(SpecCellOther);
+            break;
             
         case NewTypedArray: {
             setPrediction(speculationFromTypedArrayType(m_currentNode->typedArrayType()));

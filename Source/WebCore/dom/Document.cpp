@@ -1552,9 +1552,9 @@ void Document::setTitle(const String& title)
     updateTitle(StringWithDirection(title, LTR));
 
     if (is<HTMLTitleElement>(m_titleElement.get()))
-        downcast<HTMLTitleElement>(*m_titleElement).setTextContent(title, ASSERT_NO_EXCEPTION);
+        downcast<HTMLTitleElement>(*m_titleElement).setTextContent(title);
     else if (is<SVGTitleElement>(m_titleElement.get()))
-        downcast<SVGTitleElement>(*m_titleElement).setTextContent(title, ASSERT_NO_EXCEPTION);
+        downcast<SVGTitleElement>(*m_titleElement).setTextContent(title);
 }
 
 void Document::updateTitleElement(Element* newTitleElement)
@@ -2561,14 +2561,9 @@ ExceptionOr<void> Document::setBodyOrFrameset(RefPtr<HTMLElement>&& newBody)
     if (!m_documentElement)
         return Exception { HIERARCHY_REQUEST_ERR };
 
-    ExceptionCode ec = 0;
     if (currentBody)
-        m_documentElement->replaceChild(*newBody, *currentBody, ec);
-    else
-        m_documentElement->appendChild(*newBody, ec);
-    if (ec)
-        return Exception { ec };
-    return { };
+        return m_documentElement->replaceChild(*newBody, *currentBody);
+    return m_documentElement->appendChild(*newBody);
 }
 
 Location* Document::location() const
@@ -3282,7 +3277,7 @@ MouseEventWithHitTestResults Document::prepareMouseEvent(const HitTestRequest& r
     renderView()->hitTest(request, result);
 
     if (!request.readOnly())
-        updateHoverActiveState(request, result.innerElement());
+        updateHoverActiveState(request, result.targetElement());
 
     return MouseEventWithHitTestResults(event, result);
 }
@@ -4054,7 +4049,7 @@ EventListener* Document::getWindowAttributeEventListener(const AtomicString& eve
 {
     if (!m_domWindow)
         return nullptr;
-    return m_domWindow->getAttributeEventListener(eventType);
+    return m_domWindow->attributeEventListener(eventType);
 }
 
 void Document::dispatchWindowEvent(Event& event, EventTarget* target)
@@ -4282,7 +4277,7 @@ String Document::referrer() const
 
 String Document::origin() const
 {
-    return securityOrigin()->databaseIdentifier();
+    return SecurityOriginData::fromSecurityOrigin(*securityOrigin()).databaseIdentifier();
 }
 
 String Document::domain() const
@@ -4789,7 +4784,6 @@ String Document::queryCommandValue(const String& commandName)
 
 void Document::pushCurrentScript(HTMLScriptElement* newCurrentScript)
 {
-    ASSERT(newCurrentScript);
     m_currentScriptStack.append(newCurrentScript);
 }
 
@@ -5122,7 +5116,15 @@ void Document::initSecurityContext()
         applyQuickLookSandbox();
 #endif
 
+    if (shouldEnforceHTTP0_9Sandbox()) {
+        String message = makeString("Sandboxing '", m_url.stringCenterEllipsizedToLength(), "' because it is using HTTP/0.9.");
+        addConsoleMessage(MessageSource::Security, MessageLevel::Error, message);
+        enforceSandboxFlags(SandboxScripts | SandboxPlugins);
+    }
+
     if (Settings* settings = this->settings()) {
+        if (settings->needsStorageAccessFromFileURLsQuirk())
+            securityOrigin()->grantStorageAccessFromFileURLsQuirk();
         if (!settings->webSecurityEnabled()) {
             // Web security is turned off. We should let this document access every other document. This is used primary by testing
             // harnesses for web sites.
@@ -6902,6 +6904,14 @@ ShouldOpenExternalURLsPolicy Document::shouldOpenExternalURLsPolicyToPropagate()
         return documentLoader->shouldOpenExternalURLsPolicyToPropagate();
 
     return ShouldOpenExternalURLsPolicy::ShouldNotAllow;
+}
+
+bool Document::shouldEnforceHTTP0_9Sandbox() const
+{
+    if (m_isSynthesized || !m_frame)
+        return false;
+    DocumentLoader* documentLoader = m_frame->loader().activeDocumentLoader();
+    return documentLoader && documentLoader->response().isHttpVersion0_9();
 }
 
 #if USE(QUICK_LOOK)

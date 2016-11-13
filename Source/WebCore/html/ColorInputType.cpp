@@ -127,8 +127,8 @@ void ColorInputType::createShadowSubtree()
     wrapperElement->setPseudo(AtomicString("-webkit-color-swatch-wrapper", AtomicString::ConstructFromLiteral));
     auto colorSwatch = HTMLDivElement::create(document);
     colorSwatch->setPseudo(AtomicString("-webkit-color-swatch", AtomicString::ConstructFromLiteral));
-    wrapperElement->appendChild(colorSwatch, ASSERT_NO_EXCEPTION);
-    element().userAgentShadowRoot()->appendChild(wrapperElement, ASSERT_NO_EXCEPTION);
+    wrapperElement->appendChild(colorSwatch);
+    element().userAgentShadowRoot()->appendChild(wrapperElement);
     
     updateColorSwatch();
 }
@@ -250,7 +250,7 @@ Vector<Color> ColorInputType::suggestions() const
         suggestions.reserveInitialCapacity(length);
         for (unsigned i = 0; i != length; ++i) {
             auto value = downcast<HTMLOptionElement>(*options->item(i)).value();
-            if (isValidColorString(value))
+            if (isValidSimpleColorString(value))
                 suggestions.uncheckedAppend(Color(value));
         }
     }

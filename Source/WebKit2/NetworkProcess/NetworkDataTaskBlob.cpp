@@ -360,7 +360,6 @@ void NetworkDataTaskBlob::readData(const BlobDataItem& item)
 
 void NetworkDataTaskBlob::readFile(const BlobDataItem& item)
 {
-    ASSERT(m_client);
     ASSERT(m_stream);
 
     if (m_fileOpened) {
@@ -480,8 +479,7 @@ void NetworkDataTaskBlob::download()
     downloadManager.dataTaskBecameDownloadTask(m_pendingDownloadID, WTFMove(download));
     downloadPtr->didCreateDestination(m_pendingDownloadLocation);
 
-    if (m_client)
-        m_client->didBecomeDownload();
+    ASSERT(!m_client);
 
     m_buffer.resize(bufferSize);
     read();

@@ -199,8 +199,6 @@ public:
     bool hasPausedImageAnimations() const { return m_hasPausedImageAnimations; }
     void setHasPausedImageAnimations(bool b) { m_hasPausedImageAnimations = b; }
 
-    RenderNamedFlowThread* renderNamedFlowThreadWrapper();
-
     void setRenderBoxNeedsLazyRepaint(bool b) { m_renderBoxNeedsLazyRepaint = b; }
     bool renderBoxNeedsLazyRepaint() const { return m_renderBoxNeedsLazyRepaint; }
 
@@ -226,7 +224,6 @@ public:
     RespectImageOrientationEnum shouldRespectImageOrientation() const;
 
     void removeFromRenderFlowThread();
-    void invalidateFlowThreadContainingBlockIncludingDescendants(RenderFlowThread* = nullptr);
 
 protected:
     enum BaseTypeFlag {
@@ -284,6 +281,7 @@ protected:
     void updateOutlineAutoAncestor(bool hasOutlineAuto);
 
     void removeFromRenderFlowThreadIncludingDescendants(bool shouldUpdateState);
+    void adjustFlowThreadStateOnContainingBlockChangeIfNeeded();
 
 private:
     RenderElement(ContainerNode&, RenderStyle&&, BaseTypeFlags);

@@ -23,8 +23,7 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef CryptoAlgorithmRSAES_PKCS1_v1_5_h
-#define CryptoAlgorithmRSAES_PKCS1_v1_5_h
+#pragma once
 
 #include "CryptoAlgorithm.h"
 
@@ -44,13 +43,14 @@ public:
 
     CryptoAlgorithmIdentifier identifier() const override;
 
-    void generateKey(const std::unique_ptr<CryptoAlgorithmParameters>&&, bool extractable, CryptoKeyUsage, KeyOrKeyPairCallback&&, ExceptionCallback&&, ScriptExecutionContext*) final;
+    void generateKey(const std::unique_ptr<CryptoAlgorithmParameters>&&, bool extractable, CryptoKeyUsageBitmap, KeyOrKeyPairCallback&&, ExceptionCallback&&, ScriptExecutionContext*) final;
+    void importKey(SubtleCrypto::KeyFormat, KeyData&&, const std::unique_ptr<CryptoAlgorithmParameters>&&, bool extractable, CryptoKeyUsageBitmap, KeyCallback&&, ExceptionCallback&&) final;
 
     // The following will be deprecated.
     void encrypt(const CryptoAlgorithmParametersDeprecated&, const CryptoKey&, const CryptoOperationData&, VectorCallback&&, VoidCallback&& failureCallback, ExceptionCode&) override;
     void decrypt(const CryptoAlgorithmParametersDeprecated&, const CryptoKey&, const CryptoOperationData&, VectorCallback&&, VoidCallback&& failureCallback, ExceptionCode&) override;
-    void generateKey(const CryptoAlgorithmParametersDeprecated&, bool extractable, CryptoKeyUsage, KeyOrKeyPairCallback&&, VoidCallback&& failureCallback, ExceptionCode&, ScriptExecutionContext*) override;
-    void importKey(const CryptoAlgorithmParametersDeprecated&, const CryptoKeyData&, bool extractable, CryptoKeyUsage, KeyCallback&&, VoidCallback&& failureCallback, ExceptionCode&) override;
+    void generateKey(const CryptoAlgorithmParametersDeprecated&, bool extractable, CryptoKeyUsageBitmap, KeyOrKeyPairCallback&&, VoidCallback&& failureCallback, ExceptionCode&, ScriptExecutionContext*) override;
+    void importKey(const CryptoAlgorithmParametersDeprecated&, const CryptoKeyData&, bool extractable, CryptoKeyUsageBitmap, KeyCallback&&, VoidCallback&& failureCallback, ExceptionCode&) override;
 
 private:
     CryptoAlgorithmRSAES_PKCS1_v1_5();
@@ -61,7 +61,6 @@ private:
     void platformDecrypt(const CryptoKeyRSA&, const CryptoOperationData&, VectorCallback&&, VoidCallback&& failureCallback, ExceptionCode&);
 };
 
-}
+} // namespace WebCore
 
 #endif // ENABLE(SUBTLE_CRYPTO)
-#endif // CryptoAlgorithmRSAES_PKCS1_v1_5_h

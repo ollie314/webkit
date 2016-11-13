@@ -307,6 +307,7 @@ public:
     RenderFlowThread* cachedFlowThreadContainingBlock() const;
     void setCachedFlowThreadContainingBlockNeedsUpdate();
     virtual bool cachedFlowThreadContainingBlockNeedsUpdate() const;
+    void resetFlowThreadContainingBlockAndChildInfoIncludingDescendants();
 
 protected:
     RenderFlowThread* locateFlowThreadContainingBlock() const override;
@@ -359,6 +360,7 @@ protected:
 
     virtual bool hasLineIfEmpty() const;
     
+    virtual bool canPerformSimplifiedLayout() const;
     bool simplifiedLayout();
     virtual void simplifiedNormalFlowLayout();
 

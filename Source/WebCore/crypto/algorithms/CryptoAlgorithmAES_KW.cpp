@@ -38,6 +38,11 @@ namespace WebCore {
 
 const char* const CryptoAlgorithmAES_KW::s_name = "AES-KW";
 
+static inline bool usagesAreInvalidForCryptoAlgorithmAES_KW(CryptoKeyUsageBitmap usages)
+{
+    return usages & (CryptoKeyUsageSign | CryptoKeyUsageVerify | CryptoKeyUsageDeriveKey | CryptoKeyUsageDeriveBits | CryptoKeyUsageEncrypt | CryptoKeyUsageDecrypt);
+}
+
 CryptoAlgorithmAES_KW::CryptoAlgorithmAES_KW()
 {
 }
@@ -65,11 +70,11 @@ bool CryptoAlgorithmAES_KW::keyAlgorithmMatches(const CryptoKey& key) const
     return true;
 }
 
-void CryptoAlgorithmAES_KW::generateKey(const std::unique_ptr<CryptoAlgorithmParameters>&& parameters, bool extractable, CryptoKeyUsage usages, KeyOrKeyPairCallback&& callback, ExceptionCallback&& exceptionCallback, ScriptExecutionContext*)
+void CryptoAlgorithmAES_KW::generateKey(const std::unique_ptr<CryptoAlgorithmParameters>&& parameters, bool extractable, CryptoKeyUsageBitmap usages, KeyOrKeyPairCallback&& callback, ExceptionCallback&& exceptionCallback, ScriptExecutionContext*)
 {
     const auto& aesParameters = downcast<CryptoAlgorithmAesKeyGenParams>(*parameters);
 
-    if (usages & (CryptoKeyUsageSign | CryptoKeyUsageVerify | CryptoKeyUsageDeriveKey | CryptoKeyUsageDeriveBits | CryptoKeyUsageEncrypt | CryptoKeyUsageDecrypt)) {
+    if (usagesAreInvalidForCryptoAlgorithmAES_KW(usages)) {
         exceptionCallback(SYNTAX_ERR);
         return;
     }
@@ -81,6 +86,45 @@ void CryptoAlgorithmAES_KW::generateKey(const std::unique_ptr<CryptoAlgorithmPar
     }
 
     callback(result.get(), nullptr);
+}
+
+void CryptoAlgorithmAES_KW::importKey(SubtleCrypto::KeyFormat format, KeyData&& data, const std::unique_ptr<CryptoAlgorithmParameters>&& parameters, bool extractable, CryptoKeyUsageBitmap usages, KeyCallback&& callback, ExceptionCallback&& exceptionCallback)
+{
+    if (usagesAreInvalidForCryptoAlgorithmAES_KW(usages)) {
+        exceptionCallback(SYNTAX_ERR);
+        return;
+    }
+
+    RefPtr<CryptoKeyAES> result;
+    switch (format) {
+    case SubtleCrypto::KeyFormat::Raw:
+        result = CryptoKeyAES::importRaw(parameters->identifier, WTFMove(WTF::get<Vector<uint8_t>>(data)), extractable, usages);
+        break;
+    case SubtleCrypto::KeyFormat::Jwk: {
+        auto checkAlgCallback = [](size_t length, const Optional<String>& alg) -> bool {
+            switch (length) {
+            case CryptoKeyAES::s_length128:
+                return !alg || alg.value() == "A128KW";
+            case CryptoKeyAES::s_length192:
+                return !alg || alg.value() == "A192KW";
+            case CryptoKeyAES::s_length256:
+                return !alg || alg.value() == "A256KW";
+            }
+            return false;
+        };
+        result = CryptoKeyAES::importJwk(parameters->identifier, WTFMove(WTF::get<JsonWebKey>(data)), extractable, usages, WTFMove(checkAlgCallback));
+        break;
+    }
+    default:
+        exceptionCallback(NOT_SUPPORTED_ERR);
+        return;
+    }
+    if (!result) {
+        exceptionCallback(DataError);
+        return;
+    }
+
+    callback(*result);
 }
 
 void CryptoAlgorithmAES_KW::encryptForWrapKey(const CryptoAlgorithmParametersDeprecated&, const CryptoKey& key, const CryptoOperationData& data, VectorCallback&& callback, VoidCallback&& failureCallback, ExceptionCode& ec)
@@ -103,7 +147,7 @@ void CryptoAlgorithmAES_KW::decryptForUnwrapKey(const CryptoAlgorithmParametersD
     platformDecrypt(downcast<CryptoKeyAES>(key), data, WTFMove(callback), WTFMove(failureCallback), ec);
 }
 
-void CryptoAlgorithmAES_KW::generateKey(const CryptoAlgorithmParametersDeprecated& parameters, bool extractable, CryptoKeyUsage usages, KeyOrKeyPairCallback&& callback, VoidCallback&& failureCallback, ExceptionCode&, ScriptExecutionContext*)
+void CryptoAlgorithmAES_KW::generateKey(const CryptoAlgorithmParametersDeprecated& parameters, bool extractable, CryptoKeyUsageBitmap usages, KeyOrKeyPairCallback&& callback, VoidCallback&& failureCallback, ExceptionCode&, ScriptExecutionContext*)
 {
     const CryptoAlgorithmAesKeyGenParamsDeprecated& aesParameters = downcast<CryptoAlgorithmAesKeyGenParamsDeprecated>(parameters);
 
@@ -116,7 +160,7 @@ void CryptoAlgorithmAES_KW::generateKey(const CryptoAlgorithmParametersDeprecate
     callback(result.get(), nullptr);
 }
 
-void CryptoAlgorithmAES_KW::importKey(const CryptoAlgorithmParametersDeprecated&, const CryptoKeyData& keyData, bool extractable, CryptoKeyUsage usage, KeyCallback&& callback, VoidCallback&&, ExceptionCode& ec)
+void CryptoAlgorithmAES_KW::importKey(const CryptoAlgorithmParametersDeprecated&, const CryptoKeyData& keyData, bool extractable, CryptoKeyUsageBitmap usage, KeyCallback&& callback, VoidCallback&&, ExceptionCode& ec)
 {
     if (!is<CryptoKeyDataOctetSequence>(keyData)) {
         ec = NOT_SUPPORTED_ERR;

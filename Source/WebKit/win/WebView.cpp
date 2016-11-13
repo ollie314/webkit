@@ -127,7 +127,7 @@
 #include <WebCore/MIMETypeRegistry.h>
 #include <WebCore/MainFrame.h>
 #include <WebCore/MemoryCache.h>
-#include <WebCore/MemoryPressureHandler.h>
+#include <WebCore/MemoryRelease.h>
 #include <WebCore/NotImplemented.h>
 #include <WebCore/Page.h>
 #include <WebCore/PageCache.h>
@@ -3084,7 +3084,11 @@ HRESULT WebView::initWithFrame(RECT frame, _In_ BSTR frameName, _In_ BSTR groupN
 
         WebKitInitializeWebDatabasesIfNecessary();
 
-        MemoryPressureHandler::singleton().install();
+        auto& memoryPressureHandler = MemoryPressureHandler::singleton();
+        memoryPressureHandler.setLowMemoryHandler([] (Critical critical, Synchronous synchronous) {
+            WebCore::releaseMemory(critical, synchronous);
+        });
+        memoryPressureHandler.install();
 
         didOneTimeInitialization = true;
      }
@@ -6321,9 +6325,8 @@ LRESULT WebView::onIMERequestCharPosition(Frame* targetFrame, IMECHARPOSITION* c
         return 0;
     IntRect caret;
     if (RefPtr<Range> range = targetFrame->editor().hasComposition() ? targetFrame->editor().compositionRange() : targetFrame->selection().selection().toNormalizedRange()) {
-        ExceptionCode ec = 0;
         RefPtr<Range> tempRange = range->cloneRange();
-        tempRange->setStart(tempRange->startContainer(), tempRange->startOffset() + charPos->dwCharPos, ec);
+        tempRange->setStart(tempRange->startContainer(), tempRange->startOffset() + charPos->dwCharPos);
         caret = targetFrame->editor().firstRectForRange(tempRange.get());
     }
     caret = targetFrame->view()->contentsToWindow(caret);

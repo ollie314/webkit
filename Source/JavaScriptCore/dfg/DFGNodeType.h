@@ -185,7 +185,6 @@ namespace JSC { namespace DFG {
     macro(PutByVal, NodeMustGenerate | NodeHasVarArgs) \
     macro(PutByValAlias, NodeMustGenerate | NodeHasVarArgs) \
     macro(TryGetById, NodeResultJS) \
-    macro(PureGetById, NodeResultJS | NodeMustGenerate) \
     macro(GetById, NodeResultJS | NodeMustGenerate) \
     macro(GetByIdFlush, NodeResultJS | NodeMustGenerate) \
     macro(GetByIdWithThis, NodeResultJS | NodeMustGenerate) \
@@ -291,6 +290,7 @@ namespace JSC { namespace DFG {
     /* Allocations. */\
     macro(NewObject, NodeResultJS) \
     macro(NewArray, NodeResultJS | NodeHasVarArgs) \
+    macro(NewArrayWithSpread, NodeResultJS | NodeHasVarArgs) \
     macro(NewArrayWithSize, NodeResultJS | NodeMustGenerate) \
     macro(NewArrayBuffer, NodeResultJS) \
     macro(NewTypedArray, NodeResultJS | NodeMustGenerate) \
@@ -299,6 +299,7 @@ namespace JSC { namespace DFG {
     macro(GetRestLength, NodeResultInt32) \
     macro(CreateRest, NodeResultJS | NodeMustGenerate) \
     \
+    macro(Spread, NodeResultJS | NodeMustGenerate) \
     /* Support for allocation sinking. */\
     macro(PhantomNewObject, NodeResultJS | NodeMustGenerate) \
     macro(PutHint, NodeMustGenerate) \
@@ -348,6 +349,7 @@ namespace JSC { namespace DFG {
     macro(PhantomClonedArguments, NodeResultJS | NodeMustGenerate) \
     macro(GetFromArguments, NodeResultJS) \
     macro(PutToArguments, NodeMustGenerate) \
+    macro(GetArgument, NodeResultJS) \
     \
     macro(NewFunction, NodeResultJS) \
     \

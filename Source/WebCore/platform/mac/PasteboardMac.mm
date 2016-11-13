@@ -33,7 +33,6 @@
 #import "DragData.h"
 #import "Editor.h"
 #import "EditorClient.h"
-#import "ExceptionCodePlaceholder.h"
 #import "Frame.h"
 #import "FrameView.h"
 #import "FrameLoaderClient.h"
@@ -232,6 +231,13 @@ static long writeURLForTypes(const Vector<String>& types, const String& pasteboa
 void Pasteboard::write(const PasteboardURL& pasteboardURL)
 {
     m_changeCount = writeURLForTypes(writableTypesForURL(), m_pasteboardName, pasteboardURL);
+}
+
+void Pasteboard::writeTrustworthyWebURLsPboardType(const PasteboardURL& pasteboardURL)
+{
+    NSURL *cocoaURL = pasteboardURL.url;
+    Vector<String> paths = { [cocoaURL absoluteString], pasteboardURL.title.stripWhiteSpace() };
+    m_changeCount = platformStrategies()->pasteboardStrategy()->setPathnamesForType(paths, WebURLsWithTitlesPboardType, m_pasteboardName);
 }
 
 static NSFileWrapper* fileWrapper(const PasteboardImage& pasteboardImage)

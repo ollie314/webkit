@@ -111,6 +111,13 @@ JSTestCEReactionsStringifier::JSTestCEReactionsStringifier(Structure* structure,
 {
 }
 
+void JSTestCEReactionsStringifier::finishCreation(VM& vm)
+{
+    Base::finishCreation(vm);
+    ASSERT(inherits(info()));
+
+}
+
 JSObject* JSTestCEReactionsStringifier::createPrototype(VM& vm, JSGlobalObject* globalObject)
 {
     return JSTestCEReactionsStringifierPrototype::create(vm, globalObject, JSTestCEReactionsStringifierPrototype::createStructure(vm, globalObject, globalObject->objectPrototype()));
@@ -214,8 +221,7 @@ static inline JSC::EncodedJSValue jsTestCEReactionsStringifierPrototypeFunctionT
     UNUSED_PARAM(state);
     UNUSED_PARAM(throwScope);
     auto& impl = castedThis->wrapped();
-    JSValue result = toJS<IDLDOMString>(*state, impl.value());
-    return JSValue::encode(result);
+    return JSValue::encode(toJS<IDLDOMString>(*state, impl.value()));
 }
 
 bool JSTestCEReactionsStringifierOwner::isReachableFromOpaqueRoots(JSC::Handle<JSC::Unknown> handle, void*, SlotVisitor& visitor)

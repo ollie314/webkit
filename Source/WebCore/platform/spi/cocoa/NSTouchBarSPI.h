@@ -34,13 +34,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface NSTouchBarItem : NSObject
-@end
-
-@interface NSColorPickerTouchBarItem : NSTouchBarItem
-@end
-
-@interface NSTouchBar : NSObject
+@interface NSTouchBar ()
 @property (readonly, copy, nullable) NSArray<NSTouchBarItem *> *items;
 @property (strong, nullable) NSTouchBarItem *escapeKeyReplacementItem;
 @end
@@ -57,8 +51,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 @end
 
-#define NSTouchBarWillEnterCustomization @"NSTouchBarWillEnterCustomization"
-#define NSTouchBarDidExitCustomization @"NSTouchBarDidExitCustomization"
+APPKIT_EXTERN NSNotificationName const NSTouchBarWillEnterCustomization;
+APPKIT_EXTERN NSNotificationName const NSTouchBarDidExitCustomization;
 
 NS_ASSUME_NONNULL_END
 

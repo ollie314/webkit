@@ -1589,7 +1589,7 @@ WebInspector.SourceCodeTextEditor = class SourceCodeTextEditor extends WebInspec
             }
         }
 
-        RuntimeAgent.getRuntimeTypesForVariablesAtOffsets(allRequests, handler.bind(this));
+        this.target.RuntimeAgent.getRuntimeTypesForVariablesAtOffsets(allRequests, handler.bind(this));
     }
 
     _showPopover(content, bounds)
@@ -1731,7 +1731,7 @@ WebInspector.SourceCodeTextEditor = class SourceCodeTextEditor extends WebInspec
     {
         this.tokenTrackingController.removeHighlightedRange();
 
-        RuntimeAgent.releaseObjectGroup("popover");
+        this.target.RuntimeAgent.releaseObjectGroup("popover");
     }
 
     _dismissPopover()
@@ -1870,17 +1870,17 @@ WebInspector.SourceCodeTextEditor = class SourceCodeTextEditor extends WebInspec
 
         if (shouldActivate) {
             console.assert(this.visible, "Annotators should not be enabled if the TextEditor is not visible");
-            RuntimeAgent.enableTypeProfiler();
+
+            for (let target of WebInspector.targets)
+                target.RuntimeAgent.enableTypeProfiler();
+
             this._typeTokenAnnotator.reset();
 
             if (!this._typeTokenScrollHandler)
                 this._enableScrollEventsForTypeTokenAnnotator();
         } else {
-            // Because we disable type profiling when exiting the inspector, there is no need to call
-            // RuntimeAgent.disableTypeProfiler() here.  If we were to call it here, JavaScriptCore would
-            // compile out all the necessary type profiling information, so if a user were to quickly press then
-            // unpress the type profiling button, we wouldn't be able to re-show type information which would
-            // provide a confusing user experience.
+            for (let target of WebInspector.targets)
+                target.RuntimeAgent.disableTypeProfiler();
 
             this._typeTokenAnnotator.clear();
 
@@ -1901,7 +1901,8 @@ WebInspector.SourceCodeTextEditor = class SourceCodeTextEditor extends WebInspec
         if (shouldActivate) {
             console.assert(this.visible, "Annotators should not be enabled if the TextEditor is not visible");
 
-            RuntimeAgent.enableControlFlowProfiler();
+            for (let target of WebInspector.targets)
+                target.RuntimeAgent.enableControlFlowProfiler();
 
             console.assert(!this._basicBlockAnnotator.isActive());
             this._basicBlockAnnotator.reset();
@@ -1909,6 +1910,9 @@ WebInspector.SourceCodeTextEditor = class SourceCodeTextEditor extends WebInspec
             if (!this._controlFlowScrollHandler)
                 this._enableScrollEventsForControlFlowAnnotator();
         } else {
+            for (let target of WebInspector.targets)
+                target.RuntimeAgent.disableControlFlowProfiler();
+
             this._basicBlockAnnotator.clear();
 
             if (this._controlFlowScrollHandler)

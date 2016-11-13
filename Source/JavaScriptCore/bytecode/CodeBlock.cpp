@@ -773,6 +773,14 @@ void CodeBlock::dumpBytecode(
             printLocationOpAndRegisterOperand(out, exec, location, it, "argument_count", r0);
             break;
         }
+        case op_get_argument: {
+            int r0 = (++it)->u.operand;
+            int index = (++it)->u.operand;
+            printLocationOpAndRegisterOperand(out, exec, location, it, "argument", r0);
+            out.printf(", %d", index);
+            dumpValueProfiling(out, it, hasPrintedProfiling);
+            break;
+        }
         case op_create_rest: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
@@ -828,6 +836,30 @@ void CodeBlock::dumpBytecode(
             printLocationAndOp(out, exec, location, it, "new_array");
             out.printf("%s, %s, %d", registerName(dst).data(), registerName(argv).data(), argc);
             ++it; // Skip array allocation profile.
+            break;
+        }
+        case op_new_array_with_spread: {
+            int dst = (++it)->u.operand;
+            int argv = (++it)->u.operand;
+            int argc = (++it)->u.operand;
+            printLocationAndOp(out, exec, location, it, "new_array_with_spread");
+            out.printf("%s, %s, %d, ", registerName(dst).data(), registerName(argv).data(), argc);
+            unsigned bitVectorIndex = (++it)->u.unsignedValue;
+            const BitVector& bitVector = m_unlinkedCode->bitVector(bitVectorIndex);
+            out.print("BitVector:", bitVectorIndex, ":");
+            for (unsigned i = 0; i < static_cast<unsigned>(argc); i++) {
+                if (bitVector.get(i))
+                    out.print("1");
+                else
+                    out.print("0");
+            }
+            break;
+        }
+        case op_spread: {
+            int dst = (++it)->u.operand;
+            int arg = (++it)->u.operand;
+            printLocationAndOp(out, exec, location, it, "spread");
+            out.printf("%s, %s", registerName(dst).data(), registerName(arg).data());
             break;
         }
         case op_new_array_with_size: {
@@ -2071,7 +2103,8 @@ void CodeBlock::finishCreation(VM& vm, ScriptExecutable* ownerExecutable, Unlink
         case op_try_get_by_id:
         case op_get_by_val_with_this:
         case op_get_from_arguments:
-        case op_to_number: {
+        case op_to_number:
+        case op_get_argument: {
             linkValueProfile(i, opLength);
             break;
         }

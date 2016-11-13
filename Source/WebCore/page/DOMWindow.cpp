@@ -57,7 +57,6 @@
 #include "EventListener.h"
 #include "EventNames.h"
 #include "ExceptionCode.h"
-#include "ExceptionCodePlaceholder.h"
 #include "FloatRect.h"
 #include "FocusController.h"
 #include "FrameLoadRequest.h"
@@ -1617,7 +1616,7 @@ ExceptionOr<int> DOMWindow::setTimeout(std::unique_ptr<ScheduledAction> action, 
 {
     auto* context = scriptExecutionContext();
     if (!context)
-        return ExceptionCode { INVALID_ACCESS_ERR };
+        return Exception { INVALID_ACCESS_ERR };
     return DOMTimer::install(*context, WTFMove(action), std::chrono::milliseconds(timeout), true);
 }
 
@@ -1649,7 +1648,7 @@ ExceptionOr<int> DOMWindow::setInterval(std::unique_ptr<ScheduledAction> action,
 {
     auto* context = scriptExecutionContext();
     if (!context)
-        return ExceptionCode { INVALID_ACCESS_ERR };
+        return Exception { INVALID_ACCESS_ERR };
     return DOMTimer::install(*context, WTFMove(action), std::chrono::milliseconds(timeout), false);
 }
 

@@ -1,3 +1,941 @@
+2016-11-12  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Follow-up fix to r208639.
+
+        Unreviewed fix. This is a straightfoward change where I forgot to
+        switch from uncheckedArgument() to argument() in once case after
+        dropping an argumentCount check. All other cases do this properly.
+        This addresses an ASSERT seen on the bots running tests.
+
+        * runtime/JSDataViewPrototype.cpp:
+        (JSC::setData):
+
+2016-11-11  Joseph Pecoraro  <pecoraro@apple.com>
+
+        test262: DataView with explicit undefined byteLength should be the same as it not being present
+        https://bugs.webkit.org/show_bug.cgi?id=164453
+
+        Reviewed by Darin Adler.
+
+        * runtime/JSGenericTypedArrayViewConstructorInlines.h:
+        (JSC::constructGenericTypedArrayView):
+        Handle the special case of DataView construction with an undefined byteLength value.
+
+2016-11-11  Joseph Pecoraro  <pecoraro@apple.com>
+
+        test262: DataView get methods should allow for missing offset, set methods should allow for missing value
+        https://bugs.webkit.org/show_bug.cgi?id=164451
+
+        Reviewed by Darin Adler.
+
+        * runtime/JSDataViewPrototype.cpp:
+        (JSC::getData):
+        Missing offset is still valid and will be coerced to 0.
+
+        (JSC::setData):
+        Missing value is still valid and will be coerced to 0.
+
+2016-11-11  Saam Barati  <sbarati@apple.com>
+
+        We should have a more concise way of determining when we're varargs calling a function using rest parameters
+        https://bugs.webkit.org/show_bug.cgi?id=164258
+
+        Reviewed by Yusuke Suzuki.
+
+        This patch adds two new bytecodes and DFG nodes for the following code patterns:
+
+        ```
+        foo(a, b, ...c)
+        let x = [a, b, ...c];
+        ```
+
+        To do this, I've introduced two new bytecode operations (and their
+        corresponding DFG nodes):
+
+        op_spread and op_new_array_with_spread.
+
+        op_spread takes a single input and performs the ES6 iteration protocol on it.
+        It returns the result of doing the spread inside a new class I've
+        made called JSFixedArray. JSFixedArray is a cell with a single 'size'
+        field and a buffer of values allocated inline in the cell. Abstracting
+        the protocol into a single node is good because it will make IR analysis
+        in the future much simpler. For now, it's also good because it allows
+        us to create fast paths for array iteration (which is quite common).
+        This fast path allows us to emit really good code for array iteration
+        inside the DFG/FTL.
+
+        op_new_array_with_spread is a variable argument bytecode that also
+        has a bit vector associated with it. The bit vector indicates if
+        any particular argument is to be spread or not. Arguments that
+        are spread are known to be JSFixedArray because we must emit an
+        op_spread before op_new_array_with_spread consumes the value.
+        For example, for this array:
+        [a, b, ...c, d, ...e]
+        we will have this bit vector:
+        [0, 0, 1, 0, 1]
+
+        The reason I've chosen this IR is that it will make eliminating
+        a rest allocation for this type of code much easier:
+
+        ```
+        function foo(...args) {
+            return bar(a, b, ...args);
+        }
+        ```
+
+        It will be easier to analyze the IR now that the operations
+        will be described at a high level.
+
+        This patch is an ~8% speedup on ES6SampleBench on my MBP.
+
+        * CMakeLists.txt:
+        * DerivedSources.make:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * builtins/IteratorHelpers.js: Added.
+        (performIteration):
+        * bytecode/BytecodeList.json:
+        * bytecode/BytecodeUseDef.h:
+        (JSC::computeUsesForBytecodeOffset):
+        (JSC::computeDefsForBytecodeOffset):
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::dumpBytecode):
+        * bytecode/ObjectPropertyConditionSet.cpp:
+        (JSC::generateConditionForSelfEquivalence):
+        * bytecode/ObjectPropertyConditionSet.h:
+        * bytecode/TrackedReferences.cpp:
+        (JSC::TrackedReferences::check):
+        * bytecode/UnlinkedCodeBlock.h:
+        (JSC::UnlinkedCodeBlock::bitVectors):
+        (JSC::UnlinkedCodeBlock::bitVector):
+        (JSC::UnlinkedCodeBlock::addBitVector):
+        (JSC::UnlinkedCodeBlock::shrinkToFit):
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::emitNewArrayWithSpread):
+        * bytecompiler/BytecodeGenerator.h:
+        * bytecompiler/NodesCodegen.cpp:
+        (JSC::ArrayNode::emitBytecode):
+        * dfg/DFGAbstractInterpreterInlines.h:
+        (JSC::DFG::AbstractInterpreter<AbstractStateType>::executeEffects):
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::addToGraph):
+        (JSC::DFG::ByteCodeParser::parseBlock):
+        * dfg/DFGCapabilities.cpp:
+        (JSC::DFG::capabilityLevel):
+        * dfg/DFGClobberize.h:
+        (JSC::DFG::clobberize):
+        * dfg/DFGDoesGC.cpp:
+        (JSC::DFG::doesGC):
+        * dfg/DFGFixupPhase.cpp:
+        (JSC::DFG::FixupPhase::fixupNode):
+        (JSC::DFG::FixupPhase::watchHavingABadTime):
+        * dfg/DFGGraph.h:
+        (JSC::DFG::Graph::isWatchingArrayIteratorProtocolWatchpoint):
+        * dfg/DFGNode.h:
+        (JSC::DFG::Node::bitVector):
+        * dfg/DFGNodeType.h:
+        * dfg/DFGOperations.cpp:
+        * dfg/DFGOperations.h:
+        * dfg/DFGPredictionPropagationPhase.cpp:
+        * dfg/DFGSafeToExecute.h:
+        (JSC::DFG::safeToExecute):
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::compileSpread):
+        (JSC::DFG::SpeculativeJIT::compileNewArrayWithSpread):
+        * dfg/DFGSpeculativeJIT.h:
+        (JSC::DFG::SpeculativeJIT::callOperation):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGStructureRegistrationPhase.cpp:
+        (JSC::DFG::StructureRegistrationPhase::run):
+        * ftl/FTLAbstractHeapRepository.h:
+        * ftl/FTLCapabilities.cpp:
+        (JSC::FTL::canCompile):
+        * ftl/FTLLowerDFGToB3.cpp:
+        (JSC::FTL::DFG::LowerDFGToB3::compileNode):
+        (JSC::FTL::DFG::LowerDFGToB3::compileNewArrayWithSpread):
+        (JSC::FTL::DFG::LowerDFGToB3::compileSpread):
+        (JSC::FTL::DFG::LowerDFGToB3::allocateVariableSizedCell):
+        * jit/AssemblyHelpers.h:
+        (JSC::AssemblyHelpers::emitAllocateVariableSizedCell):
+        (JSC::AssemblyHelpers::emitAllocateVariableSizedJSObject):
+        * jit/JIT.cpp:
+        (JSC::JIT::privateCompileMainPass):
+        * jit/JIT.h:
+        * jit/JITOpcodes.cpp:
+        (JSC::JIT::emit_op_new_array_with_spread):
+        (JSC::JIT::emit_op_spread):
+        * jit/JITOperations.h:
+        * llint/LLIntData.cpp:
+        (JSC::LLInt::Data::performAssertions):
+        * llint/LLIntSlowPaths.cpp:
+        * llint/LowLevelInterpreter.asm:
+        * runtime/ArrayIteratorAdaptiveWatchpoint.cpp: Added.
+        (JSC::ArrayIteratorAdaptiveWatchpoint::ArrayIteratorAdaptiveWatchpoint):
+        (JSC::ArrayIteratorAdaptiveWatchpoint::handleFire):
+        * runtime/ArrayIteratorAdaptiveWatchpoint.h: Added.
+        * runtime/CommonSlowPaths.cpp:
+        (JSC::SLOW_PATH_DECL):
+        * runtime/CommonSlowPaths.h:
+        * runtime/IteratorOperations.h:
+        (JSC::forEachInIterable):
+        * runtime/JSCInlines.h:
+        * runtime/JSFixedArray.cpp: Added.
+        (JSC::JSFixedArray::visitChildren):
+        * runtime/JSFixedArray.h: Added.
+        (JSC::JSFixedArray::createStructure):
+        (JSC::JSFixedArray::createFromArray):
+        (JSC::JSFixedArray::get):
+        (JSC::JSFixedArray::buffer):
+        (JSC::JSFixedArray::size):
+        (JSC::JSFixedArray::offsetOfSize):
+        (JSC::JSFixedArray::offsetOfData):
+        (JSC::JSFixedArray::create):
+        (JSC::JSFixedArray::JSFixedArray):
+        (JSC::JSFixedArray::allocationSize):
+        * runtime/JSGlobalObject.cpp:
+        (JSC::JSGlobalObject::JSGlobalObject):
+        (JSC::JSGlobalObject::init):
+        (JSC::JSGlobalObject::visitChildren):
+        (JSC::JSGlobalObject::objectPrototypeIsSane): Deleted.
+        (JSC::JSGlobalObject::arrayPrototypeChainIsSane): Deleted.
+        (JSC::JSGlobalObject::stringPrototypeChainIsSane): Deleted.
+        * runtime/JSGlobalObject.h:
+        (JSC::JSGlobalObject::arrayIteratorProtocolWatchpoint):
+        (JSC::JSGlobalObject::iteratorProtocolFunction):
+        * runtime/JSGlobalObjectInlines.h: Added.
+        (JSC::JSGlobalObject::objectPrototypeIsSane):
+        (JSC::JSGlobalObject::arrayPrototypeChainIsSane):
+        (JSC::JSGlobalObject::stringPrototypeChainIsSane):
+        (JSC::JSGlobalObject::isArrayIteratorProtocolFastAndNonObservable):
+        * runtime/JSType.h:
+        * runtime/VM.cpp:
+        (JSC::VM::VM):
+        * runtime/VM.h:
+
+2016-11-11  Keith Miller  <keith_miller@apple.com>
+
+        Move Wasm tests to JS
+        https://bugs.webkit.org/show_bug.cgi?id=164611
+
+        Reviewed by Geoffrey Garen.
+
+        This patch translates most of the tests from testWasm.cpp to the JS testing api. Most of the
+        ommited tests were earliest tests, which tested trivial things, like adding two
+        constants. Some tests are ommited for other reasons, however. These are:
+
+        1) Tests using I64 since the testing api does not yet know how to handle 64-bit numbers.  2)
+        Tests that would validate the memory of the module once wasm was done with it since that's
+        not really possible in JS.
+
+        In order to make such a translation easier this patch also adds some features to the JS
+        testing api:
+
+        1) Blocks can now be done lexically by adding a lambda as the last argument of the block
+        opcode. For example one can do:
+            ...
+            .Block("i32", b => b.I32Const(1) )
+
+        and the nested lambda will automatically have an end attached.
+
+        2) The JS testing api can now handle inline signature types.
+
+        3) Relocate some code to make it easier to follow and prevent 44 space indentation.
+
+        4) Rename varuint/varint to varuint32/varint32, this lets them be directly called from the
+        wasm.json without being remapped.
+
+        5) Add support for Memory and Function sections to the Builder.
+
+        6) Add support for local variables.
+
+        On the JSC side, we needed to expose a new function to validate the compiled wasm code
+        behaves the way we expect. At least until the JS Wasm API is finished. The new validation
+        function, testWasmModuleFunctions, takes an array buffer containing the wasm binary, the
+        number of functions in the blob and tests for each of those functions.
+
+        * jsc.cpp:
+        (GlobalObject::finishCreation):
+        (box):
+        (callWasmFunction):
+        (functionTestWasmModuleFunctions):
+        * testWasm.cpp:
+        (checkPlan):
+        (runWasmTests):
+        * wasm/WasmB3IRGenerator.cpp:
+        (JSC::Wasm::parseAndCompile):
+        * wasm/WasmFunctionParser.h:
+        (JSC::Wasm::FunctionParser<Context>::parse):
+        (JSC::Wasm::FunctionParser<Context>::parseBody):
+        (JSC::Wasm::FunctionParser<Context>::parseBlock): Deleted.
+        * wasm/WasmModuleParser.cpp:
+        (JSC::Wasm::ModuleParser::parseMemory):
+        (JSC::Wasm::ModuleParser::parseExport):
+        * wasm/WasmPlan.cpp:
+        (JSC::Wasm::Plan::Plan):
+        (JSC::Wasm::Plan::run):
+        * wasm/WasmPlan.h:
+        * wasm/js/WebAssemblyModuleConstructor.cpp:
+        (JSC::constructJSWebAssemblyModule):
+
+2016-11-11  Saam Barati  <sbarati@apple.com>
+
+        Unreviewed try to fix windows build after https://bugs.webkit.org/show_bug.cgi?id=164650
+
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::parseBlock):
+
+2016-11-11  Saam Barati  <sbarati@apple.com>
+
+        We recursively grab a lock in the DFGBytecodeParser causing us to deadlock
+        https://bugs.webkit.org/show_bug.cgi?id=164650
+
+        Reviewed by Geoffrey Garen.
+
+        Some code was incorrectly holding a lock when recursively calling
+        back into the bytecode parser's via inlining a put_by_val as a put_by_id.
+        This can cause a deadlock if the inlinee CodeBlock is something we're
+        already holding a lock for. I've changed the range of the lock holder
+        to be as narrow as possible.
+
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::parseBlock):
+
+2016-11-11  Chris Dumez  <cdumez@apple.com>
+
+        Unreviewed, rolling out r208584.
+
+        Seems to have regressed Speedometer by 1% on Mac
+
+        Reverted changeset:
+
+        "We should have a more concise way of determining when we're
+        varargs calling a function using rest parameters"
+        https://bugs.webkit.org/show_bug.cgi?id=164258
+        http://trac.webkit.org/changeset/208584
+
+2016-11-11  Chris Dumez  <cdumez@apple.com>
+
+        Unreviewed, rolling out r208117 and r208160.
+
+        Regressed Speedometer by >1.5%
+
+        Reverted changesets:
+
+        "We should have a way of profiling when a get_by_id is pure
+        and to emit a PureGetById in the DFG/FTL"
+        https://bugs.webkit.org/show_bug.cgi?id=163305
+        http://trac.webkit.org/changeset/208117
+
+        "Debug JSC test microbenchmarks/pure-get-by-id-cse-2.js timing
+        out"
+        https://bugs.webkit.org/show_bug.cgi?id=164227
+        http://trac.webkit.org/changeset/208160
+
+2016-11-11  Saam Barati  <sbarati@apple.com>
+
+        We should have a more concise way of determining when we're varargs calling a function using rest parameters
+        https://bugs.webkit.org/show_bug.cgi?id=164258
+
+        Reviewed by Yusuke Suzuki.
+
+        This patch adds two new bytecodes and DFG nodes for the following code patterns:
+
+        ```
+        foo(a, b, ...c)
+        let x = [a, b, ...c];
+        ```
+
+        To do this, I've introduced two new bytecode operations (and their
+        corresponding DFG nodes):
+
+        op_spread and op_new_array_with_spread.
+
+        op_spread takes a single input and performs the ES6 iteration protocol on it.
+        It returns the result of doing the spread inside a new class I've
+        made called JSFixedArray. JSFixedArray is a cell with a single 'size'
+        field and a buffer of values allocated inline in the cell. Abstracting
+        the protocol into a single node is good because it will make IR analysis
+        in the future much simpler. For now, it's also good because it allows
+        us to create fast paths for array iteration (which is quite common).
+        This fast path allows us to emit really good code for array iteration
+        inside the DFG/FTL.
+
+        op_new_array_with_spread is a variable argument bytecode that also
+        has a bit vector associated with it. The bit vector indicates if
+        any particular argument is to be spread or not. Arguments that
+        are spread are known to be JSFixedArray because we must emit an
+        op_spread before op_new_array_with_spread consumes the value.
+        For example, for this array:
+        [a, b, ...c, d, ...e]
+        we will have this bit vector:
+        [0, 0, 1, 0, 1]
+
+        The reason I've chosen this IR is that it will make eliminating
+        a rest allocation for this type of code much easier:
+
+        ```
+        function foo(...args) {
+            return bar(a, b, ...args);
+        }
+        ```
+
+        It will be easier to analyze the IR now that the operations
+        will be described at a high level.
+
+        This patch is an ~8% speedup on ES6SampleBench on my MBP.
+
+        * CMakeLists.txt:
+        * DerivedSources.make:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * builtins/IteratorHelpers.js: Added.
+        (performIteration):
+        * bytecode/BytecodeList.json:
+        * bytecode/BytecodeUseDef.h:
+        (JSC::computeUsesForBytecodeOffset):
+        (JSC::computeDefsForBytecodeOffset):
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::dumpBytecode):
+        * bytecode/ObjectPropertyConditionSet.cpp:
+        (JSC::generateConditionForSelfEquivalence):
+        * bytecode/ObjectPropertyConditionSet.h:
+        * bytecode/TrackedReferences.cpp:
+        (JSC::TrackedReferences::check):
+        * bytecode/UnlinkedCodeBlock.h:
+        (JSC::UnlinkedCodeBlock::bitVectors):
+        (JSC::UnlinkedCodeBlock::bitVector):
+        (JSC::UnlinkedCodeBlock::addBitVector):
+        (JSC::UnlinkedCodeBlock::shrinkToFit):
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::emitNewArrayWithSpread):
+        * bytecompiler/BytecodeGenerator.h:
+        * bytecompiler/NodesCodegen.cpp:
+        (JSC::ArrayNode::emitBytecode):
+        * dfg/DFGAbstractInterpreterInlines.h:
+        (JSC::DFG::AbstractInterpreter<AbstractStateType>::executeEffects):
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::addToGraph):
+        (JSC::DFG::ByteCodeParser::parseBlock):
+        * dfg/DFGCapabilities.cpp:
+        (JSC::DFG::capabilityLevel):
+        * dfg/DFGClobberize.h:
+        (JSC::DFG::clobberize):
+        * dfg/DFGDoesGC.cpp:
+        (JSC::DFG::doesGC):
+        * dfg/DFGFixupPhase.cpp:
+        (JSC::DFG::FixupPhase::fixupNode):
+        (JSC::DFG::FixupPhase::watchHavingABadTime):
+        * dfg/DFGGraph.h:
+        (JSC::DFG::Graph::isWatchingArrayIteratorProtocolWatchpoint):
+        * dfg/DFGNode.h:
+        (JSC::DFG::Node::bitVector):
+        * dfg/DFGNodeType.h:
+        * dfg/DFGOperations.cpp:
+        * dfg/DFGOperations.h:
+        * dfg/DFGPredictionPropagationPhase.cpp:
+        * dfg/DFGSafeToExecute.h:
+        (JSC::DFG::safeToExecute):
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::compileSpread):
+        (JSC::DFG::SpeculativeJIT::compileNewArrayWithSpread):
+        * dfg/DFGSpeculativeJIT.h:
+        (JSC::DFG::SpeculativeJIT::callOperation):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGStructureRegistrationPhase.cpp:
+        (JSC::DFG::StructureRegistrationPhase::run):
+        * ftl/FTLAbstractHeapRepository.h:
+        * ftl/FTLCapabilities.cpp:
+        (JSC::FTL::canCompile):
+        * ftl/FTLLowerDFGToB3.cpp:
+        (JSC::FTL::DFG::LowerDFGToB3::compileNode):
+        (JSC::FTL::DFG::LowerDFGToB3::compileNewArrayWithSpread):
+        (JSC::FTL::DFG::LowerDFGToB3::compileSpread):
+        (JSC::FTL::DFG::LowerDFGToB3::allocateVariableSizedCell):
+        * jit/AssemblyHelpers.h:
+        (JSC::AssemblyHelpers::emitAllocateVariableSizedCell):
+        (JSC::AssemblyHelpers::emitAllocateVariableSizedJSObject):
+        * jit/JIT.cpp:
+        (JSC::JIT::privateCompileMainPass):
+        * jit/JIT.h:
+        * jit/JITOpcodes.cpp:
+        (JSC::JIT::emit_op_new_array_with_spread):
+        (JSC::JIT::emit_op_spread):
+        * jit/JITOperations.h:
+        * llint/LLIntData.cpp:
+        (JSC::LLInt::Data::performAssertions):
+        * llint/LLIntSlowPaths.cpp:
+        * llint/LowLevelInterpreter.asm:
+        * runtime/ArrayIteratorAdaptiveWatchpoint.cpp: Added.
+        (JSC::ArrayIteratorAdaptiveWatchpoint::ArrayIteratorAdaptiveWatchpoint):
+        (JSC::ArrayIteratorAdaptiveWatchpoint::handleFire):
+        * runtime/ArrayIteratorAdaptiveWatchpoint.h: Added.
+        * runtime/CommonSlowPaths.cpp:
+        (JSC::SLOW_PATH_DECL):
+        * runtime/CommonSlowPaths.h:
+        * runtime/IteratorOperations.h:
+        (JSC::forEachInIterable):
+        * runtime/JSCInlines.h:
+        * runtime/JSFixedArray.cpp: Added.
+        (JSC::JSFixedArray::visitChildren):
+        * runtime/JSFixedArray.h: Added.
+        (JSC::JSFixedArray::createStructure):
+        (JSC::JSFixedArray::createFromArray):
+        (JSC::JSFixedArray::get):
+        (JSC::JSFixedArray::buffer):
+        (JSC::JSFixedArray::size):
+        (JSC::JSFixedArray::offsetOfSize):
+        (JSC::JSFixedArray::offsetOfData):
+        (JSC::JSFixedArray::create):
+        (JSC::JSFixedArray::JSFixedArray):
+        (JSC::JSFixedArray::allocationSize):
+        * runtime/JSGlobalObject.cpp:
+        (JSC::JSGlobalObject::JSGlobalObject):
+        (JSC::JSGlobalObject::init):
+        (JSC::JSGlobalObject::visitChildren):
+        (JSC::JSGlobalObject::objectPrototypeIsSane): Deleted.
+        (JSC::JSGlobalObject::arrayPrototypeChainIsSane): Deleted.
+        (JSC::JSGlobalObject::stringPrototypeChainIsSane): Deleted.
+        * runtime/JSGlobalObject.h:
+        (JSC::JSGlobalObject::arrayIteratorProtocolWatchpoint):
+        (JSC::JSGlobalObject::iteratorProtocolFunction):
+        * runtime/JSGlobalObjectInlines.h: Added.
+        (JSC::JSGlobalObject::objectPrototypeIsSane):
+        (JSC::JSGlobalObject::arrayPrototypeChainIsSane):
+        (JSC::JSGlobalObject::stringPrototypeChainIsSane):
+        (JSC::JSGlobalObject::isArrayIteratorProtocolFastAndNonObservable):
+        * runtime/JSType.h:
+        * runtime/VM.cpp:
+        (JSC::VM::VM):
+        * runtime/VM.h:
+
+2016-11-10  JF Bastien  <jfbastien@apple.com>
+
+        ASSERTION FAILED: length > offset encountered with wasm.yaml/wasm/js-api/test_Module.js.default-wasm
+        https://bugs.webkit.org/show_bug.cgi?id=164597
+
+        Reviewed by Keith Miller.
+
+        * wasm/WasmParser.h:
+        (JSC::Wasm::Parser::parseVarUInt32): move closer to other parsers
+        (JSC::Wasm::Parser::parseVarUInt64): move closer to other parsers
+
+2016-11-10  Joseph Pecoraro  <pecoraro@apple.com>
+
+        test262: DataView / TypedArray methods should throw RangeErrors for negative numbers (ToIndex)
+        https://bugs.webkit.org/show_bug.cgi?id=164450
+
+        Reviewed by Darin Adler.
+
+        * runtime/JSCJSValue.h:
+        * runtime/JSCJSValueInlines.h:
+        (JSC::JSValue::toIndex):
+        Introduce a method for toIndex, which is used by DataView and TypedArrays
+        to convert an argument to a number with the possibility of throwing
+        RangeErrors for negative values. We also throw RangeErrors for large
+        values, because wherever this is used we expect an unsigned.
+
+        * runtime/JSArrayBufferConstructor.cpp:
+        (JSC::constructArrayBuffer):
+        * runtime/JSDataViewPrototype.cpp:
+        (JSC::getData):
+        (JSC::setData):
+        * runtime/JSGenericTypedArrayViewConstructorInlines.h:
+        (JSC::constructGenericTypedArrayViewWithArguments):
+        (JSC::constructGenericTypedArrayView):
+        Use toIndex instead of toUint32 where required.
+
+2016-11-10  Mark Lam  <mark.lam@apple.com>
+
+        A few bits of minor code clean up.
+        https://bugs.webkit.org/show_bug.cgi?id=164523
+
+        Reviewed by Yusuke Suzuki.
+
+        * interpreter/StackVisitor.cpp:
+        (JSC::StackVisitor::Frame::dump):
+        - Insert a space to make the dump more legible.
+
+        * runtime/Options.h:
+        - Fixed some typos.
+
+        * runtime/StringPrototype.cpp:
+        (JSC::stringProtoFuncReplaceUsingRegExp):
+        (JSC::stringProtoFuncReplaceUsingStringSearch):
+        - Use the VM& that is already available.
+
+2016-11-10  Mark Lam  <mark.lam@apple.com>
+
+        Graph::methodOfGettingAValueProfileFor() should be returning the profile for the operand node.
+        https://bugs.webkit.org/show_bug.cgi?id=164600
+        <rdar://problem/28828676>
+
+        Reviewed by Filip Pizlo.
+
+        Currently, Graph::methodOfGettingAValueProfileFor() assumes that the operand DFG
+        node that it is provided with always has a different origin than the node that is
+        using that operand.  For example, in a DFG graph that looks like this:
+
+            a: ...
+            b: ArithAdd(@a, ...)
+
+        ... when emitting speculation checks on @a for the ArithAdd node at @b,
+        Graph::methodOfGettingAValueProfileFor() is passed @a, and expects @a's to
+        originate from a different bytecode than @b.  The intent here is to get the
+        profile for @a so that the OSR exit ramp for @b can update @a's profile with the
+        observed result type from @a so that future type prediction on incoming args for
+        the ArithAdd node can take this into consideration.
+
+        However, op_negate can be compiled into the following series of nodes:
+
+            a: ...
+            b: BooleanToNumber(@a)
+            c: DoubleRep(@b)
+            d: ArithNegate(@c)
+
+        All 3 nodes @b, @c, and @d maps to the same op_negate bytecode i.e. they have the
+        same origin.  When the speculativeJIT emits a speculationCheck for DoubleRep, it
+        calls Graph::methodOfGettingAValueProfileFor() to get the ArithProfile for the
+        BooleanToNumber node.  But because all 3 nodes have the same origin,
+        Graph::methodOfGettingAValueProfileFor() erroneously returns the ArithProfile for
+        the op_negate.  Subsequently, the OSR exit ramp will modify the ArithProfile of
+        the op_negate and corrupt its profile.  Instead, what the OSR exit ramp should be
+        doing is update the ArithProfile of op_negate's operand i.e. BooleanToNumber's
+        operand @a in this case.
+
+        The fix is to always pass the current node we're generating code for (in addition
+        to the operand node) to Graph::methodOfGettingAValueProfileFor().  This way, we
+        know the profile is valid if and only if the current node and its operand node
+        does not have the same origin.
+
+        In this patch, we also fixed the following:
+        1. Teach Graph::methodOfGettingAValueProfileFor() to get the profile for
+           BooleanToNumber's operand if the operand node it is given is BooleanToNumber.
+        2. Change JITCompiler::appendExceptionHandlingOSRExit() to explicitly pass an
+           empty MethodOfGettingAValueProfile().  It was implicitly doing this before.
+        3. Change SpeculativeJIT::emitInvalidationPoint() to pass an empty
+           MethodOfGettingAValueProfile().  It has no child node.  Hence, it doesn't
+           make sense to call Graph::methodOfGettingAValueProfileFor() for a child node
+           that does not exist.
+
+        * dfg/DFGGraph.cpp:
+        (JSC::DFG::Graph::methodOfGettingAValueProfileFor):
+        * dfg/DFGGraph.h:
+        * dfg/DFGJITCompiler.cpp:
+        (JSC::DFG::JITCompiler::appendExceptionHandlingOSRExit):
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::speculationCheck):
+        (JSC::DFG::SpeculativeJIT::emitInvalidationPoint):
+        * ftl/FTLLowerDFGToB3.cpp:
+        (JSC::FTL::DFG::LowerDFGToB3::appendOSRExitDescriptor):
+
+2016-11-10  Aaron Chu  <aaron_chu@apple.com>
+
+        Web Inspector: AXI: clarify button roles (e.g. toggle or popup button)
+        https://bugs.webkit.org/show_bug.cgi?id=130726
+        <rdar://problem/16420420>
+
+        Reviewed by Brian Burg.
+
+        Add the isPopupButton flag to the AccessibilityProperties type.
+
+        * inspector/protocol/DOM.json:
+
+2016-11-10  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [ARM] Unreviewed buildfix after r208450.
+
+        * assembler/MacroAssemblerARM.h:
+        (JSC::MacroAssemblerARM::load8SignedExtendTo32): Added.
+
+2016-11-08  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [JSC] Avoid cloned arguments allocation in ArrayPrototype methods
+        https://bugs.webkit.org/show_bug.cgi?id=164502
+
+        Reviewed by Saam Barati.
+
+        In many builtin functions, we use `arguments` to just get optional parameters.
+        While FTL argument elimination can drop `arguments` allocations, it leaves
+        the allocations in LLInt, Baseline, and DFG. And we found that DFG compiled
+        Array#map is heavily used in ES6SampleBench/Basic. And it always creates
+        a meaningless ClonedArguments.
+
+        Using ES6 default parameter here is not a solution. It increases the number
+        of parameters of the CodeBlock (not `function.length`). And the optional
+        parameters in Array.prototype.xxx methods are not typically passed. For
+        example, we typically do not pass `thisArg` to `Array.prototype.map` function.
+        In this case, the arity check frequently fails. It requires the additional C
+        call to fixup arguments and it becomes pure overhead.
+
+        To solve this problem, this patch introduces a new bytecode intrinsic @argument().
+        This offers the way to retrieve the argument value without increasing the
+        arity of the function. And if the argument is not passed (out of bounds), it
+        just returns `undefined`. The semantics of this intrinsic is the same to the C++
+        ExecState::argument(). This operation does not require `arguments` object. And we
+        can drop the `argument` references even in lower 3 tiers.
+
+        We implement op_get_argument for this intrinsic. And later this will be converted
+        to DFG GetArgument node. All the tiers handles this feature.
+
+        This patch improves ES6SampleBench/Basic 13.8% in steady state. And in summary,
+        it improves 4.5%.
+
+        In the future, we can improve the implementation of the default parameters.
+        Currently, the default parameter always increases the arity of the function. So
+        if you do not pass the argument, the arity check fails. But since it is the default
+        parameter, it is likely that we don't pass the argument. Using op_get_argument to
+        implement the default parameter can decrease the case in which the arity check
+        frequently fails. And it can change the builtin implementation to use the ES6
+        default parameters instead of using the special @argument() intrinsic in the future.
+        And at that case, the user code also receives the benefit.
+
+        ES6SampleBench/Basic.
+            Baseline:
+                Running... Basic ( 1  to go)
+                firstIteration:     39.38 ms +- 4.48 ms
+                averageWorstCase:   20.79 ms +- 0.96 ms
+                steadyState:        1959.22 ms +- 65.55 ms
+
+            Patched:
+                Running... Basic ( 1  to go)
+                firstIteration:     37.85 ms +- 4.09 ms
+                averageWorstCase:   18.60 ms +- 0.76 ms
+                steadyState:        1721.89 ms +- 57.58 ms
+
+        All summary.
+            Baseline:
+                summary:            164.34 ms +- 5.01 ms
+            Patched:
+                summary:            157.26 ms +- 5.96 ms
+
+        * builtins/ArrayConstructor.js:
+        * builtins/ArrayPrototype.js:
+        (reduce):
+        (reduceRight):
+        (every):
+        (forEach):
+        (filter):
+        (map):
+        (some):
+        (fill):
+        (find):
+        (findIndex):
+        (includes):
+        (copyWithin):
+        * builtins/DatePrototype.js:
+        (toLocaleString):
+        (toLocaleDateString):
+        (toLocaleTimeString):
+        * builtins/MapPrototype.js:
+        (forEach):
+        * builtins/NumberPrototype.js:
+        (toLocaleString):
+        * builtins/SetPrototype.js:
+        (forEach):
+        * builtins/StringPrototype.js:
+        (padStart):
+        (padEnd):
+        (localeCompare):
+        * builtins/TypedArrayConstructor.js:
+        * builtins/TypedArrayPrototype.js:
+        (every):
+        (fill):
+        (find):
+        (findIndex):
+        (forEach):
+        (some):
+        (reduce):
+        (reduceRight):
+        (map):
+        (filter):
+        * bytecode/BytecodeIntrinsicRegistry.h:
+        * bytecode/BytecodeList.json:
+        * bytecode/BytecodeUseDef.h:
+        (JSC::computeUsesForBytecodeOffset):
+        (JSC::computeDefsForBytecodeOffset):
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::dumpBytecode):
+        (JSC::CodeBlock::finishCreation):
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::emitGetArgument):
+        * bytecompiler/BytecodeGenerator.h:
+        * bytecompiler/NodesCodegen.cpp:
+        (JSC::BytecodeIntrinsicNode::emit_intrinsic_argument):
+        * dfg/DFGAbstractInterpreterInlines.h:
+        (JSC::DFG::AbstractInterpreter<AbstractStateType>::executeEffects):
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::parseBlock):
+        * dfg/DFGCapabilities.cpp:
+        (JSC::DFG::capabilityLevel):
+        * dfg/DFGClobberize.h:
+        (JSC::DFG::clobberize):
+        * dfg/DFGDoesGC.cpp:
+        (JSC::DFG::doesGC):
+        * dfg/DFGFixupPhase.cpp:
+        (JSC::DFG::FixupPhase::fixupNode):
+        * dfg/DFGNode.h:
+        (JSC::DFG::Node::hasHeapPrediction):
+        (JSC::DFG::Node::hasArgumentIndex):
+        (JSC::DFG::Node::argumentIndex):
+        * dfg/DFGNodeType.h:
+        * dfg/DFGPreciseLocalClobberize.h:
+        (JSC::DFG::PreciseLocalClobberizeAdaptor::readTop):
+        * dfg/DFGPredictionPropagationPhase.cpp:
+        * dfg/DFGSafeToExecute.h:
+        (JSC::DFG::safeToExecute):
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::compileGetArgument):
+        * dfg/DFGSpeculativeJIT.h:
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * ftl/FTLCapabilities.cpp:
+        (JSC::FTL::canCompile):
+        * ftl/FTLLowerDFGToB3.cpp:
+        (JSC::FTL::DFG::LowerDFGToB3::compileNode):
+        (JSC::FTL::DFG::LowerDFGToB3::compileGetArgument):
+        * jit/JIT.cpp:
+        (JSC::JIT::privateCompileMainPass):
+        * jit/JIT.h:
+        * jit/JITOpcodes.cpp:
+        (JSC::JIT::emit_op_get_argument):
+        * jit/JITOpcodes32_64.cpp:
+        (JSC::JIT::emit_op_get_argument):
+        * llint/LowLevelInterpreter32_64.asm:
+        * llint/LowLevelInterpreter64.asm:
+
+2016-11-08  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: DebuggerManager.Event.Resumed introduces test flakiness
+        https://bugs.webkit.org/show_bug.cgi?id=161951
+        <rdar://problem/28295767>
+
+        Reviewed by Brian Burg.
+
+        This removes an ambiguity in the protocol when stepping through
+        JavaScript. Previously, when paused and issuing a Debugger.step*
+        command the frontend would always receive a Debugger.resumed event and
+        then, maybe, a Debugger.paused event indicating we paused again (after
+        stepping). However, this ambiguity means that the frontend needs to
+        wait for a short period of time to determine if we really resumed
+        or not. And even still that decision may be incorrect if the step
+        takes a sufficiently long period of time.
+
+        The new approach removes this ambiguity. Now, in response to a
+        Debugger.step* command the backend MUST send a single Debugger.paused
+        event or Debugger.resumed event. Now the frontend knows that the
+        next Debugger event it receives after issuing the step command is
+        the result (stepped and paused, or stepped and resumed).
+
+        To make resuming consistent in all cases, a Debugger.resume command
+        will always respond with a Debugger.resumed event.
+
+        Finally, Debugger.continueToLocation is treated like a "big step"
+        in cases where we can resolve the location. If we can't resolve the
+        location it is treated as a resume, maintaining the old behavior.
+
+        * inspector/agents/InspectorDebuggerAgent.h:
+        * inspector/agents/InspectorDebuggerAgent.cpp:
+        (Inspector::InspectorDebuggerAgent::stepOver):
+        (Inspector::InspectorDebuggerAgent::stepInto):
+        (Inspector::InspectorDebuggerAgent::stepOut):
+        (Inspector::InspectorDebuggerAgent::willStepAndMayBecomeIdle):
+        (Inspector::InspectorDebuggerAgent::didBecomeIdleAfterStepping):
+        When stepping register a VM exit observer so that we can issue
+        a Debugger.resumed event if the step caused us to exit the VM.
+
+        (Inspector::InspectorDebuggerAgent::resume):
+        Set a flag to issue a Debugger.resumed event once we break out
+        of the nested run loop.
+
+        (Inspector::InspectorDebuggerAgent::didPause):
+        We are issuing Debugger.paused so clear the state to indicate that
+        we no longer need to issue Debugger.resumed event, we have paused.
+
+        (Inspector::InspectorDebuggerAgent::didContinue):
+        Only issue the Debugger.resumed event if needed (explicitly asked
+        to resume).
+
+        (Inspector::InspectorDebuggerAgent::continueToLocation):
+        (Inspector::InspectorDebuggerAgent::clearDebuggerBreakpointState):
+        All places that do continueProgram should be audited. In error cases,
+        if we are paused and continue we should remember to send Debugger.resumed.
+
+        * inspector/protocol/Debugger.json:
+        Clarify in the protocol description the contract of these methods.
+
+2016-11-09  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Associate Worker Resources with the Worker and not the Page
+        https://bugs.webkit.org/show_bug.cgi?id=164342
+        <rdar://problem/29075775>
+
+        Reviewed by Timothy Hatcher.
+
+        * inspector/protocol/Network.json:
+        * inspector/protocol/Page.json:
+        Associate Resource data with a target.
+
+2016-11-09  Keith Miller  <keith_miller@apple.com>
+
+        jsc CLI should work with the remote inspector
+        https://bugs.webkit.org/show_bug.cgi?id=164569
+
+        Reviewed by Joseph Pecoraro.
+
+        This patch enables using the remote inspector on the jsc CLI.
+        In order to use the remote inspector, jsc users need to pass an option.
+
+        * jsc.cpp:
+        (CommandLine::parseArguments):
+        (runJSC):
+
+2016-11-09  Saam Barati  <sbarati@apple.com>
+
+        Math.min()/Math.max() with no arguments is lowered incorrectly in the BytecodeParser
+        https://bugs.webkit.org/show_bug.cgi?id=164464
+        <rdar://problem/29131452>
+
+        Reviewed by Darin Adler.
+
+        We were incorrectly matching this pattern inside the bytecode parser
+        to return NaN. Instead, we must return:
+          Infinity for Math.min()
+         -Infinity for Math.max()
+
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::handleMinMax):
+
+2016-11-09  Saam Barati  <sbarati@apple.com>
+
+        TypeProfiler and running GC collection on another thread don't play nicely with each other
+        https://bugs.webkit.org/show_bug.cgi?id=164441
+        <rdar://problem/29132174>
+
+        Reviewed by Geoffrey Garen.
+
+        This fix here is simple: we now treat the type profiler log as a GC root.
+        GC will make sure that we mark any values/structures that are in the log.
+        It's easy to reason about the correctness of this, and it also solves
+        the problem that we were clearing the log on the GC thread. Clearing the
+        log on the GC thread was a problem because when we clear the log, we may
+        allocate, which we're not allowed to do from the GC thread.
+
+        * heap/Heap.cpp:
+        (JSC::Heap::markRoots):
+        (JSC::Heap::visitTypeProfiler):
+        (JSC::Heap::collectInThread):
+        * heap/Heap.h:
+        * runtime/TypeProfilerLog.cpp:
+        (JSC::TypeProfilerLog::processLogEntries):
+        (JSC::TypeProfilerLog::visit):
+        * runtime/TypeProfilerLog.h:
+
 2016-11-09  JF Bastien  <jfbastien@apple.com>
 
         WebAssembly: Silence noisy warning

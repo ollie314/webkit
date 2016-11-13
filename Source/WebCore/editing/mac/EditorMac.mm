@@ -42,6 +42,7 @@
 #import "Frame.h"
 #import "FrameLoaderClient.h"
 #import "FrameView.h"
+#import "HTMLAnchorElement.h"
 #import "HTMLAttachmentElement.h"
 #import "HTMLConverter.h"
 #import "HTMLElement.h"
@@ -335,7 +336,7 @@ RefPtr<Range> Editor::adjustedSelectionRange()
     ASSERT(commonAncestor);
     auto* enclosingAnchor = enclosingElementWithTag(firstPositionInNode(commonAncestor), HTMLNames::aTag);
     if (enclosingAnchor && comparePositions(firstPositionInOrBeforeNode(range->startPosition().anchorNode()), range->startPosition()) >= 0)
-        range->setStart(*enclosingAnchor, 0, IGNORE_EXCEPTION);
+        range->setStart(*enclosingAnchor, 0);
     return range;
 }
     
@@ -628,7 +629,7 @@ bool Editor::WebContentReader::readURL(const URL& url, const String& title)
     if (url.string().isEmpty())
         return false;
 
-    auto anchor = frame.document()->createElement(HTMLNames::aTag, false);
+    auto anchor = HTMLAnchorElement::create(*frame.document());
     anchor->setAttributeWithoutSynchronization(HTMLNames::hrefAttr, url.string());
     anchor->appendChild(frame.document()->createTextNode([title precomposedStringWithCanonicalMapping]));
 

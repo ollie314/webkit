@@ -57,7 +57,7 @@ WebInspector.DebuggerManager = class DebuggerManager extends WebInspector.Object
         this._allExceptionsBreakpoint.resolved = true;
 
         this._allUncaughtExceptionsBreakpoint = new WebInspector.Breakpoint(specialBreakpointLocation, !this._allUncaughtExceptionsBreakpointEnabledSetting.value);
-        
+
         this._assertionsBreakpoint = new WebInspector.Breakpoint(specialBreakpointLocation, !this._assertionsBreakpointEnabledSetting.value);
         this._assertionsBreakpoint.resolved = true;
 
@@ -611,9 +611,18 @@ WebInspector.DebuggerManager = class DebuggerManager extends WebInspector.Object
     {
         // Called from WebInspector.DebuggerObserver.
 
-        // We delay clearing the state and firing events so the user interface does not flash
-        // between brief steps or successive breakpoints.
-        this._delayedResumeTimeout = setTimeout(this._didResumeInternal.bind(this, target), 50);
+        // COMPATIBILITY (iOS 10): Debugger.resumed event was ambiguous. When stepping
+        // we would receive a Debugger.resumed and we would not know if it really meant
+        // the backend resumed or would pause again due to a step. Legacy backends wait
+        // 50ms, and treat it as a real resume if we haven't paused in that time frame.
+        // This delay ensures the user interface does not flash between brief steps
+        // or successive breakpoints.
+        if (!DebuggerAgent.setPauseOnAssertions) {
+            this._delayedResumeTimeout = setTimeout(this._didResumeInternal.bind(this, target), 50);
+            return;
+        }
+
+        this._didResumeInternal(target);
     }
 
     playBreakpointActionSound(breakpointActionIdentifier)
@@ -644,12 +653,19 @@ WebInspector.DebuggerManager = class DebuggerManager extends WebInspector.Object
 
         let script = new WebInspector.Script(target, scriptIdentifier, new WebInspector.TextRange(startLine, startColumn, endLine, endColumn), url, isContentScript, sourceURL, sourceMapURL);
 
-        if (!target.mainResource && target.type === WebInspector.Target.Type.Worker) {
-            if (script.url === target.name)
-                target.mainResource = script;
-        }
-
         targetData.addScript(script);
+
+        if (target !== WebInspector.mainTarget && !target.mainResource) {
+            // FIXME: <https://webkit.org/b/164427> Web Inspector: WorkerTarget's mainResource should be a Resource not a Script
+            // We make the main resource of a WorkerTarget the Script instead of the Resource
+            // because the frontend may not be informed of the Resource. We should gaurantee
+            // the frontend is informed of the Resource.
+            if (script.url === target.name) {
+                target.mainResource = script;
+                if (script.resource)
+                    target.resourceCollection.remove(script.resource);
+            }
+        }
 
         if (isWebKitInternalScript(script.sourceURL)) {
             this._internalWebKitScripts.push(script);
@@ -662,6 +678,9 @@ WebInspector.DebuggerManager = class DebuggerManager extends WebInspector.Object
             return;
 
         this.dispatchEventToListeners(WebInspector.DebuggerManager.Event.ScriptAdded, {script});
+
+        if (target !== WebInspector.mainTarget && !script.isMainResource() && !script.resource)
+            target.addScript(script);
     }
 
     // Private

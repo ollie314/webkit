@@ -43,7 +43,6 @@
 #include "DOMPath.h"
 #include "DisplayListRecorder.h"
 #include "DisplayListReplayer.h"
-#include "ExceptionCodePlaceholder.h"
 #include "FloatQuad.h"
 #include "HTMLImageElement.h"
 #include "HTMLVideoElement.h"
@@ -1887,11 +1886,8 @@ String CanvasRenderingContext2D::displayListAsText(DisplayList::AsTextFlags flag
 String CanvasRenderingContext2D::replayDisplayListAsText(DisplayList::AsTextFlags flags) const
 {
     auto it = contextDisplayListMap().find(this);
-    if (it != contextDisplayListMap().end()) {
-        TextStream stream;
-        stream << it->value->asText(flags);
-        return stream.release();
-    }
+    if (it != contextDisplayListMap().end())
+        return it->value->asText(flags);
 
     return String();
 }

@@ -179,11 +179,8 @@ void SpeculativeJIT::cachedGetById(CodeOrigin codeOrigin, GPRReg baseGPR, GPRReg
         slowCases.append(slowPathTarget);
     slowCases.append(gen.slowPathJump());
     
-    auto slowPathFunction = type == AccessType::Get ? operationGetByIdOptimize :
-        type == AccessType::PureGet ? operationPureGetByIdOptimize : operationTryGetByIdOptimize;
-
     auto slowPath = slowPathCall(
-        slowCases, this, slowPathFunction,
+        slowCases, this, type == AccessType::Get ? operationGetByIdOptimize : operationTryGetByIdOptimize,
         spillMode, ExceptionCheckRequirement::CheckNeeded,
         resultGPR, gen.stubInfo(), baseGPR, identifierUID(identifierNumber));
     
@@ -3923,6 +3920,16 @@ void SpeculativeJIT::compile(Node* node)
         cellResult(result.gpr(), node, UseChildrenCalledExplicitly);
         break;
     }
+
+    case NewArrayWithSpread: {
+        compileNewArrayWithSpread(node);
+        break;
+    }
+
+    case Spread: {
+        compileSpread(node);
+        break;
+    }
         
     case NewArrayWithSize: {
         JSGlobalObject* globalObject = m_jit.graph().globalObjectFor(node->origin.semantic);
@@ -4235,11 +4242,6 @@ void SpeculativeJIT::compile(Node* node)
             DFG_CRASH(m_jit.graph(), node, "Bad use kind");
             break;
         }
-        break;
-    }
-
-    case PureGetById: {
-        compilePureGetById(node);
         break;
     }
 
@@ -5153,6 +5155,11 @@ void SpeculativeJIT::compile(Node* node)
         
     case PutToArguments: {
         compilePutToArguments(node);
+        break;
+    }
+
+    case GetArgument: {
+        compileGetArgument(node);
         break;
     }
         

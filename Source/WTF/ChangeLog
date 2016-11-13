@@ -1,3 +1,55 @@
+2016-11-11  Alex Christensen  <achristensen@webkit.org>
+
+        Allow mutable lambdas in HashMap::ensure
+        https://bugs.webkit.org/show_bug.cgi?id=164642
+
+        Reviewed by Sam Weinig.
+
+        * wtf/HashMap.h:
+        (WTF::HashMapEnsureTranslator::translate):
+        (WTF::X>::removeIf):
+
+2016-11-11  Beth Dakin  <bdakin@apple.com>
+
+        Get touch bar code building for open source builds
+        https://bugs.webkit.org/show_bug.cgi?id=164610
+
+        Reviewed by Wenson Hsieh.
+
+        * wtf/Platform.h:
+
+2016-11-10  JF Bastien  <jfbastien@apple.com>
+
+        ASSERTION FAILED: length > offset encountered with wasm.yaml/wasm/js-api/test_Module.js.default-wasm
+        https://bugs.webkit.org/show_bug.cgi?id=164597
+
+        Reviewed by Keith Miller.
+
+        Decoding at end of file should fail, not assert.
+
+        * wtf/LEBDecoder.h:
+        (WTF::LEBDecoder::decodeUInt):
+        (WTF::LEBDecoder::decodeInt32):
+
+2016-11-10  Alex Christensen  <achristensen@webkit.org>
+
+        Remove unused CFURLCACHE code
+        https://bugs.webkit.org/show_bug.cgi?id=164551
+
+        Reviewed by Antti Koivisto.
+
+        * wtf/Platform.h:
+
+2016-11-09  Alex Christensen  <achristensen@webkit.org>
+
+        Allow RefPtrs of const ThreadSafeRefCounted types
+        https://bugs.webkit.org/show_bug.cgi?id=164548
+
+        Reviewed by Tim Horton.
+
+        * wtf/ThreadSafeRefCounted.h:
+        Make m_refCount mutable like we did with RefCounted in r203257.
+
 2016-11-09  Chris Dumez  <cdumez@apple.com>
 
         [Mac] Stop using deprecated AppKit enumeration values

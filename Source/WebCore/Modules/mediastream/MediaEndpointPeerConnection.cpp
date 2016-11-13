@@ -699,8 +699,8 @@ RefPtr<RTCRtpReceiver> MediaEndpointPeerConnection::createReceiver(const String&
 
     // Create a muted remote source that will be unmuted once media starts arriving.
     auto remoteSource = m_mediaEndpoint->createMutedRemoteSource(transceiverMid, sourceType);
-    auto remoteTrackPrivate = MediaStreamTrackPrivate::create(WTFMove(remoteSource), trackId);
-    auto remoteTrack = MediaStreamTrack::create(*m_peerConnection.scriptExecutionContext(), *remoteTrackPrivate);
+    auto remoteTrackPrivate = MediaStreamTrackPrivate::create(WTFMove(remoteSource), String(trackId));
+    auto remoteTrack = MediaStreamTrack::create(*m_peerConnection.scriptExecutionContext(), WTFMove(remoteTrackPrivate));
 
     return RTCRtpReceiver::create(WTFMove(remoteTrack));
 }
@@ -716,7 +716,7 @@ void MediaEndpointPeerConnection::replaceTrack(RTCRtpSender& sender, RefPtr<Medi
     if (mid.isNull()) {
         // Transceiver is not associated with a media description yet.
         sender.setTrack(WTFMove(withTrack));
-        promise.resolve(nullptr);
+        promise.resolve();
         return;
     }
 
@@ -733,7 +733,7 @@ void MediaEndpointPeerConnection::replaceTrackTask(RTCRtpSender& sender, const S
     m_mediaEndpoint->replaceSendSource(withTrack->source(), mid);
 
     sender.setTrack(WTFMove(withTrack));
-    promise.resolve(nullptr);
+    promise.resolve();
 }
 
 void MediaEndpointPeerConnection::doStop()

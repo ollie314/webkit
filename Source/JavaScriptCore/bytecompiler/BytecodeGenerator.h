@@ -527,6 +527,7 @@ namespace JSC {
         void liftTDZCheckIfPossible(const Variable&);
         RegisterID* emitNewObject(RegisterID* dst);
         RegisterID* emitNewArray(RegisterID* dst, ElementNode*, unsigned length); // stops at first elision
+        RegisterID* emitNewArrayWithSpread(RegisterID* dst, ElementNode*);
         RegisterID* emitNewArrayWithSize(RegisterID* dst, RegisterID* length);
 
         RegisterID* emitNewFunction(RegisterID* dst, FunctionMetadataNode*);
@@ -576,6 +577,8 @@ namespace JSC {
         void emitPutGetterSetter(RegisterID* base, const Identifier& property, unsigned attributes, RegisterID* getter, RegisterID* setter);
         void emitPutGetterByVal(RegisterID* base, RegisterID* property, unsigned propertyDescriptorOptions, RegisterID* getter);
         void emitPutSetterByVal(RegisterID* base, RegisterID* property, unsigned propertyDescriptorOptions, RegisterID* setter);
+
+        RegisterID* emitGetArgument(RegisterID* dst, int32_t index);
 
         // Initialize object with generator fields (@generatorThis, @generatorNext, @generatorState, @generatorFrame)
         void emitPutGeneratorFields(RegisterID* nextFunction);

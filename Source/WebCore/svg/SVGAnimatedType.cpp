@@ -90,7 +90,7 @@ SVGAnimatedType::~SVGAnimatedType()
     }
 }
 
-std::unique_ptr<SVGAnimatedType> SVGAnimatedType::createAngleAndEnumeration(std::unique_ptr<std::pair<SVGAngle, unsigned>> angleAndEnumeration)
+std::unique_ptr<SVGAnimatedType> SVGAnimatedType::createAngleAndEnumeration(std::unique_ptr<std::pair<SVGAngleValue, unsigned>> angleAndEnumeration)
 {
     ASSERT(angleAndEnumeration);
     auto animatedType = std::make_unique<SVGAnimatedType>(AnimatedAngle);
@@ -194,7 +194,7 @@ std::unique_ptr<SVGAnimatedType> SVGAnimatedType::createPointList(std::unique_pt
     return animatedType;
 }
 
-std::unique_ptr<SVGAnimatedType> SVGAnimatedType::createPreserveAspectRatio(std::unique_ptr<SVGPreserveAspectRatio> preserveAspectRatio)
+std::unique_ptr<SVGAnimatedType> SVGAnimatedType::createPreserveAspectRatio(std::unique_ptr<SVGPreserveAspectRatioValue> preserveAspectRatio)
 {
     ASSERT(preserveAspectRatio);
     auto animatedType = std::make_unique<SVGAnimatedType>(AnimatedPreserveAspectRatio);

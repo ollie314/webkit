@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007 Apple Inc. All rights reserved.
+ * Copyright (C) 2007-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -105,12 +105,6 @@ SecurityOrigin::SecurityOrigin(const URL& url)
     : m_protocol(url.protocol().isNull() ? emptyString() : url.protocol().toString().convertToASCIILowercase())
     , m_host(url.host().isNull() ? emptyString() : url.host().convertToASCIILowercase())
     , m_port(url.port())
-    , m_isUnique(false)
-    , m_universalAccess(false)
-    , m_domainWasSetInDOM(false)
-    , m_storageBlockingPolicy(AllowAllStorage)
-    , m_enforceFilePathSeparation(false)
-    , m_needsDatabaseIdentifierQuirkForFiles(false)
 {
     // document.domain starts as m_host, but can be set by the DOM.
     m_domain = m_host;
@@ -130,12 +124,6 @@ SecurityOrigin::SecurityOrigin()
     , m_host(emptyString())
     , m_domain(emptyString())
     , m_isUnique(true)
-    , m_universalAccess(false)
-    , m_domainWasSetInDOM(false)
-    , m_canLoadLocalResources(false)
-    , m_storageBlockingPolicy(AllowAllStorage)
-    , m_enforceFilePathSeparation(false)
-    , m_needsDatabaseIdentifierQuirkForFiles(false)
 {
 }
 
@@ -151,7 +139,7 @@ SecurityOrigin::SecurityOrigin(const SecurityOrigin* other)
     , m_canLoadLocalResources(other->m_canLoadLocalResources)
     , m_storageBlockingPolicy(other->m_storageBlockingPolicy)
     , m_enforceFilePathSeparation(other->m_enforceFilePathSeparation)
-    , m_needsDatabaseIdentifierQuirkForFiles(other->m_needsDatabaseIdentifierQuirkForFiles)
+    , m_needsStorageAccessFromFileURLsQuirk(other->m_needsStorageAccessFromFileURLsQuirk)
 {
 }
 
@@ -160,19 +148,8 @@ Ref<SecurityOrigin> SecurityOrigin::create(const URL& url)
     if (RefPtr<SecurityOrigin> cachedOrigin = getCachedOrigin(url))
         return cachedOrigin.releaseNonNull();
 
-    if (shouldTreatAsUniqueOrigin(url)) {
-        Ref<SecurityOrigin> origin(adoptRef(*new SecurityOrigin));
-
-        if (url.protocolIs("file")) {
-            // Unfortunately, we can't represent all unique origins exactly
-            // the same way because we need to produce a quirky database
-            // identifier for file URLs due to persistent storage in some
-            // embedders of WebKit.
-            origin->m_needsDatabaseIdentifierQuirkForFiles = true;
-        }
-
-        return origin;
-    }
+    if (shouldTreatAsUniqueOrigin(url))
+        return adoptRef(*new SecurityOrigin);
 
     if (shouldUseInnerURL(url))
         return adoptRef(*new SecurityOrigin(extractInnerURL(url)));
@@ -351,6 +328,9 @@ bool SecurityOrigin::canAccessStorage(const SecurityOrigin* topOrigin, ShouldAll
     if (isUnique())
         return false;
 
+    if (isLocal() && !needsStorageAccessFromFileURLsQuirk() && !m_universalAccess && shouldAllowFromThirdParty != AlwaysAllowFromThirdParty)
+        return false;
+    
     if (m_storageBlockingPolicy == BlockAllStorage)
         return false;
 
@@ -405,6 +385,11 @@ void SecurityOrigin::grantLoadLocalResources()
 void SecurityOrigin::grantUniversalAccess()
 {
     m_universalAccess = true;
+}
+
+void SecurityOrigin::grantStorageAccessFromFileURLsQuirk()
+{
+    m_needsStorageAccessFromFileURLsQuirk = true;
 }
 
 #if ENABLE(CACHE_PARTITIONING)
@@ -555,26 +540,6 @@ Ref<SecurityOrigin> SecurityOrigin::create(const String& protocol, const String&
     auto origin = create(URL(URL(), protocol + "://" + host + "/"));
     origin->m_port = port;
     return origin;
-}
-
-String SecurityOrigin::databaseIdentifier() const 
-{
-    // Historically, we've used the following (somewhat non-sensical) string
-    // for the databaseIdentifier of local files. We used to compute this
-    // string because of a bug in how we handled the scheme for file URLs.
-    // Now that we've fixed that bug, we still need to produce this string
-    // to avoid breaking existing persistent state.
-    if (m_needsDatabaseIdentifierQuirkForFiles)
-        return ASCIILiteral("file__0");
-
-    StringBuilder stringBuilder;
-    stringBuilder.append(m_protocol);
-    stringBuilder.append(separatorCharacter);
-    stringBuilder.append(encodeForFileName(m_host));
-    stringBuilder.append(separatorCharacter);
-    stringBuilder.appendNumber(m_port.valueOr(0));
-
-    return stringBuilder.toString();
 }
 
 bool SecurityOrigin::equal(const SecurityOrigin* other) const 

@@ -210,8 +210,6 @@ void SpeculativeJIT::cachedGetById(
     J_JITOperation_ESsiJI getByIdFunction;
     if (type == AccessType::Get)
         getByIdFunction = operationGetByIdOptimize;
-    else if (type == AccessType::PureGet)
-        getByIdFunction = operationPureGetByIdOptimize;
     else
         getByIdFunction = operationTryGetByIdOptimize;
 
@@ -3941,6 +3939,16 @@ void SpeculativeJIT::compile(Node* node)
         break;
     }
 
+    case NewArrayWithSpread: {
+        compileNewArrayWithSpread(node);
+        break;
+    }
+
+    case Spread: {
+        compileSpread(node);
+        break;
+    }
+
     case NewArrayWithSize: {
         JSGlobalObject* globalObject = m_jit.graph().globalObjectFor(node->origin.semantic);
         if (!globalObject->isHavingABadTime() && !hasAnyArrayStorage(node->indexingType())) {
@@ -4268,11 +4276,6 @@ void SpeculativeJIT::compile(Node* node)
             RELEASE_ASSERT_NOT_REACHED();
             break;
         }
-        break;
-    }
-
-    case PureGetById: {
-        compilePureGetById(node);
         break;
     }
 
@@ -4981,6 +4984,11 @@ void SpeculativeJIT::compile(Node* node)
         
     case PutToArguments: {
         compilePutToArguments(node);
+        break;
+    }
+
+    case GetArgument: {
+        compileGetArgument(node);
         break;
     }
         

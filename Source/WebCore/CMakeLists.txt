@@ -327,11 +327,15 @@ set(WebCore_NON_SVG_IDL_FILES
     crypto/CryptoAlgorithmParameters.idl
     crypto/CryptoKey.idl
     crypto/CryptoKeyPair.idl
+    crypto/CryptoKeyUsage.idl
+    crypto/JsonWebKey.idl
+    crypto/RsaOtherPrimesInfo.idl
     crypto/SubtleCrypto.idl
     crypto/WebKitSubtleCrypto.idl
 
     crypto/parameters/AesKeyGenParams.idl
-    crypto/parameters/HmacKeyGenParams.idl
+    crypto/parameters/HmacKeyParams.idl
+    crypto/parameters/RsaHashedImportParams.idl
     crypto/parameters/RsaHashedKeyGenParams.idl
     crypto/parameters/RsaKeyGenParams.idl
 
@@ -861,6 +865,7 @@ set(WebCore_SOURCES
     Modules/indexeddb/shared/IDBGetAllRecordsData.cpp
     Modules/indexeddb/shared/IDBGetRecordData.cpp
     Modules/indexeddb/shared/IDBIndexInfo.cpp
+    Modules/indexeddb/shared/IDBIterateCursorData.cpp
     Modules/indexeddb/shared/IDBObjectStoreInfo.cpp
     Modules/indexeddb/shared/IDBRequestData.cpp
     Modules/indexeddb/shared/IDBResourceIdentifier.cpp
@@ -1152,6 +1157,7 @@ set(WebCore_SOURCES
     bindings/js/JSIDBIndexCustom.cpp
     bindings/js/JSIDBObjectStoreCustom.cpp
     bindings/js/JSIDBRequestCustom.cpp
+    bindings/js/JSIDBTransactionCustom.cpp
     bindings/js/JSImageConstructor.cpp
     bindings/js/JSImageDataCustom.cpp
     bindings/js/JSInspectorFrontendHostCustom.cpp
@@ -1159,6 +1165,8 @@ set(WebCore_SOURCES
     bindings/js/JSLocationCustom.cpp
     bindings/js/JSMainThreadExecState.cpp
     bindings/js/JSMediaDevicesCustom.cpp
+    bindings/js/JSMediaKeySessionCustom.cpp
+    bindings/js/JSMediaKeySystemAccessCustom.cpp
     bindings/js/JSMediaStreamTrackCustom.cpp
     bindings/js/JSMediaTrackSupportedConstraintsCustom.cpp
     bindings/js/JSMessageChannelCustom.cpp
@@ -2038,6 +2046,7 @@ set(WebCore_SOURCES
     page/IntersectionObserverEntry.cpp
     page/Location.cpp
     page/MainFrame.cpp
+    page/MemoryRelease.cpp
     page/MouseEventWithHitTestResults.cpp
     page/Navigator.cpp
     page/NavigatorBase.cpp
@@ -2336,7 +2345,6 @@ set(WebCore_SOURCES
     platform/mock/DeviceMotionClientMock.cpp
     platform/mock/DeviceOrientationClientMock.cpp
     platform/mock/GeolocationClientMock.cpp
-    platform/mock/MediaConstraintsMock.cpp
     platform/mock/MockMediaEndpoint.cpp
     platform/mock/MockRealtimeAudioSource.cpp
     platform/mock/MockRealtimeMediaSource.cpp
@@ -2679,7 +2687,7 @@ set(WebCore_SOURCES
     svg/SVGAltGlyphDefElement.cpp
     svg/SVGAltGlyphElement.cpp
     svg/SVGAltGlyphItemElement.cpp
-    svg/SVGAngle.cpp
+    svg/SVGAngleValue.cpp
     svg/SVGAnimateColorElement.cpp
     svg/SVGAnimateElement.cpp
     svg/SVGAnimateElementBase.cpp
@@ -2795,7 +2803,7 @@ set(WebCore_SOURCES
     svg/SVGPolyElement.cpp
     svg/SVGPolygonElement.cpp
     svg/SVGPolylineElement.cpp
-    svg/SVGPreserveAspectRatio.cpp
+    svg/SVGPreserveAspectRatioValue.cpp
     svg/SVGRadialGradientElement.cpp
     svg/SVGRectElement.cpp
     svg/SVGSVGElement.cpp
@@ -3036,6 +3044,33 @@ if (ENABLE_LEGACY_ENCRYPTED_MEDIA)
         Modules/encryptedmedia/legacy/WebKitMediaKeys.idl
 
         html/WebKitMediaKeyError.idl
+    )
+endif ()
+
+if (ENABLE_ENCRYPTED_MEDIA)
+    list(APPEND WebCore_SOURCES
+        Modules/encryptedmedia/MediaKeyMessageEvent.cpp
+        Modules/encryptedmedia/MediaKeySession.cpp
+        Modules/encryptedmedia/MediaKeyStatusMap.cpp
+        Modules/encryptedmedia/MediaKeySystemAccess.cpp
+        Modules/encryptedmedia/MediaKeys.cpp
+        Modules/encryptedmedia/NavigatorEME.cpp
+
+        html/MediaEncryptedEvent.cpp
+    )
+    list(APPEND WebCore_IDL_FILES
+    )
+    list(APPEND WebCore_IDL_FILES
+        Modules/encryptedmedia/MediaKeyMessageEvent.idl
+        Modules/encryptedmedia/MediaKeySession.idl
+        Modules/encryptedmedia/MediaKeyStatusMap.idl
+        Modules/encryptedmedia/MediaKeySystemAccess.idl
+        Modules/encryptedmedia/MediaKeySystemConfiguration.idl
+        Modules/encryptedmedia/MediaKeySystemMediaCapability.idl
+        Modules/encryptedmedia/MediaKeys.idl
+        Modules/encryptedmedia/NavigatorEME.idl
+
+        html/MediaEncryptedEvent.idl
     )
 endif ()
 

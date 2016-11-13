@@ -375,6 +375,7 @@ void Internals::resetToConsistentState(Page& page)
 #endif
     }
 
+    WebCore::clearDefaultPortForProtocolMapForTesting();
     WebCore::overrideUserPreferredLanguages(Vector<String>());
     WebCore::Settings::setUsesOverlayScrollbars(false);
     WebCore::Settings::setUsesMockScrollAnimator(false);
@@ -646,6 +647,19 @@ unsigned Internals::imageFrameIndex(HTMLImageElement& element)
 
     auto* image = cachedImage->image();
     return is<BitmapImage>(image) ? downcast<BitmapImage>(*image).currentFrame() : 0;
+}
+
+void Internals::setImageFrameDecodingDuration(HTMLImageElement& element, float duration)
+{
+    auto* cachedImage = element.cachedImage();
+    if (!cachedImage)
+        return;
+    
+    auto* image = cachedImage->image();
+    if (!is<BitmapImage>(image))
+        return;
+    
+    downcast<BitmapImage>(*image).setFrameDecodingDurationForTesting(duration);
 }
 
 void Internals::clearPageCache()
@@ -2168,6 +2182,11 @@ void Internals::registerURLSchemeAsBypassingContentSecurityPolicy(const String& 
 void Internals::removeURLSchemeRegisteredAsBypassingContentSecurityPolicy(const String& scheme)
 {
     SchemeRegistry::removeURLSchemeRegisteredAsBypassingContentSecurityPolicy(scheme);
+}
+
+void Internals::registerDefaultPortForProtocol(unsigned short port, const String& protocol)
+{
+    registerDefaultPortForProtocolForTesting(port, protocol);
 }
 
 Ref<MallocStatistics> Internals::mallocStatistics() const

@@ -1,3 +1,300 @@
+2016-11-12  Darin Adler  <darin@apple.com>
+
+        Remove a few assorted uses of ExceptionCode
+        https://bugs.webkit.org/show_bug.cgi?id=164683
+
+        Reviewed by Chris Dumez.
+
+        * DOM/DOMDOMImplementation.mm:
+        (-[DOMImplementation createDocumentType:publicId:systemId:]):
+        Use raiseOnDOMError instead of much longer hand written equivalent.
+        (-[DOMImplementation createDocument:qualifiedName:doctype:]): Ditto.
+
+        * DOM/DOMDocument.mm:
+        (-[DOMDocument createEntityReference:]): Use raiseNotSupportedErrorException
+        so we are not using a specific exception code.
+
+        * DOM/DOMHTMLOptionsCollection.mm:
+        (-[DOMHTMLOptionsCollection add:index:]): Use raiseOnDOMError instead of
+        much longer hand written equivalent.
+        * DOM/DOMHTMLSelectElement.mm:
+        (-[DOMHTMLSelectElement add:before:]): Ditto. Also removed unneeded return
+        statement after calling a "no return" function.
+
+        * DOM/ExceptionHandlers.h: Removed overloads of raiseDOMException and
+        raiseOnDOMError functions that take ExceptionCode; keep the ones that take
+        Exception and ExceptionOr. Renamed the other overload of raiseDOMException
+        to raiseDOMErrorException; it is only used as the non-inline implementation
+        part of the inline raiseOnDOMError function.
+        * DOM/ExceptionHandlers.mm:
+        (raiseDOMErrorException): Renamed. Made the ExceptionCode overload be local
+        to this source file instead of in the header.
+        (raiseTypeErrorException): Updated for name change.
+        (raiseNotSupportedErrorException): Added.
+
+2016-11-11  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Hovering over a slotted Text node clears hover state
+        https://bugs.webkit.org/show_bug.cgi?id=164002
+        <rdar://problem/29040471>
+
+        Reviewed by Simon Fraser.
+
+        * WebView/WebImmediateActionController.mm:
+        (-[WebImmediateActionController performHitTestAtPoint:]):
+
+2016-11-11  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        [WK2] autocorrect and autocapitalize attributes do not work in contenteditable elements
+        https://bugs.webkit.org/show_bug.cgi?id=164538
+        <rdar://problem/8418711>
+
+        Reviewed by Ryosuke Niwa.
+
+        Account for renaming HTMLElement::autocorrect to HTMLElement::shouldAutocorrect, as well as moving
+        WebAutocapitalizeType to WebKit from WebCore. Additionally, moves the -autocorrect and -autocapitalize SPIs out
+        of HTML(Input|Form|TextArea)ElementPrivate.h and into HTMLElementPrivate.h. This also means removing redundant
+        code for interfacing with the unwrapped HTMLElement's autocorrect and autocapitalize attributes.
+
+        * DOM/DOMHTML.mm:
+        (webAutocapitalizeType):
+        (-[DOMHTMLInputElement _autocapitalizeType]):
+        (-[DOMHTMLTextAreaElement _autocapitalizeType]):
+        * DOM/DOMHTMLElement.mm:
+        (-[DOMHTMLElement autocorrect]):
+        (-[DOMHTMLElement setAutocorrect:]):
+        (-[DOMHTMLElement autocapitalize]):
+        (-[DOMHTMLElement setAutocapitalize:]):
+        * DOM/DOMHTMLElementPrivate.h: Copied from Source/WebCore/html/Autocapitalize.h.
+        * DOM/DOMHTMLFormElement.mm:
+        (-[DOMHTMLFormElement autocorrect]): Deleted.
+        (-[DOMHTMLFormElement setAutocorrect:]): Deleted.
+        (-[DOMHTMLFormElement autocapitalize]): Deleted.
+        (-[DOMHTMLFormElement setAutocapitalize:]): Deleted.
+        * DOM/DOMHTMLInputElement.mm:
+        (-[DOMHTMLInputElement autocorrect]): Deleted.
+        (-[DOMHTMLInputElement setAutocorrect:]): Deleted.
+        (-[DOMHTMLInputElement autocapitalize]): Deleted.
+        (-[DOMHTMLInputElement setAutocapitalize:]): Deleted.
+        * DOM/DOMHTMLInputElementPrivate.h:
+        * DOM/DOMHTMLTextAreaElement.mm:
+        (-[DOMHTMLTextAreaElement autocorrect]): Deleted.
+        (-[DOMHTMLTextAreaElement setAutocorrect:]): Deleted.
+        (-[DOMHTMLTextAreaElement autocapitalize]): Deleted.
+        (-[DOMHTMLTextAreaElement setAutocapitalize:]): Deleted.
+        * DOM/DOMHTMLTextAreaElementPrivate.h:
+
+        We need to import DOMHTMLElementPrivate.h here to avoid breaking UIKit. We should follow this up with a UIKit
+        change to import DOMHTMLElementPrivate.h directly.
+
+        * DOM/DOMPrivate.h:
+        * DOM/WebAutocapitalizeTypes.h: Copied from Tools/WebKitTestRunner/ios/UIKitSPI.h.
+        * MigrateHeaders.make:
+
+2016-11-11  Beth Dakin  <bdakin@apple.com>
+
+        Move to modern TouchBar methods
+        https://bugs.webkit.org/show_bug.cgi?id=164655
+        -and corresponding-
+        rdar://problem/29226911
+
+        Reviewed by Wenson Hsieh.
+
+        customizationDefaultItemIdentifiers -> defaultItemIdentifiers
+        itemIdentifiers -> defaultItemIdentifiers
+        defaultItems -> templateItems
+
+        * WebView/WebView.mm:
+        (-[WebView _plainTextTouchBarDefaultItemIdentifiers]):
+        (-[WebView _richTextTouchBarDefaultItemIdentifiers]):
+        (-[WebView setUpTextTouchBar:]):
+        (-[WebView updateTextTouchBar]):
+        (-[WebView _plainTextTouchBarCustomizationDefaultItemIdentifiers]): Deleted.
+        (-[WebView _richTextTouchBarCustomizationDefaultItemIdentifiers]): Deleted.
+
+2016-11-11  Darin Adler  <darin@apple.com>
+
+        Move Node from ExceptionCode to ExceptionOr
+        https://bugs.webkit.org/show_bug.cgi?id=164515
+
+        Reviewed by Sam Weinig.
+
+        * DOM/DOMHTMLSelectElement.mm:
+        (-[DOMHTMLSelectElement remove:]): Call remove instead of removeByIndex
+        now that it was renamed.
+        * DOM/DOMNode.mm:
+        (-[DOMNode setNodeValue:]): Updated exception handling.
+        (-[DOMNode setPrefix:]): Ditto.
+        (-[DOMNode setTextContent:]): Ditto.
+        (-[DOMNode insertBefore:refChild:]): Ditto.
+        (-[DOMNode replaceChild:oldChild:]): Ditto.
+        (-[DOMNode removeChild:]): Ditto.
+        (-[DOMNode appendChild:]): Ditto.
+        (-[DOMNode cloneNode:]): Ditto.
+
+2016-11-11  Beth Dakin  <bdakin@apple.com>
+
+        Get touch bar code building for open source builds
+        https://bugs.webkit.org/show_bug.cgi?id=164610
+
+        Reviewed by Wenson Hsieh.
+
+        * WebKitPrefix.h:
+
+2016-11-10  Alex Christensen  <achristensen@webkit.org>
+
+        Fix assertion after r208534.
+        https://bugs.webkit.org/show_bug.cgi?id=160497
+
+        * WebView/WebView.mm:
+        (-[WebView _commonInitializationWithFrameName:groupName:]):
+        (WebInstallMemoryPressureHandler):
+        WebInstallMemoryPressureHandler can be called before [WebView initWithFrame:frameName:groupName:]
+        When this happens, we should use the same std::once_flag to make sure we install the MemoryPressureHandler::singleton
+        only once, otherwise we get an assertion !m_installed in MemoryPressureHandler::setLowMemoryHandler.
+
+2016-11-10  Alex Christensen  <achristensen@webkit.org>
+
+        Move SecurityOrigin::databaseIdentifier() to SecurityOriginData
+        https://bugs.webkit.org/show_bug.cgi?id=164573
+
+        Reviewed by Brady Eidson.
+
+        * WebCoreSupport/WebSecurityOrigin.mm:
+        (-[WebSecurityOrigin databaseIdentifier]):
+
+2016-10-14  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        MemoryPressureHandler shouldn't know how to release WebCore memory
+        https://bugs.webkit.org/show_bug.cgi?id=160497
+
+        Reviewed by Michael Catanzaro.
+
+        Set the low memory handler before installing the memory pressure handler.
+
+        * WebView/WebView.mm:
+        (-[WebView _commonInitializationWithFrameName:groupName:]):
+
+2016-11-09  Ryosuke Niwa  <rniwa@webkit.org>
+
+        WebHTMLView's _attributeStringFromDOMRange should use HTMLConverter instead of NSAttributedString's _initWithDOMRange
+        https://bugs.webkit.org/show_bug.cgi?id=164501
+        <rdar://problem/29152282>
+
+        Reviewed by Sam Weinig.
+
+        Align what [WebHTMLView attributedString] returns to what would be used on copy & paste by using HTMLConverter
+        instead of _initWithDOMRange in [WebHTMLView _attributeStringFromDOMRange].
+
+        * WebView/WebHTMLView.mm:
+        (-[WebHTMLView _attributedStringFromDOMRange:]): Renamed from _attributeStringFromDOMRange.
+        (-[WebHTMLView attributedString]):
+        (-[WebHTMLView selectedAttributedString]):
+        (-[WebHTMLView selectedString]): Moved to reduce the number of occurrences of the if-defs.
+
+2016-11-04  Brent Fulgham  <bfulgham@apple.com>
+
+        Local HTML should be blocked from localStorage access unless "Disable Local File Restrictions" is checked
+        https://bugs.webkit.org/show_bug.cgi?id=155185
+        <rdar://problem/11101440>
+
+        Reviewed by Brady Eidson.
+
+        Provide SPI to access the new quirk for localStorage. The quirk defaults to 'on'. When active, this
+        quirk says that localStorage access should be granted, without needing to grant universal file access.
+
+        If the quirk is turned off, then localStorage is blocked unless the WebKit client explicitly
+        grants universal file access.
+
+        * WebView/WebPreferenceKeysPrivate.h:
+        * WebView/WebPreferences.mm:
+        (-[WebPreferences needsLocalStorageQuirk]): Added.
+        (-[WebPreferences setNeedsLocalStorageQuirk:]): Added.
+        * WebView/WebPreferencesPrivate.h:
+        * WebView/WebView.mm:
+        (-[WebView _preferencesChanged:]): Honor the new localStorage quirk.
+
+2016-11-09  Alex Christensen  <achristensen@webkit.org>
+
+        Clean up Storage code
+        https://bugs.webkit.org/show_bug.cgi?id=164562
+
+        Reviewed by Brady Eidson.
+
+        * Storage/WebStorageManager.mm:
+        (-[WebStorageManager origins]):
+        (-[WebStorageManager deleteAllOrigins]):
+        (-[WebStorageManager deleteOrigin:]):
+        (-[WebStorageManager diskUsageForOrigin:]):
+        (-[WebStorageManager syncLocalStorage]):
+        (-[WebStorageManager syncFileSystemAndTrackerDatabase]):
+        (+[WebStorageManager setStorageDatabaseIdleInterval:]):
+        (+[WebStorageManager closeIdleLocalStorageDatabases]):
+        (WebKitInitializeStorageIfNecessary):
+        * WebView/WebView.mm:
+        (+[WebView _applicationWillTerminate]):
+
+2016-11-09  Beth Dakin  <bdakin@apple.com>
+
+        Another attempted build fix.
+
+        * WebView/WebView.mm:
+
+2016-11-09  Beth Dakin  <bdakin@apple.com>
+
+        Attempted build fix.
+
+        * WebView/WebView.mm:
+
+2016-11-09  Darin Adler  <darin@apple.com>
+
+        Move Range from ExceptionCode to ExceptionOr
+        https://bugs.webkit.org/show_bug.cgi?id=164457
+
+        Reviewed by Alex Christensen.
+
+        * DOM/DOMRange.mm:
+        (-[DOMRange setStart:offset:]): Updated exception handling.
+        (-[DOMRange setEnd:offset:]): Ditto.
+        (-[DOMRange setStartBefore:]): Ditto.
+        (-[DOMRange setStartAfter:]): Ditto.
+        (-[DOMRange setEndBefore:]): Ditto.
+        (-[DOMRange setEndAfter:]): Ditto.
+        (-[DOMRange selectNode:]): Ditto.
+        (-[DOMRange selectNodeContents:]): Ditto.
+        (-[DOMRange compareBoundaryPoints:sourceRange:]): Ditto.
+        (-[DOMRange deleteContents]): Ditto.
+        (-[DOMRange extractContents]): Ditto.
+        (-[DOMRange cloneContents]): Ditto.
+        (-[DOMRange insertNode:]): Ditto.
+        (-[DOMRange surroundContents:]): Ditto.
+        (-[DOMRange createContextualFragment:]): Ditto.
+        (-[DOMRange compareNode:]): Ditto.
+        (-[DOMRange intersectsNode:]): Ditto.
+        (-[DOMRange comparePoint:offset:]): Ditto.
+        (-[DOMRange isPointInRange:offset:]): Ditto.
+        (-[DOMRange expand:]): Ditto.
+        * WebView/WebFrame.mm:
+        (-[WebFrame _documentFragmentWithMarkupString:baseURLString:]): Ditto.
+        (-[WebFrame _smartDeleteRangeForProposedRange:]): Deleted.
+        This function was incorrectly implemented (set both start and end of
+        the range to the computed start), not declared in any header file,
+        not used anywhere inside WebKit, and I also could not find a use of it
+        in outside-WebKit Apple code.
+        * mac/DOM/DOMUIKitExtensions.mm:
+        (-[DOMRange move:inDirection:]): Ditto.
+        (-[DOMRange extend:inDirection:]): Ditto.
+
+2016-11-09  Darin Adler  <darin@apple.com>
+
+        Move EventTarget from ExceptionCode to ExceptionOr
+        https://bugs.webkit.org/show_bug.cgi?id=164465
+
+        Reviewed by Youenn Fablet.
+
+        * DOM/DOMNode.mm:
+        (-[DOMNode dispatchEvent:]): Updated exception handling.
+
 2016-11-09  Chris Dumez  <cdumez@apple.com>
 
         [Mac] Stop using deprecated AppKit enumeration values
