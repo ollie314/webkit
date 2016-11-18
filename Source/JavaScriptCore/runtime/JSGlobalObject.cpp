@@ -49,6 +49,7 @@
 #include "Debugger.h"
 #include "DebuggerScope.h"
 #include "DirectArguments.h"
+#include "DirectEvalExecutable.h"
 #include "ECMAScriptSpecInternalFunctions.h"
 #include "Error.h"
 #include "ErrorConstructor.h"
@@ -60,6 +61,7 @@
 #include "GeneratorPrototype.h"
 #include "GetterSetter.h"
 #include "HeapIterationScope.h"
+#include "IndirectEvalExecutable.h"
 #include "InspectorInstrumentationObject.h"
 #include "Interpreter.h"
 #include "IteratorPrototype.h"
@@ -356,6 +358,7 @@ static JSObject* getGetterById(ExecState* exec, JSObject* base, const Identifier
 void JSGlobalObject::init(VM& vm)
 {
     ASSERT(vm.currentThreadIsHoldingAPILock());
+    auto catchScope = DECLARE_CATCH_SCOPE(vm);
 
     Base::setStructure(vm, Structure::toCacheableDictionaryTransition(vm, structure()));
 
@@ -612,7 +615,6 @@ m_ ## properName ## Structure.set(vm, this, instanceType::createStructure(vm, th
     m_throwTypeErrorFunction.set(vm, this, throwTypeErrorFunction);
 
     JSCell* functionConstructor = FunctionConstructor::create(vm, FunctionConstructor::createStructure(vm, this, m_functionPrototype.get()), m_functionPrototype.get());
-    m_functionConstructor.set(vm, this, (FunctionConstructor*)functionConstructor);
 
     ArrayConstructor* arrayConstructor = ArrayConstructor::create(vm, this, ArrayConstructor::createStructure(vm, this, m_functionPrototype.get()), m_arrayPrototype.get(), m_speciesGetterSetter.get());
     m_arrayConstructor.set(vm, this, arrayConstructor);
@@ -668,15 +670,10 @@ m_ ## lowerName ## Prototype->putDirectWithoutTransition(vm, vm.propertyNames->c
     m_generatorPrototype->putDirectWithoutTransition(vm, vm.propertyNames->constructor, m_generatorFunctionPrototype.get(), DontEnum | ReadOnly);
     m_generatorFunctionPrototype->putDirectWithoutTransition(vm, vm.propertyNames->prototype, m_generatorPrototype.get(), DontEnum | ReadOnly);
 
-    m_asyncFunctionStructure.initLater(
-        [](LazyClassStructure::Initializer& init) {
-            AsyncFunctionPrototype* asyncFunctionPrototype = AsyncFunctionPrototype::create(init.vm, AsyncFunctionPrototype::createStructure(init.vm, init.global, init.global->m_functionPrototype.get()));
-            init.setPrototype(asyncFunctionPrototype);
-            init.setStructure(JSAsyncFunction::createStructure(init.vm, init.global, init.prototype));
-            init.setConstructor(PropertyName(nullptr), AsyncFunctionConstructor::create(init.vm, AsyncFunctionConstructor::createStructure(init.vm, init.global, init.global->m_functionConstructor.get()), asyncFunctionPrototype));
-
-            init.global->putDirectWithoutTransition(init.vm, init.vm.propertyNames->builtinNames().asyncFunctionResumePrivateName(), JSFunction::createBuiltinFunction(init.vm, asyncFunctionPrototypeAsyncFunctionResumeCodeGenerator(init.vm), init.global), DontEnum | DontDelete | ReadOnly);
-        });
+    m_asyncFunctionPrototype.set(vm, this, AsyncFunctionPrototype::create(vm, AsyncFunctionPrototype::createStructure(vm, this, m_functionPrototype.get())));
+    AsyncFunctionConstructor* asyncFunctionConstructor = AsyncFunctionConstructor::create(vm, AsyncFunctionConstructor::createStructure(vm, this, functionConstructor), m_asyncFunctionPrototype.get());
+    m_asyncFunctionPrototype->putDirectWithoutTransition(vm, vm.propertyNames->constructor, asyncFunctionConstructor, DontEnum | ReadOnly);
+    m_asyncFunctionStructure.set(vm, this, JSAsyncFunction::createStructure(vm, this, m_asyncFunctionPrototype.get()));
 
     m_objectPrototype->putDirectWithoutTransition(vm, vm.propertyNames->constructor, objectConstructor, DontEnum);
     m_functionPrototype->putDirectWithoutTransition(vm, vm.propertyNames->constructor, functionConstructor, DontEnum);
@@ -744,13 +741,20 @@ putDirectWithoutTransition(vm, vm.propertyNames-> jsName, lowerName ## Construct
     JSFunction* privateFuncConcatSlowPath = JSFunction::createBuiltinFunction(vm, arrayPrototypeConcatSlowPathCodeGenerator(vm), this);
 
     JSObject* regExpProtoFlagsGetterObject = getGetterById(exec, m_regExpPrototype.get(), vm.propertyNames->flags);
+    ASSERT_UNUSED(catchScope, !catchScope.exception());
     JSObject* regExpProtoGlobalGetterObject = getGetterById(exec, m_regExpPrototype.get(), vm.propertyNames->global);
+    ASSERT(!catchScope.exception());
     m_regExpProtoGlobalGetter.set(vm, this, regExpProtoGlobalGetterObject);
     JSObject* regExpProtoIgnoreCaseGetterObject = getGetterById(exec, m_regExpPrototype.get(), vm.propertyNames->ignoreCase);
+    ASSERT(!catchScope.exception());
     JSObject* regExpProtoMultilineGetterObject = getGetterById(exec, m_regExpPrototype.get(), vm.propertyNames->multiline);
+    ASSERT(!catchScope.exception());
     JSObject* regExpProtoSourceGetterObject = getGetterById(exec, m_regExpPrototype.get(), vm.propertyNames->source);
+    ASSERT(!catchScope.exception());
     JSObject* regExpProtoStickyGetterObject = getGetterById(exec, m_regExpPrototype.get(), vm.propertyNames->sticky);
+    ASSERT(!catchScope.exception());
     JSObject* regExpProtoUnicodeGetterObject = getGetterById(exec, m_regExpPrototype.get(), vm.propertyNames->unicode);
+    ASSERT(!catchScope.exception());
     m_regExpProtoUnicodeGetter.set(vm, this, regExpProtoUnicodeGetterObject);
     JSObject* builtinRegExpExec = asObject(m_regExpPrototype->getDirect(vm, vm.propertyNames->exec).asCell());
     m_regExpProtoExec.set(vm, this, builtinRegExpExec);
@@ -897,17 +901,16 @@ putDirectWithoutTransition(vm, vm.propertyNames-> jsName, lowerName ## Construct
 
     {
         ExecState* exec = globalExec();
-        auto scope = DECLARE_THROW_SCOPE(vm);
 
         auto setupAdaptiveWatchpoint = [&] (JSObject* base, const Identifier& ident) -> ObjectPropertyCondition {
             // Performing these gets should not throw.
             PropertySlot slot(base, PropertySlot::InternalMethodType::Get);
             bool result = base->getOwnPropertySlot(base, exec, ident, slot);
             ASSERT_UNUSED(result, result);
-            ASSERT_UNUSED(scope, !scope.exception());
+            ASSERT(!catchScope.exception());
             RELEASE_ASSERT(slot.isCacheableValue());
             JSValue functionValue = slot.getValue(exec, ident);
-            ASSERT_UNUSED(scope, !scope.exception());
+            ASSERT(!catchScope.exception());
             ASSERT(jsDynamicCast<JSFunction*>(functionValue));
 
             ObjectPropertyCondition condition = generateConditionForSelfEquivalence(m_vm, nullptr, base, ident.impl());
@@ -938,17 +941,24 @@ putDirectWithoutTransition(vm, vm.propertyNames-> jsName, lowerName ## Construct
 
 bool JSGlobalObject::put(JSCell* cell, ExecState* exec, PropertyName propertyName, JSValue value, PutPropertySlot& slot)
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
     JSGlobalObject* thisObject = jsCast<JSGlobalObject*>(cell);
     ASSERT(!Heap::heap(value) || Heap::heap(value) == Heap::heap(thisObject));
 
-    if (UNLIKELY(isThisValueAltered(slot, thisObject)))
+    if (UNLIKELY(isThisValueAltered(slot, thisObject))) {
+        scope.release();
         return ordinarySetSlow(exec, thisObject, propertyName, value, slot.thisValue(), slot.isStrictMode());
+    }
 
     bool shouldThrowReadOnlyError = slot.isStrictMode();
     bool ignoreReadOnlyErrors = false;
     bool putResult = false;
-    if (symbolTablePutTouchWatchpointSet(thisObject, exec, propertyName, value, shouldThrowReadOnlyError, ignoreReadOnlyErrors, putResult))
+    bool done = symbolTablePutTouchWatchpointSet(thisObject, exec, propertyName, value, shouldThrowReadOnlyError, ignoreReadOnlyErrors, putResult);
+    ASSERT((!!scope.exception() == (done && !putResult)) || !shouldThrowReadOnlyError);
+    if (done)
         return putResult;
+    scope.release();
     return Base::put(thisObject, exec, propertyName, value, slot);
 }
 
@@ -964,7 +974,7 @@ bool JSGlobalObject::defineOwnProperty(JSObject* object, ExecState* exec, Proper
 
 void JSGlobalObject::addGlobalVar(const Identifier& ident)
 {
-    ConcurrentJITLocker locker(symbolTable()->m_lock);
+    ConcurrentJSLocker locker(symbolTable()->m_lock);
     SymbolTableEntry entry = symbolTable()->get(locker, ident.impl());
     if (!entry.isNull())
         return;
@@ -1175,7 +1185,6 @@ void JSGlobalObject::visitChildren(JSCell* cell, SlotVisitor& visitor)
     thisObject->m_throwTypeErrorGetterSetter.visit(visitor);
     visitor.append(&thisObject->m_throwTypeErrorArgumentsCalleeAndCallerGetterSetter);
     visitor.append(&thisObject->m_moduleLoader);
-    visitor.append(&thisObject->m_functionConstructor);
 
     visitor.append(&thisObject->m_objectPrototype);
     visitor.append(&thisObject->m_functionPrototype);
@@ -1184,7 +1193,7 @@ void JSGlobalObject::visitChildren(JSCell* cell, SlotVisitor& visitor)
     visitor.append(&thisObject->m_iteratorPrototype);
     visitor.append(&thisObject->m_generatorFunctionPrototype);
     visitor.append(&thisObject->m_generatorPrototype);
-    thisObject->m_asyncFunctionStructure.visit(visitor);
+    visitor.append(&thisObject->m_asyncFunctionPrototype);
     visitor.append(&thisObject->m_moduleLoaderPrototype);
 
     thisObject->m_debuggerScopeStructure.visit(visitor);
@@ -1220,6 +1229,7 @@ void JSGlobalObject::visitChildren(JSCell* cell, SlotVisitor& visitor)
     visitor.append(&thisObject->m_symbolObjectStructure);
     visitor.append(&thisObject->m_regExpStructure);
     visitor.append(&thisObject->m_generatorFunctionStructure);
+    visitor.append(&thisObject->m_asyncFunctionStructure);
     visitor.append(&thisObject->m_iteratorResultObjectStructure);
     visitor.append(&thisObject->m_regExpMatchesArrayStructure);
     visitor.append(&thisObject->m_moduleRecordStructure);
@@ -1287,7 +1297,7 @@ void JSGlobalObject::addStaticGlobals(GlobalPropertyInfo* globals, int count)
         WatchpointSet* watchpointSet = nullptr;
         WriteBarrierBase<Unknown>* variable = nullptr;
         {
-            ConcurrentJITLocker locker(symbolTable()->m_lock);
+            ConcurrentJSLocker locker(symbolTable()->m_lock);
             ScopeOffset offset = symbolTable()->takeNextScopeOffset(locker);
             RELEASE_ASSERT(offset = startOffset + i);
             SymbolTableEntry newEntry(VarOffset(offset), global.attributes);
@@ -1323,8 +1333,8 @@ UnlinkedProgramCodeBlock* JSGlobalObject::createProgramCodeBlock(CallFrame* call
     ParserError error;
     JSParserStrictMode strictMode = executable->isStrictMode() ? JSParserStrictMode::Strict : JSParserStrictMode::NotStrict;
     DebuggerMode debuggerMode = hasInteractiveDebugger() ? DebuggerOn : DebuggerOff;
-    UnlinkedProgramCodeBlock* unlinkedCodeBlock = vm().codeCache()->getProgramCodeBlock(
-        vm(), executable, executable->source(), JSParserBuiltinMode::NotBuiltin, strictMode, 
+    UnlinkedProgramCodeBlock* unlinkedCodeBlock = vm().codeCache()->getUnlinkedProgramCodeBlock(
+        vm(), executable, executable->source(), strictMode, 
         debuggerMode, error);
 
     if (hasDebugger())
@@ -1338,7 +1348,32 @@ UnlinkedProgramCodeBlock* JSGlobalObject::createProgramCodeBlock(CallFrame* call
     return unlinkedCodeBlock;
 }
 
-UnlinkedEvalCodeBlock* JSGlobalObject::createEvalCodeBlock(CallFrame* callFrame, EvalExecutable* executable, const VariableEnvironment* variablesUnderTDZ)
+UnlinkedEvalCodeBlock* JSGlobalObject::createLocalEvalCodeBlock(CallFrame* callFrame, DirectEvalExecutable* executable, const VariableEnvironment* variablesUnderTDZ)
+{
+    VM& vm = this->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
+    ParserError error;
+    JSParserStrictMode strictMode = executable->isStrictMode() ? JSParserStrictMode::Strict : JSParserStrictMode::NotStrict;
+    DebuggerMode debuggerMode = hasInteractiveDebugger() ? DebuggerOn : DebuggerOff;
+    EvalContextType evalContextType = executable->executableInfo().evalContextType();
+
+    // We don't bother with CodeCache here because local eval uses a specialized EvalCodeCache.
+    UnlinkedEvalCodeBlock* unlinkedCodeBlock = generateUnlinkedCodeBlock<UnlinkedEvalCodeBlock>(
+        vm, executable, executable->source(), strictMode, JSParserScriptMode::Classic, debuggerMode, error, evalContextType, variablesUnderTDZ);
+
+    if (hasDebugger())
+        debugger()->sourceParsed(callFrame, executable->source().provider(), error.line(), error.message());
+
+    if (error.isValid()) {
+        throwVMError(callFrame, scope, error.toErrorObject(this, executable->source()));
+        return nullptr;
+    }
+
+    return unlinkedCodeBlock;
+}
+
+UnlinkedEvalCodeBlock* JSGlobalObject::createGlobalEvalCodeBlock(CallFrame* callFrame, IndirectEvalExecutable* executable)
 {
     VM& vm = this->vm();
     auto scope = DECLARE_THROW_SCOPE(vm);
@@ -1348,8 +1383,8 @@ UnlinkedEvalCodeBlock* JSGlobalObject::createEvalCodeBlock(CallFrame* callFrame,
     DebuggerMode debuggerMode = hasInteractiveDebugger() ? DebuggerOn : DebuggerOff;
     EvalContextType evalContextType = executable->executableInfo().evalContextType();
     
-    UnlinkedEvalCodeBlock* unlinkedCodeBlock = vm.codeCache()->getEvalCodeBlock(
-        vm, executable, executable->source(), JSParserBuiltinMode::NotBuiltin, strictMode, debuggerMode, error, evalContextType, variablesUnderTDZ);
+    UnlinkedEvalCodeBlock* unlinkedCodeBlock = vm.codeCache()->getUnlinkedGlobalEvalCodeBlock(
+        vm, executable, executable->source(), strictMode, debuggerMode, error, evalContextType);
 
     if (hasDebugger())
         debugger()->sourceParsed(callFrame, executable->source().provider(), error.line(), error.message());
@@ -1369,8 +1404,8 @@ UnlinkedModuleProgramCodeBlock* JSGlobalObject::createModuleProgramCodeBlock(Cal
 
     ParserError error;
     DebuggerMode debuggerMode = hasInteractiveDebugger() ? DebuggerOn : DebuggerOff;
-    UnlinkedModuleProgramCodeBlock* unlinkedCodeBlock = vm.codeCache()->getModuleProgramCodeBlock(
-        vm, executable, executable->source(), JSParserBuiltinMode::NotBuiltin, debuggerMode, error);
+    UnlinkedModuleProgramCodeBlock* unlinkedCodeBlock = vm.codeCache()->getUnlinkedModuleProgramCodeBlock(
+        vm, executable, executable->source(), debuggerMode, error);
 
     if (hasDebugger())
         debugger()->sourceParsed(callFrame, executable->source().provider(), error.line(), error.message());

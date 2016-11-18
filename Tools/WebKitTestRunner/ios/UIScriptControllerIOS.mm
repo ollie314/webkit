@@ -399,6 +399,12 @@ void UIScriptController::removeAllDynamicDictionaries()
     [UIKeyboard removeAllDynamicDictionaries];
 }
 
+JSRetainPtr<JSStringRef> UIScriptController::scrollingTreeAsText() const
+{
+    TestRunnerWKWebView *webView = TestController::singleton().mainWebView()->platformView();
+    return JSStringCreateWithCFString((CFStringRef)[webView _scrollingTreeAsText]);
+}
+
 void UIScriptController::platformSetDidStartFormControlInteractionCallback()
 {
     TestRunnerWKWebView *webView = TestController::singleton().mainWebView()->platformView();
@@ -492,6 +498,11 @@ void UIScriptController::platformSetDidEndScrollingCallback()
 void UIScriptController::platformClearAllCallbacks()
 {
     TestRunnerWKWebView *webView = TestController::singleton().mainWebView()->platformView();
+    
+    webView.didStartFormControlInteractionCallback = nil;
+    webView.didEndFormControlInteractionCallback = nil;
+    webView.didShowForcePressPreviewCallback = nil;
+    webView.didDismissForcePressPreviewCallback = nil;
     webView.didEndZoomingCallback = nil;
     webView.willBeginZoomingCallback = nil;
     webView.didHideKeyboardCallback = nil;

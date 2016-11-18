@@ -117,6 +117,9 @@ RefPtr<CryptoKeyRSA> CryptoKeyRSA::create(CryptoAlgorithmIdentifier identifier, 
         return nullptr;
     }
     CCRSACryptorRef cryptor;
+    // FIXME: It is so weired that we recaculate the private exponent from first prime factor and second prime factor,
+    // given the fact that we have already had it. Also, the re-caculated private exponent may not match the given one.
+    // See <rdar://problem/15452324>.
     CCCryptorStatus status = CCRSACryptorCreateFromData(
         keyData.type() == CryptoKeyDataRSAComponents::Type::Public ? ccRSAKeyPublic : ccRSAKeyPrivate,
         (uint8_t*)keyData.modulus().data(), keyData.modulus().size(),
@@ -162,7 +165,7 @@ size_t CryptoKeyRSA::keySizeInBits() const
 
 std::unique_ptr<KeyAlgorithm> CryptoKeyRSA::buildAlgorithm() const
 {
-    String name = CryptoAlgorithmRegistry::singleton().nameForIdentifier(algorithmIdentifier());
+    String name = CryptoAlgorithmRegistry::singleton().name(algorithmIdentifier());
     Vector<uint8_t> modulus;
     Vector<uint8_t> publicExponent;
     CCCryptorStatus status = getPublicKeyComponents(m_platformKey, modulus, publicExponent);
@@ -174,7 +177,7 @@ std::unique_ptr<KeyAlgorithm> CryptoKeyRSA::buildAlgorithm() const
 
     size_t modulusLength = modulus.size() * 8;
     if (m_restrictedToSpecificHash)
-        return std::make_unique<RsaHashedKeyAlgorithm>(name, modulusLength, WTFMove(publicExponent), CryptoAlgorithmRegistry::singleton().nameForIdentifier(m_hash));
+        return std::make_unique<RsaHashedKeyAlgorithm>(name, modulusLength, WTFMove(publicExponent), CryptoAlgorithmRegistry::singleton().name(m_hash));
     return std::make_unique<RsaKeyAlgorithm>(name, modulusLength, WTFMove(publicExponent));
 }
 

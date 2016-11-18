@@ -91,8 +91,11 @@ public:
     bool WARN_UNUSED_RETURN store(StoreOpType, ExpressionType pointer, ExpressionType value, uint32_t offset);
 
     // Basic operators
-    bool WARN_UNUSED_RETURN binaryOp(BinaryOpType, ExpressionType left, ExpressionType right, ExpressionType& result);
-    bool WARN_UNUSED_RETURN unaryOp(UnaryOpType, ExpressionType arg, ExpressionType& result);
+    template<OpType>
+    bool WARN_UNUSED_RETURN addOp(ExpressionType arg, ExpressionType& result);
+    template<OpType>
+    bool WARN_UNUSED_RETURN addOp(ExpressionType left, ExpressionType right, ExpressionType& result);
+    bool WARN_UNUSED_RETURN addSelect(ExpressionType condition, ExpressionType nonZero, ExpressionType zero, ExpressionType& result);
 
     // Control flow
     ControlData WARN_UNUSED_RETURN addBlock(Type signature);
@@ -180,6 +183,22 @@ Validate::ControlType Validate::addBlock(Type signature)
 Validate::ControlType Validate::addLoop(Type signature)
 {
     return ControlData(BlockType::Loop, signature);
+}
+
+bool Validate::addSelect(ExpressionType condition, ExpressionType nonZero, ExpressionType zero, ExpressionType& result)
+{
+    if (condition != I32) {
+        m_errorMessage = makeString("Attempting to use ", toString(condition), " as the condition for select");
+        return false;
+    }
+
+    if (nonZero != zero) {
+        m_errorMessage = makeString("Result types of select don't match. Got: ", toString(nonZero), " and ", toString(zero));
+        return false;
+    }
+
+    result = zero;
+    return true;
 }
 
 bool Validate::addIf(ExpressionType condition, Type signature, ControlType& result)

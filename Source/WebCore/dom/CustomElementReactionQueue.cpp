@@ -205,16 +205,12 @@ void CustomElementReactionQueue::invokeAll(Element& element)
 
 inline void CustomElementReactionStack::ElementQueue::add(Element& element)
 {
-    ASSERT(!m_invoking);
     // FIXME: Avoid inserting the same element multiple times.
     m_elements.append(element);
 }
 
 inline void CustomElementReactionStack::ElementQueue::invokeAll()
 {
-#if !ASSERT_DISABLED
-    TemporaryChange<bool> invoking(m_invoking);
-#endif
     Vector<Ref<Element>> elements;
     elements.swap(m_elements);
     for (auto& element : elements) {
@@ -222,7 +218,6 @@ inline void CustomElementReactionStack::ElementQueue::invokeAll()
         ASSERT(queue);
         queue->invokeAll(element.get());
     }
-    ASSERT(m_elements.isEmpty());
 }
 
 CustomElementReactionQueue& CustomElementReactionStack::ensureCurrentQueue(Element& element)

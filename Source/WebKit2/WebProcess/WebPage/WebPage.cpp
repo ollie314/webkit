@@ -185,7 +185,7 @@
 #include <runtime/JSLock.h>
 #include <runtime/SamplingProfiler.h>
 #include <wtf/RunLoop.h>
-#include <wtf/TemporaryChange.h>
+#include <wtf/SetForScope.h>
 
 #if ENABLE(DATA_DETECTION)
 #include "DataDetectionResult.h"
@@ -2238,7 +2238,7 @@ static bool handleMouseEvent(const WebMouseEvent& mouseEvent, WebPage* page, boo
 
 void WebPage::mouseEvent(const WebMouseEvent& mouseEvent)
 {
-    TemporaryChange<bool> userIsInteractingChange { m_userIsInteracting, true };
+    SetForScope<bool> userIsInteractingChange { m_userIsInteracting, true };
 
     m_userActivityHysteresis.impulse();
 
@@ -2316,7 +2316,7 @@ static bool handleKeyEvent(const WebKeyboardEvent& keyboardEvent, Page* page)
 
 void WebPage::keyEvent(const WebKeyboardEvent& keyboardEvent)
 {
-    TemporaryChange<bool> userIsInteractingChange { m_userIsInteracting, true };
+    SetForScope<bool> userIsInteractingChange { m_userIsInteracting, true };
 
     m_userActivityHysteresis.impulse();
 
@@ -2378,7 +2378,7 @@ static bool handleTouchEvent(const WebTouchEvent& touchEvent, Page* page)
 #if ENABLE(IOS_TOUCH_EVENTS)
 void WebPage::dispatchTouchEvent(const WebTouchEvent& touchEvent, bool& handled)
 {
-    TemporaryChange<bool> userIsInteractingChange { m_userIsInteracting, true };
+    SetForScope<bool> userIsInteractingChange { m_userIsInteracting, true };
 
     m_lastInteractionLocation = touchEvent.position();
     CurrentEvent currentEvent(touchEvent);
@@ -2539,7 +2539,7 @@ void WebPage::setInitialFocus(bool forward, bool isKeyboardEventValid, const Web
     if (!m_page)
         return;
 
-    TemporaryChange<bool> userIsInteractingChange { m_userIsInteracting, true };
+    SetForScope<bool> userIsInteractingChange { m_userIsInteracting, true };
 
     Frame& frame = m_page->focusController().focusedOrMainFrame();
     frame.document()->setFocusedElement(0);
@@ -3200,6 +3200,8 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     RuntimeEnabledFeatures::sharedFeatures().setDownloadAttributeEnabled(store.getBoolValueForKey(WebPreferencesKey::downloadAttributeEnabledKey()));
 #endif
 
+    settings.setEs6ModulesEnabled(store.getBoolValueForKey(WebPreferencesKey::es6ModulesEnabledKey()));
+
     RuntimeEnabledFeatures::sharedFeatures().setShadowDOMEnabled(store.getBoolValueForKey(WebPreferencesKey::shadowDOMEnabledKey()));
 
     RuntimeEnabledFeatures::sharedFeatures().setInteractiveFormValidationEnabled(store.getBoolValueForKey(WebPreferencesKey::interactiveFormValidationEnabledKey()));
@@ -3256,11 +3258,20 @@ void WebPage::setDataDetectionResults(NSArray *detectionResults)
 #if PLATFORM(COCOA)
 void WebPage::willCommitLayerTree(RemoteLayerTreeTransaction& layerTransaction)
 {
-    layerTransaction.setContentsSize(corePage()->mainFrame().view()->contentsSize());
-    layerTransaction.setScrollOrigin(corePage()->mainFrame().view()->scrollOrigin());
+    FrameView* frameView = corePage()->mainFrame().view();
+    if (!frameView)
+        return;
+
+    layerTransaction.setContentsSize(frameView->contentsSize());
+    layerTransaction.setScrollOrigin(frameView->scrollOrigin());
     layerTransaction.setPageScaleFactor(corePage()->pageScaleFactor());
     layerTransaction.setRenderTreeSize(corePage()->renderTreeSize());
     layerTransaction.setPageExtendedBackgroundColor(corePage()->pageExtendedBackgroundColor());
+
+    layerTransaction.setBaseLayoutViewportSize(frameView->baseLayoutViewportSize());
+    layerTransaction.setMinStableLayoutViewportOrigin(frameView->minStableLayoutViewportOrigin());
+    layerTransaction.setMaxStableLayoutViewportOrigin(frameView->maxStableLayoutViewportOrigin());
+
 #if PLATFORM(IOS)
     layerTransaction.setScaleWasSetByUIProcess(scaleWasSetByUIProcess());
     layerTransaction.setMinimumScaleFactor(m_viewportConfiguration.minimumScale());
@@ -3271,8 +3282,9 @@ void WebPage::willCommitLayerTree(RemoteLayerTreeTransaction& layerTransaction)
     layerTransaction.setViewportMetaTagCameFromImageDocument(m_viewportConfiguration.viewportArguments().type == ViewportArguments::ImageDocument);
     layerTransaction.setAllowsUserScaling(allowsUserScaling());
 #endif
+
 #if PLATFORM(MAC)
-    layerTransaction.setScrollPosition(corePage()->mainFrame().view()->scrollPosition());
+    layerTransaction.setScrollPosition(frameView->scrollPosition());
 #endif
 }
 
@@ -4630,7 +4642,7 @@ void WebPage::insertTextAsync(const String& text, const EditingRange& replacemen
     if (replacementEditingRange.location != notFound) {
         RefPtr<Range> replacementRange = rangeFromEditingRange(frame, replacementEditingRange, static_cast<EditingRangeIsRelativeTo>(editingRangeIsRelativeTo));
         if (replacementRange) {
-            TemporaryChange<bool> isSelectingTextWhileInsertingAsynchronously(m_isSelectingTextWhileInsertingAsynchronously, suppressSelectionUpdate);
+            SetForScope<bool> isSelectingTextWhileInsertingAsynchronously(m_isSelectingTextWhileInsertingAsynchronously, suppressSelectionUpdate);
             frame.selection().setSelection(VisibleSelection(*replacementRange, SEL_DEFAULT_AFFINITY));
             replacesText = true;
         }
@@ -5650,5 +5662,16 @@ void WebPage::didLosePointerLock()
     corePage()->pointerLockController().didLosePointerLock();
 }
 #endif
+
+void WebPage::didGetLoadDecisionForIcon(bool decision, uint64_t loadIdentifier, uint64_t newCallbackID)
+{
+    if (auto* documentLoader = corePage()->mainFrame().loader().documentLoader())
+        documentLoader->didGetLoadDecisionForIcon(decision, loadIdentifier, newCallbackID);
+}
+
+void WebPage::setUseIconLoadingClient(bool useIconLoadingClient)
+{
+    static_cast<WebFrameLoaderClient&>(corePage()->mainFrame().loader().client()).setUseIconLoadingClient(useIconLoadingClient);
+}
 
 } // namespace WebKit

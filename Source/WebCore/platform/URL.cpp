@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2007, 2008, 2011, 2012, 2013, 2015-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2007-2008, 2011-2013, 2015-2016 Apple Inc. All rights reserved.
  * Copyright (C) 2012 Research In Motion Limited. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -666,11 +666,13 @@ void URL::init(const URL& base, const String& relative, const TextEncoding& enco
 
                 // all done with the path work, now copy any remainder
                 // of the relative reference; this will also add a null terminator
-                strncpy(bufferPos, relStringPos, bufferSize - (bufferPos - bufferStart));
+                const size_t currentOffset = bufferPos - bufferStart;
+                auto remainingBufferSize = bufferSize - currentOffset;
+                ASSERT(currentOffset + strlen(relStringPos) + 1 <= bufferSize);
+                strncpy(bufferPos, relStringPos, remainingBufferSize);
+                bufferPos[remainingBufferSize - 1] = '\0';
 
                 parse(parseBuffer.data(), &relative);
-
-                ASSERT(strlen(parseBuffer.data()) + 1 <= parseBuffer.size());
                 break;
             }
         }
@@ -1673,8 +1675,22 @@ void URL::parse(const char* url, const String* originalString)
     }
 
     // assemble it all, remembering the real ranges
+    Checked<unsigned, RecordOverflow> bufferLength = fragmentEnd;
+    bufferLength *= 3;
 
-    Vector<char, 4096> buffer(fragmentEnd * 3 + 1);
+    // The magic number 10 comes from the worst-case addition of characters for password start,
+    // user info, and colon for port number, colon after scheme, plus inserting missing slashes
+    // after protocol, slash for empty path, and possible end-of-query '#' character. This
+    // yields a max of nine additional characters, plus a null.
+    bufferLength += 10;
+
+    if (bufferLength.hasOverflowed()) {
+        m_string = originalString ? *originalString : url;
+        invalidate();
+        return;
+    }
+
+    Vector<char, 4096> buffer(bufferLength.unsafeGet());
 
     char* p = buffer.data();
     const char* strPtr = url;

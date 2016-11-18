@@ -215,18 +215,11 @@
             ]
         },
         {
-            "name": "setTouchEmulationEnabled",
-            "parameters": [
-                { "name": "enabled", "type": "boolean", "description": "Whether the touch event emulation should be enabled." }
-            ],
-            "description": "Toggles mouse event-based touch event emulation."
-        },
-        {
             "name": "setEmulatedMedia",
+            "description": "Emulates the given media for CSS media queries.",
             "parameters": [
                 { "name": "media", "type": "string", "description": "Media type to emulate. Empty string disables the override." }
-            ],
-            "description": "Emulates the given media for CSS media queries."
+            ]
         },
         {
             "name": "getCompositingBordersVisible",

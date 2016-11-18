@@ -1499,19 +1499,11 @@ bool Element::isJavaScriptURLAttribute(const Attribute& attribute) const
 
 void Element::stripScriptingAttributes(Vector<Attribute>& attributeVector) const
 {
-    size_t destination = 0;
-    for (size_t source = 0; source < attributeVector.size(); ++source) {
-        if (isEventHandlerAttribute(attributeVector[source])
-            || isJavaScriptURLAttribute(attributeVector[source])
-            || isHTMLContentAttribute(attributeVector[source]))
-            continue;
-
-        if (source != destination)
-            attributeVector[destination] = attributeVector[source];
-
-        ++destination;
-    }
-    attributeVector.shrink(destination);
+    attributeVector.removeAllMatching([this](auto& attribute) -> bool {
+        return isEventHandlerAttribute(attribute)
+            || this->isJavaScriptURLAttribute(attribute)
+            || this->isHTMLContentAttribute(attribute);
+    });
 }
 
 void Element::parserSetAttributes(const Vector<Attribute>& attributeVector)
@@ -1539,11 +1531,11 @@ void Element::parserDidSetAttributes()
 {
 }
 
-void Element::didMoveToNewDocument(Document* oldDocument)
+void Element::didMoveToNewDocument(Document& oldDocument)
 {
     Node::didMoveToNewDocument(oldDocument);
 
-    if (oldDocument->inQuirksMode() != document().inQuirksMode()) {
+    if (oldDocument.inQuirksMode() != document().inQuirksMode()) {
         // ElementData::m_classNames or ElementData::m_idForStyleResolution need to be updated with the right case.
         if (hasID())
             attributeChanged(idAttr, nullAtom, getIdAttribute());
@@ -1552,7 +1544,7 @@ void Element::didMoveToNewDocument(Document* oldDocument)
     }
 
     if (UNLIKELY(isDefinedCustomElement()))
-        CustomElementReactionQueue::enqueueAdoptedCallbackIfNeeded(*this, *oldDocument, document());
+        CustomElementReactionQueue::enqueueAdoptedCallbackIfNeeded(*this, oldDocument, document());
 }
 
 bool Element::hasAttributes() const
@@ -1754,7 +1746,7 @@ void Element::addShadowRoot(Ref<ShadowRoot>&& newShadowRoot)
     ensureElementRareData().setShadowRoot(WTFMove(newShadowRoot));
 
     shadowRoot.setHost(this);
-    shadowRoot.setParentTreeScope(&treeScope());
+    shadowRoot.setParentTreeScope(treeScope());
 
     NodeVector postInsertionNotificationTargets;
     notifyChildNodeInserted(*this, shadowRoot, postInsertionNotificationTargets);
@@ -1776,14 +1768,14 @@ void Element::removeShadowRoot()
         return;
 
     InspectorInstrumentation::willPopShadowRoot(*this, *oldRoot);
-    document().removeFocusedNodeOfSubtree(oldRoot.get());
+    document().removeFocusedNodeOfSubtree(*oldRoot);
 
     ASSERT(!oldRoot->renderer());
 
     elementRareData()->clearShadowRoot();
 
     oldRoot->setHost(nullptr);
-    oldRoot->setParentTreeScope(&document());
+    oldRoot->setParentTreeScope(document());
 }
 
 static bool canAttachAuthorShadowRoot(const Element& element)
@@ -2155,7 +2147,7 @@ ExceptionOr<RefPtr<Attr>> Element::setAttributeNode(Attr& attrNode)
     }
     if (attrNode.ownerElement() != this) {
         attrNode.attachToElement(*this);
-        treeScope().adoptIfNeeded(&attrNode);
+        treeScope().adoptIfNeeded(attrNode);
         ensureAttrNodeListForElement(*this).append(&attrNode);
     }
     return WTFMove(oldAttrNode);
@@ -2186,7 +2178,7 @@ ExceptionOr<RefPtr<Attr>> Element::setAttributeNodeNS(Attr& attrNode)
     setAttributeInternal(index, attrNode.qualifiedName(), attrNode.value(), NotInSynchronizationOfLazyAttribute);
 
     attrNode.attachToElement(*this);
-    treeScope().adoptIfNeeded(&attrNode);
+    treeScope().adoptIfNeeded(attrNode);
     ensureAttrNodeListForElement(*this).append(&attrNode);
 
     return WTFMove(oldAttrNode);
@@ -3397,7 +3389,7 @@ Ref<Attr> Element::ensureAttr(const QualifiedName& name)
     RefPtr<Attr> attrNode = findAttrNodeInList(attrNodeList, name);
     if (!attrNode) {
         attrNode = Attr::create(*this, name);
-        treeScope().adoptIfNeeded(attrNode.get());
+        treeScope().adoptIfNeeded(*attrNode);
         attrNodeList.append(attrNode);
     }
     return attrNode.releaseNonNull();

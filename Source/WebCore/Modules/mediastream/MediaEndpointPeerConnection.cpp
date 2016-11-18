@@ -169,7 +169,7 @@ void MediaEndpointPeerConnection::createOfferTask(const RTCOfferOptions&)
 
         mediaDescription.mode = transceiver->directionString();
         if (transceiver->hasSendingDirection()) {
-            RTCRtpSender& sender = *transceiver->sender();
+            auto& sender = transceiver->sender();
 
             mediaDescription.mediaStreamId = sender.mediaStreamIds()[0];
             mediaDescription.mediaStreamTrackId = sender.trackId();
@@ -181,7 +181,7 @@ void MediaEndpointPeerConnection::createOfferTask(const RTCOfferOptions&)
     // Add media descriptions for remaining transceivers.
     for (auto& transceiver : transceivers) {
         PeerMediaDescription mediaDescription;
-        RTCRtpSender& sender = *transceiver->sender();
+        auto& sender = transceiver->sender();
 
         mediaDescription.mode = transceiver->directionString();
         mediaDescription.mid = transceiver->provisionalMid();
@@ -247,7 +247,7 @@ void MediaEndpointPeerConnection::createAnswerTask(const RTCAnswerOptions&)
         if (i >= configurationSnapshot->mediaDescriptions().size()) {
             PeerMediaDescription newMediaDescription;
 
-            RTCRtpSender& sender = *transceiver->sender();
+            auto& sender = transceiver->sender();
             if (sender.track()) {
                 if (sender.mediaStreamIds().size())
                     newMediaDescription.mediaStreamId = sender.mediaStreamIds()[0];
@@ -306,8 +306,8 @@ static RealtimeMediaSourceMap createSourceMap(const MediaDescriptionVector& remo
 
         RTCRtpTransceiver* transceiver = matchTransceiverByMid(transceivers, remoteMediaDescription.mid);
         if (transceiver) {
-            if (transceiver->hasSendingDirection() && transceiver->sender()->track())
-                sourceMap.set(transceiver->mid(), &transceiver->sender()->track()->source());
+            if (transceiver->hasSendingDirection() && transceiver->sender().track())
+                sourceMap.set(transceiver->mid(), &transceiver->sender().track()->source());
         }
     }
 
@@ -409,10 +409,7 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RefPtr<RTCSessionDescr
         break;
     }
 
-    if (newSignalingState != m_peerConnection.internalSignalingState()) {
-        m_peerConnection.setSignalingState(newSignalingState);
-        m_peerConnection.fireEvent(Event::create(eventNames().signalingstatechangeEvent, false, false));
-    }
+    updateSignalingState(newSignalingState);
 
     if (m_peerConnection.internalIceGatheringState() == IceGatheringState::New && mediaDescriptions.size())
         m_peerConnection.updateIceGatheringState(IceGatheringState::Gathering);
@@ -485,7 +482,7 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RefPtr<RTCSessionDesc
             if (mediaDescription.mode == "sendrecv" || mediaDescription.mode == "recvonly") {
                 // Try to match an existing transceiver.
                 transceiver = matchTransceiver(transceivers, [&mediaDescription] (RTCRtpTransceiver& current) {
-                    return !current.stopped() && current.mid().isNull() && current.sender()->trackKind() == mediaDescription.type;
+                    return !current.stopped() && current.mid().isNull() && current.sender().trackKind() == mediaDescription.type;
                 });
 
                 if (transceiver) {
@@ -512,7 +509,7 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RefPtr<RTCSessionDesc
         }
 
         if (mediaDescription.mode == "sendrecv" || mediaDescription.mode == "sendonly") {
-            RTCRtpReceiver& receiver = *transceiver->receiver();
+            auto& receiver = transceiver->receiver();
             if (receiver.isDispatched())
                 continue;
             receiver.setDispatched(true);
@@ -578,11 +575,7 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RefPtr<RTCSessionDesc
         break;
     }
 
-    if (newSignalingState != m_peerConnection.internalSignalingState()) {
-        m_peerConnection.setSignalingState(newSignalingState);
-        m_peerConnection.fireEvent(Event::create(eventNames().signalingstatechangeEvent, false, false));
-    }
-
+    updateSignalingState(newSignalingState);
     setRemoteDescriptionSucceeded();
 }
 
@@ -693,7 +686,7 @@ Vector<RefPtr<MediaStream>> MediaEndpointPeerConnection::getRemoteStreams() cons
     return remoteStreams;
 }
 
-RefPtr<RTCRtpReceiver> MediaEndpointPeerConnection::createReceiver(const String& transceiverMid, const String& trackKind, const String& trackId)
+Ref<RTCRtpReceiver> MediaEndpointPeerConnection::createReceiver(const String& transceiverMid, const String& trackKind, const String& trackId)
 {
     RealtimeMediaSource::Type sourceType = trackKind == "audio" ? RealtimeMediaSource::Type::Audio : RealtimeMediaSource::Type::Video;
 
@@ -705,10 +698,15 @@ RefPtr<RTCRtpReceiver> MediaEndpointPeerConnection::createReceiver(const String&
     return RTCRtpReceiver::create(WTFMove(remoteTrack));
 }
 
+std::unique_ptr<RTCDataChannelHandler> MediaEndpointPeerConnection::createDataChannelHandler(const String& label, const RTCDataChannelInit& options)
+{
+    return m_mediaEndpoint->createDataChannelHandler(label, options);
+}
+
 void MediaEndpointPeerConnection::replaceTrack(RTCRtpSender& sender, RefPtr<MediaStreamTrack>&& withTrack, PeerConnection::VoidPromise&& promise)
 {
     RTCRtpTransceiver* transceiver = matchTransceiver(m_peerConnection.getTransceivers(), [&sender] (RTCRtpTransceiver& current) {
-        return current.sender() == &sender;
+        return &current.sender() == &sender;
     });
     ASSERT(transceiver);
 

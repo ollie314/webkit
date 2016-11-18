@@ -96,14 +96,13 @@ namespace JSC {
 #define END_IMPL() RETURN_TWO(pc, exec)
 
 #define THROW(exceptionToThrow) do {                        \
-        auto scope = DECLARE_THROW_SCOPE(vm);               \
-        throwException(exec, scope, exceptionToThrow);      \
+        throwException(exec, throwScope, exceptionToThrow); \
         RETURN_TO_THROW(exec, pc);                          \
         END_IMPL();                                         \
     } while (false)
 
 #define CHECK_EXCEPTION() do {                    \
-        doExceptionFuzzingIfEnabled(exec, "CommonSlowPaths", pc);   \
+        doExceptionFuzzingIfEnabled(exec, throwScope, "CommonSlowPaths", pc);   \
         if (UNLIKELY(throwScope.exception())) {   \
             RETURN_TO_THROW(exec, pc);            \
             END_IMPL();                           \
@@ -826,7 +825,7 @@ SLOW_PATH_DECL(slow_path_resolve_scope)
         if (resolvedScope->isGlobalObject()) {
             JSGlobalObject* globalObject = jsCast<JSGlobalObject*>(resolvedScope);
             if (globalObject->hasProperty(exec, ident)) {
-                ConcurrentJITLocker locker(exec->codeBlock()->m_lock);
+                ConcurrentJSLocker locker(exec->codeBlock()->m_lock);
                 if (resolveType == UnresolvedProperty)
                     pc[4].u.operand = GlobalProperty;
                 else
@@ -836,7 +835,7 @@ SLOW_PATH_DECL(slow_path_resolve_scope)
             }
         } else if (resolvedScope->isGlobalLexicalEnvironment()) {
             JSGlobalLexicalEnvironment* globalLexicalEnvironment = jsCast<JSGlobalLexicalEnvironment*>(resolvedScope);
-            ConcurrentJITLocker locker(exec->codeBlock()->m_lock);
+            ConcurrentJSLocker locker(exec->codeBlock()->m_lock);
             if (resolveType == UnresolvedProperty)
                 pc[4].u.operand = GlobalLexicalVar;
             else

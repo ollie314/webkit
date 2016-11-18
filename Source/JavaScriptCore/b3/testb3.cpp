@@ -1757,6 +1757,74 @@ void testDivArgsFloatWithEffectfulDoubleConversion(float a, float b)
     CHECK(isIdentical(effect, static_cast<double>(a) / static_cast<double>(b)));
 }
 
+void testUDivArgsInt32(uint32_t a, uint32_t b)
+{
+    // UDiv with denominator == 0 is invalid.
+    if (!b)
+        return;
+
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* argument1 = root->appendNew<Value>(proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0));
+    Value* argument2 = root->appendNew<Value>(proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR1));
+    Value* result = root->appendNew<Value>(proc, UDiv, Origin(), argument1, argument2);
+    root->appendNew<Value>(proc, Return, Origin(), result);
+
+    CHECK_EQ(compileAndRun<uint32_t>(proc, a, b), a / b);
+}
+
+void testUDivArgsInt64(uint64_t a, uint64_t b)
+{
+    // UDiv with denominator == 0 is invalid.
+    if (!b)
+        return;
+
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* argument1 = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
+    Value* argument2 = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR1);
+    Value* result = root->appendNew<Value>(proc, UDiv, Origin(), argument1, argument2);
+    root->appendNew<Value>(proc, Return, Origin(), result);
+
+    CHECK_EQ(compileAndRun<uint64_t>(proc, a, b), a / b);
+}
+
+void testUModArgsInt32(uint32_t a, uint32_t b)
+{
+    // UMod with denominator == 0 is invalid.
+    if (!b)
+        return;
+
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* argument1 = root->appendNew<Value>(proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0));
+    Value* argument2 = root->appendNew<Value>(proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR1));
+    Value* result = root->appendNew<Value>(proc, UMod, Origin(), argument1, argument2);
+    root->appendNew<Value>(proc, Return, Origin(), result);
+
+    CHECK_EQ(compileAndRun<uint32_t>(proc, a, b), a % b);
+}
+
+void testUModArgsInt64(uint64_t a, uint64_t b)
+{
+    // UMod with denominator == 0 is invalid.
+    if (!b)
+        return;
+
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* argument1 = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
+    Value* argument2 = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR1);
+    Value* result = root->appendNew<Value>(proc, UMod, Origin(), argument1, argument2);
+    root->appendNew<Value>(proc, Return, Origin(), result);
+    
+    CHECK_EQ(compileAndRun<uint64_t>(proc, a, b), a % b);
+}
+
 void testSubArg(int a)
 {
     Procedure proc;
@@ -11891,6 +11959,76 @@ void testSShrShl64(int64_t value, int32_t sshrAmount, int32_t shlAmount)
 }
 
 template<typename T>
+void testRotR(T valueInt, int32_t shift)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+
+    Value* value = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
+    if (sizeof(T) == 4)
+        value = root->appendNew<Value>(proc, Trunc, Origin(), value);
+
+    Value* ammount = root->appendNew<Value>(proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR1));
+    root->appendNewControlValue(proc, Return, Origin(),
+        root->appendNew<Value>(proc, RotR, Origin(), value, ammount));
+
+    CHECK_EQ(compileAndRun<T>(proc, valueInt, shift), rotateRight(valueInt, shift));
+}
+
+template<typename T>
+void testRotL(T valueInt, int32_t shift)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+
+    Value* value = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
+    if (sizeof(T) == 4)
+        value = root->appendNew<Value>(proc, Trunc, Origin(), value);
+
+    Value* ammount = root->appendNew<Value>(proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR1));
+    root->appendNewControlValue(proc, Return, Origin(),
+        root->appendNew<Value>(proc, RotL, Origin(), value, ammount));
+
+    CHECK_EQ(compileAndRun<T>(proc, valueInt, shift), rotateLeft(valueInt, shift));
+}
+
+template<typename T>
+void testRotRWithImmShift(T valueInt, int32_t shift)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+
+    Value* value = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
+    if (sizeof(T) == 4)
+        value = root->appendNew<Value>(proc, Trunc, Origin(), value);
+
+    Value* ammount = root->appendIntConstant(proc, Origin(), Int32, shift);
+    root->appendNewControlValue(proc, Return, Origin(),
+        root->appendNew<Value>(proc, RotR, Origin(), value, ammount));
+
+    CHECK_EQ(compileAndRun<T>(proc, valueInt, shift), rotateRight(valueInt, shift));
+}
+
+template<typename T>
+void testRotLWithImmShift(T valueInt, int32_t shift)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+
+    Value* value = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
+    if (sizeof(T) == 4)
+        value = root->appendNew<Value>(proc, Trunc, Origin(), value);
+
+    Value* ammount = root->appendIntConstant(proc, Origin(), Int32, shift);
+    root->appendNewControlValue(proc, Return, Origin(),
+        root->appendNew<Value>(proc, RotL, Origin(), value, ammount));
+
+    CHECK_EQ(compileAndRun<T>(proc, valueInt, shift), rotateLeft(valueInt, shift));
+}
+
+template<typename T>
 void testComputeDivisionMagic(T value, T magicMultiplier, unsigned shift)
 {
     DivisionMagic<T> magic = computeDivisionMagic(value);
@@ -14053,6 +14191,9 @@ void run(const char* filter)
     RUN_BINARY(testDivArgsFloatWithUselessDoubleConversion, floatingPointOperands<float>(), floatingPointOperands<float>());
     RUN_BINARY(testDivArgsFloatWithEffectfulDoubleConversion, floatingPointOperands<float>(), floatingPointOperands<float>());
 
+    RUN_BINARY(testUDivArgsInt32, int32Operands(), int32Operands());
+    RUN_BINARY(testUDivArgsInt64, int64Operands(), int64Operands());
+
     RUN_UNARY(testModArgDouble, floatingPointOperands<double>());
     RUN_BINARY(testModArgsDouble, floatingPointOperands<double>(), floatingPointOperands<double>());
     RUN_BINARY(testModArgImmDouble, floatingPointOperands<double>(), floatingPointOperands<double>());
@@ -14063,6 +14204,9 @@ void run(const char* filter)
     RUN_BINARY(testModArgImmFloat, floatingPointOperands<float>(), floatingPointOperands<float>());
     RUN_BINARY(testModImmArgFloat, floatingPointOperands<float>(), floatingPointOperands<float>());
     RUN_BINARY(testModImmsFloat, floatingPointOperands<float>(), floatingPointOperands<float>());
+
+    RUN_BINARY(testUModArgsInt32, int32Operands(), int32Operands());
+    RUN_BINARY(testUModArgsInt64, int64Operands(), int64Operands());
 
     RUN(testSubArg(24));
     RUN(testSubArgs(1, 1));
@@ -15218,6 +15362,16 @@ void run(const char* filter)
     RUN(testSShrShl64(-42000000000, 8, 8));
 
     RUN(testCheckMul64SShr());
+
+    RUN_BINARY(testRotR, int32Operands(), int32Operands());
+    RUN_BINARY(testRotR, int64Operands(), int32Operands());
+    RUN_BINARY(testRotL, int32Operands(), int32Operands());
+    RUN_BINARY(testRotL, int64Operands(), int32Operands());
+
+    RUN_BINARY(testRotRWithImmShift, int32Operands(), int32Operands());
+    RUN_BINARY(testRotRWithImmShift, int64Operands(), int32Operands());
+    RUN_BINARY(testRotLWithImmShift, int32Operands(), int32Operands());
+    RUN_BINARY(testRotLWithImmShift, int64Operands(), int32Operands());
 
     RUN(testComputeDivisionMagic<int32_t>(2, -2147483647, 0));
     RUN(testTrivialInfiniteLoop());

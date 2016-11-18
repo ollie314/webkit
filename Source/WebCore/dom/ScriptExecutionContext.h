@@ -200,6 +200,7 @@ public:
 
     virtual EventQueue& eventQueue() const = 0;
 
+    DatabaseContext* databaseContext() { return m_databaseContext.get(); }
     void setDatabaseContext(DatabaseContext*);
 
 #if ENABLE(SUBTLE_CRYPTO)
@@ -258,6 +259,7 @@ private:
     RefPtr<DatabaseContext> m_databaseContext;
 
     bool m_activeDOMObjectAdditionForbidden;
+    bool m_willProcessMessagePortMessagesSoon { false };
     int m_timerNestingLevel;
 
 #if !ASSERT_DISABLED

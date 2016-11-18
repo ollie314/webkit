@@ -45,7 +45,12 @@ CachedResourceRequest PreloadRequest::resourceRequest(Document& document)
     ASSERT(isMainThread());
     CachedResourceRequest request(completeURL(document), CachedResourceLoader::defaultCachedResourceOptions());
     request.setInitiator(m_initiator);
-    request.setAsPotentiallyCrossOrigin(m_crossOriginMode, document);
+    String crossOriginMode = m_crossOriginMode;
+    if (m_moduleScript == ModuleScript::Yes) {
+        if (crossOriginMode.isNull())
+            crossOriginMode = ASCIILiteral("omit");
+    }
+    request.setAsPotentiallyCrossOrigin(crossOriginMode, document);
     return request;
 }
 
@@ -57,7 +62,7 @@ void HTMLResourcePreloader::preload(PreloadRequestStream requests)
 
 static bool mediaAttributeMatches(Document& document, const RenderStyle* renderStyle, const String& attributeValue)
 {
-    auto mediaQueries = MediaQuerySet::createAllowingDescriptionSyntax(attributeValue);
+    auto mediaQueries = MediaQuerySet::create(attributeValue);
     return MediaQueryEvaluator { "screen", document, renderStyle }.evaluate(mediaQueries.get());
 }
 

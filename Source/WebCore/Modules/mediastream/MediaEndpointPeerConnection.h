@@ -68,7 +68,7 @@ public:
 
     Vector<RefPtr<MediaStream>> getRemoteStreams() const override;
 
-    RefPtr<RTCRtpReceiver> createReceiver(const String& transceiverMid, const String& trackKind, const String& trackId) override;
+    Ref<RTCRtpReceiver> createReceiver(const String& transceiverMid, const String& trackKind, const String& trackId) override;
     void replaceTrack(RTCRtpSender&, RefPtr<MediaStreamTrack>&&, PeerConnection::VoidPromise&&) override;
 
     bool isNegotiationNeeded() const override { return m_negotiationNeeded; };
@@ -110,6 +110,8 @@ private:
     void gotIceCandidate(const String& mid, IceCandidate&&) override;
     void doneGatheringCandidates(const String& mid) override;
     void iceTransportStateChanged(const String& mid, MediaEndpoint::IceTransportState) override;
+
+    std::unique_ptr<RTCDataChannelHandler> createDataChannelHandler(const String&, const RTCDataChannelInit&) final;
 
     std::unique_ptr<MediaEndpoint> m_mediaEndpoint;
 

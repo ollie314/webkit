@@ -37,7 +37,7 @@
 #include "ScrollingTreeOverflowScrollingNode.h"
 #include "ScrollingTreeScrollingNode.h"
 #include "TextStream.h"
-#include <wtf/TemporaryChange.h>
+#include <wtf/SetForScope.h>
 
 namespace WebCore {
 
@@ -138,7 +138,7 @@ void ScrollingTree::commitTreeState(std::unique_ptr<ScrollingStateTree> scrollin
     }
     
     bool scrollRequestIsProgammatic = rootNode ? rootNode->requestedScrollPositionRepresentsProgrammaticScroll() : false;
-    TemporaryChange<bool> changeHandlingProgrammaticScroll(m_isHandlingProgrammaticScroll, scrollRequestIsProgammatic);
+    SetForScope<bool> changeHandlingProgrammaticScroll(m_isHandlingProgrammaticScroll, scrollRequestIsProgammatic);
 
     removeDestroyedNodes(*scrollingStateTree);
 
@@ -379,6 +379,30 @@ void ScrollingTree::clearLatchedNode()
 {
     LockHolder locker(m_mutex);
     m_latchedNode = 0;
+}
+
+String ScrollingTree::scrollingTreeAsText()
+{
+    TextStream ts(TextStream::LineMode::MultipleLine);
+
+    TextStream::GroupScope scope(ts);
+    ts << "scrolling tree";
+    
+    if (m_latchedNode)
+        ts.dumpProperty("latched node", m_latchedNode);
+
+    if (m_mainFrameScrollPosition != IntPoint())
+        ts.dumpProperty("main frame scroll position", m_mainFrameScrollPosition);
+    
+    {
+        LockHolder lock(m_mutex);
+        if (m_rootNode) {
+            TextStream::GroupScope scope(ts);
+            m_rootNode->dump(ts, ScrollingStateTreeAsTextBehaviorIncludeLayerPositions);
+        }
+    }
+
+    return ts.release();
 }
 
 } // namespace WebCore

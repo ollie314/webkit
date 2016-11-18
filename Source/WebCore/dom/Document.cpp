@@ -192,8 +192,8 @@
 #include <inspector/ScriptCallStack.h>
 #include <wtf/CurrentTime.h>
 #include <wtf/NeverDestroyed.h>
+#include <wtf/SetForScope.h>
 #include <wtf/SystemTracing.h>
-#include <wtf/TemporaryChange.h>
 #include <wtf/text/StringBuffer.h>
 #include <yarr/RegularExpression.h>
 
@@ -861,42 +861,51 @@ void Document::childrenChanged(const ChildChange& change)
     styleScope().clearResolver();
 }
 
-static ALWAYS_INLINE RefPtr<HTMLElement> createUpgradeCandidateElement(Document& document, const QualifiedName& name)
+static ALWAYS_INLINE Ref<HTMLElement> createUpgradeCandidateElement(Document& document, const QualifiedName& name)
 {
-    if (!RuntimeEnabledFeatures::sharedFeatures().customElementsEnabled())
-        return nullptr;
-
-    if (Document::validateCustomElementName(name.localName()) != CustomElementNameValidationStatus::Valid)
-        return nullptr;
+    if (!RuntimeEnabledFeatures::sharedFeatures().customElementsEnabled()
+        || Document::validateCustomElementName(name.localName()) != CustomElementNameValidationStatus::Valid)
+        return HTMLUnknownElement::create(name, document);
 
     auto element = HTMLElement::create(name, document);
     element->setIsCustomElementUpgradeCandidate();
-    return WTFMove(element);
+    return element;
 }
 
-static ExceptionOr<Ref<Element>> createHTMLElementWithNameValidation(Document& document, const AtomicString& localName)
+static ALWAYS_INLINE Ref<HTMLElement> createUpgradeCandidateElement(Document& document, const AtomicString& localName)
 {
-    auto element = HTMLElementFactory::createKnownElement(localName, document);
+    return createUpgradeCandidateElement(document, QualifiedName { nullAtom, localName, xhtmlNamespaceURI });
+}
+
+static inline bool isValidHTMLElementName(const AtomicString& localName)
+{
+    return Document::isValidName(localName);
+}
+
+static inline bool isValidHTMLElementName(const QualifiedName& name)
+{
+    return Document::isValidName(name.localName());
+}
+
+template<typename NameType>
+static ExceptionOr<Ref<Element>> createHTMLElementWithNameValidation(Document& document, const NameType& name)
+{
+    auto element = HTMLElementFactory::createKnownElement(name, document);
     if (LIKELY(element))
         return Ref<Element> { element.releaseNonNull() };
 
     if (auto* window = document.domWindow()) {
         auto* registry = window->customElementRegistry();
         if (UNLIKELY(registry)) {
-            if (auto* elementInterface = registry->findInterface(localName))
-                return elementInterface->constructElementWithFallback(document, localName);
+            if (auto* elementInterface = registry->findInterface(name))
+                return elementInterface->constructElementWithFallback(document, name);
         }
     }
 
-    if (UNLIKELY(!Document::isValidName(localName)))
+    if (UNLIKELY(!isValidHTMLElementName(name)))
         return Exception { INVALID_CHARACTER_ERR };
 
-    QualifiedName qualifiedName { nullAtom, localName, xhtmlNamespaceURI };
-
-    if (auto element = createUpgradeCandidateElement(document, qualifiedName))
-        return Ref<Element> { element.releaseNonNull() };
-
-    return Ref<Element> { HTMLUnknownElement::create(qualifiedName, document) };
+    return Ref<Element> { createUpgradeCandidateElement(document, name) };
 }
 
 ExceptionOr<Ref<Element>> Document::createElementForBindings(const AtomicString& name)
@@ -1015,7 +1024,7 @@ ExceptionOr<Ref<Node>> Document::adoptNode(Node& source)
             return result.releaseException();
     }
 
-    adoptIfNeeded(&source);
+    adoptIfNeeded(source);
 
     return Ref<Node> { source };
 }
@@ -1055,9 +1064,7 @@ static Ref<HTMLElement> createFallbackHTMLElement(Document& document, const Qual
         }
     }
     // FIXME: Should we also check the equality of prefix between the custom element and name?
-    if (auto element = createUpgradeCandidateElement(document, name))
-        return element.releaseNonNull();
-    return HTMLUnknownElement::create(name, document);
+    return createUpgradeCandidateElement(document, name);
 }
 
 // FIXME: This should really be in a possible ElementFactory class.
@@ -1159,6 +1166,10 @@ ExceptionOr<Ref<Element>> Document::createElementNS(const AtomicString& namespac
     QualifiedName parsedName { parseResult.releaseReturnValue() };
     if (!hasValidNamespaceForElements(parsedName))
         return Exception { NAMESPACE_ERR };
+
+    if (parsedName.namespaceURI() == xhtmlNamespaceURI)
+        return createHTMLElementWithNameValidation(*this, parsedName);
+
     return createElement(parsedName, false);
 }
 
@@ -1829,7 +1840,7 @@ void Document::recalcStyle(Style::Change change)
         m_inStyleRecalc = false;
 
         if (styleUpdate) {
-            TemporaryChange<bool> inRenderTreeUpdate(m_inRenderTreeUpdate, true);
+            SetForScope<bool> inRenderTreeUpdate(m_inRenderTreeUpdate, true);
 
             RenderTreeUpdater updater(*this);
             updater.commit(WTFMove(styleUpdate));
@@ -1958,7 +1969,7 @@ std::unique_ptr<RenderStyle> Document::styleForElementIgnoringPendingStylesheets
     // On iOS request delegates called during styleForElement may result in re-entering WebKit and killing the style resolver.
     Style::PostResolutionCallbackDisabler disabler(*this);
 
-    TemporaryChange<bool> change(m_ignorePendingStylesheets, true);
+    SetForScope<bool> change(m_ignorePendingStylesheets, true);
     auto elementStyle = element.resolveStyle(parentStyle);
 
     if (elementStyle.relations) {
@@ -2207,7 +2218,7 @@ void Document::destroyRenderTree()
     ASSERT(hasLivingRenderTree());
     ASSERT(m_pageCacheState != InPageCache);
 
-    TemporaryChange<bool> change(m_renderTreeBeingDestroyed, true);
+    SetForScope<bool> change(m_renderTreeBeingDestroyed, true);
 
     if (this == &topDocument())
         clearAXObjectCache();
@@ -2643,7 +2654,12 @@ void Document::implicitClose()
     // ramifications, and we need to decide what is the Right Thing To Do(tm)
     Frame* f = frame();
     if (f) {
-        f->loader().icon().startLoader();
+        if (f->loader().client().useIconLoadingClient()) {
+            if (auto* documentLoader = loader())
+                documentLoader->startIconLoading();
+        } else
+            f->loader().icon().startLoader();
+
         f->animation().startAnimationsIfNotSuspended(this);
 
         // FIXME: We shouldn't be dispatching pending events globally on all Documents here.
@@ -3520,27 +3536,24 @@ void Document::pageMutedStateDidChange()
         audioProducer->pageMutedStateDidChange();
 }
 
-static bool isNodeInSubtree(Node* node, Node* container, bool amongChildrenOnly)
+static bool isNodeInSubtree(Node& node, Node& container, bool amongChildrenOnly)
 {
-    bool nodeInSubtree = false;
     if (amongChildrenOnly)
-        nodeInSubtree = node->isDescendantOf(container);
+        return node.isDescendantOf(container);
     else
-        nodeInSubtree = (node == container) || node->isDescendantOf(container);
-    
-    return nodeInSubtree;
+        return &node == &container || node.isDescendantOf(container);
 }
 
-void Document::removeFocusedNodeOfSubtree(Node* node, bool amongChildrenOnly)
+void Document::removeFocusedNodeOfSubtree(Node& node, bool amongChildrenOnly)
 {
     if (!m_focusedElement || pageCacheState() != NotInPageCache) // If the document is in the page cache, then we don't need to clear out the focused node.
         return;
 
-    Element* focusedElement = node->treeScope().focusedElement();
+    Element* focusedElement = node.treeScope().focusedElement();
     if (!focusedElement)
         return;
     
-    if (isNodeInSubtree(focusedElement, node, amongChildrenOnly)) {
+    if (isNodeInSubtree(*focusedElement, node, amongChildrenOnly)) {
         setFocusedElement(nullptr, FocusDirectionNone, FocusRemovalEventsMode::DoNotDispatch);
         // Set the focus navigation starting node to the previous focused element so that
         // we can fallback to the siblings or parent node for the next search.
@@ -3857,14 +3870,14 @@ void Document::detachNodeIterator(NodeIterator* ni)
     m_nodeIterators.remove(ni);
 }
 
-void Document::moveNodeIteratorsToNewDocument(Node* node, Document* newDocument)
+void Document::moveNodeIteratorsToNewDocument(Node& node, Document& newDocument)
 {
     Vector<NodeIterator*> nodeIterators;
     copyToVector(m_nodeIterators, nodeIterators);
     for (auto* it : nodeIterators) {
-        if (&it->root() == node) {
+        if (&it->root() == &node) {
             detachNodeIterator(it);
-            newDocument->attachNodeIterator(it);
+            newDocument.attachNodeIterator(it);
         }
     }
 }
@@ -3879,11 +3892,11 @@ void Document::nodeChildrenWillBeRemoved(ContainerNode& container)
 {
     NoEventDispatchAssertion assertNoEventDispatch;
 
-    removeFocusedNodeOfSubtree(&container, true /* amongChildrenOnly */);
+    removeFocusedNodeOfSubtree(container, true /* amongChildrenOnly */);
     removeFocusNavigationNodeOfSubtree(container, true /* amongChildrenOnly */);
 
 #if ENABLE(FULLSCREEN_API)
-    removeFullScreenElementOfSubtree(&container, true /* amongChildrenOnly */);
+    removeFullScreenElementOfSubtree(container, true /* amongChildrenOnly */);
 #endif
 
     for (auto* range : m_ranges)
@@ -3908,31 +3921,31 @@ void Document::nodeChildrenWillBeRemoved(ContainerNode& container)
     }
 }
 
-void Document::nodeWillBeRemoved(Node& n)
+void Document::nodeWillBeRemoved(Node& node)
 {
     NoEventDispatchAssertion assertNoEventDispatch;
 
-    removeFocusedNodeOfSubtree(&n);
-    removeFocusNavigationNodeOfSubtree(n);
+    removeFocusedNodeOfSubtree(node);
+    removeFocusNavigationNodeOfSubtree(node);
 
 #if ENABLE(FULLSCREEN_API)
-    removeFullScreenElementOfSubtree(&n);
+    removeFullScreenElementOfSubtree(node);
 #endif
 
     for (auto* it : m_nodeIterators)
-        it->nodeWillBeRemoved(n);
+        it->nodeWillBeRemoved(node);
 
     for (auto* range : m_ranges)
-        range->nodeWillBeRemoved(n);
+        range->nodeWillBeRemoved(node);
 
     if (Frame* frame = this->frame()) {
-        frame->eventHandler().nodeWillBeRemoved(n);
-        frame->selection().nodeWillBeRemoved(n);
-        frame->page()->dragCaretController().nodeWillBeRemoved(n);
+        frame->eventHandler().nodeWillBeRemoved(node);
+        frame->selection().nodeWillBeRemoved(node);
+        frame->page()->dragCaretController().nodeWillBeRemoved(node);
     }
 
-    if (is<Text>(n))
-        m_markers->removeMarkers(&n);
+    if (is<Text>(node))
+        m_markers->removeMarkers(&node);
 }
 
 static Node* fallbackFocusNavigationStartingNodeAfterRemoval(Node& node)
@@ -3945,7 +3958,7 @@ void Document::removeFocusNavigationNodeOfSubtree(Node& node, bool amongChildren
     if (!m_focusNavigationStartingNode)
         return;
 
-    if (isNodeInSubtree(m_focusNavigationStartingNode.get(), &node, amongChildrenOnly)) {
+    if (isNodeInSubtree(*m_focusNavigationStartingNode, node, amongChildrenOnly)) {
         m_focusNavigationStartingNode = amongChildrenOnly ? &node : fallbackFocusNavigationStartingNodeAfterRemoval(node);
         m_focusNavigationStartingNodeIsRemoved = true;
     }
@@ -5948,7 +5961,7 @@ void Document::fullScreenElementRemoved()
     webkitCancelFullScreen();
 }
 
-void Document::removeFullScreenElementOfSubtree(Node* node, bool amongChildrenOnly)
+void Document::removeFullScreenElementOfSubtree(Node& node, bool amongChildrenOnly)
 {
     if (!m_fullScreenElement)
         return;
@@ -5957,7 +5970,7 @@ void Document::removeFullScreenElementOfSubtree(Node* node, bool amongChildrenOn
     if (amongChildrenOnly)
         elementInSubtree = m_fullScreenElement->isDescendantOf(node);
     else
-        elementInSubtree = (m_fullScreenElement == node) || m_fullScreenElement->isDescendantOf(node);
+        elementInSubtree = (m_fullScreenElement == &node) || m_fullScreenElement->isDescendantOf(node);
     
     if (elementInSubtree)
         fullScreenElementRemoved();
@@ -5974,7 +5987,7 @@ void Document::setAnimatingFullScreen(bool flag)
         return;
     m_isAnimatingFullScreen = flag;
 
-    if (m_fullScreenElement && m_fullScreenElement->isDescendantOf(this)) {
+    if (m_fullScreenElement && m_fullScreenElement->isDescendantOf(*this)) {
         m_fullScreenElement->invalidateStyleForSubtree();
         scheduleForcedStyleRecalc();
     }

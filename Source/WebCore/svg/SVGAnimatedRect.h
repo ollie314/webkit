@@ -17,8 +17,7 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef SVGAnimatedRect_h
-#define SVGAnimatedRect_h
+#pragma once
 
 #include "SVGAnimatedPropertyMacros.h"
 #include "SVGAnimatedPropertyTearOff.h"
@@ -27,10 +26,9 @@
 
 namespace WebCore {
 
-template<typename T> 
-class SVGPropertyTearOff;
+class SVGRect;
 
-using SVGAnimatedRect = SVGAnimatedPropertyTearOff<SVGPropertyTearOff<FloatRect>>;
+using SVGAnimatedRect = SVGAnimatedPropertyTearOff<SVGRect>;
 
 // Helper macros to declare/define a SVGAnimatedRect object
 #define DECLARE_ANIMATED_RECT(UpperProperty, LowerProperty) \
@@ -60,5 +58,3 @@ public:
 };
 
 } // namespace WebCore
-
-#endif

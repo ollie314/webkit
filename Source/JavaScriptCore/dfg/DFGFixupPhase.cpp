@@ -1435,6 +1435,7 @@ private:
         case PhantomNewObject:
         case PhantomNewFunction:
         case PhantomNewGeneratorFunction:
+        case PhantomNewAsyncFunction:
         case PhantomCreateActivation:
         case PhantomDirectArguments:
         case PhantomCreateRest:
@@ -1576,7 +1577,7 @@ private:
             } else if (typeSet->doesTypeConformTo(TypeObject)) {
                 StructureSet set;
                 {
-                    ConcurrentJITLocker locker(typeSet->m_lock);
+                    ConcurrentJSLocker locker(typeSet->m_lock);
                     set = typeSet->structureSet(locker);
                 }
                 if (!set.isEmpty()) {
@@ -1596,7 +1597,8 @@ private:
         case CreateScopedArguments:
         case CreateActivation:
         case NewFunction:
-        case NewGeneratorFunction: {
+        case NewGeneratorFunction:
+        case NewAsyncFunction: {
             fixEdge<CellUse>(node->child1());
             break;
         }
@@ -2657,7 +2659,7 @@ private:
             profiledBlock->getArrayProfile(node->origin.semantic.bytecodeIndex);
         ArrayMode arrayMode = ArrayMode(Array::SelectUsingPredictions);
         if (arrayProfile) {
-            ConcurrentJITLocker locker(profiledBlock->m_lock);
+            ConcurrentJSLocker locker(profiledBlock->m_lock);
             arrayProfile->computeUpdatedPrediction(locker, profiledBlock);
             arrayMode = ArrayMode::fromObserved(locker, arrayProfile, Array::Read, false);
             if (arrayMode.type() == Array::Unprofiled) {

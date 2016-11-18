@@ -122,8 +122,14 @@ void printInternal(PrintStream& out, Opcode opcode)
     case Div:
         out.print("Div");
         return;
+    case UDiv:
+        out.print("UDiv");
+        return;
     case Mod:
         out.print("Mod");
+        return;
+    case UMod:
+        out.print("UMod");
         return;
     case Neg:
         out.print("Neg");
@@ -145,6 +151,12 @@ void printInternal(PrintStream& out, Opcode opcode)
         return;
     case ZShr:
         out.print("ZShr");
+        return;
+    case RotR:
+        out.print("RotR");
+        return;
+    case RotL:
+        out.print("RotL");
         return;
     case Clz:
         out.print("Clz");

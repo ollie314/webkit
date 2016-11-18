@@ -23,8 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef CSSKeyframeRule_h
-#define CSSKeyframeRule_h
+#pragma once
 
 #include "CSSParser.h"
 #include "CSSRule.h"
@@ -52,7 +51,7 @@ public:
     ~StyleKeyframe();
 
     String keyText() const;
-    void setKeyText(const String& text) { m_keys = CSSParser::parseKeyframeSelector(text); }
+    bool setKeyText(const String&);
     void setKey(double key)
     {
         ASSERT(m_keys.isEmpty());
@@ -99,5 +98,3 @@ private:
 };
 
 } // namespace WebCore
-
-#endif // CSSKeyframeRule_h

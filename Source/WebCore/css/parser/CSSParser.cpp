@@ -69,6 +69,7 @@
 #include "CSSSelectorParser.h"
 #include "CSSShadowValue.h"
 #include "CSSStyleSheet.h"
+#include "CSSSupportsParser.h"
 #include "CSSTimingFunctionValue.h"
 #include "CSSTokenizer.h"
 #include "CSSUnicodeRangeValue.h"
@@ -112,8 +113,8 @@
 #include <limits.h>
 #include <wtf/HexNumber.h>
 #include <wtf/NeverDestroyed.h>
+#include <wtf/SetForScope.h>
 #include <wtf/StdLibExtras.h>
-#include <wtf/TemporaryChange.h>
 #include <wtf/dtoa.h>
 #include <wtf/text/StringBuffer.h>
 #include <wtf/text/StringBuilder.h>
@@ -404,18 +405,30 @@ RefPtr<StyleRuleBase> CSSParser::parseRule(StyleSheetContents* sheet, const Stri
 
 RefPtr<StyleKeyframe> CSSParser::parseKeyframeRule(StyleSheetContents* sheet, const String& string)
 {
+    if (m_context.useNewParser && m_context.mode != UASheetMode) {
+        RefPtr<StyleRuleBase> keyframe = CSSParserImpl::parseRule(string, m_context, nullptr, CSSParserImpl::KeyframeRules);
+        return downcast<StyleKeyframe>(keyframe.get());
+    }
+
     setStyleSheet(sheet);
     setupParser("@-webkit-keyframe-rule{ ", string, "} ");
     cssyyparse(this);
     return m_keyframe;
 }
 
-bool CSSParser::parseSupportsCondition(const String& string)
+bool CSSParser::parseSupportsCondition(const String& condition)
 {
+    if (m_context.useNewParser && m_context.mode != UASheetMode) {
+        CSSTokenizer::Scope scope(condition);
+        CSSParserTokenRange range = scope.tokenRange();
+        CSSParserImpl parser(strictCSSParserContext());
+        return CSSSupportsParser::supportsCondition(range, parser) == CSSSupportsParser::Supported;
+    }
+
     m_supportsCondition = false;
     // can't use { because tokenizer state switches from supports to initial state when it sees { token.
     // instead insert one " " (which is WHITESPACE in CSSGrammar.y)
-    setupParser("@-webkit-supports-condition ", string, "} ");
+    setupParser("@-webkit-supports-condition ", condition, "} ");
     cssyyparse(this);
     return m_supportsCondition;
 }
@@ -1440,11 +1453,13 @@ Ref<ImmutableStyleProperties> CSSParser::parseInlineStyleDeclaration(const Strin
     if (context.useNewParser)
         return CSSParserImpl::parseInlineStyleDeclaration(string, element);
 
-    return CSSParser(context).parseDeclaration(string, nullptr);
+    return CSSParser(context).parseDeclarationDeprecated(string, nullptr);
 }
 
-Ref<ImmutableStyleProperties> CSSParser::parseDeclaration(const String& string, StyleSheetContents* contextStyleSheet)
+Ref<ImmutableStyleProperties> CSSParser::parseDeclarationDeprecated(const String& string, StyleSheetContents* contextStyleSheet)
 {
+    ASSERT(!m_context.useNewParser);
+    
     setStyleSheet(contextStyleSheet);
 
     setupParser("@-webkit-decls{", string, "} ");
@@ -1459,6 +1474,9 @@ Ref<ImmutableStyleProperties> CSSParser::parseDeclaration(const String& string, 
 
 bool CSSParser::parseDeclaration(MutableStyleProperties& declaration, const String& string, RefPtr<CSSRuleSourceData>&& ruleSourceData, StyleSheetContents* contextStyleSheet)
 {
+    if (m_context.useNewParser && m_context.mode != UASheetMode)
+        return CSSParserImpl::parseDeclarationList(&declaration, string, m_context);
+
     // Length of the "@-webkit-decls{" prefix.
     static const unsigned prefixLength = 15;
 
@@ -1495,21 +1513,6 @@ bool CSSParser::parseDeclaration(MutableStyleProperties& declaration, const Stri
     }
 
     return ok;
-}
-
-std::unique_ptr<MediaQuery> CSSParser::parseMediaQuery(const String& string)
-{
-    if (string.isEmpty())
-        return nullptr;
-
-    ASSERT(!m_mediaQuery);
-
-    // can't use { because tokenizer state switches from mediaquery to initial state when it sees { token.
-    // instead insert one " " (which is WHITESPACE in CSSGrammar.y)
-    setupParser("@-webkit-mediaquery ", string, "} ");
-    cssyyparse(this);
-
-    return WTFMove(m_mediaQuery);
 }
 
 static inline void filterProperties(bool important, const ParsedPropertyVector& input, Vector<CSSProperty, 256>& output, size_t& unusedEntries, std::bitset<numCSSProperties>& seenProperties, HashSet<AtomicString>& seenCustomProperties)
@@ -3416,7 +3419,7 @@ bool CSSParser::parseFillShorthand(CSSPropertyID propId, const CSSPropertyID* pr
         return false;
 
     ShorthandScope scope(this, propId);
-    TemporaryChange<bool> change(m_implicitShorthand);
+    SetForScope<bool> change(m_implicitShorthand);
 
     bool parsedProperty[cMaxFillProperties] = { false };
     RefPtr<CSSValue> values[cMaxFillProperties];
@@ -3812,7 +3815,7 @@ bool CSSParser::parseShorthand(CSSPropertyID propId, const StylePropertyShorthan
 
     // Fill in any remaining properties with the initial value.
     auto& cssValuePool = CSSValuePool::singleton();
-    TemporaryChange<bool> change(m_implicitShorthand, true);
+    SetForScope<bool> change(m_implicitShorthand, true);
     const StylePropertyShorthand* propertiesForInitialization = shorthand.propertiesForInitialization();
     for (unsigned i = 0; i < shorthand.length(); ++i) {
         if (propertyFound[i])
@@ -3849,7 +3852,7 @@ bool CSSParser::parse4Values(CSSPropertyID propId, const CSSPropertyID *properti
             if (!parseValue(properties[0], important))
                 return false;
             CSSValue* value = m_parsedProperties.last().value();
-            TemporaryChange<bool> change(m_implicitShorthand, true);
+            SetForScope<bool> change(m_implicitShorthand, true);
             addProperty(properties[1], value, important);
             addProperty(properties[2], value, important);
             addProperty(properties[3], value, important);
@@ -3859,7 +3862,7 @@ bool CSSParser::parse4Values(CSSPropertyID propId, const CSSPropertyID *properti
             if (!parseValue(properties[0], important) || !parseValue(properties[1], important))
                 return false;
             CSSValue* value = m_parsedProperties[m_parsedProperties.size() - 2].value();
-            TemporaryChange<bool> change(m_implicitShorthand, true);
+            SetForScope<bool> change(m_implicitShorthand, true);
             addProperty(properties[2], value, important);
             value = m_parsedProperties[m_parsedProperties.size() - 2].value();
             addProperty(properties[3], value, important);
@@ -3869,7 +3872,7 @@ bool CSSParser::parse4Values(CSSPropertyID propId, const CSSPropertyID *properti
             if (!parseValue(properties[0], important) || !parseValue(properties[1], important) || !parseValue(properties[2], important))
                 return false;
             CSSValue* value = m_parsedProperties[m_parsedProperties.size() - 2].value();
-            TemporaryChange<bool> change(m_implicitShorthand, true);
+            SetForScope<bool> change(m_implicitShorthand, true);
             addProperty(properties[3], value, important);
             break;
         }
@@ -4943,34 +4946,9 @@ RefPtr<CSSPrimitiveValue> CSSParser::parseAnimationProperty(AnimationParseContex
 }
 
 /* static */
-Vector<double> CSSParser::parseKeyframeSelector(const String& selector) {
-    Vector<double> keys;
-    Vector<String> strings;
-    selector.split(',', strings);
-
-    keys.reserveInitialCapacity(strings.size());
-    for (size_t i = 0; i < strings.size(); ++i) {
-        double key = -1;
-        String cur = strings[i].stripWhiteSpace();
-
-        // For now the syntax MUST be 'xxx%' or 'from' or 'to', where xxx is a legal floating point number
-        if (equalLettersIgnoringASCIICase(cur, "from"))
-            key = 0;
-        else if (equalLettersIgnoringASCIICase(cur, "to"))
-            key = 1;
-        else if (cur.endsWith('%')) {
-            double k = cur.substring(0, cur.length() - 1).toDouble();
-            if (k >= 0 && k <= 100)
-                key = k / 100;
-        }
-        if (key < 0) {
-            keys.clear();
-            break;
-        }
-        keys.uncheckedAppend(key);
-    }
-
-    return keys;
+std::unique_ptr<Vector<double>> CSSParser::parseKeyframeKeyList(const String& selector)
+{
+    return CSSParserImpl::parseKeyframeKeyList(selector);
 }
 
 bool CSSParser::parseTransformOriginShorthand(RefPtr<CSSPrimitiveValue>& value1, RefPtr<CSSPrimitiveValue>& value2, RefPtr<CSSValue>& value3)
@@ -7083,7 +7061,6 @@ bool CSSParser::parseFontWeight(bool important)
 
 bool CSSParser::parseFontSynthesis(bool important)
 {
-    // none | [ weight || style ]
     CSSParserValue* value = m_valueList->current();
     if (value && value->id == CSSValueNone) {
         addProperty(CSSPropertyFontSynthesis, CSSValuePool::singleton().createIdentifierValue(CSSValueNone), important);
@@ -7091,29 +7068,30 @@ bool CSSParser::parseFontSynthesis(bool important)
         return true;
     }
 
-    bool encounteredWeight = false;
-    bool encounteredStyle = false;
-    while (value) {
+    RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
+
+    do {
         switch (value->id) {
         case CSSValueWeight:
-            encounteredWeight = true;
+        case CSSValueStyle: {
+            auto singleValue = CSSValuePool::singleton().createIdentifierValue(value->id);
+            if (list->hasValue(singleValue.ptr()))
+                return false;
+            list->append(WTFMove(singleValue));
             break;
-        case CSSValueStyle:
-            encounteredStyle = true;
-            break;
+        }
         default:
             return false;
         }
-        value = m_valueList->next();
-    }
-
-    auto list = CSSValueList::createSpaceSeparated();
-    if (encounteredWeight)
-        list->append(CSSValuePool::singleton().createIdentifierValue(CSSValueWeight));
-    if (encounteredStyle)
-        list->append(CSSValuePool::singleton().createIdentifierValue(CSSValueStyle));
-    addProperty(CSSPropertyFontSynthesis, WTFMove(list), important);
+    } while ((value = m_valueList->next()));
+    
+    if (!list->length())
+        return false;
+    
+    addProperty(CSSPropertyFontSynthesis, list.releaseNonNull(), important);
+    m_valueList->next();
     return true;
+
 }
 
 bool CSSParser::parseFontFaceSrcURI(CSSValueList& valueList)
@@ -8624,7 +8602,7 @@ bool CSSParser::parseBorderRadius(CSSPropertyID propId, bool important)
     } else
         completeBorderRadii(radii[1]);
 
-    TemporaryChange<bool> change(m_implicitShorthand, true);
+    SetForScope<bool> change(m_implicitShorthand, true);
     addProperty(CSSPropertyBorderTopLeftRadius, createPrimitiveValuePair(WTFMove(radii[0][0]), WTFMove(radii[1][0])), important);
     addProperty(CSSPropertyBorderTopRightRadius, createPrimitiveValuePair(WTFMove(radii[0][1]), WTFMove(radii[1][1])), important);
     addProperty(CSSPropertyBorderBottomRightRadius, createPrimitiveValuePair(WTFMove(radii[0][2]), WTFMove(radii[1][2])), important);
@@ -10411,19 +10389,36 @@ bool CSSParser::parseTextDecorationSkip(bool important)
     // The text-decoration-skip property has syntax "none | [ objects || spaces || ink || edges || box-decoration ]".
     // However, only 'none' and 'ink' are implemented yet, so we will parse syntax "none | ink" for now.
     CSSParserValue* value = m_valueList->current();
+    if (value && value->id == CSSValueNone) {
+        addProperty(CSSPropertyWebkitTextDecorationSkip, CSSValuePool::singleton().createIdentifierValue(CSSValueNone), important);
+        m_valueList->next();
+        return true;
+    }
+    
+    RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
+
     do {
         switch (value->id) {
-        case CSSValueNone:
         case CSSValueAuto:
         case CSSValueInk:
-        case CSSValueObjects:
-            addProperty(CSSPropertyWebkitTextDecorationSkip, CSSValuePool::singleton().createIdentifierValue(value->id), important);
-            return true;
-        default:
+        case CSSValueObjects: {
+            auto singleValue = CSSValuePool::singleton().createIdentifierValue(value->id);
+            if (list->hasValue(singleValue.ptr()))
+                return false;
+            list->append(WTFMove(singleValue));
             break;
         }
+        default:
+            return false;
+        }
     } while ((value = m_valueList->next()));
-    return false;
+    
+    if (!list->length())
+        return false;
+    
+    addProperty(CSSPropertyWebkitTextDecorationSkip, list.releaseNonNull(), important);
+    m_valueList->next();
+    return true;
 }
 
 bool CSSParser::parseTextUnderlinePosition(bool important)

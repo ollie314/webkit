@@ -664,16 +664,14 @@ void HTMLMediaElement::unregisterWithDocument(Document& document)
     removeElementFromDocumentMap(*this, document);
 }
 
-void HTMLMediaElement::didMoveToNewDocument(Document* oldDocument)
+void HTMLMediaElement::didMoveToNewDocument(Document& oldDocument)
 {
     if (m_shouldDelayLoadEvent) {
-        if (oldDocument)
-            oldDocument->decrementLoadEventDelayCount();
+        oldDocument.decrementLoadEventDelayCount();
         document().incrementLoadEventDelayCount();
     }
 
-    if (oldDocument)
-        unregisterWithDocument(*oldDocument);
+    unregisterWithDocument(oldDocument);
 
     registerWithDocument(document());
 
@@ -1050,8 +1048,11 @@ void HTMLMediaElement::setSrcObject(ScriptExecutionContext& context, MediaStream
     // https://bugs.webkit.org/show_bug.cgi?id=124896
 
     m_mediaStreamSrcObject = mediaStream;
-    if (mediaStream)
+    if (mediaStream) {
+        m_settingMediaStreamSrcObject = true;
         setSrc(DOMURL::createPublicURL(context, *mediaStream));
+        m_settingMediaStreamSrcObject = false;
+    }
 }
 #endif
 
@@ -3574,6 +3575,7 @@ void HTMLMediaElement::addVideoTrack(Ref<VideoTrack>&& track)
 void HTMLMediaElement::removeAudioTrack(AudioTrack& track)
 {
     m_audioTracks->remove(track);
+    track.clearClient();
 }
 
 void HTMLMediaElement::removeTextTrack(TextTrack& track, bool scheduleEvent)
@@ -3591,6 +3593,7 @@ void HTMLMediaElement::removeTextTrack(TextTrack& track, bool scheduleEvent)
 void HTMLMediaElement::removeVideoTrack(VideoTrack& track)
 {
     m_videoTracks->remove(track);
+    track.clearClient();
 }
 
 void HTMLMediaElement::forgetResourceSpecificTracks()
@@ -4983,6 +4986,11 @@ void HTMLMediaElement::clearMediaPlayer(DelayedActionType flags)
 {
     LOG(Media, "HTMLMediaElement::clearMediaPlayer(%p) - flags = %s", this, actionName(flags).utf8().data());
 
+#if ENABLE(MEDIA_STREAM)
+    if (!m_settingMediaStreamSrcObject)
+        m_mediaStreamSrcObject = nullptr;
+#endif
+
 #if ENABLE(MEDIA_SOURCE)
     detachMediaSource();
 #endif
@@ -5944,10 +5952,6 @@ void HTMLMediaElement::createMediaPlayer()
 #if ENABLE(MEDIA_SOURCE)
     if (m_mediaSource)
         m_mediaSource->detachFromElement(*this);
-#endif
-
-#if ENABLE(MEDIA_STREAM)
-    m_mediaStreamSrcObject = nullptr;
 #endif
 
 #if ENABLE(VIDEO_TRACK)

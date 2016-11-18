@@ -1,3 +1,301 @@
+2016-11-17  Brady Eidson  <beidson@apple.com>
+
+        Add _WKIconLoadingDelegate SPI.
+        https://bugs.webkit.org/show_bug.cgi?id=164894
+
+        Reviewed by Alex Christensen.
+
+        Add MiniBrowser support for this new SPI, configurable with a setting.
+
+        * MiniBrowser/mac/SettingsController.h:
+        * MiniBrowser/mac/SettingsController.m:
+        (-[SettingsController _populateMenu]):
+        (-[SettingsController validateMenuItem:]):
+        (-[SettingsController loadsAllSiteIcons]):
+        (-[SettingsController toggleLoadsAllSiteIcons:]):
+        * MiniBrowser/mac/WK2BrowserWindowController.m:
+        (-[WK2BrowserWindowController awakeFromNib]):
+        (-[WK2BrowserWindowController webView:shouldLoadIconWithParameters:completionHandler:]):
+
+2016-11-17  Caitlin Potter  <caitp@igalia.com>
+
+        [JSC] remove leftover references to ES2017_ASYNCFUNCTION_SYNTAX flag
+        https://bugs.webkit.org/show_bug.cgi?id=164879
+
+        Reviewed by Alex Christensen.
+
+        The flag was referenced in FeatureList.pm and in one of the
+        FeatureDefines.xcconfig files, despite being removed.
+
+        * Scripts/webkitperl/FeatureList.pm:
+        * TestWebKitAPI/Configurations/FeatureDefines.xcconfig:
+
+2016-11-17  Per Arne Vollan  <pvollan@apple.com>
+
+        [Win] run-api-tests is failing.
+        https://bugs.webkit.org/show_bug.cgi?id=164818
+
+        Reviewed by Alexey Proskuryakov.
+
+        Make sure Visual Studio interprets string literal as utf8.
+ 
+        * TestWebKitAPI/Tests/WebCore/URLParser.cpp:
+        (TestWebKitAPI::TEST_F):
+
+2016-11-17  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [JSC] WTF::TemporaryChange with WTF::SetForScope
+        https://bugs.webkit.org/show_bug.cgi?id=164761
+
+        Reviewed by Saam Barati.
+
+        * TestWebKitAPI/CMakeLists.txt:
+        * TestWebKitAPI/TestWebKitAPI.xcodeproj/project.pbxproj:
+        * TestWebKitAPI/Tests/WTF/SetForScope.cpp: Renamed from Tools/TestWebKitAPI/Tests/WTF/TemporaryChange.cpp.
+        (TestWebKitAPI::TEST):
+        * WebKitTestRunner/TestController.cpp:
+        (WTR::TestController::resetStateToConsistentValues):
+
+2016-11-16  Alexey Proskuryakov  <ap@apple.com>
+
+        REGRESSION (r208455): LayoutTests swipe/pushState-cached-back-swipe.html and swipe/main-frame-pinning-requirement.html are failing
+        https://bugs.webkit.org/show_bug.cgi?id=164572
+
+        Reviewed by Tim Horton.
+
+        * WebKitTestRunner/mac/TestControllerMac.mm: (WTR::TestController::platformResetStateToConsistentValues):
+        Use the correct constant.
+
+2016-11-16  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [ES6][WebCore] Change ES6_MODULES compile time flag to runtime flag
+        https://bugs.webkit.org/show_bug.cgi?id=164827
+
+        Reviewed by Ryosuke Niwa.
+
+        Enabled ES6 Modules in test runners.
+
+        * DumpRenderTree/mac/DumpRenderTree.mm:
+        (resetWebPreferencesToConsistentValues):
+        * DumpRenderTree/win/DumpRenderTree.cpp:
+        (resetWebPreferencesToConsistentValues):
+        * Scripts/webkitperl/FeatureList.pm:
+        * TestWebKitAPI/Configurations/FeatureDefines.xcconfig:
+        * WebKitTestRunner/InjectedBundle/InjectedBundle.cpp:
+        (WTR::InjectedBundle::beginTesting):
+        * WebKitTestRunner/InjectedBundle/TestRunner.cpp:
+        (WTR::TestRunner::setES6ModulesEnabled):
+        * WebKitTestRunner/InjectedBundle/TestRunner.h:
+
+2016-11-16  Simon Fraser  <simon.fraser@apple.com>
+
+        Hard to write reliable UIScriptController scrollingTreeAsText tests
+        https://bugs.webkit.org/show_bug.cgi?id=164764
+
+        Reviewed by Wenson Hsieh.
+
+        Fix one cause of flakiness by resetting the WKWebView's UIScrollView scale
+        and scroll position between tests.
+
+        * WebKitTestRunner/ios/TestControllerIOS.mm:
+        (WTR::TestController::platformResetStateToConsistentValues):
+
+2016-11-16  Simon Fraser  <simon.fraser@apple.com>
+
+        UIScriptController: script with no async tasks fails if an earlier script registered a callback
+        https://bugs.webkit.org/show_bug.cgi?id=164762
+
+        Reviewed by Wenson Hsieh.
+        
+        Make TestRunner::callUIScriptCallback() async in DumpRenderTree to match WebKitTestRunner behavior.
+        This fixes ui-side-script-with-callback.html in WK1, which failed because the second runUIScript()
+        would occur inside the completion callback from the first. This no longer happens.
+
+        * DumpRenderTree/TestRunner.cpp:
+        (TestRunner::callUIScriptCallback):
+        * TestRunnerShared/UIScriptContext/UIScriptContext.cpp:
+        (UIScriptContext::tryToCompleteUIScriptForCurrentParentCallback):
+
+2016-11-16  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Unreviewed, rolling out r208770.
+
+        The test added with this change is timing out on mac-wk1.
+
+        Reverted changeset:
+
+        "UIScriptController: script with no async tasks fails if an
+        earlier script registered a callback"
+        https://bugs.webkit.org/show_bug.cgi?id=164762
+        http://trac.webkit.org/changeset/208770
+
+2016-11-16  Per Arne Vollan  <pvollan@apple.com>
+
+        [Win] WebCore test is failing.
+        https://bugs.webkit.org/show_bug.cgi?id=164772
+
+        Reviewed by Brent Fulgham.
+
+        The value of CGRectInfinite is not the same on Windows as on Mac.
+
+        * TestWebKitAPI/Tests/WebCore/FloatRect.cpp:
+        (TestWebKitAPI::TEST):
+
+2016-11-15  Alexey Proskuryakov  <ap@apple.com>
+
+        Update Youenn's e-mail addresses.
+
+        * Scripts/webkitpy/common/config/contributors.json:
+
+2016-11-15  Simon Fraser  <simon.fraser@apple.com>
+
+        UIScriptController: script with no async tasks fails if an earlier script registered a callback
+        https://bugs.webkit.org/show_bug.cgi?id=164762
+
+        Reviewed by Wenson Hsieh.
+        
+        UIScriptContext::runUIScript() considers a script to be "immediate" if that script doesn't
+        queue any async tasks. However, if an earlier UI script registered a callback, UIScriptContext::runUIScript()
+        would consider that an outstanding task.
+        
+        Fix by unregistering any callbacks associated with the current UI script when uiScriptComplete() is called.
+
+        * TestRunnerShared/UIScriptContext/UIScriptContext.cpp:
+        (UIScriptContext::tryToCompleteUIScriptForCurrentParentCallback):
+
+2016-11-15  Simon Fraser  <simon.fraser@apple.com>
+
+        UIScriptController: setting a callback to undefined should unregister it
+        https://bugs.webkit.org/show_bug.cgi?id=164796
+
+        Reviewed by Dean Jackson.
+        
+        "Immediate" UI scripts (those that don't schedule any async tasks) should return
+        immediately, without the need to call uiScriptComplete(). However, this is broken if
+        an earlier UI script registered a callback (since no-one clears that callback after the
+        first script completes).
+
+        Make possible the workaround of setting the callback to undefined, which previously did
+        not clear the callback registration.
+
+        * TestRunnerShared/UIScriptContext/UIScriptContext.cpp:
+        (UIScriptContext::registerCallback):
+        * TestRunnerShared/UIScriptContext/UIScriptContext.h:
+        * WebKitTestRunner/ios/UIScriptControllerIOS.mm:
+        (WTR::UIScriptController::platformClearAllCallbacks):
+
+2016-11-14  Mark Lam  <mark.lam@apple.com>
+
+        Enhance run-jsc-stress-test script to allow optional test specific options to be added for all test run configurations.
+        https://bugs.webkit.org/show_bug.cgi?id=164695
+
+        Reviewed by Keith Miller.
+
+        This gives us more flexibility when specific tests needs to enable special JSC
+        options in order to exercise specific code paths to be tested.  It also saves us
+        from having to create duplicate test run configurations e.g. runMiscFTLNoCJITTest.
+        We can now just use runFTLNoCJIT in its place.
+
+        Also replaced the ifJSCArgIsntProvidedAreWeReleaseBuild variable with $buildType
+        so that we have the ability to skip certain tests for release or debug builds.
+        This will be needed in the upcoming patch for https://webkit.org/b/155145.
+
+        * Scripts/run-jsc-stress-tests:
+
+2016-11-14  Joanmarie Diggs  <jdiggs@igalia.com>
+
+        AX: [ATK] Expose STATE_SINGLE_LINE and STATE_MULTI_LINE for ARIA searchbox role
+        https://bugs.webkit.org/show_bug.cgi?id=164712
+
+        Reviewed by Chris Fleizach.
+
+        Add AccessibilityUIElement::isSingleLine, AccessibilityUIElement::isMultiLine
+        to DRT and WKTR. Implement it for ATK.
+
+        * DumpRenderTree/AccessibilityUIElement.h:
+        * DumpRenderTree/ios/AccessibilityUIElementIOS.mm:
+        (AccessibilityUIElement::isSingleLine):
+        (AccessibilityUIElement::isMultiLine):
+        * DumpRenderTree/mac/AccessibilityUIElementMac.mm:
+        (AccessibilityUIElement::isSingleLine):
+        (AccessibilityUIElement::isMultiLine):
+        * DumpRenderTree/win/AccessibilityUIElementWin.cpp:
+        (AccessibilityUIElement::isSingleLine):
+        (AccessibilityUIElement::isMultiLine):
+        * WebKitTestRunner/InjectedBundle/AccessibilityUIElement.h:
+        * WebKitTestRunner/InjectedBundle/Bindings/AccessibilityUIElement.idl:
+        * WebKitTestRunner/InjectedBundle/atk/AccessibilityUIElementAtk.cpp:
+        (WTR::AccessibilityUIElement::isSingleLine):
+        (WTR::AccessibilityUIElement::isMultiLine):
+        * WebKitTestRunner/InjectedBundle/ios/AccessibilityUIElementIOS.mm:
+        (WTR::AccessibilityUIElement::isSingleLine):
+        (WTR::AccessibilityUIElement::isMultiLine):
+        * WebKitTestRunner/InjectedBundle/mac/AccessibilityUIElementMac.mm:
+        (WTR::AccessibilityUIElement::isSingleLine):
+        (WTR::AccessibilityUIElement::isMultiLine):
+
+2016-11-14  Youenn Fablet  <youenn@apple.com>
+
+        Support WPT templated tests
+        https://bugs.webkit.org/show_bug.cgi?id=164707
+
+        Reviewed by Sam Weinig.
+
+        * Scripts/webkitpy/w3c/test_importer.py:
+        (TestImporter.write_html_files_for_templated_js_tests): Generating empty HTML files for templated JS tests.
+        (TestImporter.import_tests):
+
+2016-11-13  JF Bastien  <jfbastien@apple.com>
+
+        Implement WTF::Expected
+        https://bugs.webkit.org/show_bug.cgi?id=164526
+
+        Reviewed by Yusuke Suzuki.
+
+        std::expected isn't in C++17, and may be in C++20. It's a nice
+        complement to std::any / std::optional because it's a type-tagged
+        union which has a single expected result but could also contain an
+        error.
+
+        This would be useful in the WebAssembly parser, for example.
+
+        Using this implementation will allow us to provide feedback to the
+        standards committee and guide std::expected's design before it
+        gets standardized. I've already sent a bunch of feedback to the
+        author based on my experience implementing this.
+
+        This could supplement WTF::Either and WTF::ExceptionOr.
+
+        * TestWebKitAPI/CMakeLists.txt:
+        * TestWebKitAPI/TestWebKitAPI.xcodeproj/project.pbxproj:
+        * TestWebKitAPI/Tests/WTF/Expected.cpp: Added.
+        (WTF::operator<<):
+        (TestWebKitAPI::TEST):
+        (TestWebKitAPI::foo::foo):
+        (TestWebKitAPI::foo::~foo):
+        (TestWebKitAPI::foo::operator==):
+        (TestWebKitAPI::operator<<):
+
+2016-11-12  Simon Fraser  <simon.fraser@apple.com>
+
+        Add a way to get the UI-side scrolling tree as text via UIScriptController
+        https://bugs.webkit.org/show_bug.cgi?id=164697
+
+        Reviewed by Zalan Bujtas.
+
+        Add UIScriptController::scrollingTreeAsText(), which gets the state of the scrolling
+        tree in the UI process, including the current positions of CALayers. This will be used
+        to test UI-side scrolling and visual viewports.
+
+        * DumpRenderTree/ios/UIScriptControllerIOS.mm:
+        (WTR::UIScriptController::scrollingTreeAsText):
+        * TestRunnerShared/UIScriptContext/Bindings/UIScriptController.idl:
+        * TestRunnerShared/UIScriptContext/UIScriptController.cpp:
+        (WTR::UIScriptController::scrollingTreeAsText):
+        * TestRunnerShared/UIScriptContext/UIScriptController.h:
+        * WebKitTestRunner/ios/UIScriptControllerIOS.mm:
+        (WTR::UIScriptController::scrollingTreeAsText):
+
 2016-11-12  Wenson Hsieh  <wenson_hsieh@apple.com>
 
         The main content heuristic should be robust when handling large media elements

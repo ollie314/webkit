@@ -136,6 +136,10 @@ bool Options::isAvailable(Options::ID id, Options::Availability availability)
     if (id == reportLLIntStatsID || id == llintStatsFileID)
         return true;
 #endif
+#if !defined(NDEBUG)
+    if (id == maxSingleAllocationSizeID)
+        return true;
+#endif
     return false;
 }
 
@@ -313,7 +317,7 @@ static void recomputeDependentOptions()
 #if !ENABLE(YARR_JIT)
     Options::useRegExpJIT() = false;
 #endif
-#if !ENABLE(CONCURRENT_JIT)
+#if !ENABLE(CONCURRENT_JS)
     Options::useConcurrentJIT() = false;
 #endif
 #if !ENABLE(DFG_JIT)
@@ -380,6 +384,9 @@ static void recomputeDependentOptions()
     Options::useSeparatedWXHeap() = true;
 #endif
 
+    if (Options::alwaysUseShadowChicken())
+        Options::maximumInliningDepth() = 1;
+
     // Compute the maximum value of the reoptimization retry counter. This is simply
     // the largest value at which we don't overflow the execute counter, when using it
     // to left-shift the execution counter by this amount. Currently the value ends
@@ -395,6 +402,12 @@ static void recomputeDependentOptions()
 
 #if ENABLE(LLINT_STATS)
     LLInt::Data::loadStats();
+#endif
+#if !defined(NDEBUG)
+    if (Options::maxSingleAllocationSize())
+        fastSetMaxSingleAllocationSize(Options::maxSingleAllocationSize());
+    else
+        fastSetMaxSingleAllocationSize(std::numeric_limits<size_t>::max());
 #endif
 }
 

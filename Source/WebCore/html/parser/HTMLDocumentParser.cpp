@@ -27,7 +27,6 @@
 #include "config.h"
 #include "HTMLDocumentParser.h"
 
-#include "CachedScript.h"
 #include "DocumentFragment.h"
 #include "Frame.h"
 #include "HTMLDocument.h"
@@ -317,7 +316,7 @@ void HTMLDocumentParser::constructTreeFromHTMLToken(HTMLTokenizer::TokenPtr& raw
         rawToken.clear();
     }
 
-    m_treeBuilder->constructTree(token);
+    m_treeBuilder->constructTree(WTFMove(token));
 }
 
 bool HTMLDocumentParser::hasInsertionPoint()

@@ -34,6 +34,7 @@
 
 #include "JSDOMPromise.h"
 #include "PeerConnectionStates.h"
+#include "RTCDataChannel.h"
 
 namespace WebCore {
 
@@ -43,6 +44,7 @@ class MediaStream;
 class MediaStreamTrack;
 class PeerConnectionBackend;
 class RTCConfiguration;
+class RTCDataChannelHandler;
 class RTCIceCandidate;
 class RTCPeerConnection;
 class RTCRtpReceiver;
@@ -77,6 +79,8 @@ public:
     void setRemoteDescription(RTCSessionDescription&, PeerConnection::VoidPromise&&);
     void addIceCandidate(RTCIceCandidate&, PeerConnection::VoidPromise&&);
 
+    virtual std::unique_ptr<RTCDataChannelHandler> createDataChannelHandler(const String&, const RTCDataChannelInit&) = 0;
+
     void stop();
 
     virtual RefPtr<RTCSessionDescription> localDescription() const = 0;
@@ -93,7 +97,7 @@ public:
 
     virtual Vector<RefPtr<MediaStream>> getRemoteStreams() const = 0;
 
-    virtual RefPtr<RTCRtpReceiver> createReceiver(const String& transceiverMid, const String& trackKind, const String& trackId) = 0;
+    virtual Ref<RTCRtpReceiver> createReceiver(const String& transceiverMid, const String& trackKind, const String& trackId) = 0;
     virtual void replaceTrack(RTCRtpSender&, RefPtr<MediaStreamTrack>&&, PeerConnection::VoidPromise&&) = 0;
 
     virtual bool isNegotiationNeeded() const = 0;
@@ -105,6 +109,8 @@ public:
 protected:
     void fireICECandidateEvent(RefPtr<RTCIceCandidate>&&);
     void doneGatheringCandidates();
+
+    void updateSignalingState(PeerConnectionStates::SignalingState);
 
     void createOfferSucceeded(String&&);
     void createOfferFailed(Exception&&);

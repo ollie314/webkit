@@ -190,7 +190,9 @@ public:
             case Sub:
             case Mul:
             case Div:
+            case UDiv:
             case Mod:
+            case UMod:
             case BitAnd:
             case BitXor:
                 VALIDATE(!value->kind().traps(), ("At ", *value));
@@ -227,6 +229,8 @@ public:
             case Shl:
             case SShr:
             case ZShr:
+            case RotR:
+                case RotL:
                 VALIDATE(!value->kind().hasExtraBits(), ("At ", *value));
                 VALIDATE(value->numChildren() == 2, ("At ", *value));
                 VALIDATE(value->type() == value->child(0)->type(), ("At ", *value));

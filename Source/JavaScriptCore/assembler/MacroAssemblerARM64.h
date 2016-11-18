@@ -533,6 +533,16 @@ public:
         m_assembler.sdiv<64>(dest, dividend, divisor);
     }
 
+    void uDiv32(RegisterID dividend, RegisterID divisor, RegisterID dest)
+    {
+        m_assembler.udiv<32>(dest, dividend, divisor);
+    }
+
+    void uDiv64(RegisterID dividend, RegisterID divisor, RegisterID dest)
+    {
+        m_assembler.udiv<64>(dest, dividend, divisor);
+    }
+
     void neg32(RegisterID dest)
     {
         m_assembler.neg<32>(dest, dest);
@@ -654,9 +664,34 @@ public:
         m_assembler.orr<64>(dest, dest, dataTempRegister);
     }
 
+    void rotateRight32(RegisterID src, TrustedImm32 imm, RegisterID dest)
+    {
+        m_assembler.ror<32>(dest, src, imm.m_value & 31);
+    }
+
+    void rotateRight32(TrustedImm32 imm, RegisterID srcDst)
+    {
+        rotateRight32(srcDst, imm, srcDst);
+    }
+
+    void rotateRight32(RegisterID src, RegisterID shiftAmmount, RegisterID dest)
+    {
+        m_assembler.ror<32>(dest, src, shiftAmmount);
+    }
+
+    void rotateRight64(RegisterID src, TrustedImm32 imm, RegisterID dest)
+    {
+        m_assembler.ror<64>(dest, src, imm.m_value & 63);
+    }
+
     void rotateRight64(TrustedImm32 imm, RegisterID srcDst)
     {
-        m_assembler.ror<64>(srcDst, srcDst, imm.m_value & 63);
+        rotateRight64(srcDst, imm, srcDst);
+    }
+
+    void rotateRight64(RegisterID src, RegisterID shiftAmmount, RegisterID dest)
+    {
+        m_assembler.ror<64>(dest, src, shiftAmmount);
     }
 
     void rshift32(RegisterID src, RegisterID shiftAmount, RegisterID dest)

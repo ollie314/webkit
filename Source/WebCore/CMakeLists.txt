@@ -449,6 +449,8 @@ set(WebCore_NON_SVG_IDL_FILES
     dom/StaticRange.idl
     dom/StringCallback.idl
     dom/Text.idl
+    dom/TextDecoder.idl
+    dom/TextEncoder.idl
     dom/TextEvent.idl
     dom/Touch.idl
     dom/TouchEvent.idl
@@ -998,7 +1000,6 @@ set(WebCore_SOURCES
     Modules/webdatabase/DatabaseAuthorizer.cpp
     Modules/webdatabase/DatabaseContext.cpp
     Modules/webdatabase/DatabaseManager.cpp
-    Modules/webdatabase/DatabaseServer.cpp
     Modules/webdatabase/DatabaseTask.cpp
     Modules/webdatabase/DatabaseThread.cpp
     Modules/webdatabase/DatabaseTracker.cpp
@@ -1009,7 +1010,6 @@ set(WebCore_SOURCES
     Modules/webdatabase/SQLStatement.cpp
     Modules/webdatabase/SQLTransaction.cpp
     Modules/webdatabase/SQLTransactionBackend.cpp
-    Modules/webdatabase/SQLTransactionClient.cpp
     Modules/webdatabase/SQLTransactionCoordinator.cpp
     Modules/webdatabase/SQLTransactionStateMachine.cpp
 
@@ -1070,6 +1070,8 @@ set(WebCore_SOURCES
     bindings/generic/RuntimeEnabledFeatures.cpp
 
     bindings/js/ArrayValue.cpp
+    bindings/js/CachedModuleScript.cpp
+    bindings/js/CachedModuleScriptLoader.cpp
     bindings/js/CallbackFunction.cpp
     bindings/js/DOMWrapperWorld.cpp
     bindings/js/Dictionary.cpp
@@ -1187,7 +1189,6 @@ set(WebCore_SOURCES
     bindings/js/JSRTCStatsResponseCustom.cpp
     bindings/js/JSSQLResultSetRowListCustom.cpp
     bindings/js/JSSQLTransactionCustom.cpp
-    bindings/js/JSSVGLengthCustom.cpp
     bindings/js/JSSVGPathSegCustom.cpp
     bindings/js/JSStorageCustom.cpp
     bindings/js/JSStyleSheetCustom.cpp
@@ -1458,7 +1459,6 @@ set(WebCore_SOURCES
     dom/EventPath.cpp
     dom/EventTarget.cpp
     dom/ExceptionBase.cpp
-    dom/ExceptionCodePlaceholder.cpp
     dom/ExtensionStyleSheets.cpp
     dom/FocusEvent.cpp
     dom/GenericEventQueue.cpp
@@ -1469,6 +1469,7 @@ set(WebCore_SOURCES
     dom/KeyboardEvent.cpp
     dom/LiveNodeList.cpp
     dom/LoadableClassicScript.cpp
+    dom/LoadableModuleScript.cpp
     dom/LoadableScript.cpp
     dom/MessageChannel.cpp
     dom/MessageEvent.cpp
@@ -1521,6 +1522,8 @@ set(WebCore_SOURCES
     dom/StyledElement.cpp
     dom/TagCollection.cpp
     dom/Text.cpp
+    dom/TextDecoder.cpp
+    dom/TextEncoder.cpp
     dom/TextEvent.cpp
     dom/TextNodeTraversal.cpp
     dom/Touch.cpp
@@ -2771,9 +2774,9 @@ set(WebCore_SOURCES
     svg/SVGImageElement.cpp
     svg/SVGImageLoader.cpp
     svg/SVGLangSpace.cpp
-    svg/SVGLength.cpp
     svg/SVGLengthContext.cpp
-    svg/SVGLengthList.cpp
+    svg/SVGLengthListValues.cpp
+    svg/SVGLengthValue.cpp
     svg/SVGLineElement.cpp
     svg/SVGLinearGradientElement.cpp
     svg/SVGLocatable.cpp
@@ -2782,7 +2785,7 @@ set(WebCore_SOURCES
     svg/SVGMaskElement.cpp
     svg/SVGMetadataElement.cpp
     svg/SVGMissingGlyphElement.cpp
-    svg/SVGNumberList.cpp
+    svg/SVGNumberListValues.cpp
     svg/SVGPaint.cpp
     svg/SVGParserUtilities.cpp
     svg/SVGPathBlender.cpp
@@ -2794,12 +2797,13 @@ set(WebCore_SOURCES
     svg/SVGPathSegList.cpp
     svg/SVGPathSegListBuilder.cpp
     svg/SVGPathSegListSource.cpp
+    svg/SVGPathSegListValues.cpp
     svg/SVGPathStringBuilder.cpp
     svg/SVGPathStringSource.cpp
     svg/SVGPathTraversalStateBuilder.cpp
     svg/SVGPathUtilities.cpp
     svg/SVGPatternElement.cpp
-    svg/SVGPointList.cpp
+    svg/SVGPointListValues.cpp
     svg/SVGPolyElement.cpp
     svg/SVGPolygonElement.cpp
     svg/SVGPolylineElement.cpp
@@ -2810,7 +2814,7 @@ set(WebCore_SOURCES
     svg/SVGScriptElement.cpp
     svg/SVGSetElement.cpp
     svg/SVGStopElement.cpp
-    svg/SVGStringList.cpp
+    svg/SVGStringListValues.cpp
     svg/SVGStyleElement.cpp
     svg/SVGSwitchElement.cpp
     svg/SVGSymbolElement.cpp
@@ -2825,7 +2829,8 @@ set(WebCore_SOURCES
     svg/SVGToOTFFontConversion.cpp
     svg/SVGTransform.cpp
     svg/SVGTransformDistance.cpp
-    svg/SVGTransformList.cpp
+    svg/SVGTransformListValues.cpp
+    svg/SVGTransformValue.cpp
     svg/SVGTransformable.cpp
     svg/SVGURIReference.cpp
     svg/SVGUseElement.cpp
@@ -2849,7 +2854,6 @@ set(WebCore_SOURCES
 
     svg/properties/SVGAnimatedProperty.cpp
     svg/properties/SVGAttributeToPropertyMap.cpp
-    svg/properties/SVGPathSegListPropertyTearOff.cpp
     svg/properties/SVGPropertyInfo.cpp
 
     workers/AbstractWorker.cpp

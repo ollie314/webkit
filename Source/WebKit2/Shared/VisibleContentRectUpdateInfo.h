@@ -27,10 +27,15 @@
 #define VisibleContentRectUpdateInfo_h
 
 #include <WebCore/FloatRect.h>
+#include <wtf/text/WTFString.h>
 
 namespace IPC {
 class Decoder;
 class Encoder;
+}
+
+namespace WebCore {
+class TextStream;
 }
 
 namespace WebKit {
@@ -83,11 +88,13 @@ public:
     void encode(IPC::Encoder&) const;
     static bool decode(IPC::Decoder&, VisibleContentRectUpdateInfo&);
 
+    String dump() const;
+
 private:
     WebCore::FloatRect m_exposedContentRect;
     WebCore::FloatRect m_unobscuredContentRect;
     WebCore::FloatRect m_unobscuredRectInScrollViewCoordinates;
-    WebCore::FloatRect m_customFixedPositionRect;
+    WebCore::FloatRect m_customFixedPositionRect; // When visual viewports are enabled, this is the layout viewport.
     WebCore::FloatSize m_obscuredInset;
     uint64_t m_lastLayerTreeTransactionID { 0 };
     double m_scale { -1 };
@@ -116,6 +123,8 @@ inline bool operator==(const VisibleContentRectUpdateInfo& a, const VisibleConte
         && a.allowShrinkToFit() == b.allowShrinkToFit()
         && a.enclosedInScrollableAncestorView() == b.enclosedInScrollableAncestorView();
 }
+
+WebCore::TextStream& operator<<(WebCore::TextStream&, const VisibleContentRectUpdateInfo&);
 
 } // namespace WebKit
 

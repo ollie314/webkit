@@ -35,6 +35,7 @@ namespace WebCore {
 class StorageThread;
 class SecurityOrigin;
 class StorageTrackerClient;
+struct SecurityOriginData;
 }
 
 namespace WebKit {
@@ -46,15 +47,12 @@ public:
     static void initializeTracker(const String& storagePath, WebCore::StorageTrackerClient*);
     static StorageTracker& tracker();
 
-    void setDatabaseDirectoryPath(const String&);
-    String databaseDirectoryPath() const;
-
     void setOriginDetails(const String& originIdentifier, const String& databaseFile);
     
     void deleteAllOrigins();
-    void deleteOrigin(WebCore::SecurityOrigin*);
+    void deleteOrigin(const WebCore::SecurityOriginData&);
     void deleteOriginWithIdentifier(const String& originIdentifier);
-    void origins(Vector<RefPtr<WebCore::SecurityOrigin>>& result);
+    Vector<WebCore::SecurityOriginData> origins();
     long long diskUsageForOrigin(WebCore::SecurityOrigin*);
     
     void cancelDeletingOrigin(const String& originIdentifier);

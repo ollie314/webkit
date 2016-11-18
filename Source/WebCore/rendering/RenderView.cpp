@@ -51,8 +51,8 @@
 #include "Settings.h"
 #include "StyleInheritedData.h"
 #include "TransformState.h"
+#include <wtf/SetForScope.h>
 #include <wtf/StackStats.h>
-#include <wtf/TemporaryChange.h>
 
 namespace WebCore {
 
@@ -186,7 +186,7 @@ bool RenderView::hitTest(const HitTestRequest& request, const HitTestLocation& l
     document().updateLayout();
     
 #if !ASSERT_DISABLED
-    TemporaryChange<bool> hitTestRestorer { m_inHitTesting, true };
+    SetForScope<bool> hitTestRestorer { m_inHitTesting, true };
 #endif
 
     FrameFlatteningLayoutDisallower disallower(frameView());
@@ -407,6 +407,9 @@ LayoutUnit RenderView::clientLogicalWidthForFixedPosition() const
         return isHorizontalWritingMode() ? frameView().customFixedPositionLayoutRect().width() : frameView().customFixedPositionLayoutRect().height();
 #endif
 
+    if (frameView().frame().settings().visualViewportEnabled())
+        return isHorizontalWritingMode() ? frameView().layoutViewportRect().width() : frameView().layoutViewportRect().height();
+
     return clientLogicalWidth();
 }
 
@@ -420,6 +423,9 @@ LayoutUnit RenderView::clientLogicalHeightForFixedPosition() const
     if (frameView().useCustomFixedPositionLayoutRect())
         return isHorizontalWritingMode() ? frameView().customFixedPositionLayoutRect().height() : frameView().customFixedPositionLayoutRect().width();
 #endif
+
+    if (frameView().frame().settings().visualViewportEnabled())
+        return isHorizontalWritingMode() ? frameView().layoutViewportRect().height() : frameView().layoutViewportRect().width();
 
     return clientLogicalHeight();
 }

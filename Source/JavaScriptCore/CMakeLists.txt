@@ -683,6 +683,7 @@ set(JavaScriptCore_SOURCES
     runtime/DatePrototype.cpp
     runtime/DirectArguments.cpp
     runtime/DirectArgumentsOffset.cpp
+    runtime/DirectEvalExecutable.cpp
     runtime/DumpContext.cpp
     runtime/ECMAScriptSpecInternalFunctions.cpp
     runtime/Error.cpp
@@ -710,6 +711,7 @@ set(JavaScriptCore_SOURCES
     runtime/HashMapImpl.cpp
     runtime/Identifier.cpp
     runtime/IndexingType.cpp
+    runtime/IndirectEvalExecutable.cpp
     runtime/InferredType.cpp
     runtime/InferredTypeTable.cpp
     runtime/InferredValue.cpp
@@ -1155,6 +1157,7 @@ macro(GENERATE_PYTHON _generator _input _output)
 endmacro()
 GENERATE_PYTHON(${CMAKE_CURRENT_SOURCE_DIR}/wasm/generateWasmOpsHeader.py ${CMAKE_CURRENT_SOURCE_DIR}/wasm/wasm.json ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/WasmOps.h)
 GENERATE_PYTHON(${CMAKE_CURRENT_SOURCE_DIR}/wasm/generateWasmValidateInlinesHeader.py ${CMAKE_CURRENT_SOURCE_DIR}/wasm/wasm.json ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/WasmValidateInlines.h)
+GENERATE_PYTHON(${CMAKE_CURRENT_SOURCE_DIR}/wasm/generateWasmB3IRGeneratorInlinesHeader.py ${CMAKE_CURRENT_SOURCE_DIR}/wasm/wasm.json ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/WasmB3IRGeneratorInlines.h)
 
 # LUT generator
 

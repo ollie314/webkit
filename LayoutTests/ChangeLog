@@ -1,3 +1,1067 @@
+2016-11-17  Alex Christensen  <achristensen@webkit.org>
+
+        Implement TextDecoder and TextEncoder
+        https://bugs.webkit.org/show_bug.cgi?id=163771
+
+        Reviewed by Sam Weinig.
+
+        * fast/encoding/utf-8-non-ascii-expected.txt: Added.
+        * fast/encoding/utf-8-non-ascii.html: Added.
+        * js/dom/global-constructors-attributes-dedicated-worker-expected.txt:
+        * platform/efl/js/dom/global-constructors-attributes-expected.txt:
+        * platform/gtk/js/dom/global-constructors-attributes-expected.txt:
+        * platform/mac-wk1/js/dom/global-constructors-attributes-expected.txt:
+        * platform/mac-yosemite/js/dom/global-constructors-attributes-expected.txt:
+        * platform/mac/js/dom/global-constructors-attributes-expected.txt:
+        * platform/win/js/dom/global-constructors-attributes-expected.txt:
+
+2016-11-17  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Rebaseline fast/html/keygen.html for Sierra.
+
+        Unreviewed test gardening.
+
+        * platform/mac/fast/html/keygen-expected.txt:
+
+2016-11-17  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [JSC] Drop arguments.caller
+        https://bugs.webkit.org/show_bug.cgi?id=164859
+
+        Reviewed by Saam Barati.
+
+        * js/basic-strict-mode-expected.txt:
+        * js/script-tests/basic-strict-mode.js:
+        * js/script-tests/strict-throw-type-error.js:
+        * js/script-tests/throw-type-error-is-unique.js:
+        (test):
+        * js/strict-throw-type-error-expected.txt:
+
+2016-11-17  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Update TestExpectations for media/modern-media-controls/pip-support/pip-support-enabled.html.
+        https://bugs.webkit.org/show_bug.cgi?id=164336
+
+        Unreviewed test gardening.
+
+        * platform/mac-wk1/TestExpectations:
+
+2016-11-17  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Correct a typo in a TestExpectations file.
+
+        Unreviewed test gardening.
+
+        * platform/mac-wk2/TestExpectations:
+
+2016-11-17  Zalan Bujtas  <zalan@apple.com>
+
+        Render tree should be all clean by the end of FrameView::layout().
+        https://bugs.webkit.org/show_bug.cgi?id=162834
+
+        Reviewed by Simon Fraser.
+
+        * TestExpectations:
+
+2016-11-17  Brent Fulgham  <bfulgham@apple.com>
+
+        keygen element should not support < 2048 RSA key lengths
+        https://bugs.webkit.org/show_bug.cgi?id=164874
+        <rdar://problem/22618141>
+
+        Reviewed by Dean Jackson.
+
+        * platform/mac/fast/html/keygen-expected.txt:
+        * platform/mac-elcapitan/fast/html/keygen-expected.txt:
+
+2016-11-17  Devin Rousso  <dcrousso+webkit@gmail.com>
+
+        Web Inspector: Shift clicking on named color value only shows its hex form
+        https://bugs.webkit.org/show_bug.cgi?id=162758
+
+        Reviewed by Timothy Hatcher.
+
+        * inspector/model/color.html:
+        Updated the WebInspector.Color.prototype.nextFormat test for the new nextFormat logic.
+
+2016-11-17  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking http/tests/media/modern-media-controls/skip-back-support/skip-back-support-button-click.html as flaky.
+        https://bugs.webkit.org/show_bug.cgi?id=164616
+
+        Unreviewed test gardening.
+
+        * platform/mac/TestExpectations:
+
+2016-11-17  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking inspector/worker/debugger-multiple-targets-pause.html as flaky.
+        https://bugs.webkit.org/show_bug.cgi?id=164872
+
+        Unreviewed test gardening.
+
+        * platform/mac/TestExpectations:
+
+2016-11-17  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking imported/w3c/web-platform-tests/IndexedDB/idbcursor_iterating.htm as flaky on mac-wk2 debug.
+        https://bugs.webkit.org/show_bug.cgi?id=164870
+
+        Unreviewed test gardening.
+
+        * platform/mac-wk2/TestExpectations:
+
+2016-11-16  Dave Hyatt  <hyatt@apple.com>
+
+        [CSS Parser] Add @supports, @keyframe and media query parsing options
+        https://bugs.webkit.org/show_bug.cgi?id=164821
+
+        Reviewed by Sam Weinig and Zalan Bujtas.
+
+        Delete the fallback descriptor tests, since that feature has been
+        removed. Update some of the other tests based off some parsing changes
+        from using the new parser always.
+
+        * fast/media/media-descriptor-syntax-01-expected.html: Removed.
+        * fast/media/media-descriptor-syntax-01.html: Removed.
+        * fast/media/media-descriptor-syntax-02-expected.html: Removed.
+        * fast/media/media-descriptor-syntax-02.html: Removed.
+        * fast/media/media-descriptor-syntax-03-expected.html: Removed.
+        * fast/media/media-descriptor-syntax-03.html: Removed.
+        * fast/media/media-descriptor-syntax-04-expected.html: Removed.
+        * fast/media/media-descriptor-syntax-04.html: Removed.
+        * fast/media/media-descriptor-syntax-06-expected.html: Removed.
+        * fast/media/media-descriptor-syntax-06.html: Removed.
+        * fast/media/media-query-list-02-expected.txt:
+        * fast/media/media-query-list-03-expected.txt:
+        * fast/media/media-query-list-04-expected.txt:
+        * fast/media/media-query-list-05-expected.txt:
+        * fast/media/media-query-list-06-expected.txt:
+        * fast/media/mq-pointer-expected.txt:
+        * fast/media/w3c/test_media_queries-expected.txt:
+
+2016-11-17  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Remove pass expectation for custom-elements tests on ios-sim because CEReactions were disabled in r208837.
+        https://bugs.webkit.org/show_bug.cgi?id=164852
+
+        Unreviewed test gardening.
+
+        * platform/ios-simulator/TestExpectations:
+
+2016-11-16  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [WebCore] Clean up script loading code in XML
+        https://bugs.webkit.org/show_bug.cgi?id=161651
+
+        Reviewed by Ryosuke Niwa.
+
+        Add tests that ensure modules are not executed in XHTML documents.
+
+        * js/dom/modules/module-inline-dynamic-in-xhtml-expected.txt: Added.
+        * js/dom/modules/module-inline-dynamic-in-xhtml.xhtml: Added.
+        * js/dom/modules/module-inline-simple-in-xhtml-expected.txt: Added.
+        * js/dom/modules/module-inline-simple-in-xhtml.xhtml: Added.
+        * js/dom/modules/module-src-dynamic-in-xhtml-expected.txt: Added.
+        * js/dom/modules/module-src-dynamic-in-xhtml.xhtml: Added.
+        * js/dom/modules/module-src-simple-in-xhtml-expected.txt: Added.
+        * js/dom/modules/module-src-simple-in-xhtml.xhtml: Added.
+
+2016-11-16  Ryosuke Niwa  <rniwa@webkit.org>
+
+        REGRESSION(r208082): 1% Speedometer regression on iOS
+        https://bugs.webkit.org/show_bug.cgi?id=164852
+
+        Reviewed by Chris Dumez.
+
+        Add failing test expectations for various custom elements now that CEReactions is not working.
+
+        * TestExpectations:
+
+2016-11-16  Alexey Proskuryakov  <ap@apple.com>
+
+        REGRESSION (r208455): LayoutTests swipe/pushState-cached-back-swipe.html and swipe/main-frame-pinning-requirement.html are failing
+        https://bugs.webkit.org/show_bug.cgi?id=164572
+
+        Reviewed by Tim Horton.
+
+        * platform/mac-wk2/TestExpectations: Remove flakiness expectations.
+
+2016-11-16  Brent Fulgham  <bfulgham@apple.com>
+
+        Clear track client when removing a track
+        https://bugs.webkit.org/show_bug.cgi?id=164842
+        <rdar://problem/29213621>
+
+        Reviewed by Eric Carlson.
+
+        * media/track/audio-track-add-remove-expected.txt: Added.
+        * media/track/audio-track-add-remove.html: Added.
+        * media/track/video-track-add-remove-expected.txt: Added.
+        * media/track/video-track-add-remove.html: Added.
+
+2016-11-16  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [ES6][WebCore] Change ES6_MODULES compile time flag to runtime flag
+        https://bugs.webkit.org/show_bug.cgi?id=164827
+
+        Reviewed by Ryosuke Niwa.
+
+        * TestExpectations:
+
+2016-11-16  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking inspector/worker/debugger-pause.html as flaky.
+        https://bugs.webkit.org/show_bug.cgi?id=164833
+
+        Unreviewed test gardening.
+
+        * platform/mac/TestExpectations:
+
+2016-11-16  Ryosuke Niwa  <rniwa@webkit.org>
+
+        slotchange event should bubble and dispatched once
+        https://bugs.webkit.org/show_bug.cgi?id=164770
+
+        Reviewed by Antti Koivisto.
+
+        * fast/shadow-dom/slotchange-event-bubbling-expected.txt: Added.
+        * fast/shadow-dom/slotchange-event-bubbling.html: Added.
+
+2016-11-16  Simon Fraser  <simon.fraser@apple.com>
+
+        UIScriptController: script with no async tasks fails if an earlier script registered a callback
+        https://bugs.webkit.org/show_bug.cgi?id=164762
+
+        Reviewed by Wenson Hsieh.
+        
+        Move the tests that use runUIScript into their own directory for easier TestExpectations management,
+        and fix TestExpectations to match.
+
+        * TestExpectations:
+        * fast/harness/uiscriptcontroller/concurrent-ui-side-scripts-expected.txt: Renamed from LayoutTests/fast/harness/concurrent-ui-side-scripts-expected.txt.
+        * fast/harness/uiscriptcontroller/concurrent-ui-side-scripts.html: Renamed from LayoutTests/fast/harness/concurrent-ui-side-scripts.html.
+        * fast/harness/uiscriptcontroller/ui-side-script-unregister-callback-expected.txt: Copied from LayoutTests/fast/harness/ui-side-script-unregister-callback-expected.txt.
+        * fast/harness/uiscriptcontroller/ui-side-script-unregister-callback.html: Copied from LayoutTests/fast/harness/ui-side-script-unregister-callback.html.
+        * fast/harness/uiscriptcontroller/ui-side-script-with-callback-expected.txt: Renamed from LayoutTests/fast/harness/ui-side-script-unregister-callback-expected.txt.
+        * fast/harness/uiscriptcontroller/ui-side-script-with-callback.html: Renamed from LayoutTests/fast/harness/ui-side-script-unregister-callback.html.
+        * fast/harness/uiscriptcontroller/ui-side-scripts-expected.txt: Renamed from LayoutTests/fast/harness/ui-side-scripts-expected.txt.
+        * fast/harness/uiscriptcontroller/ui-side-scripts.html: Renamed from LayoutTests/fast/harness/ui-side-scripts.html.
+        * platform/mac/TestExpectations:
+
+2016-11-16  Alex Christensen  <achristensen@webkit.org>
+
+        REGRESSION (r207162): [debug] loader/stateobjects LayoutTests timing out
+        https://bugs.webkit.org/show_bug.cgi?id=163307
+
+        Reviewed by Alexey Proskuryakov.
+
+        * platform/ios-simulator/TestExpectations:
+        * platform/mac/TestExpectations:
+
+2016-11-16  Alex Christensen  <achristensen@webkit.org>
+
+        Unreviewed gardening.
+        https://bugs.webkit.org/show_bug.cgi?id=163127
+
+        * platform/ios-simulator/TestExpectations:
+        Unskip passing tests.
+
+2016-11-16  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Fix typo in LayoutTest.
+
+        Unreviewed follow-up comment.
+
+        * inspector/page/setEmulatedMedia-expected.txt:
+        * inspector/page/setEmulatedMedia.html:
+
+2016-11-16  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        js/dom/domjit-function-get-element-by-id-licm.html and js/dom/domjit-function-get-element-by-id-changed.html are flaky timeouts
+        https://bugs.webkit.org/show_bug.cgi?id=164797
+
+        Reviewed by Saam Barati.
+
+        The performance of the both tests rely on PureGetById.
+        However, PureGetById is rolled out temporary[1], these tests become timed out.
+        This patch makes the both tests [ PASS TIMEOUT ] until PureGetById patch[1] is
+        relanded or impure object optimization patch[2] is landed.
+
+        [1]: https://bugs.webkit.org/show_bug.cgi?id=163305
+        [2]: https://bugs.webkit.org/show_bug.cgi?id=164175
+
+        * TestExpectations:
+
+2016-11-16  Jiewen Tan  <jiewen_tan@apple.com>
+
+        Add more tests for SubtleCrypto::importKey and SubtleCrypto::exportKey
+        https://bugs.webkit.org/show_bug.cgi?id=164815
+        <rdar://problem/29281660>
+
+        Reviewed by Brent Fulgham.
+
+        * crypto/subtle/aes-import-jwk-key-export-jwk-key.html: Added.
+        * crypto/subtle/aes-import-jwk-key-export-raw-key.html: Added.
+        * crypto/subtle/aes-import-raw-key-export-jwk-key.html: Added.
+        * crypto/subtle/aes-import-raw-key-export-raw-key.html: Added.
+        * crypto/subtle/hmac-import-jwk-key-export-jwk-key.html: Added.
+        * crypto/subtle/hmac-import-jwk-key-export-raw-key.html: Added.
+        * crypto/subtle/hmac-import-raw-key-export-jwk-key.html: Added.
+        * crypto/subtle/hmac-import-raw-key-export-raw-key.html: Added.
+        * crypto/subtle/rsa-import-jwk-key-export-jwk-key-private.html: Added.
+        * crypto/subtle/rsa-import-jwk-key-export-jwk-key-public.html: Added.
+
+2016-11-16  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Updating TestExpectations for two http/tests/security/module-crossorigin tests.
+        https://bugs.webkit.org/show_bug.cgi?id=164539
+
+        Unreviewed test gardening.
+
+        * TestExpectations:
+
+2016-11-16  Daniel Bates  <dabates@apple.com>
+
+        Make test sandbox-should-not-persist-on-navigation.html more representative of real-world scenario
+        https://bugs.webkit.org/show_bug.cgi?id=164752
+
+        Reviewed by Brent Fulgham.
+
+        Modify the test http-0.9/sandbox-should-not-persist-on-navigation.html so that it loads
+        a document on a default port using HTTP 0.9 to trigger the HTTP 0.9 sandbox as this
+        is more representative of a real-world scenario where we want a sandbox to be applied
+        and is the scenario that is currently covered by our HTTP 0.9 sandbox machinery.
+
+        Currently this test makes use of the pre r208549 behavior where the HTTP 0.9 sandbox
+        was applied to a document if one of its subresources loaded on a non-default port
+        using HTTP 0.9 in addition to the behavior where the sandbox is applied to a document
+        that loads on a default port using HTTP 0.9. Following r208549 we no longer apply the
+        sandbox to the document for the former case as this did not improve security much, if
+        any. The latter case is more representative of a real-world scenario where we want to
+        apply the sandbox policy and reflects our behavior following r208549.
+
+        * http/tests/security/http-0.9/resources/nph-sandbox-should-not-persist-on-navigation.pl: Added.
+        * http/tests/security/http-0.9/sandbox-should-not-persist-on-navigation-expected.txt:
+        * http/tests/security/http-0.9/sandbox-should-not-persist-on-navigation.html:
+        * platform/wk2/TestExpectations: Skip the HTTP-0.9 tests in WebKit2 as it uses internals.registerDefaultPortForProtocol().
+
+2016-11-16  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Unreviewed, rolling out r208770.
+
+        The test added with this change is timing out on mac-wk1.
+
+        Reverted changeset:
+
+        "UIScriptController: script with no async tasks fails if an
+        earlier script registered a callback"
+        https://bugs.webkit.org/show_bug.cgi?id=164762
+        http://trac.webkit.org/changeset/208770
+
+2016-11-16  Simon Fraser  <simon.fraser@apple.com>
+
+        Fix typo in bug url.
+
+        * platform/mac/TestExpectations:
+
+2016-11-16  Romain Bellessort  <romain.bellessort@crf.canon.fr>
+
+        [Readable Streams API] Implement ReadableByteStreamController close()
+        https://bugs.webkit.org/show_bug.cgi?id=164413
+
+        Reviewed by Darin Adler.
+
+        Updated test expectations for close() tests and added tests
+        to ensure errors are thrown in various cases defined by spec.
+
+        * streams/readable-byte-stream-controller.js: Updated.
+
+2016-11-16  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [ES6] Integrate ES6 Modules into WebCore
+        https://bugs.webkit.org/show_bug.cgi?id=148897
+
+        Reviewed by Ryosuke Niwa.
+
+        * TestExpectations:
+        * http/tests/misc/module-absolute-url-expected.txt: Added.
+        * http/tests/misc/module-absolute-url.html: Added.
+        * http/tests/misc/module-script-async-expected.txt: Added.
+        * http/tests/misc/module-script-async.html: Added.
+        * http/tests/misc/resources/module-absolute-url.js: Added.
+        * http/tests/misc/resources/module-absolute-url2.js: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/module-scriptnonce-allowed-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/module-scriptnonce-allowed.html: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/module-scriptnonce-and-scripthash-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/module-scriptnonce-and-scripthash.html: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/module-scriptnonce-basic-blocked-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/module-scriptnonce-basic-blocked.html: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/module-scriptnonce-blocked-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/module-scriptnonce-blocked.html: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/module-scriptnonce-ignore-unsafeinline-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/module-scriptnonce-ignore-unsafeinline.html: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/module-scriptnonce-in-enforced-policy-and-not-in-report-only-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/module-scriptnonce-in-enforced-policy-and-not-in-report-only.html: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/module-scriptnonce-in-one-enforced-policy-neither-in-another-enforced-policy-nor-report-policy-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/module-scriptnonce-in-one-enforced-policy-neither-in-another-enforced-policy-nor-report-policy.html: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/module-scriptnonce-invalidnonce-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/module-scriptnonce-invalidnonce.html: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/module-scriptnonce-multiple-policies-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/module-scriptnonce-multiple-policies.html: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/module-scriptnonce-redirect-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/module-scriptnonce-redirect-same-origin-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/module-scriptnonce-redirect-same-origin.html: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/module-scriptnonce-redirect.html: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/resources/module-scriptnonce-in-enforced-policy-and-not-in-report-only.php: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/resources/module-scriptnonce-in-one-enforced-policy-neither-in-another-enforced-policy-nor-report-policy.php: Added.
+        * http/tests/security/contentSecurityPolicy/module-eval-blocked-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/module-eval-blocked-in-external-script-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/module-eval-blocked-in-external-script.html: Added.
+        * http/tests/security/contentSecurityPolicy/module-eval-blocked.html: Added.
+        * http/tests/security/contentSecurityPolicy/resources/echo-module-script-src.pl: Added.
+        * http/tests/security/contentSecurityPolicy/resources/multiple-iframe-module-test.js: Added.
+        (testPreescapedPolicy):
+        (testExperimentalPolicy):
+        (test):
+        (iframe.onload):
+        (testImpl):
+        (finishTesting):
+        * http/tests/security/module-correct-mime-types-expected.txt: Added.
+        * http/tests/security/module-correct-mime-types.html: Added.
+        * http/tests/security/module-crossorigin-error-event-information-expected.txt: Added.
+        * http/tests/security/module-crossorigin-error-event-information.html: Added.
+        * http/tests/security/module-crossorigin-loads-correctly-credentials-expected.txt: Added.
+        * http/tests/security/module-crossorigin-loads-correctly-credentials.html: Added.
+        * http/tests/security/module-crossorigin-loads-omit-expected.txt: Added.
+        * http/tests/security/module-crossorigin-loads-omit.html: Added.
+        * http/tests/security/module-crossorigin-loads-same-origin-expected.txt: Added.
+        * http/tests/security/module-crossorigin-loads-same-origin.html: Added.
+        * http/tests/security/module-crossorigin-onerror-information-expected.txt: Added.
+        * http/tests/security/module-crossorigin-onerror-information.html: Added.
+        * http/tests/security/module-incorrect-mime-types-expected.txt: Added.
+        * http/tests/security/module-incorrect-mime-types.html: Added.
+        * http/tests/security/module-no-mime-type-expected.txt: Added.
+        * http/tests/security/module-no-mime-type.html: Added.
+        * http/tests/security/resources/cors-script.php:
+        * http/tests/security/resources/module-local-script.js: Added.
+        * js/dom/modules/module-and-dom-content-loaded-expected.txt: Added.
+        * js/dom/modules/module-and-dom-content-loaded.html: Added.
+        * js/dom/modules/module-and-window-load-expected.txt: Added.
+        * js/dom/modules/module-and-window-load.html: Added.
+        * js/dom/modules/module-async-and-window-load-expected.txt: Added.
+        * js/dom/modules/module-async-and-window-load.html: Added.
+        * js/dom/modules/module-document-write-expected.txt: Added.
+        * js/dom/modules/module-document-write-src-expected.txt: Added.
+        * js/dom/modules/module-document-write-src.html: Added.
+        * js/dom/modules/module-document-write.html: Added.
+        * js/dom/modules/module-execution-error-inside-dependent-module-should-be-propagated-to-onerror-expected.txt: Added.
+        * js/dom/modules/module-execution-error-inside-dependent-module-should-be-propagated-to-onerror.html: Added.
+        * js/dom/modules/module-execution-error-should-be-propagated-to-onerror-expected.txt: Added.
+        * js/dom/modules/module-execution-error-should-be-propagated-to-onerror.html: Added.
+        * js/dom/modules/module-execution-order-inline-expected.txt: Added.
+        * js/dom/modules/module-execution-order-inline.html: Added.
+        * js/dom/modules/module-execution-order-mixed-expected.txt: Added.
+        * js/dom/modules/module-execution-order-mixed-with-classic-scripts-expected.txt: Added.
+        * js/dom/modules/module-execution-order-mixed-with-classic-scripts.html: Added.
+        * js/dom/modules/module-execution-order-mixed.html: Added.
+        * js/dom/modules/module-incorrect-relative-specifier-expected.txt: Added.
+        * js/dom/modules/module-incorrect-relative-specifier.html: Added.
+        * js/dom/modules/module-incorrect-tag-expected.txt: Added.
+        * js/dom/modules/module-incorrect-tag.html: Added.
+        * js/dom/modules/module-inline-current-script-expected.txt: Added.
+        * js/dom/modules/module-inline-current-script.html: Added.
+        * js/dom/modules/module-inline-dynamic-expected.txt: Added.
+        * js/dom/modules/module-inline-dynamic.html: Added.
+        * js/dom/modules/module-inline-simple-expected.txt: Added.
+        * js/dom/modules/module-inline-simple.html: Added.
+        * js/dom/modules/module-load-event-expected.txt: Added.
+        * js/dom/modules/module-load-event-with-src-expected.txt: Added.
+        * js/dom/modules/module-load-event-with-src.html: Added.
+        * js/dom/modules/module-load-event.html: Added.
+        * js/dom/modules/module-load-same-module-from-different-entry-point-dynamic-expected.txt: Added.
+        * js/dom/modules/module-load-same-module-from-different-entry-point-dynamic.html: Added.
+        * js/dom/modules/module-load-same-module-from-different-entry-point-expected.txt: Added.
+        * js/dom/modules/module-load-same-module-from-different-entry-point.html: Added.
+        * js/dom/modules/module-not-found-error-event-expected.txt: Added.
+        * js/dom/modules/module-not-found-error-event-with-src-and-import-expected.txt: Added.
+        * js/dom/modules/module-not-found-error-event-with-src-and-import.html: Added.
+        * js/dom/modules/module-not-found-error-event-with-src-expected.txt: Added.
+        * js/dom/modules/module-not-found-error-event-with-src.html: Added.
+        * js/dom/modules/module-not-found-error-event.html: Added.
+        * js/dom/modules/module-src-current-script-expected.txt: Added.
+        * js/dom/modules/module-src-current-script.html: Added.
+        * js/dom/modules/module-src-dynamic-expected.txt: Added.
+        * js/dom/modules/module-src-dynamic.html: Added.
+        * js/dom/modules/module-src-simple-expected.txt: Added.
+        * js/dom/modules/module-src-simple.html: Added.
+        * js/dom/modules/module-type-case-insensitive-expected.txt: Added.
+        * js/dom/modules/module-type-case-insensitive.html: Added.
+        * js/dom/modules/module-will-fire-beforeload-expected.txt: Added.
+        * js/dom/modules/module-will-fire-beforeload.html: Added.
+        * js/dom/modules/script-tests/module-document-write-src.js: Added.
+        * js/dom/modules/script-tests/module-execution-error-inside-dependent-module-should-be-propagated-to-onerror-throw.js: Added.
+        * js/dom/modules/script-tests/module-execution-error-inside-dependent-module-should-be-propagated-to-onerror.js: Added.
+        * js/dom/modules/script-tests/module-execution-order-mixed-2.js: Added.
+        * js/dom/modules/script-tests/module-execution-order-mixed-cappuccino.js: Added.
+        * js/dom/modules/script-tests/module-execution-order-mixed-cocoa.js: Added.
+        * js/dom/modules/script-tests/module-execution-order-mixed-matcha.js: Added.
+        * js/dom/modules/script-tests/module-execution-order-mixed-with-classic-scripts-2.js: Added.
+        * js/dom/modules/script-tests/module-execution-order-mixed-with-classic-scripts-cappuccino.js: Added.
+        * js/dom/modules/script-tests/module-execution-order-mixed-with-classic-scripts-cocoa.js: Added.
+        * js/dom/modules/script-tests/module-execution-order-mixed-with-classic-scripts-matcha.js: Added.
+        * js/dom/modules/script-tests/module-execution-order-mixed-with-classic-scripts.js: Added.
+        * js/dom/modules/script-tests/module-execution-order-mixed.js: Added.
+        * js/dom/modules/script-tests/module-inline-dynamic.js: Added.
+        (export.default.Cocoa.prototype.taste):
+        (export.default.Cocoa):
+        * js/dom/modules/script-tests/module-inline-simple.js: Added.
+        (export.default.Cocoa.prototype.taste):
+        (export.default.Cocoa):
+        * js/dom/modules/script-tests/module-load-event-with-src.js: Added.
+        * js/dom/modules/script-tests/module-load-same-module-from-different-entry-point.js: Added.
+        * js/dom/modules/script-tests/module-not-found-error-event-with-src-and-import.js: Added.
+        * js/dom/modules/script-tests/module-src-current-script.js: Added.
+        * js/dom/modules/script-tests/module-src-dynamic-cocoa.js: Added.
+        (Cocoa.prototype.taste):
+        (Cocoa):
+        * js/dom/modules/script-tests/module-src-dynamic.js: Added.
+        * js/dom/modules/script-tests/module-src-simple-cocoa.js: Added.
+        (Cocoa.prototype.taste):
+        (Cocoa):
+        * js/dom/modules/script-tests/module-src-simple.js: Added.
+        * js/dom/modules/script-tests/module-will-fire-beforeload.js: Added.
+
+2016-11-15  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Preview other CSS @media in browser window (print)
+        https://bugs.webkit.org/show_bug.cgi?id=13530
+        <rdar://problem/5712928>
+
+        Reviewed by Timothy Hatcher.
+
+        * inspector/page/media-query-list-listener-exception-expected.txt: Copied from LayoutTests/inspector/page/setEmulatedMedia-expected.txt.
+        * inspector/page/media-query-list-listener-exception.html: Copied from LayoutTests/inspector/page/setEmulatedMedia.html.
+        Rename this test which is about swallowing exceptions and happened to use inspector code.
+
+        * inspector/page/setEmulatedMedia-expected.txt:
+        * inspector/page/setEmulatedMedia.html:
+        Test for Page.setEmulatedMedia command.
+
+2016-11-15  Jon Lee  <jonlee@apple.com>
+
+        Report active video and audio capture devices separately
+        https://bugs.webkit.org/show_bug.cgi?id=164769
+
+        Reviewed by Eric Carlson.
+
+        * fast/mediastream/MediaStream-page-muted-expected.txt: Update test.
+        * fast/mediastream/MediaStream-page-muted.html:
+
+2016-11-15  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking js/regress-141098.html as flaky on ios-simulator.
+        https://bugs.webkit.org/show_bug.cgi?id=163046
+
+        Unreviewed test gardening.
+
+        * platform/ios-simulator/TestExpectations:
+
+2016-11-15  Brady Eidson  <beidson@apple.com>
+
+        IndexedDB 2.0: Key collation during SQLite lookups is insanely slow.
+        https://bugs.webkit.org/show_bug.cgi?id=164754
+
+        Reviewed by Alex Christensen.
+
+        * TestExpectations: Unskip a test that passes even in debug builds, and re-classify
+          a test that used to be too-slow everywhere to be too-slow only in debug builds.
+
+2016-11-15  Simon Fraser  <simon.fraser@apple.com>
+
+        UIScriptController: script with no async tasks fails if an earlier script registered a callback
+        https://bugs.webkit.org/show_bug.cgi?id=164762
+
+        Reviewed by Wenson Hsieh.
+
+        * fast/harness/ui-side-script-with-callback-expected.txt: Added.
+        * fast/harness/ui-side-script-with-callback.html: Added.
+
+2016-11-15  Simon Fraser  <simon.fraser@apple.com>
+
+        UIScriptController: setting a callback to undefined should unregister it
+        https://bugs.webkit.org/show_bug.cgi?id=164796
+
+        Reviewed by Dean Jackson.
+
+        * fast/harness/ui-side-script-unregister-callback-expected.txt: Added.
+        * fast/harness/ui-side-script-unregister-callback.html: Added.
+
+2016-11-15  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking http/tests/cache/disk-cache/disk-cache-remove-several-pending-writes.html as flaky.
+        https://bugs.webkit.org/show_bug.cgi?id=161650
+
+        Unreviewed test gardening.
+
+        * platform/mac/TestExpectations:
+
+2016-11-15  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Skip fast/forms/search-cancel-button-change-input.html on ios-simulator since the test relies upon mouse events.
+
+        Unreviewed test gardening.
+
+        * platform/ios-simulator/TestExpectations:
+
+2016-11-15  Filip Pizlo  <fpizlo@apple.com>
+
+        [mac-wk1 debug] ASSERTION FAILED: thisObject->m_propertyTableUnsafe
+        https://bugs.webkit.org/show_bug.cgi?id=162986
+
+        Reviewed by Saam Barati.
+        
+        This test should not crash anymore.
+
+        * platform/mac-wk1/TestExpectations:
+
+2016-11-15  Jiewen Tan  <jiewen_tan@apple.com>
+
+        js-test-pre.js::shouldReject doesn't need _rejectCallback and _resolveCallback
+        https://bugs.webkit.org/show_bug.cgi?id=164758
+
+        Reviewed by Youenn Fablet.
+
+        Since the function returns a promise, it doesn't need _rejectCallback and _resolveCallback.
+
+        * crypto/subtle/generate-key-malformed-parameters.html:
+        * crypto/subtle/rsa-generate-key-malformed-parameters.html:
+        * crypto/workers/subtle/resources/rsa-generate-key.js:
+        * crypto/workers/subtle/rsa-generate-key-expected.txt:
+        * resources/js-test-pre.js:
+
+2016-11-15  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: inspector/worker/debugger-pause.html fails on WebKit1
+        https://bugs.webkit.org/show_bug.cgi?id=164787
+
+        Reviewed by Timothy Hatcher.
+
+        * inspector/worker/debugger-pause.html:
+        Make this test work for WebKit1 where the VM is shared between the
+        page and inspector page. We need to be able to stop the Inspector's
+        evaluation, so that we can evaluate and pause on the page, and then
+        come back to the inspector afterwards.
+
+2016-11-15  Simon Fraser  <simon.fraser@apple.com>
+
+        [iOS WK2] Implement support for visual viewports
+        https://bugs.webkit.org/show_bug.cgi?id=164765
+
+        Reviewed by Tim Horton.
+
+        Adopt the visual viewport scrolling model in iOS WK2.
+        
+        These tests don't correctly test iOS WK2's async scrolling behavior (webkit.org/b/164779)
+        so rebaseline.
+
+        * platform/ios-simulator-wk2/fast/visual-viewport/nonzoomed-rects-expected.txt: Added.
+        * platform/ios-simulator-wk2/fast/visual-viewport/rtl-nonzoomed-rects-expected.txt: Added.
+        * platform/ios-simulator-wk2/fast/visual-viewport/rtl-zoomed-rects-expected.txt: Added.
+        * platform/ios-simulator-wk2/fast/visual-viewport/zoomed-fixed-expected.txt: Added.
+        * platform/ios-simulator-wk2/fast/visual-viewport/zoomed-fixed-scroll-down-then-up-expected.txt: Added.
+        * platform/ios-simulator-wk2/fast/visual-viewport/zoomed-rects-expected.txt: Added.
+
+2016-11-14  Brent Fulgham  <bfulgham@apple.com>
+
+        Correct handling of changing input type
+        https://bugs.webkit.org/show_bug.cgi?id=164759
+        <rdar://problem/29211174>
+
+        Reviewed by Darin Adler.
+
+        * fast/forms/search-cancel-button-change-input-expected.txt: Added.
+        * fast/forms/search-cancel-button-change-input.html: Added.
+
+2016-11-15  Antti Koivisto  <antti@apple.com>
+
+        slot doesn't work as a flex container
+        https://bugs.webkit.org/show_bug.cgi?id=160740
+        <rdar://problem/28605080>
+
+        Reviewed by Ryosuke Niwa.
+
+        * fast/shadow-dom/css-scoping-slot-flex-expected.html: Added.
+        * fast/shadow-dom/css-scoping-slot-flex.html: Added.
+        * fast/shadow-dom/slot-crash-expected.txt:
+
+2016-11-15  Joanmarie Diggs  <jdiggs@igalia.com>
+
+        AX: Need to update implicit/default values for aria-valuemin, aria-valuenow, and aria-valuemax
+        https://bugs.webkit.org/show_bug.cgi?id=164773
+
+        Reviewed by Chris Fleizach.
+
+        * accessibility/progressbar-expected.txt: Updated to reflect new behavior.
+        * accessibility/progressbar.html: Updated to reflect new behavior.
+        * accessibility/spinbutton-implicit-values-expected.txt: Added.
+        * accessibility/spinbutton-implicit-values.html: Added.
+
+2016-11-14  Jiewen Tan  <jiewen_tan@apple.com>
+
+        Update SubtleCrypto::exportKey to match the latest spec
+        https://bugs.webkit.org/show_bug.cgi?id=164722
+        <rdar://problem/29251740>
+
+        Reviewed by Brent Fulgham.
+
+        Besides adding test cases for SubtleCrypto::exportKey, this patch also corrects a typo:
+        hmac-import-malformed-parameters* => hmac-import-key-malformed-parameters*.
+
+        * crypto/subtle/aes-cbc-generate-export-key-jwk-length-128-expected.txt: Added.
+        * crypto/subtle/aes-cbc-generate-export-key-jwk-length-128.html: Added.
+        * crypto/subtle/aes-cbc-generate-export-key-jwk-length-192-expected.txt: Added.
+        * crypto/subtle/aes-cbc-generate-export-key-jwk-length-192.html: Added.
+        * crypto/subtle/aes-cbc-generate-export-key-jwk-length-256-expected.txt: Added.
+        * crypto/subtle/aes-cbc-generate-export-key-jwk-length-256.html: Added.
+        * crypto/subtle/aes-cbc-generate-export-key-raw-expected.txt: Added.
+        * crypto/subtle/aes-cbc-generate-export-key-raw.html: Added.
+        * crypto/subtle/aes-export-key-malformed-parameters-expected.txt: Added.
+        * crypto/subtle/aes-export-key-malformed-parameters.html: Added.
+        * crypto/subtle/aes-kw-generate-export-key-jwk-length-128-expected.txt: Added.
+        * crypto/subtle/aes-kw-generate-export-key-jwk-length-128.html: Added.
+        * crypto/subtle/aes-kw-generate-export-key-jwk-length-192-expected.txt: Added.
+        * crypto/subtle/aes-kw-generate-export-key-jwk-length-192.html: Added.
+        * crypto/subtle/aes-kw-generate-export-key-jwk-length-256-expected.txt: Added.
+        * crypto/subtle/aes-kw-generate-export-key-jwk-length-256.html: Added.
+        * crypto/subtle/aes-kw-generate-export-raw-key-expected.txt: Added.
+        * crypto/subtle/aes-kw-generate-export-raw-key.html: Added.
+        * crypto/subtle/export-key-malformed-parameters-expected.txt: Added.
+        * crypto/subtle/export-key-malformed-parameters.html: Added.
+        * crypto/subtle/hmac-export-key-malformed-parameters-expected.txt: Added.
+        * crypto/subtle/hmac-export-key-malformed-parameters.html: Added.
+        * crypto/subtle/hmac-generate-export-key-jwk-sha1-expected.txt: Added.
+        * crypto/subtle/hmac-generate-export-key-jwk-sha1.html: Added.
+        * crypto/subtle/hmac-generate-export-key-jwk-sha224-expected.txt: Added.
+        * crypto/subtle/hmac-generate-export-key-jwk-sha224.html: Added.
+        * crypto/subtle/hmac-generate-export-key-jwk-sha256-expected.txt: Added.
+        * crypto/subtle/hmac-generate-export-key-jwk-sha256.html: Added.
+        * crypto/subtle/hmac-generate-export-key-jwk-sha384-expected.txt: Added.
+        * crypto/subtle/hmac-generate-export-key-jwk-sha384.html: Added.
+        * crypto/subtle/hmac-generate-export-key-jwk-sha512-expected.txt: Added.
+        * crypto/subtle/hmac-generate-export-key-jwk-sha512.html: Added.
+        * crypto/subtle/hmac-generate-export-raw-key-expected.txt: Added.
+        * crypto/subtle/hmac-generate-export-raw-key.html: Added.
+        * crypto/subtle/hmac-import-key-malformed-parameters-expected.txt: Renamed from LayoutTests/crypto/subtle/hmac-import-malformed-parameters-expected.txt.
+        * crypto/subtle/hmac-import-key-malformed-parameters.html: Renamed from LayoutTests/crypto/subtle/hmac-import-malformed-parameters.html.
+        * crypto/subtle/rsa-export-key-malformed-parameters-expected.txt: Added.
+        * crypto/subtle/rsa-export-key-malformed-parameters.html: Added.
+        * crypto/subtle/rsa-oaep-generate-export-key-jwk-sha1-expected.txt: Added.
+        * crypto/subtle/rsa-oaep-generate-export-key-jwk-sha1.html: Added.
+        * crypto/subtle/rsa-oaep-generate-export-key-jwk-sha224-expected.txt: Added.
+        * crypto/subtle/rsa-oaep-generate-export-key-jwk-sha224.html: Added.
+        * crypto/subtle/rsa-oaep-generate-export-key-jwk-sha256-expected.txt: Added.
+        * crypto/subtle/rsa-oaep-generate-export-key-jwk-sha256.html: Added.
+        * crypto/subtle/rsa-oaep-generate-export-key-jwk-sha384-expected.txt: Added.
+        * crypto/subtle/rsa-oaep-generate-export-key-jwk-sha384.html: Added.
+        * crypto/subtle/rsa-oaep-generate-export-key-jwk-sha512-expected.txt: Added.
+        * crypto/subtle/rsa-oaep-generate-export-key-jwk-sha512.html: Added.
+        * crypto/subtle/rsaes-pkcs1-v1_5-generate-export-key-jwk-expected.txt: Added.
+        * crypto/subtle/rsaes-pkcs1-v1_5-generate-export-key-jwk.html: Added.
+        * crypto/subtle/rsassa-pkcs1-v1_5-generate-export-key-jwk-sha1-expected.txt: Added.
+        * crypto/subtle/rsassa-pkcs1-v1_5-generate-export-key-jwk-sha1.html: Added.
+        * crypto/subtle/rsassa-pkcs1-v1_5-generate-export-key-jwk-sha224-expected.txt: Added.
+        * crypto/subtle/rsassa-pkcs1-v1_5-generate-export-key-jwk-sha224.html: Added.
+        * crypto/subtle/rsassa-pkcs1-v1_5-generate-export-key-jwk-sha256-expected.txt: Added.
+        * crypto/subtle/rsassa-pkcs1-v1_5-generate-export-key-jwk-sha256.html: Added.
+        * crypto/subtle/rsassa-pkcs1-v1_5-generate-export-key-jwk-sha384-expected.txt: Added.
+        * crypto/subtle/rsassa-pkcs1-v1_5-generate-export-key-jwk-sha384.html: Added.
+        * crypto/subtle/rsassa-pkcs1-v1_5-generate-export-key-jwk-sha512-expected.txt: Added.
+        * crypto/subtle/rsassa-pkcs1-v1_5-generate-export-key-jwk-sha512.html: Added.
+        * crypto/workers/subtle/aes-generate-export-key-jwk-expected.txt: Added.
+        * crypto/workers/subtle/aes-generate-export-key-jwk.html: Added.
+        * crypto/workers/subtle/aes-generate-export-key-raw-expected.txt: Added.
+        * crypto/workers/subtle/aes-generate-export-key-raw.html: Added.
+        * crypto/workers/subtle/hmac-generate-export-key-jwk-expected.txt: Added.
+        * crypto/workers/subtle/hmac-generate-export-key-jwk.html: Added.
+        * crypto/workers/subtle/hmac-generate-export-key-raw-expected.txt: Added.
+        * crypto/workers/subtle/hmac-generate-export-key-raw.html: Added.
+        * crypto/workers/subtle/resources/aes-generate-export-key-jwk.js: Added.
+        * crypto/workers/subtle/resources/aes-generate-export-key-raw.js: Added.
+        * crypto/workers/subtle/resources/hmac-generate-export-key-jwk.js: Added.
+        * crypto/workers/subtle/resources/hmac-generate-export-key-raw.js: Added.
+        * crypto/workers/subtle/resources/rsa-generate-export-key-jwk.js: Added.
+        * crypto/workers/subtle/rsa-generate-export-key-jwk-expected.txt: Added.
+        * crypto/workers/subtle/rsa-generate-export-key-jwk.html: Added.
+
+2016-11-15  Jon Lee  <jonlee@apple.com>
+
+        Remove HasMediaCaptureDevice
+        https://bugs.webkit.org/show_bug.cgi?id=164767
+        <rdar://problem/29263696>
+
+        Reviewed by Eric Carlson.
+
+        * fast/mediastream/MediaStream-page-muted-expected.txt: Remove check for HasMediaCaptureDevice.
+        * fast/mediastream/MediaStream-page-muted.html:
+
+2016-11-14  Dave Hyatt  <hyatt@apple.com>
+
+        [CSS Parser] Fix font-synthesis and text-decoration-skip parsing
+        https://bugs.webkit.org/show_bug.cgi?id=164736
+
+        Reviewed by Dean Jackson.
+
+        * fast/css3-text/css3-text-decoration/text-decoration-skip/text-decoration-skip-roundtrip-expected.txt:
+        * fast/css3-text/css3-text-decoration/text-decoration-skip/text-decoration-skip-roundtrip.html:
+        * fast/css3-text/font-synthesis-parse-expected.txt:
+        * fast/css3-text/font-synthesis-parse.html:
+
+2016-11-15  Daniel Bates  <dabates@apple.com>
+
+        Disallow loads using HTTP 0.9 at the ResourceHandle/NetworkDataTask level
+        https://bugs.webkit.org/show_bug.cgi?id=164662
+        <rdar://problem/29268514>
+
+        Reviewed by Reviewed by Alex Christensen and Brady Eidson.
+
+        Add a test to ensure that we block a synchronous XHR load using HTTP 0.9.
+        Renamed test image-default-port-blocked.html to image-default-port-allowed.html
+        as we now allow a subresource load using HTTP 0.9 on a default port regardless
+        of the HTTP version the embedding page used.
+
+        Update test expectations as DRT/WTR do not emit a localized description for the
+        error associated with a load failure. Note that a message is emitted to
+        Web Inspector console.
+
+        * http/tests/security/http-0.9/iframe-blocked-expected.txt:
+        * http/tests/security/http-0.9/iframe-blocked.html: Dump frame load callbacks
+        to see that load was cancelled as there is no other unique visible indication
+        of success.
+        * http/tests/security/http-0.9/image-blocked-expected.txt: Update expected result.
+        * http/tests/security/http-0.9/image-default-port-allowed-expected.txt: Renamed from LayoutTests/http/tests/security/http-0.9/image-default-port-blocked-expected.txt.
+        * http/tests/security/http-0.9/image-default-port-allowed.html: Renamed from LayoutTests/http/tests/security/http-0.9/image-default-port-blocked.html.
+        * http/tests/security/http-0.9/image-on-HTTP-0.9-page-blocked-expected.txt: Update expected result.
+        * http/tests/security/http-0.9/image-on-HTTP-0.9-page-blocked.html: Ditto.
+        * http/tests/security/http-0.9/sandbox-should-not-persist-on-navigation-expected.txt: Ditto.
+        * http/tests/security/http-0.9/worker-connect-src-blocked-expected.txt: Ditto.
+        * http/tests/security/http-0.9/worker-importScripts-blocked-expected.txt: Ditto.
+        * http/tests/security/http-0.9/xhr-asynchronous-blocked-expected.txt: Ditto.
+        * http/tests/security/http-0.9/xhr-blocked-expected.txt: Added.
+        * http/tests/security/http-0.9/xhr-blocked.html: Added.
+        * platform/wk2/TestExpectations: Skip the HTTP-0.9 tests in WebKit2 that use internals.registerDefaultPortForProtocol().
+        The function internals.registerDefaultPortForProtocol only updates the default-port-to-protocol map in the WebContent
+        process. However network loads in WebKit2 occur in the NetworkProcess. Further investigation is needed to determine
+        the best way to support testing with default ports. Ideally, we would run an HTTP server on port 80 for testing and
+        remove the need for internals.registerDefaultPortForProtocol().
+
+2016-11-15  Zalan Bujtas  <zalan@apple.com>
+
+        [MultiCol] Render tree should be all clean by the end of FrameView::layout().
+        https://bugs.webkit.org/show_bug.cgi?id=162833
+
+        Reviewed by Simon Fraser.
+
+        This patch actually fixes the renderering of the closing quotation mark. Currently, it is
+        not rendered at all.
+
+        * fast/inline/out-of-flow-quotation-text-with-multicolumn-expected.html: Added.
+        * fast/inline/out-of-flow-quotation-text-with-multicolumn.html: Added.
+
+2016-11-15  Alejandro G. Castro  <alex@igalia.com>
+
+        WebRTC: update MediaStream-MediaElement-srcObject.html test and unskip it
+        https://bugs.webkit.org/show_bug.cgi?id=159343
+
+        Reviewed by Philippe Normand.
+
+        Update the test to use the getUserMedia API and unskip it.
+
+        * fast/mediastream/MediaStream-MediaElement-srcObject-expected.txt:
+        Update the result of using the getUserMedia API.
+        * fast/mediastream/MediaStream-MediaElement-srcObject.html: Use
+        the getUserMedia API from the helper.
+        * platform/gtk/TestExpectations: Unskip the test.
+        * platform/mac/TestExpectations: Unskip the test.
+
+2016-11-14  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Worker debugging should pause all targets and view call frames in all targets
+        https://bugs.webkit.org/show_bug.cgi?id=164305
+        <rdar://problem/29056192>
+
+        Reviewed by Timothy Hatcher.
+
+        * inspector/debugger/continueUntilNextRunLoop-expected.txt: Added.
+        * inspector/debugger/continueUntilNextRunLoop.html: Added.
+        New test for new Debugger.continueUntilNextRunLoop protocol method.
+
+        * inspector/worker/debugger-multiple-targets-pause-expected.txt: Added.
+        * inspector/worker/debugger-multiple-targets-pause.html: Added.
+        * inspector/worker/resources/worker-debugger-thread-1.js: Added.
+        * inspector/worker/resources/worker-debugger-thread-2.js: Added.
+        This tests uses a 250ms timeout because we have to have the worker thread
+        evaluate some work and trigger a pause on other threads before their work
+        starts. On debug builds, shorter times, like 100ms, would not be enough.
+
+        * inspector/worker/debugger-pause-expected.txt:
+        * inspector/worker/debugger-pause.html:
+        Now that all threads pause, the first InspectorTest.log evaluates JavaScript on
+        the page and causes a pause. So make the first log empty to keep the test unchanged.
+
+        * inspector/worker/runtime-basic-expected.txt:
+        * inspector/unit-tests/target-manager-expected.txt:
+        Updated display name of the mainTarget.
+
+2016-11-14  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        [WebGL2] Teach WebGLRenderingContextBase about new texture internal formats
+        https://bugs.webkit.org/show_bug.cgi?id=164525
+
+        Reviewed by Dean Jackson.
+
+        Test texture types without drawing. Instead, attach a texture to a framebuffer and
+        use readPixels() to make sure the texture retains its data.
+
+        * fast/canvas/webgl/webgl2-texture-upload-enums-expected.txt: Added.
+        * fast/canvas/webgl/webgl2-texture-upload-enums.html: Added.
+
+2016-11-14  Ryosuke Niwa  <rniwa@webkit.org>
+
+        document.createElementNS doesn't construct a custom element
+        https://bugs.webkit.org/show_bug.cgi?id=164700
+
+        Reviewed by Darin Adler.
+
+        Added W3C style testharness.js tests for createElementNS and DOMImplementation's createDocument.
+
+        * fast/custom-elements/DOMImplementation-createDocument-expected.txt: Added.
+        * fast/custom-elements/DOMImplementation-createDocument.html: Added.
+        * fast/custom-elements/document-createElementNS-expected.txt: Added.
+        * fast/custom-elements/document-createElementNS.html: Added.
+
+2016-11-14  Dean Jackson  <dino@apple.com>
+
+        Handle filter() image type in new CSS Parser
+        https://bugs.webkit.org/show_bug.cgi?id=164673
+        <rdar://problems/29231376>
+
+        Reviewed by Darin Adler.
+
+        Remove the test that allows a string value for the
+        image source rather than a url().
+
+        * fast/filter-image/filter-image-animation-expected.txt:
+        * fast/filter-image/filter-image-animation.html:
+
+2016-11-14  Joanmarie Diggs  <jdiggs@igalia.com>
+
+        AX: In ARIA 1.1, the implicit value for aria-level on headings is 2
+        https://bugs.webkit.org/show_bug.cgi?id=164714
+
+        Reviewed by Chris Fleizach.
+
+        Added new test case to existing test and updated expectations.
+
+        * accessibility/gtk/xml-roles-exposed-expected.txt: Updated.
+        * accessibility/heading-level-expected.txt: Updated.
+        * accessibility/heading-level.html: New test case added.
+
+2016-11-14  Dave Hyatt  <hyatt@apple.com>
+
+        [CSS Parser] Remove incorrect cursor result
+        https://bugs.webkit.org/show_bug.cgi?id=164717
+
+        Reviewed by Dean Jackson.
+
+        * fast/css/cursor-parsing-expected.txt:
+        * fast/css/cursor-parsing.html:
+
+2016-11-14  Youenn Fablet  <youenn@apple.com>
+
+        Refresh RTCDataChannel abstract infrastructure
+        https://bugs.webkit.org/show_bug.cgi?id=164680
+
+        Reviewed by Darin Adler.
+
+        * fast/mediastream/RTCPeerConnection-datachannel-expected.txt:
+        * fast/mediastream/RTCPeerConnection-datachannel.html:
+        * platform/mac/TestExpectations:
+
+2016-11-14  David Kilzer  <ddkilzer@apple.com>
+
+        REGRESSION (r83521): Fix malformed <canvas> tag in fast/canvas/DrawImageSinglePixelStretch.html
+
+        Unreviewed.
+
+        Before: <canvas id="c"</canvas>
+        Parsed: <canvas id="c" <="" canvas="" width="200" height="50"></canvas>
+
+        After:  <canvas id="c"></canvas>
+        Parsed: <canvas id="c" width="200" height="50"></canvas>
+
+        * fast/canvas/DrawImageSinglePixelStretch.html: Close <canvas>
+        tag.  This does not affect test results, but the HTML5 parser
+        was covering for this mistake.
+
+2016-11-14  David Kilzer  <ddkilzer@apple.com>
+
+        Bug 164702: WebContent crash due to checked unsigned overflow in WebCore: WebCore::RenderLayerCompositor::requiresCompositingLayer const + 1104
+        <https://webkit.org/b/164702>
+        <rdar://problem/29236368>
+
+        Reviewed by Darin Adler.
+
+        * inspector/layers/layers-compositing-reasons-expected.txt:
+        Update results.
+        * inspector/layers/layers-compositing-reasons.html: Update to
+        reproduce the crash.  This does not reproduce the original crash
+        stack, but does exercise the same crashing code.
+
+2016-11-14  Joanmarie Diggs  <jdiggs@igalia.com>
+
+        AX: [ATK] Expose STATE_SINGLE_LINE and STATE_MULTI_LINE for ARIA searchbox role
+        https://bugs.webkit.org/show_bug.cgi?id=164712
+
+        Reviewed by Chris Fleizach.
+
+        * accessibility/gtk/singleline-and-multiline-expected.txt: Added.
+        * accessibility/gtk/singleline-and-multiline.html: Added.
+
+2016-11-13  Fujii Hironori  <Hironori.Fujii@sony.com>
+
+        [HarfBuzz] HarfBuzzShaper should not assume numGlyphs is greater than 0
+        https://bugs.webkit.org/show_bug.cgi?id=164500
+
+        Reviewed by Myles C. Maxfield.
+
+        * fast/text/international/harfbuzz-runs-with-no-glyph-expected.txt: Added.
+        * fast/text/international/harfbuzz-runs-with-no-glyph.html: Added.
+        * fast/text/international/resources/ignorables.woff: Added.
+
+2016-11-13  Chris Dumez  <cdumez@apple.com>
+
+        REGRESSION (204441): newsplex.com map does not load
+        https://bugs.webkit.org/show_bug.cgi?id=164705
+        <rdar://problem/28753438>
+
+        Reviewed by Darin Adler.
+
+        * fast/dom/getElementsByTagName-HTMLElement-prefix-expected.txt: Added.
+        * fast/dom/getElementsByTagName-HTMLElement-prefix.html: Added.
+
+2016-11-12  Simon Fraser  <simon.fraser@apple.com>
+
+        Add a way to get the UI-side scrolling tree as text via UIScriptController
+        https://bugs.webkit.org/show_bug.cgi?id=164697
+
+        Reviewed by Zalan Bujtas.
+
+        Add a test that dumps the scrolling state tree with a fixed element.
+
+        * scrollingcoordinator/ios/ui-scrolling-tree-expected.txt: Added.
+        * scrollingcoordinator/ios/ui-scrolling-tree.html: Added.
+
 2016-11-12  Simon Fraser  <simon.fraser@apple.com>
 
         [iOS WK2] Share some code with Mac for post-async-scroll state reconciliation

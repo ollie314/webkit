@@ -63,16 +63,11 @@ private:
 class CustomElementReactionStack {
 public:
     CustomElementReactionStack()
-        : m_previousProcessingStack(s_currentProcessingStack)
     {
-        s_currentProcessingStack = this;
     }
 
     ~CustomElementReactionStack()
     {
-        if (UNLIKELY(m_queue))
-            processQueue();
-        s_currentProcessingStack = m_previousProcessingStack;
     }
 
     static CustomElementReactionQueue& ensureCurrentQueue(Element&);
@@ -89,9 +84,6 @@ private:
 
     private:
         Vector<Ref<Element>> m_elements;
-#if !ASSERT_DISABLED
-        bool m_invoking { false };
-#endif
     };
 
     WEBCORE_EXPORT void processQueue();
@@ -100,7 +92,6 @@ private:
     static ElementQueue& backupElementQueue();
 
     ElementQueue* m_queue { nullptr };
-    CustomElementReactionStack* m_previousProcessingStack;
 
     WEBCORE_EXPORT static CustomElementReactionStack* s_currentProcessingStack;
 };
