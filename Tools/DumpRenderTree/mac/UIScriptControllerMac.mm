@@ -46,6 +46,11 @@ void UIScriptController::doAsyncTask(JSValueRef callback)
     });
 }
 
+void UIScriptController::doAfterPresentationUpdate(JSValueRef callback)
+{
+    return doAsyncTask(callback);
+}
+
 void UIScriptController::insertText(JSStringRef, int, int)
 {
 }
@@ -62,6 +67,10 @@ void UIScriptController::zoomToScale(double scale, JSValueRef callback)
             return;
         m_context->asyncTaskComplete(callbackID);
     });
+}
+
+void UIScriptController::simulateAccessibilitySettingsChangeNotification(JSValueRef)
+{
 }
 
 JSObjectRef UIScriptController::contentsOfUserInterfaceItem(JSStringRef interfaceItem) const

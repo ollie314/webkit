@@ -1,3 +1,236 @@
+2016-11-16  Philippe Normand  <pnormand@igalia.com>
+
+        [GTK][WebRTC] Switch to downstream OpenWebRTC and more recent GStreamer
+        https://bugs.webkit.org/show_bug.cgi?id=164817
+
+        Reviewed by Alejandro G. Castro.
+
+        This is temporary, hopefully. The OpenWebRTC patches will/should
+        be soon reviewed and upstream but meanwhile it makes sense to use
+        the Igalia downstream fork so that the WebRTC testing is easier.
+
+        Recent GStreamer patches are also needed for RTP bundling support
+        and RTP retransmission fixes.
+
+        * gtk/jhbuild.modules:
+        * gtk/openwebrtc.modules: Removed.
+        * gtk/patches/gst-plugins-good-0001-rtpbin-pipeline-gets-an-EOS-when-any-rtpsources-byes.patch: Added.
+        * gtk/patches/gst-plugins-good-0002-rtpbin-avoid-generating-errors-when-rtcp-messages-ar.patch: Added.
+        * gtk/patches/gst-plugins-good-0003-rtpbin-receive-bundle-support.patch: Added.
+
+2016-11-20  Zan Dobersek  <zdobersek@igalia.com>
+
+        [EncryptedMedia] Make EME API runtime-enabled
+        https://bugs.webkit.org/show_bug.cgi?id=164927
+
+        Reviewed by Jer Noble.
+
+        Enable the EME API via the WKTR InjectedBundle whenever testing
+        commences. This does not have any effect unless the EME feature
+        is enabled at compile-time, but it's still added to match other
+        features and for future use.
+
+        * WebKitTestRunner/InjectedBundle/InjectedBundle.cpp:
+        (WTR::InjectedBundle::beginTesting):
+        * WebKitTestRunner/InjectedBundle/TestRunner.cpp:
+        (WTR::TestRunner::setEncryptedMediaAPIEnabled):
+        * WebKitTestRunner/InjectedBundle/TestRunner.h:
+
+2016-11-19  Simon Fraser  <simon.fraser@apple.com>
+
+        Fix the Mac and iOS bulds.
+
+        * WebKitTestRunner/cocoa/TestRunnerWKWebView.mm:
+        (-[TestRunnerWKWebView _stableStateOverride]):
+        (-[TestRunnerWKWebView _setStableStateOverride:]):
+
+2016-11-18  Simon Fraser  <simon.fraser@apple.com>
+
+        Make it possible to test non-stable-state scrolling on iOS
+        https://bugs.webkit.org/show_bug.cgi?id=164905
+
+        Reviewed by Dan Bernstein.
+
+        Make it possible for an iOS layout test to force every visible rect update
+        from the UI process to the web process to be in a non-stable state. This emulates
+        what happens during panning and zooming interactions, and allows us to test the
+        scrolling and layer trees in these transient states.
+        
+        This is done by adding a testing property on WKWebView, _stableStateOverride, whose
+        getters and setters are overridden in TestRunnerWKWebView. When non-nil, we _updateVisibleContentRectAfterScrollInView
+        consults the NSNumber's boolValue and uses it to override the stable state.
+        
+        To facilitate this kind of testing, also add immediateScrollToOffset() and
+        immediateZoomToScale() to UIScriptController. Finally, add doAfterPresentationUpdate()
+        which provides a callback that fires after one trip to the web process and back.
+        
+        Add code generation support for optional boolean attributes in IDL.
+
+        Align CodeGeneratorDumpRenderTree.pm and CodeGeneratorTestRunner.pm.
+
+        * DumpRenderTree/Bindings/CodeGeneratorDumpRenderTree.pm:
+        (_generateImplementationFile):
+        (_platformTypeConstructor):
+        (_returnExpression):
+        * DumpRenderTree/ios/UIScriptControllerIOS.mm:
+        (WTR::UIScriptController::doAfterPresentationUpdate):
+        (WTR::contentOffsetBoundedInValidRange):
+        (WTR::UIScriptController::scrollToOffset):
+        (WTR::UIScriptController::immediateScrollToOffset):
+        (WTR::UIScriptController::immediateZoomToScale):
+        (WTR::UIScriptController::stableStateOverride):
+        (WTR::UIScriptController::setStableStateOverride):
+        * DumpRenderTree/mac/UIScriptControllerMac.mm:
+        (WTR::UIScriptController::doAfterPresentationUpdate):
+        * TestRunnerShared/Bindings/JSWrappable.h:
+        (WTR::JSValueMakeBooleanOrNull):
+        (WTR::JSValueToNullableBoolean):
+        * TestRunnerShared/UIScriptContext/Bindings/UIScriptController.idl:
+        * TestRunnerShared/UIScriptContext/UIScriptController.cpp:
+        (WTR::UIScriptController::immediateScrollToOffset):
+        (WTR::UIScriptController::immediateZoomToScale):
+        (WTR::UIScriptController::stableStateOverride):
+        (WTR::UIScriptController::setStableStateOverride):
+        * TestRunnerShared/UIScriptContext/UIScriptController.h:
+        * WebKitTestRunner/InjectedBundle/Bindings/CodeGeneratorTestRunner.pm:
+        (_classRefGetter):
+        (_platformTypeConstructor):
+        (_returnExpression):
+        * WebKitTestRunner/cocoa/TestRunnerWKWebView.mm:
+        (-[TestRunnerWKWebView dealloc]):
+        (-[TestRunnerWKWebView _stableStateOverride]):
+        (-[TestRunnerWKWebView _setStableStateOverride:]):
+        * WebKitTestRunner/ios/TestControllerIOS.mm:
+        (WTR::TestController::platformResetStateToConsistentValues):
+        * WebKitTestRunner/ios/UIScriptControllerIOS.mm:
+        (WTR::UIScriptController::doAsyncTask):
+        (WTR::UIScriptController::doAfterPresentationUpdate):
+        (WTR::UIScriptController::zoomToScale):
+        (WTR::UIScriptController::immediateScrollToOffset):
+        (WTR::UIScriptController::immediateZoomToScale):
+        (WTR::UIScriptController::stableStateOverride):
+        (WTR::UIScriptController::setStableStateOverride):
+        * WebKitTestRunner/mac/UIScriptControllerMac.mm:
+        (WTR::UIScriptController::doAfterPresentationUpdate):
+
+2016-11-19  Joanmarie Diggs  <jdiggs@igalia.com>
+
+        AX: [ATK] Expose aria-busy via ATK_STATE_BUSY
+        https://bugs.webkit.org/show_bug.cgi?id=164909
+
+        Reviewed by Chris Fleizach.
+
+        Implement boolAttributeValue() for ATK so we can test AXElementBusy.
+
+        * WebKitTestRunner/InjectedBundle/atk/AccessibilityUIElementAtk.cpp:
+        (WTR::AccessibilityUIElement::boolAttributeValue):
+
+2016-11-18  Simon Fraser  <simon.fraser@apple.com>
+
+        [iOS WK2] Eliminate a source of flakiness in layout tests by forcing WebPage into "responsive" mode for all tests, with an internals override
+        https://bugs.webkit.org/show_bug.cgi?id=164980
+
+        Reviewed by Chris Dumez.
+
+        * WebKitTestRunner/InjectedBundle/InjectedBundlePage.cpp:
+        (WTR::InjectedBundlePage::prepare):
+
+2016-11-18  Dean Jackson  <dino@apple.com>
+
+        AX: "(inverted-colors)" media query only matches on page reload; should match on change
+        https://bugs.webkit.org/show_bug.cgi?id=163564
+        <rdar://problem/28807350>
+
+        Reviewed by Simon Fraser.
+
+        Add a UIScriptController method that tricks WebKit into thinking
+        it has received a notification that accessibility settings have
+        changed. Combined with our forced overrides, this allows us to
+        test if a page would react to the notifications.
+
+        * DumpRenderTree/ios/UIScriptControllerIOS.mm:
+        (WTR::UIScriptController::simulateAccessibilitySettingsChangeNotification):
+        * DumpRenderTree/mac/UIScriptControllerMac.mm:
+        (WTR::UIScriptController::simulateAccessibilitySettingsChangeNotification):
+        * TestRunnerShared/UIScriptContext/Bindings/UIScriptController.idl:
+        * TestRunnerShared/UIScriptContext/UIScriptController.cpp:
+        (WTR::simulateAccessibilitySettingsChangeNotification):
+        * TestRunnerShared/UIScriptContext/UIScriptController.h:
+        * WebKitTestRunner/ios/UIScriptControllerIOS.mm:
+        (WTR::UIScriptController::simulateAccessibilitySettingsChangeNotification):
+        * WebKitTestRunner/mac/UIScriptControllerMac.mm:
+        (WTR::UIScriptController::simulateAccessibilitySettingsChangeNotification):
+
+2016-11-18  Alex Christensen  <achristensen@webkit.org>
+
+        Fix API test after r208902
+        https://bugs.webkit.org/show_bug.cgi?id=144194
+
+        * TestWebKitAPI/Tests/Cocoa/URLExtras.mm:
+        (TestWebKitAPI::TEST):
+        The fullwidth solidus, U+FF0F, changed encoding from IDN2003 to IDN2008, probably to prevent domains from using it
+        to spoof other domains.  https://webkit.org/blog/ and https://webkit.org\uFF0Fblog/ would otherwise look 
+        too similar when rendered.
+
+2016-11-17  Alex Christensen  <achristensen@webkit.org>
+
+        Support IDN2008 with UTS #46 instead of IDN2003
+        https://bugs.webkit.org/show_bug.cgi?id=144194
+
+        Reviewed by Darin Adler.
+
+        * TestWebKitAPI/Tests/WebCore/URLParser.cpp:
+        (TestWebKitAPI::TEST_F):
+        Add some tests from http://unicode.org/faq/idn.html verifying that we follow UTS46's deviations from IDN2008.
+        Add some tests based on https://tools.ietf.org/html/rfc5893 verifying that we check for bidirectional text.
+        Add a test based on https://tools.ietf.org/html/rfc5892 verifying that we do not do ContextO check.
+        Add a test for U+321D and U+321E which have particularly interesting punycode encodings.  We match Firefox here now.
+        Also add a test from http://www.unicode.org/reports/tr46/#IDNAComparison verifying we are not using IDN2003.
+        We should consider importing all of http://www.unicode.org/Public/idna/9.0.0/IdnaTest.txt as URL domain tests.
+
+2016-11-17  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Downloads started by context menu actions should also have a web view associated
+        https://bugs.webkit.org/show_bug.cgi?id=164364
+
+        Reviewed by Michael Catanzaro.
+
+        Add a GTK+ unit tests to check that downloads started by the context menu have a web view associated.
+
+        * TestWebKitAPI/Tests/WebKit2Gtk/TestDownloads.cpp:
+        (downloadLocalFileSuccessfully):
+        (testDownloadOverwriteDestinationDisallowed):
+        (testDownloadLocalFileError):
+        (testDownloadRemoteFile):
+        (testDownloadRemoteFileError):
+        (testDownloadMIMEType):
+        (contextMenuCallback):
+        (testContextMenuDownloadActions):
+        (beforeAll):
+
+2016-11-17  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Add an experimental API to find elements across shadow boundaries
+        https://bugs.webkit.org/show_bug.cgi?id=164851
+        <rdar://problem/28220092>
+
+        Reviewed by Sam Weinig.
+
+        Added test cases for window.collectMatchingElementsInFlatTree to WebKit2.InjectedBundleMakeAllShadowRootOpen.
+
+        * TestWebKitAPI/TestWebKitAPI.xcodeproj/project.pbxproj:
+        * TestWebKitAPI/Tests/WebKit2/InjectedBundleMakeAllShadowRoot*s*Open_Bundle.cpp: Renamed
+        from InjectedBundleMakeAllShadowRootOpen_Bundle.cpp.
+        (TestWebKitAPI::InjectedBundleMakeAllShadowRootOpenTest::initialize): Added test cases for
+        window.collectMatchingElementsInFlatTree by calling alert() many times.
+        * TestWebKitAPI/Tests/WebKit2/InjectedBundleMakeAllShadowRootsOpen.cpp:
+        (TestWebKitAPI::runJavaScriptAlert): Added expectations for multiple test cases. Each test case
+        finishes with a call to alert, and moves testNumber forward.
+        (TestWebKitAPI::TEST): Use the newly added closed-shadow-tree-test.html
+        * TestWebKitAPI/Tests/WebKit2/closed-shadow-tree-test.html: Added. Creates a shadow tree with slots
+        and tests that window.collectMatchingElementsInFlatTree is not present when
+        an event named "testnormalworld" is dispatched by the injected bundle.
+
 2016-11-17  Brady Eidson  <beidson@apple.com>
 
         Add _WKIconLoadingDelegate SPI.

@@ -1,3 +1,1318 @@
+2016-11-21  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Add URL::hostAndPort()
+        https://bugs.webkit.org/show_bug.cgi?id=164907
+
+        Reviewed by Alex Christensen.
+
+        As a convenient way of getting the host and port (if any) as a string.
+
+        * html/URLUtils.h:
+        (WebCore::URLUtils<T>::host): Use URL::hostAndPort().
+        * page/Location.cpp:
+        (WebCore::Location::host): Ditto.
+        * platform/URL.cpp:
+        (WebCore::URL::hostAndPort): Return host:port or just host if there isn't a port.
+        * platform/URL.h:
+        * platform/network/CredentialStorage.cpp:
+        (WebCore::originStringFromURL): Use URL::hostAndPort().
+        * workers/WorkerLocation.cpp:
+        (WebCore::WorkerLocation::host): Ditto.
+
+2016-11-21  Philippe Normand  <pnormand@igalia.com>
+
+        [WebRTC][OpenWebRTC] parse turns urls
+        https://bugs.webkit.org/show_bug.cgi?id=164587
+
+        Reviewed by Alejandro G. Castro.
+
+        * platform/mediastream/openwebrtc/MediaEndpointOwr.cpp:
+        (WebCore::MediaEndpointOwr::ensureTransportAgentAndTransceivers):
+        Hook turns servers between the RTCConfiguration and the underlying
+        OpenWebRTC layer.
+
+2016-11-21  Philippe Normand  <pnormand@igalia.com>
+
+        [Gstreamer] Add volume and mute support to the WebRTC mediaplayer
+        https://bugs.webkit.org/show_bug.cgi?id=153828
+
+        Reviewed by Darin Adler.
+
+        * platform/graphics/gstreamer/MediaPlayerPrivateGStreamerOwr.cpp:
+        (WebCore::MediaPlayerPrivateGStreamerOwr::setVolume): New implementation setting the OWR source volume property.
+        (WebCore::MediaPlayerPrivateGStreamerOwr::setMuted): New implementation setting the OWR source mute property.
+        (WebCore::MediaPlayerPrivateGStreamerOwr::maybeHandleChangeMutedState): Also set audio OWR source mute state depending on the track enabled state.
+        (WebCore::MediaPlayerPrivateGStreamerOwr::trackEnabledChanged): chain to maybeHandleChangeMuteState.
+        * platform/graphics/gstreamer/MediaPlayerPrivateGStreamerOwr.h:
+
+2016-11-21  Alejandro G. Castro  <alex@igalia.com> and Philippe Normand  <pnormand@igalia.com>
+
+        [WebRTC][OpenWebRTC] RTP bundling support
+        https://bugs.webkit.org/show_bug.cgi?id=162333
+
+        Reviewed by Alejandro G. Castro.
+
+        Configure the OpenWebRTC transport agent bundle policy according
+        to the RTCConfiguration and pass the receive SSRCs over to
+        OpenWebRTC as well. Those are needed so the agent is aware of the
+        bundle layout.
+
+        * platform/mediastream/openwebrtc/MediaEndpointOwr.cpp:
+        (WebCore::MediaEndpointOwr::updateReceiveConfiguration):
+        (WebCore::MediaEndpointOwr::updateSendConfiguration):
+        (WebCore::MediaEndpointOwr::ensureTransportAgentAndTransceivers):
+
+2016-11-20  Zan Dobersek  <zdobersek@igalia.com>
+
+        [EncryptedMedia] Make EME API runtime-enabled
+        https://bugs.webkit.org/show_bug.cgi?id=164927
+
+        Reviewed by Jer Noble.
+
+        Update the EME API IDL definitions to use the EnabledAtRuntime
+        attribute on the relevant interfaces, attributes and operations.
+        EncryptedMediaAPI is used as the attribute value.
+
+        The corresponding getter, setter and member boolean are added to
+        the RuntimeEnabledFeatures class.
+
+        * Modules/encryptedmedia/MediaKeyMessageEvent.idl:
+        * Modules/encryptedmedia/MediaKeySession.idl:
+        * Modules/encryptedmedia/MediaKeyStatusMap.idl:
+        * Modules/encryptedmedia/MediaKeySystemAccess.idl:
+        * Modules/encryptedmedia/MediaKeys.idl:
+        * Modules/encryptedmedia/NavigatorEME.idl:
+        * bindings/generic/RuntimeEnabledFeatures.h:
+        (WebCore::RuntimeEnabledFeatures::setEncryptedMediaAPIEnabled):
+        (WebCore::RuntimeEnabledFeatures::encryptedMediaAPIEnabled):
+        * html/HTMLMediaElement.idl:
+        * html/MediaEncryptedEvent.idl:
+
+2016-11-20  Eric Carlson  <eric.carlson@apple.com>
+
+        REGRESSION (r208606?): LayoutTest fast/mediastream/enumerating-crash.html is a flaky crash
+        https://bugs.webkit.org/show_bug.cgi?id=164715
+        <rdar://problem/29277180>
+
+        Reviewed by Alexey Proskuryakov.
+
+        No new tests, fixes an existing test crash.
+
+        * Modules/mediastream/UserMediaRequest.cpp:
+        (WebCore::UserMediaRequest::contextDestroyed): Call base class method before clearing m_controller
+          because it nullifies the security context.
+
+2016-11-19  Chris Dumez  <cdumez@apple.com>
+
+        Update HTML form validation messages
+        https://bugs.webkit.org/show_bug.cgi?id=164957
+        <rdar://problem/29338669>
+
+        Reviewed by Darin Adler.
+
+        Update HTML form validation messages as per recent feedback:
+        - Drop the "Please".
+        - Drop the period at the end.
+        - Drop the "if you want to proceed" that was used only for the checkbox.
+
+        No new tests, rebaselined existing tests.
+
+        * English.lproj/Localizable.strings:
+        * platform/LocalizedStrings.cpp:
+        (WebCore::validationMessageValueMissingText):
+        (WebCore::validationMessageValueMissingForCheckboxText):
+        (WebCore::validationMessageValueMissingForFileText):
+        (WebCore::validationMessageValueMissingForRadioText):
+        (WebCore::validationMessageValueMissingForSelectText):
+        (WebCore::validationMessageTypeMismatchText):
+        (WebCore::validationMessageTypeMismatchForEmailText):
+        (WebCore::validationMessageTypeMismatchForURLText):
+        (WebCore::validationMessagePatternMismatchText):
+        (WebCore::validationMessageTooShortText):
+        (WebCore::validationMessageTooLongText):
+        (WebCore::validationMessageRangeUnderflowText):
+        (WebCore::validationMessageRangeOverflowText):
+        (WebCore::validationMessageStepMismatchText):
+        (WebCore::validationMessageBadInputForNumberText):
+
+2016-11-19  Joanmarie Diggs  <jdiggs@igalia.com>
+
+        AX: [ATK] Implement selection interface and states for elements supporting aria-selected and for menu roles
+        https://bugs.webkit.org/show_bug.cgi?id=164865
+
+        Reviewed by Chris Fleizach.
+
+        Implement AtkSelection and support ATK_STATE_SELECTABLE and ATK_STATE_SELECTED
+        for elements supporting aria-selected and for menu-related roles. Also enable the
+        equivalent support for the Mac because NSAccessibilitySelectedChildrenAttribute is
+        included as supported on the same roles.
+
+        In addition, fix several bugs discovered along the way: Call isSelected() on role
+        tab, because tab supports aria-selected; not aria-checked. Correct ATK mapping
+        of ListBoxRole and ListBoxOptionRole for combobox descendants. Always defer to
+        WebCore for inclusion/exclusion decisions related to elements with an explicit
+        ARIA role.
+
+        Tests: accessibility/aria-combobox-hierarchy.html
+               accessibility/aria-selected-menu-items.html
+               accessibility/aria-selected.html
+
+        * accessibility/AccessibilityNodeObject.cpp:
+        (WebCore::AccessibilityNodeObject::selectedTabItem):
+        (WebCore::AccessibilityNodeObject::canSetSelectedAttribute):
+        * accessibility/AccessibilityObject.cpp:
+        (WebCore::AccessibilityObject::isDescendantOfRole):
+        * accessibility/AccessibilityObject.h:
+        (WebCore::AccessibilityObject::canHaveSelectedChildren):
+        * accessibility/AccessibilityRenderObject.cpp:
+        (WebCore::AccessibilityRenderObject::isSelected):
+        (WebCore::AccessibilityRenderObject::canHaveSelectedChildren):
+        (WebCore::AccessibilityRenderObject::selectedChildren):
+        * accessibility/AccessibilityRenderObject.h:
+        * accessibility/atk/AccessibilityObjectAtk.cpp:
+        (WebCore::AccessibilityObject::accessibilityPlatformIncludesObject):
+        * accessibility/atk/WebKitAccessibleInterfaceSelection.cpp:
+        (webkitAccessibleSelectionGetSelectionCount):
+        * accessibility/atk/WebKitAccessibleWrapperAtk.cpp:
+        (atkRole):
+        (getInterfaceMaskFromObject):
+        * accessibility/mac/WebAccessibilityObjectWrapperMac.mm:
+        (-[WebAccessibilityObjectWrapper accessibilityAttributeValue:]):
+
+2016-11-19  Simon Fraser  <simon.fraser@apple.com>
+
+        [iOS WK2] When zoomed in and panning on pages with fixed bars, parts of the bars are sometimes missing
+        https://bugs.webkit.org/show_bug.cgi?id=164855
+
+        Reviewed by Sam Weinig.
+
+        During UI-process panning and zooming, we send visible rect updates to the web process
+        with inStableState=false, and don't update GraphicsLayers until we get into a stable state.
+
+        This causes a problem where the web process has a stale notion of where the GraphicsLayers
+        for position:fixed elements are, but is then told to update tiling coverage with an up-to-date
+        visible rect. The existing "sync layer positions" path isn't useful to fix this, because it
+        breaks the relationship between the GraphicsLayer positions and their FixedPositionViewportConstraints
+        in the scrolling tree.
+
+        To address this, add the notion of an Optional<> approximatePosition on GraphicsLayers. This is used
+        only by the coverageRect computation code path, and is cleared by a setPosition(). ApproximatePositions
+        are pushed onto GraphicsLayers via the syncViewportConstrainedLayerPositions() code path (renamed to
+        reconcileViewportConstrainedLayerPositions).
+
+        This allows us to remmove "viewportIsStable" from GraphicsLayer flushing, and FrameView.
+
+        SetOrSyncScrollingLayerPosition is made into an enum class.
+
+        Tested by scrollingcoordinator/ios/non-stable-viewport-scroll.html
+
+        * page/FrameView.cpp:
+        (WebCore::FrameView::reset):
+        * page/FrameView.h:
+        * page/scrolling/AsyncScrollingCoordinator.cpp:
+        (WebCore::AsyncScrollingCoordinator::requestScrollPositionUpdate):
+        (WebCore::AsyncScrollingCoordinator::scheduleUpdateScrollPositionAfterAsyncScroll):
+        (WebCore::AsyncScrollingCoordinator::updateScrollPositionAfterAsyncScroll):
+        (WebCore::AsyncScrollingCoordinator::reconcileScrollingState):
+        (WebCore::AsyncScrollingCoordinator::reconcileViewportConstrainedLayerPositions):
+        (WebCore::AsyncScrollingCoordinator::syncViewportConstrainedLayerPositions): Deleted.
+        * page/scrolling/AsyncScrollingCoordinator.h:
+        (WebCore::AsyncScrollingCoordinator::ScheduledScrollUpdate::ScheduledScrollUpdate):
+        * page/scrolling/ScrollingCoordinator.cpp:
+        (WebCore::operator<<):
+        * page/scrolling/ScrollingCoordinator.h:
+        (WebCore::ScrollingCoordinator::reconcileScrollingState):
+        (WebCore::ScrollingCoordinator::reconcileViewportConstrainedLayerPositions):
+        (WebCore::ScrollingCoordinator::syncViewportConstrainedLayerPositions): Deleted.
+        * page/scrolling/ScrollingStateFixedNode.cpp:
+        (WebCore::ScrollingStateFixedNode::reconcileLayerPositionForViewportRect):
+        (WebCore::ScrollingStateFixedNode::syncLayerPositionForViewportRect): Deleted.
+        * page/scrolling/ScrollingStateFixedNode.h:
+        * page/scrolling/ScrollingStateNode.h:
+        (WebCore::ScrollingStateNode::reconcileLayerPositionForViewportRect):
+        (WebCore::ScrollingStateNode::syncLayerPositionForViewportRect): Deleted.
+        * page/scrolling/ScrollingStateStickyNode.cpp:
+        (WebCore::ScrollingStateStickyNode::reconcileLayerPositionForViewportRect):
+        (WebCore::ScrollingStateStickyNode::syncLayerPositionForViewportRect): Deleted.
+        * page/scrolling/ScrollingStateStickyNode.h:
+        * page/scrolling/ScrollingTree.cpp:
+        (WebCore::ScrollingTree::scrollPositionChangedViaDelegatedScrolling):
+        * page/scrolling/ScrollingTree.h:
+        * page/scrolling/ThreadedScrollingTree.cpp:
+        (WebCore::ThreadedScrollingTree::scrollingTreeNodeDidScroll):
+        * page/scrolling/ThreadedScrollingTree.h:
+        * page/scrolling/ios/ScrollingTreeFrameScrollingNodeIOS.mm:
+        (WebCore::ScrollingTreeFrameScrollingNodeIOS::setScrollPositionWithoutContentEdgeConstraints):
+        * page/scrolling/ios/ScrollingTreeIOS.cpp:
+        (WebCore::ScrollingTreeIOS::scrollingTreeNodeDidScroll):
+        * page/scrolling/ios/ScrollingTreeIOS.h:
+        * page/scrolling/mac/ScrollingTreeFixedNode.mm:
+        (WebCore::ScrollingTreeFixedNode::updateLayersAfterAncestorChange):
+        * platform/graphics/GraphicsLayer.cpp:
+        (WebCore::GraphicsLayer::dumpProperties):
+        * platform/graphics/GraphicsLayer.h:
+        (WebCore::GraphicsLayer::setPosition):
+        (WebCore::GraphicsLayer::approximatePosition):
+        (WebCore::GraphicsLayer::setApproximatePosition):
+        (WebCore::GraphicsLayer::flushCompositingState):
+        (WebCore::GraphicsLayer::flushCompositingStateForThisLayerOnly):
+        * platform/graphics/ca/GraphicsLayerCA.cpp:
+        (WebCore::GraphicsLayerCA::flushCompositingState):
+        (WebCore::GraphicsLayerCA::flushCompositingStateForThisLayerOnly):
+        (WebCore::GraphicsLayerCA::computeVisibleAndCoverageRect):
+        (WebCore::GraphicsLayerCA::setVisibleAndCoverageRects): No longer bail for viewportConstained layers when the viewport is unstable.
+        (WebCore::GraphicsLayerCA::recursiveCommitChanges):
+        * platform/graphics/ca/GraphicsLayerCA.h:
+        (WebCore::GraphicsLayerCA::CommitState::CommitState): Deleted.
+        * platform/graphics/texmap/GraphicsLayerTextureMapper.cpp:
+        (WebCore::GraphicsLayerTextureMapper::flushCompositingState):
+        * platform/graphics/texmap/coordinated/CoordinatedGraphicsLayer.cpp:
+        (WebCore::CoordinatedGraphicsLayer::flushCompositingState):
+        * rendering/RenderLayerCompositor.cpp:
+        (WebCore::RenderLayerCompositor::flushPendingLayerChanges):
+
+2016-11-19  Joanmarie Diggs  <jdiggs@igalia.com>
+
+        AX: [ATK] Expose aria-busy via ATK_STATE_BUSY
+        https://bugs.webkit.org/show_bug.cgi?id=164909
+
+        Reviewed by Chris Fleizach.
+
+        Expose aria-busy via ATK_STATE_BUSY. Also rename ariaLiveRegionBusy()
+        to isBusy() because in ARIA 1.1 aria-busy is no longer limited to live
+        regions.
+
+        Test: accessibility/aria-busy.html
+
+        * accessibility/AccessibilityObject.h:
+        (WebCore::AccessibilityObject::isBusy):
+        (WebCore::AccessibilityObject::ariaLiveRegionBusy): Deleted.
+        * accessibility/AccessibilityRenderObject.cpp:
+        (WebCore::AccessibilityRenderObject::isBusy):
+        (WebCore::AccessibilityRenderObject::ariaLiveRegionBusy): Deleted.
+        * accessibility/AccessibilityRenderObject.h:
+        * accessibility/atk/WebKitAccessibleWrapperAtk.cpp:
+        (setAtkStateSetFromCoreObject):
+        * accessibility/ios/WebAccessibilityObjectWrapperIOS.mm:
+        (-[WebAccessibilityObjectWrapper accessibilityARIAIsBusy]):
+        * accessibility/mac/WebAccessibilityObjectWrapperMac.mm:
+        (-[WebAccessibilityObjectWrapper accessibilityAttributeValue:]):
+        * inspector/InspectorDOMAgent.cpp:
+        (WebCore::InspectorDOMAgent::buildObjectForAccessibilityProperties):
+
+2016-11-19  Ryosuke Niwa  <rniwa@webkit.org>
+
+        REGRESSION(r200964): Tab focus navigation is broken on results.en.voyages-sncf.com
+        https://bugs.webkit.org/show_bug.cgi?id=164888
+
+        Reviewed by Antti Koivisto.
+
+        The bug was caused by FocusNavigationScope::parentInScope incorrectly returning nullptr when moving out of
+        a user agent shadow tree of a SVG use element. Fixed the bug by explicitly checking against the focus scope's
+        root node or its slot element. Also removed a superfluous early return when the parent node is a focus scope.
+
+        Tests: fast/shadow-dom/focus-navigation-out-of-slot.html
+               fast/shadow-dom/focus-navigation-passes-shadow-host.html
+               fast/shadow-dom/focus-navigation-passes-svg-use-element.html
+
+        * page/FocusController.cpp:
+        (WebCore::FocusNavigationScope::parentInScope):
+
+2016-11-18  Simon Fraser  <simon.fraser@apple.com>
+
+        [iOS WK2] Eliminate a source of flakiness in layout tests by forcing WebPage into "responsive" mode for all tests, with an internals override
+        https://bugs.webkit.org/show_bug.cgi?id=164980
+
+        Reviewed by Chris Dumez.
+
+        WebPage::eventThrottlingDelay() uses a latency estimate based on the round-trip time from the UI process
+        to affect behavior, including whether scroll events are fired. This also affects the FrameView "scrolledByUser"
+        flag that impacts tile coverage.
+
+        During testing, latency falling above or below the 16ms threshold could affect behavior. Fix by forcing
+        WebPage into "responsive" mode while running tests, via InjectedBundlePage::prepare().
+
+        Add a nullable internals property so that a test can specify responsive, unresponsive or default behavior.
+
+        Tests: fast/scrolling/ios/scroll-events-default.html
+               fast/scrolling/ios/scroll-events-responsive.html
+               fast/scrolling/ios/scroll-events-unresponsive.html
+
+        * page/Page.h:
+        (WebCore::Page::eventThrottlingBehaviorOverride):
+        (WebCore::Page::setEventThrottlingBehaviorOverride):
+        * testing/Internals.cpp:
+        (WebCore::Internals::setEventThrottlingBehaviorOverride):
+        (WebCore::Internals::eventThrottlingBehaviorOverride):
+        * testing/Internals.h:
+        * testing/Internals.idl:
+
+2016-11-18  Chris Dumez  <cdumez@apple.com>
+
+        Unreviewed attempt to fix the build after r208917.
+
+        * dom/CustomElementReactionQueue.cpp:
+        (WebCore::CustomElementReactionStack::ElementQueue::invokeAll):
+
+2016-11-18  Chris Dumez  <cdumez@apple.com>
+
+        Unreviewed attempt to fix the build after r208917.
+
+        * dom/CustomElementReactionQueue.cpp:
+
+2016-11-18  Jiewen Tan  <jiewen_tan@apple.com>
+
+        Update SubtleCrypto::decrypt to match the latest spec
+        https://bugs.webkit.org/show_bug.cgi?id=164739
+        <rdar://problem/29257848>
+
+        Reviewed by Brent Fulgham.
+
+        This patch does following few things:
+        1. It updates the SubtleCrypto::decrypt method to match the latest spec:
+           https://www.w3.org/TR/WebCryptoAPI/#SubtleCrypto-method-decrypt.
+           It also refers to the latest Editor's Draft to a certain degree:
+           https://w3c.github.io/webcrypto/Overview.html#SubtleCrypto-method-decrypt.
+        2. It implements decrypt operations of the following algorithms: AES-CBC,
+           RSAES-PKCS1-V1_5, and RSA-OAEP.
+
+        Tests: crypto/subtle/aes-cbc-decrypt-malformed-parameters.html
+               crypto/subtle/aes-cbc-generate-key-encrypt-decrypt.html
+               crypto/subtle/aes-cbc-import-key-decrypt.html
+               crypto/subtle/decrypt-malformed-parameters.html
+               crypto/subtle/rsa-oaep-decrypt-malformed-parameters.html
+               crypto/subtle/rsa-oaep-generate-key-encrypt-decrypt-label.html
+               crypto/subtle/rsa-oaep-generate-key-encrypt-decrypt.html
+               crypto/subtle/rsa-oaep-import-key-decrypt-label.html
+               crypto/subtle/rsa-oaep-import-key-decrypt.html
+               crypto/subtle/rsaes-pkcs1-v1_5-generate-key-encrypt-decrypt.html
+               crypto/subtle/rsaes-pkcs1-v1_5-import-key-decrypt.html
+               crypto/workers/subtle/aes-cbc-import-key-decrypt.html
+               crypto/workers/subtle/rsa-oaep-import-key-decrypt.html
+               crypto/workers/subtle/rsaes-pkcs1-v1_5-import-key-decrypt.html
+
+        * bindings/js/JSSubtleCryptoCustom.cpp:
+        (WebCore::normalizeCryptoAlgorithmParameters):
+        (WebCore::toCryptoKey):
+        (WebCore::toVector):
+        (WebCore::jsSubtleCryptoFunctionEncryptPromise):
+        (WebCore::jsSubtleCryptoFunctionDecryptPromise):
+        (WebCore::jsSubtleCryptoFunctionExportKeyPromise):
+        (WebCore::JSSubtleCrypto::decrypt):
+        * crypto/CryptoAlgorithm.cpp:
+        (WebCore::CryptoAlgorithm::decrypt):
+        * crypto/CryptoAlgorithm.h:
+        * crypto/SubtleCrypto.idl:
+        * crypto/algorithms/CryptoAlgorithmAES_CBC.cpp:
+        (WebCore::CryptoAlgorithmAES_CBC::decrypt):
+        * crypto/algorithms/CryptoAlgorithmAES_CBC.h:
+        * crypto/algorithms/CryptoAlgorithmRSAES_PKCS1_v1_5.cpp:
+        (WebCore::CryptoAlgorithmRSAES_PKCS1_v1_5::decrypt):
+        * crypto/algorithms/CryptoAlgorithmRSAES_PKCS1_v1_5.h:
+        * crypto/algorithms/CryptoAlgorithmRSA_OAEP.cpp:
+        (WebCore::CryptoAlgorithmRSA_OAEP::decrypt):
+        * crypto/algorithms/CryptoAlgorithmRSA_OAEP.h:
+        * crypto/gnutls/CryptoAlgorithmAES_CBCGnuTLS.cpp:
+        (WebCore::CryptoAlgorithmAES_CBC::platformDecrypt):
+        * crypto/gnutls/CryptoAlgorithmRSAES_PKCS1_v1_5GnuTLS.cpp:
+        (WebCore::CryptoAlgorithmRSAES_PKCS1_v1_5::platformDecrypt):
+        * crypto/gnutls/CryptoAlgorithmRSA_OAEPGnuTLS.cpp:
+        (WebCore::CryptoAlgorithmRSA_OAEP::platformDecrypt):
+        * crypto/mac/CryptoAlgorithmAES_CBCMac.cpp:
+        (WebCore::CryptoAlgorithmAES_CBC::platformDecrypt):
+        * crypto/mac/CryptoAlgorithmRSAES_PKCS1_v1_5Mac.cpp:
+        (WebCore::decryptRSAES_PKCS1_v1_5):
+        (WebCore::CryptoAlgorithmRSAES_PKCS1_v1_5::platformDecrypt):
+        * crypto/mac/CryptoAlgorithmRSA_OAEPMac.cpp:
+        (WebCore::decryptRSA_OAEP):
+        (WebCore::CryptoAlgorithmRSA_OAEP::platformDecrypt):
+
+2016-11-18  Chris Dumez  <cdumez@apple.com>
+
+        Unreviewed, rolling out r208837.
+
+        The bots did not show a progression
+
+        Reverted changeset:
+
+        "REGRESSION(r208082): 1% Speedometer regression on iOS"
+        https://bugs.webkit.org/show_bug.cgi?id=164852
+        http://trac.webkit.org/changeset/208837
+
+2016-11-18  Simon Fraser  <simon.fraser@apple.com>
+
+        Remove use of std::chrono in WebPage and entrained code
+        https://bugs.webkit.org/show_bug.cgi?id=164967
+
+        Reviewed by Tim Horton.
+
+        Replace std::chrono with Seconds and Monotonic Time.
+
+        Use more C++11 initialization for WebPage data members.
+
+        * page/ChromeClient.h:
+        * page/FrameView.cpp:
+        (WebCore::FrameView::scrollPositionChanged):
+        (WebCore::FrameView::setScrollVelocity):
+        * page/FrameView.h:
+        * platform/Timer.h:
+        (WebCore::TimerBase::startRepeating):
+        (WebCore::TimerBase::startOneShot):
+        (WebCore::TimerBase::augmentFireInterval):
+        (WebCore::TimerBase::augmentRepeatInterval):
+        * platform/graphics/TiledBacking.h:
+        (WebCore::VelocityData::VelocityData):
+        * platform/graphics/ca/TileController.cpp:
+        (WebCore::TileController::adjustTileCoverageRect):
+
+2016-11-18  Dean Jackson  <dino@apple.com>
+
+        AX: "(inverted-colors)" media query only matches on page reload; should match on change
+        https://bugs.webkit.org/show_bug.cgi?id=163564
+        <rdar://problem/28807350>
+
+        Reviewed by Simon Fraser.
+
+        Mark some media queries as responding to notifications that
+        system accessibility settings have changed. When Page gets told
+        that has happened, check if any of the results have changed.
+
+        Tests: fast/media/mq-inverted-colors-live-update.html
+               fast/media/mq-monochrome-live-update.html
+               fast/media/mq-prefers-reduced-motion-live-update.html
+
+        * css/MediaQueryEvaluator.cpp:
+        (WebCore::isAccessibilitySettingsDependent):
+        (WebCore::MediaQueryEvaluator::evaluate):
+        * css/StyleResolver.cpp:
+        (WebCore::StyleResolver::addAccessibilitySettingsDependentMediaQueryResult):
+        (WebCore::StyleResolver::hasMediaQueriesAffectedByAccessibilitySettingsChange):
+        * css/StyleResolver.h:
+        (WebCore::StyleResolver::hasAccessibilitySettingsDependentMediaQueries):
+        * page/Page.cpp:
+        (WebCore::Page::accessibilitySettingsDidChange):
+        * page/Page.h:
+
+2016-11-18  Anders Carlsson  <andersca@apple.com>
+
+        Rename the 'other' Apple Pay Button type to 'donate'
+        https://bugs.webkit.org/show_bug.cgi?id=164978
+
+        Reviewed by Dean Jackson.
+
+        * DerivedSources.make:
+        * WebCorePrefix.h:
+        * css/CSSPrimitiveValueMappings.h:
+        (WebCore::CSSPrimitiveValue::CSSPrimitiveValue):
+        (WebCore::CSSPrimitiveValue::operator ApplePayButtonType):
+        * css/CSSValueKeywords.in:
+        * css/parser/CSSParser.cpp:
+        (WebCore::isValidKeywordPropertyAndValue):
+        * css/parser/CSSParserFastPaths.cpp:
+        (WebCore::CSSParserFastPaths::isValidKeywordPropertyAndValue):
+        * rendering/RenderThemeCocoa.mm:
+        (WebCore::toPKPaymentButtonType):
+        * rendering/style/RenderStyleConstants.h:
+
+2016-11-18  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        [WebGL2] Implement texStorage2D()
+        https://bugs.webkit.org/show_bug.cgi?id=164493
+
+        Reviewed by Dean Jackson.
+
+        Create a new validation function which only accepts sized internalFormats.
+        After running texStorage2D(), we also texSubImage2D() to zero-fill it. This
+        is to compensate for potentially buggy drivers.
+
+        Because glTexStorage2D() was only added to OpenGL in version 4.2, not all
+        OpenGL 3.2+ contexts can implement this command. However, according to
+        https://developer.apple.com/opengl/capabilities/ all Apple GPUs have the
+        GL_ARB_texture_storage which implements this call. In the future, we could
+        implement texStorage2D() on top of texImage2D() if there are any ports which
+        want WebGL2 but don't have 4.2 and don't have the extension.
+
+        Also, when calling texStorage2D, callers specify an internalFormat but not a
+        type/format pair. This means that storing the texture's type is only valid
+        for WebGL 1 contexts. This patch surrounds all calls to reading the texture
+        type with guards and adds an ASSERT() at the read site to make sure the
+        right thing is happening.
+
+        Test: fast/canvas/webgl/webgl2-texStorage.html
+
+        * html/canvas/WebGL2RenderingContext.cpp:
+        (WebCore::WebGL2RenderingContext::validateTexStorageFuncParameters):
+        (WebCore::WebGL2RenderingContext::texStorage2D):
+        * html/canvas/WebGL2RenderingContext.h:
+        * html/canvas/WebGLRenderingContext.cpp:
+        (WebCore::WebGLRenderingContext::validateIndexArrayConservative):
+        * html/canvas/WebGLRenderingContextBase.cpp:
+        (WebCore::WebGLRenderingContextBase::create):
+        (WebCore::WebGLRenderingContextBase::copyTexSubImage2D):
+        (WebCore::WebGLRenderingContextBase::validateTexFunc):
+        (WebCore::WebGLRenderingContextBase::validateTexFuncData):
+        (WebCore::WebGLRenderingContextBase::texImage2D):
+        * html/canvas/WebGLTexture.cpp:
+        (WebCore::WebGLTexture::WebGLTexture):
+        (WebCore::WebGLTexture::getType):
+        (WebCore::WebGLTexture::needToUseBlackTexture):
+        (WebCore::WebGLTexture::canGenerateMipmaps):
+        (WebCore::internalFormatIsFloatType):
+        (WebCore::internalFormatIsHalfFloatType):
+        (WebCore::WebGLTexture::update):
+        * html/canvas/WebGLTexture.h:
+        * platform/graphics/GraphicsContext3D.cpp:
+        (WebCore::GraphicsContext3D::texImage2DResourceSafe):
+        (WebCore::GraphicsContext3D::packImageData):
+        (WebCore::GraphicsContext3D::extractImageData):
+        * platform/graphics/GraphicsContext3D.h:
+        * platform/graphics/opengl/Extensions3DOpenGLCommon.cpp:
+        (WebCore::Extensions3DOpenGLCommon::initializeAvailableExtensions):
+        * platform/graphics/opengl/GraphicsContext3DOpenGLCommon.cpp:
+        (WebCore::GraphicsContext3D::texStorage2D):
+        (WebCore::GraphicsContext3D::texStorage3D):
+
+2016-11-18  Alex Christensen  <achristensen@webkit.org>
+
+        TextDecoder constructor should not accept replacement encodings
+        https://bugs.webkit.org/show_bug.cgi?id=164903
+
+        Reviewed by Chris Dumez.
+
+        Covered by newly passing web platform tests.
+
+        * dom/TextDecoder.cpp:
+        (WebCore::TextDecoder::create):
+        https://encoding.spec.whatwg.org/#textdecoder says about the constructor:
+        "If label is either not a label or is a label for replacement, throws a RangeError."
+        See https://bugs.webkit.org/show_bug.cgi?id=159180 for the mapping of the replacement
+        codec names to "replacement".
+
+2016-11-18  Chris Dumez  <cdumez@apple.com>
+
+        Assertion failures in ActiveDOMObject::~ActiveDOMObject under Database destructor
+        https://bugs.webkit.org/show_bug.cgi?id=164955
+        <rdar://problem/29336715>
+
+        Reviewed by Brady Eidson.
+
+        Make sure the Database's DatabaseContext object is destroyed on the context
+        thread given that DatabaseContext is an ActiveDOMObject and there is an
+        assertion in the ActiveDOMObject destructor that it should be destroyed on
+        on the context thread.
+
+        No new tests, already covered by existing tests.
+
+        * Modules/webdatabase/Database.cpp:
+        (WebCore::Database::~Database):
+
+2016-11-18  Enrica Casucci  <enrica@apple.com>
+
+        Refactor drag and drop for WebKit2 to encode DragData message exchange.
+        https://bugs.webkit.org/show_bug.cgi?id=164945
+
+        Reviewed by Tim Horton.
+
+        No new tests. No change in functionality.
+
+        * loader/EmptyClients.h:
+        * page/DragClient.h:
+        * page/DragController.cpp:
+        (WebCore::createMouseEvent):
+        (WebCore::documentFragmentFromDragData):
+        (WebCore::DragController::dragIsMove):
+        (WebCore::DragController::dragEntered):
+        (WebCore::DragController::dragExited):
+        (WebCore::DragController::dragUpdated):
+        (WebCore::DragController::performDragOperation):
+        (WebCore::DragController::dragEnteredOrUpdated):
+        (WebCore::DragController::tryDocumentDrag):
+        (WebCore::DragController::operationForLoad):
+        (WebCore::DragController::dispatchTextInputEventFor):
+        (WebCore::DragController::concludeEditDrag):
+        (WebCore::DragController::canProcessDrag):
+        (WebCore::DragController::tryDHTMLDrag):
+        * page/DragController.h:
+        * page/efl/DragControllerEfl.cpp:
+        (WebCore::DragController::isCopyKeyDown):
+        (WebCore::DragController::dragOperation):
+        * page/gtk/DragControllerGtk.cpp:
+        (WebCore::DragController::isCopyKeyDown):
+        (WebCore::DragController::dragOperation):
+        * page/mac/DragControllerMac.mm:
+        (WebCore::DragController::isCopyKeyDown):
+        (WebCore::DragController::dragOperation):
+        * page/win/DragControllerWin.cpp:
+        (WebCore::DragController::dragOperation):
+        (WebCore::DragController::isCopyKeyDown):
+        * platform/DragData.h:
+        (WebCore::DragData::DragData):
+
+2016-11-18  Jeremy Jones  <jeremyj@apple.com>
+
+        Add runtime flag to enable pointer lock. Enable pointer lock feature for mac.
+        https://bugs.webkit.org/show_bug.cgi?id=163801
+
+        Reviewed by Simon Fraser.
+
+        These tests now pass with DumpRenderTree.
+        LayoutTests/pointer-lock/lock-already-locked.html
+        LayoutTests/pointer-lock/lock-element-not-in-dom.html
+        LayoutTests/pointer-lock/locked-element-iframe-removed-from-dom.html
+        LayoutTests/pointer-lock/mouse-event-api.html
+
+        PointerLockController::requestPointerLock now protects against synchronous callback
+        to allowPointerLock().
+
+        Add pointerLockEnabled setting.
+
+        * Configurations/FeatureDefines.xcconfig:
+        * dom/Document.cpp:
+        (WebCore::Document::exitPointerLock): Fix existing typo.
+        (WebCore::Document::pointerLockElement):
+        * features.json:
+        * page/EventHandler.cpp:
+        * page/PointerLockController.cpp:
+        (WebCore::PointerLockController::requestPointerLock):
+        (WebCore::PointerLockController::requestPointerUnlock):
+        * page/Settings.in:
+
+2016-11-17  Alex Christensen  <achristensen@webkit.org>
+
+        Support IDN2008 with UTS #46 instead of IDN2003
+        https://bugs.webkit.org/show_bug.cgi?id=144194
+
+        Reviewed by Darin Adler.
+
+        Use uidna_nameToASCII instead of the deprecated uidna_IDNToASCII.
+        It uses IDN2008 instead of IDN2003, and it uses UTF #46 when used with a UIDNA opened with uidna_openUTS46.
+        This follows https://url.spec.whatwg.org/#concept-domain-to-ascii except we do not use Transitional_Processing
+        to prevent homograph attacks on german domain names with "ß" and "ss" in them.  These are now treated as separate domains.
+        Firefox also doesn't use Transitional_Processing. Chrome and the current specification use Transitional_processing,
+        but https://github.com/whatwg/url/issues/110 might change the spec.
+        
+        In addition, http://unicode.org/reports/tr46/ says:
+        "implementations are encouraged to apply the Bidi and ContextJ validity criteria"
+        Bidi checks prevent domain names with bidirectional text, such as latin and hebrew characters in the same domain.  Chrome and Firefox do this.
+
+        ContextJ checks prevent code points such as U+200D, which is a zero-width joiner which users would not see when looking at the domain name.
+        Firefox currently enables ContextJ checks and it is suggested by UTS #46, so we'll do it.
+
+        ContextO checks, which we do not use and neither does any other browser nor the spec, would fail if a domain contains code points such as U+30FB,
+        which looks somewhat like a dot.  We can investigate enabling these checks later.
+
+        Covered by new API tests and rebased LayoutTests.
+        The new API tests verify that we do not use transitional processing, that we do apply the Bidi and ContextJ checks, but not ContextO checks.
+
+        * platform/URLParser.cpp:
+        (WebCore::URLParser::domainToASCII):
+        (WebCore::URLParser::internationalDomainNameTranscoder):
+        * platform/URLParser.h:
+        * platform/mac/WebCoreNSURLExtras.mm:
+        (WebCore::mapHostNameWithRange):
+
+2016-11-18  Dean Jackson  <dino@apple.com>
+
+        Better testing for accessibility media queries
+        https://bugs.webkit.org/show_bug.cgi?id=164954
+        <rdar://problem/29338292>
+
+        Reviewed by Myles Maxfield.
+
+        Provide an override mode for the accessibility media queries
+        that rely on system settings. This way we can test that they
+        are least responding to something.
+
+        Tests: fast/media/mq-inverted-colors-forced-value.html
+               fast/media/mq-monochrome-forced-value.html
+
+        * css/MediaQueryEvaluator.cpp: Query the Settings to see if we're
+        forcing a value.
+        (WebCore::monochromeEvaluate):
+        (WebCore::invertedColorsEvaluate):
+        (WebCore::prefersReducedMotionEvaluate):
+        * page/Settings.h:
+        * testing/InternalSettings.cpp: Add new forcing values for inverted-colors
+        and monochrome.
+        (WebCore::InternalSettings::Backup::Backup):
+        (WebCore::InternalSettings::Backup::restoreTo):
+        (WebCore::settingsToInternalSettingsValue):
+        (WebCore::internalSettingsToSettingsValue):
+        (WebCore::InternalSettings::forcedColorsAreInvertedAccessibilityValue):
+        (WebCore::InternalSettings::setForcedColorsAreInvertedAccessibilityValue):
+        (WebCore::InternalSettings::forcedDisplayIsMonochromeAccessibilityValue):
+        (WebCore::InternalSettings::setForcedDisplayIsMonochromeAccessibilityValue):
+        (WebCore::InternalSettings::forcedPrefersReducedMotionAccessibilityValue):
+        (WebCore::InternalSettings::setForcedPrefersReducedMotionAccessibilityValue):
+        (WebCore::InternalSettings::forcedPrefersReducedMotionValue): Deleted.
+        (WebCore::InternalSettings::setForcedPrefersReducedMotionValue): Deleted.
+        * testing/InternalSettings.h:
+        * testing/InternalSettings.idl:
+
+2016-11-18  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Unsupported emoji are invisible
+        https://bugs.webkit.org/show_bug.cgi?id=164944
+        <rdar://problem/28591608>
+
+        Reviewed by Dean Jackson.
+
+        In WidthIterator, we explicitly skip characters which the OS has no font
+        to render with. However, for emoji, we should draw something to show that
+        there is missing content. Because we have nothing to draw, we can draw
+        the .notdef glyph (empty box, or "tofu").
+
+        Test: fast/text/emoji-draws.html
+
+        * platform/graphics/WidthIterator.cpp:
+        (WebCore::characterMustDrawSomething):
+        (WebCore::WidthIterator::advanceInternal):
+
+2016-11-18  Sam Weinig  <sam@webkit.org>
+
+        [WebIDL] Add support for record types
+        https://bugs.webkit.org/show_bug.cgi?id=164935
+
+        Reviewed by Tim Horton.
+
+        Add support for WebIDLs record types. We map them to HashMap<String, {OtherType}>.
+
+        * bindings/generic/IDLTypes.h:
+        - Add IDLRecord type and helper predicate.
+        - Remove IDLRegExp which is no longer in WebIDL and we never supported.
+
+        * bindings/js/JSDOMBinding.cpp:
+        (WebCore::stringToByteString):
+        (WebCore::identifierToByteString):
+        (WebCore::valueToByteString):
+        (WebCore::hasUnpairedSurrogate):
+        (WebCore::stringToUSVString):
+        (WebCore::identifierToUSVString):
+        (WebCore::valueToUSVString):
+        * bindings/js/JSDOMBinding.h:
+        Refactor ByteString and USVString conversion to support converting from
+        either a JSValue or Identifier.
+
+        * bindings/js/JSDOMConvert.h:
+        (WebCore::DetailConverter<IDLRecord<K, V>>):
+        (WebCore::JSConverter<IDLRecord<K, V>>):
+        Add conversion support for record types. Use Detail::IdentifierConverter helper
+        to convert identifiers to strings using the correct conversion rules.
+
+        (WebCore::Converter<IDLUnion<T...>>::convert):
+        Update comments in union conversion to match current spec. Remove check
+        for regular expressions and add support for record types.
+
+        * bindings/scripts/CodeGenerator.pm:
+        (IsRefPtrType):
+        Add record and union types to the list of things that aren't RefPtrs.
+
+        (IsRecordType):
+        Add predicate for testing if a type is a record.
+
+        (IsWrapperType):
+        Remove check for union. This is now handled in the IsRefPtrType check.
+
+        (SkipIncludeHeader): Deleted.
+        (GetSequenceInnerType): Deleted.
+        (GetFrozenArrayInnerType): Deleted.
+        (GetSequenceOrFrozenArrayInnerType): Deleted.
+        Remove no longer necessary functions.
+
+        * bindings/scripts/CodeGeneratorJS.pm:
+        (AddIncludesForImplementationType):
+        Remove check for includes to skip. This is now only called for interfaces, which should be included
+        unconditionally.
+
+        (AddToIncludesForIDLType):
+        Add includes and recursive includes for record types.
+
+        (GenerateOverloadedFunctionOrConstructor):
+        Update to account for records.
+
+        (GetGnuVTableRefForInterface):
+        (GetGnuVTableNameForInterface):
+        (GetGnuMangledNameForInterface):
+        (GetWinVTableNameForInterface):
+        (GetWinMangledNameForInterface):
+        Strength-reduce GetNativeTypeForConversions and GetNamespaceForInterface into their callers.
+
+        (GetBaseIDLType):
+        Add support for IDLRecord. Remove call to GetIDLInterfaceName now that is simply the type name.
+
+        (GetNativeType):
+        Simplify sequence/FrozenArray support and add record support.
+
+        (GetNativeInnerType):
+        Generalize GetNativeVectorInnerType to work for record types as well.
+
+        (ShouldPassWrapperByReference):
+        Moved so native type accessors can be together.
+
+        (NativeToJSValueDOMConvertNeedsState):
+        (NativeToJSValueDOMConvertNeedsGlobalObject):
+        Add record support.
+
+        (GetNativeTypeForConversions): Deleted.
+        (GetNamespaceForInterface): Deleted.
+        (GetNativeVectorType): Deleted.
+        (GetIDLInterfaceName): Deleted.
+        (GetNativeVectorInnerType): Deleted.
+        Remove unneeded functions.
+
+        * bindings/scripts/IDLParser.pm:
+        (typeDescription):
+        Add helper useful for debugging, that constructs the string form of a type.
+
+        (typeByApplyingTypedefs):
+        Add missing call to typeByApplyingTypedefs (this is noted by a fix in JSTestCallbackFunctionWithTypedefs.h)
+
+        (parseNonAnyType):
+        Remove unused $subtypeName variables and add support for parsing record types.
+
+        * bindings/scripts/test/JS/JSTestCallbackFunctionWithTypedefs.cpp:
+        * bindings/scripts/test/JS/JSTestCallbackFunctionWithTypedefs.h:
+        * bindings/scripts/test/JS/JSTestObj.cpp:
+        * bindings/scripts/test/TestObj.idl:
+        Add tests for records and update results.
+
+        * testing/TypeConversions.h:
+        (WebCore::TypeConversions::testLongRecord):
+        (WebCore::TypeConversions::setTestLongRecord):
+        (WebCore::TypeConversions::testNodeRecord):
+        (WebCore::TypeConversions::setTestNodeRecord):
+        (WebCore::TypeConversions::testSequenceRecord):
+        (WebCore::TypeConversions::setTestSequenceRecord):
+        * testing/TypeConversions.idl:
+        Add record types so it can be tested from layout tests.
+
+2016-11-18  Dave Hyatt  <hyatt@apple.com>
+
+        [CSS Parser] Support font-variation-settings
+        https://bugs.webkit.org/show_bug.cgi?id=164947
+
+        Reviewed by Myles Maxfield.
+
+        * css/parser/CSSPropertyParser.cpp:
+        (WebCore::consumeFontVariationTag):
+        (WebCore::consumeFontVariationSettings):
+        (WebCore::CSSPropertyParser::parseSingleValue):
+
+2016-11-17  Jiewen Tan  <jiewen_tan@apple.com>
+
+        Update SubtleCrypto::encrypt to match the latest spec
+        https://bugs.webkit.org/show_bug.cgi?id=164738
+        <rdar://problem/29257812>
+
+        Reviewed by Brent Fulgham.
+
+        This patch does following few things:
+        1. It updates the SubtleCrypto::encrypt method to match the latest spec:
+           https://www.w3.org/TR/WebCryptoAPI/#SubtleCrypto-method-encrypt.
+           It also refers to the latest Editor's Draft to a certain degree:
+           https://w3c.github.io/webcrypto/Overview.html#SubtleCrypto-method-encrypt.
+        2. It implements encrypt operations of the following algorithms: AES-CBC,
+           RSAES-PKCS1-V1_5, and RSA-OAEP.
+        3. It addes ASSERT(parameters) for every method that accepts a
+           std::unique_ptr<CryptoAlgorithmParameters>&& type parameter.
+        4. It changes RefPtr<CryptoKey>&& to Ref<CryptoKey>&& for every method that
+           accepts a CryptoKey.
+
+        Tests: crypto/subtle/aes-cbc-encrypt-malformed-parameters.html
+               crypto/subtle/aes-cbc-import-key-encrypt.html
+               crypto/subtle/encrypt-malformed-parameters.html
+               crypto/subtle/rsa-oaep-encrypt-malformed-parameters.html
+               crypto/subtle/rsa-oaep-import-key-encrypt-label.html
+               crypto/subtle/rsa-oaep-import-key-encrypt.html
+               crypto/subtle/rsaes-pkcs1-v1_5-import-key-encrypt.html
+               crypto/workers/subtle/aes-cbc-import-key-encrypt.html
+               crypto/workers/subtle/rsa-oaep-import-key-encrypt.html
+               crypto/workers/subtle/rsaes-pkcs1-v1_5-import-key-encrypt.html
+
+        * CMakeLists.txt:
+        * DerivedSources.make:
+        * WebCore.xcodeproj/project.pbxproj:
+        * bindings/js/BufferSource.h:
+        (WebCore::BufferSource::BufferSource):
+        Add a default constructor for initializing an empty BufferSource object.
+        * bindings/js/JSSubtleCryptoCustom.cpp:
+        (WebCore::normalizeCryptoAlgorithmParameters):
+        (WebCore::jsSubtleCryptoFunctionEncryptPromise):
+        (WebCore::JSSubtleCrypto::encrypt):
+        * crypto/CryptoAlgorithm.cpp:
+        (WebCore::CryptoAlgorithm::encrypt):
+        (WebCore::CryptoAlgorithm::exportKey):
+        * crypto/CryptoAlgorithm.h:
+        * crypto/CryptoAlgorithmParameters.h:
+        * crypto/CryptoKey.h:
+        * crypto/SubtleCrypto.cpp:
+        (WebCore::SubtleCrypto::SubtleCrypto):
+        * crypto/SubtleCrypto.h:
+        (WebCore::SubtleCrypto::workQueue):
+        * crypto/SubtleCrypto.idl:
+        * crypto/gnutls/CryptoAlgorithmAES_CBCGnuTLS.cpp:
+        (WebCore::CryptoAlgorithmAES_CBC::platformEncrypt):
+        * crypto/gnutls/CryptoAlgorithmRSAES_PKCS1_v1_5GnuTLS.cpp:
+        (WebCore::CryptoAlgorithmRSAES_PKCS1_v1_5::platformEncrypt):
+        * crypto/gnutls/CryptoAlgorithmRSA_OAEPGnuTLS.cpp:
+        (WebCore::CryptoAlgorithmRSA_OAEP::platformEncrypt):
+        * crypto/gnutls/CryptoKeyRSAGnuTLS.cpp:
+        (WebCore::CryptoKeyRSA::generatePair):
+        * crypto/algorithms/CryptoAlgorithmAES_CBC.cpp:
+        (WebCore::CryptoAlgorithmAES_CBC::encrypt):
+        (WebCore::CryptoAlgorithmAES_CBC::generateKey):
+        (WebCore::CryptoAlgorithmAES_CBC::importKey):
+        (WebCore::CryptoAlgorithmAES_CBC::exportKey):
+        * crypto/algorithms/CryptoAlgorithmAES_CBC.h:
+        * crypto/algorithms/CryptoAlgorithmAES_KW.cpp:
+        (WebCore::CryptoAlgorithmAES_KW::generateKey):
+        (WebCore::CryptoAlgorithmAES_KW::importKey):
+        (WebCore::CryptoAlgorithmAES_KW::exportKey):
+        * crypto/algorithms/CryptoAlgorithmAES_KW.h:
+        * crypto/algorithms/CryptoAlgorithmHMAC.cpp:
+        (WebCore::CryptoAlgorithmHMAC::generateKey):
+        (WebCore::CryptoAlgorithmHMAC::importKey):
+        (WebCore::CryptoAlgorithmHMAC::exportKey):
+        * crypto/algorithms/CryptoAlgorithmHMAC.h:
+        * crypto/algorithms/CryptoAlgorithmRSAES_PKCS1_v1_5.cpp:
+        (WebCore::CryptoAlgorithmRSAES_PKCS1_v1_5::encrypt):
+        (WebCore::CryptoAlgorithmRSAES_PKCS1_v1_5::generateKey):
+        (WebCore::CryptoAlgorithmRSAES_PKCS1_v1_5::importKey):
+        (WebCore::CryptoAlgorithmRSAES_PKCS1_v1_5::exportKey):
+        * crypto/algorithms/CryptoAlgorithmRSAES_PKCS1_v1_5.h:
+        * crypto/algorithms/CryptoAlgorithmRSASSA_PKCS1_v1_5.cpp:
+        (WebCore::CryptoAlgorithmRSASSA_PKCS1_v1_5::generateKey):
+        (WebCore::CryptoAlgorithmRSASSA_PKCS1_v1_5::importKey):
+        (WebCore::CryptoAlgorithmRSASSA_PKCS1_v1_5::exportKey):
+        * crypto/algorithms/CryptoAlgorithmRSASSA_PKCS1_v1_5.h:
+        * crypto/algorithms/CryptoAlgorithmRSA_OAEP.cpp:
+        (WebCore::CryptoAlgorithmRSA_OAEP::encrypt):
+        (WebCore::CryptoAlgorithmRSA_OAEP::generateKey):
+        (WebCore::CryptoAlgorithmRSA_OAEP::importKey):
+        (WebCore::CryptoAlgorithmRSA_OAEP::exportKey):
+        * crypto/algorithms/CryptoAlgorithmRSA_OAEP.h:
+        * crypto/keys/CryptoKeyRSA.h:
+        * crypto/mac/CryptoAlgorithmAES_CBCMac.cpp:
+        (WebCore::transformAES_CBC):
+        (WebCore::CryptoAlgorithmAES_CBC::platformEncrypt):
+        (WebCore::CryptoAlgorithmAES_CBC::platformDecrypt):
+        * crypto/mac/CryptoAlgorithmRSAES_PKCS1_v1_5Mac.cpp:
+        (WebCore::encryptRSAES_PKCS1_v1_5):
+        (WebCore::CryptoAlgorithmRSAES_PKCS1_v1_5::platformEncrypt):
+        * crypto/mac/CryptoAlgorithmRSA_OAEPMac.cpp:
+        (WebCore::encryptRSA_OAEP):
+        (WebCore::CryptoAlgorithmRSA_OAEP::platformEncrypt):
+        * crypto/mac/CryptoKeyRSAMac.cpp:
+        (WebCore::CryptoKeyRSA::generatePair):
+        * crypto/parameters/AesCbcParams.idl: Added.
+        * crypto/parameters/CryptoAlgorithmAesCbcParams.h: Added.
+        * crypto/parameters/CryptoAlgorithmAesCbcParamsDeprecated.h:
+        * crypto/parameters/CryptoAlgorithmRsaOaepParams.h: Added.
+        * crypto/parameters/RsaOaepParams.idl: Added.
+
+2016-11-18  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Attempt to fix iOS build again.
+        <rdar://problem/29312689>
+
+        Unreviewed build fix.
+
+        * platform/graphics/avfoundation/objc/MediaPlayerPrivateAVFoundationObjC.mm:
+        (WebCore::MediaPlayerPrivateAVFoundationObjC::setCurrentTextTrack):
+        (WebCore::MediaPlayerPrivateAVFoundationObjC::languageOfPrimaryAudioTrack):
+
+2016-11-18  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        [CSS Font Loading] FontFaceSet.load() promises don't always fire
+        https://bugs.webkit.org/show_bug.cgi?id=164902
+
+        Reviewed by David Hyatt.
+
+        Test: fast/text/fontfaceset-rebuild-during-loading.html
+
+        We currently handle web fonts in two phases. The first phase is building up
+        StyleRuleFontFace objects which reflect the style on the page. The second is creating
+        CSSFontFace objects from those StyleRuleFontFace objects. When script modifies the
+        style on the page, we can often update the CSSFontFace objects, but there are some
+        modifications which we don't know how to model. For these operations, we destroy the
+        CSSFontFace objects and rebuild them from the newly modified StyleRuleFontFace objects.
+
+        Normally, this is fine. However, with the CSS font loading API, the CSSFontFaces back
+        Javascript objects which will persist across the rebuilding step mentioned above. This
+        means that the FontFace objects need to adopt the new CSSFontFace objects and forget
+        the old CSSFontFace objects.
+
+        There was one bit of state which I forgot to update during this rebuilding phase. The
+        FontFaceSet object contains an internal HashMap where a reference to a CSSFontFace
+        is used as a key. After the rebuilding phase, this reference wasn't updated to point
+        to the new CSSFontFace.
+
+        The solution is to instead use a reference to the higher-level FontFace as the key to
+        the HashMap. This object is persistent across the rebuilding phase (and it adopts
+        the new CSSFontFaces). There is not a lifetime problem because the FontFace holds a
+        strong reference to its backing CSSFontFace object.
+
+        This bug didn't cause a memory problem because the HashMap was keeping the old
+        CSSFontFace alive because the key was a strong reference.
+
+        This patch also adds a lengthy comment explaining how the migration works.
+
+        * css/CSSFontFace.cpp:
+        (WebCore::CSSFontFace::initializeWrapper): This is another bit of state which didn't
+        survive the rebuilding phase. Moving it here causes it to survive.
+        (WebCore::CSSFontFace::wrapper):
+        * css/CSSFontSelector.cpp:
+        (WebCore::CSSFontSelector::addFontFaceRule):
+        * css/FontFaceSet.cpp:
+        (WebCore::FontFaceSet::load):
+        (WebCore::FontFaceSet::faceFinished):
+        * css/FontFaceSet.h:
+
+2016-11-18  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        [SVG -> OTF Font Converter] Fonts advances are not internally consistent inside the generated font file
+        https://bugs.webkit.org/show_bug.cgi?id=164846
+        <rdar://problem/29031509>
+
+        Reviewed by Darin Adler.
+
+        The fonts I'm generating in the SVG -> OTF converter have fractional FUnit values for their advances.
+        The CFF table can encode that, but hmtx can't, which means the font isn't internally consistent.
+
+        Covered by existing tests.
+
+        * svg/SVGToOTFFontConversion.cpp:
+
+2016-11-18  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Attempt to fix iOS build.
+        <rdar://problem/29312689>
+
+        Unreviewed build fix.
+
+        * platform/graphics/avfoundation/MediaSelectionGroupAVFObjC.mm:
+        (WebCore::MediaSelectionGroupAVFObjC::updateOptions):
+
+2016-11-18  Dave Hyatt  <hyatt@apple.com>
+
+        [CSS Parser] Hook up InspectorStyleSheet to the new CSS parser.
+        https://bugs.webkit.org/show_bug.cgi?id=164886
+
+        Reviewed by Dean Jackson.
+
+        * css/CSSGrammar.y.in:
+        Get rid of the CSSRuleSourceData type enum, since StyleRule's type
+        enum is exactly the same.
+
+        * css/CSSPropertySourceData.cpp:
+        (WebCore::CSSPropertySourceData::CSSPropertySourceData):
+        * css/CSSPropertySourceData.h:
+        Add a concept of disabled to CSSPropertySourceData. This is used for
+        commented out properties.
+
+        (WebCore::CSSRuleSourceData::create):
+        (WebCore::CSSRuleSourceData::createUnknown):
+        (WebCore::CSSRuleSourceData::CSSRuleSourceData):
+        Get rid of the CSSRuleSourceData type enum, since StyleRule's type
+        enum is exactly the same.
+
+        * css/parser/CSSParser.cpp:
+        (WebCore::CSSParserContext::CSSParserContext):
+        (WebCore::CSSParser::parseSheetForInspector):
+        (WebCore::CSSParser::parseDeclarationForInspector):
+        (WebCore::CSSParser::markSupportsRuleHeaderStart):
+        (WebCore::CSSParser::markRuleHeaderStart):
+        (WebCore::CSSParser::markPropertyEnd):
+        * css/parser/CSSParser.h:
+        Add functions that represent the new API for inspector sheet
+        and declaration parsing. Patch the old parse code to use StyleRule::Type
+        now that the CSSRuleSourceData type is gone.
+
+        * css/parser/CSSParserObserver.h:
+        Tweak the API for our memory management.
+
+        * inspector/InspectorStyleSheet.cpp:
+        (flattenSourceData):
+        (WebCore::parserContextForDocument):
+        (WebCore::StyleSheetHandler::StyleSheetHandler):
+        (WebCore::StyleSheetHandler::startRuleHeader):
+        (WebCore::StyleSheetHandler::setRuleHeaderEnd):
+        (WebCore::StyleSheetHandler::endRuleHeader):
+        (WebCore::StyleSheetHandler::observeSelector):
+        (WebCore::StyleSheetHandler::startRuleBody):
+        (WebCore::StyleSheetHandler::endRuleBody):
+        (WebCore::StyleSheetHandler::popRuleData):
+        (WebCore::fixUnparsedProperties):
+        (WebCore::StyleSheetHandler::fixUnparsedPropertyRanges):
+        (WebCore::StyleSheetHandler::observeProperty):
+        (WebCore::StyleSheetHandler::observeComment):
+        (WebCore::InspectorStyle::populateAllProperties):
+        (WebCore::isValidSelectorListString):
+        (WebCore::InspectorStyleSheet::ensureSourceData):
+        (WebCore::InspectorStyleSheetForInlineStyle::ensureParsedDataReady):
+        (WebCore::InspectorStyleSheetForInlineStyle::ruleSourceData):
+        (WebCore::createCSSParser): Deleted.
+        (WebCore::InspectorStyleSheetForInlineStyle::getStyleAttributeRanges): Deleted.
+        * inspector/InspectorStyleSheet.h:
+        (WebCore::InspectorStyleProperty::setRawTextFromStyleDeclaration):
+        Add the new implementation. This involves duplicating most of the old
+        parser code for this into a new class, StyleSheetHandler, that implements
+        the observer interface and builds up the same data structures as the old
+        parser did in response to the callbacks.
+
+2016-11-18  Dan Bernstein  <mitz@apple.com>
+
+        Tried to fix some non-macOS builds.
+        <rdar://problems/29331425&29331438&29331722>
+
+        * platform/mac/WebPlaybackControlsManager.h:
+
+2016-11-18  Per Arne Vollan  <pvollan@apple.com>
+
+        [Win32] Start releasing memory earlier when memory is running low.
+        https://bugs.webkit.org/show_bug.cgi?id=164862
+
+        Reviewed by Brent Fulgham.
+
+        On Windows, 32-bit processes have 2GB of memory available, where some is used by the system.
+        Debugging has shown that allocations might fail and cause crashes when memory usage is > ~1GB.
+        We should start releasing memory before we reach 1GB.
+
+        * platform/win/MemoryPressureHandlerWin.cpp:
+        (WebCore::CheckMemoryTimer::fired):
+
+2016-11-17  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        REGRESSION(r208511): ImageDecoders: Crash decoding GIF images since r208511
+        https://bugs.webkit.org/show_bug.cgi?id=164864
+
+        Reviewed by Simon Fraser.
+
+        This happens sometimes since r208511 because the same decoder is used by more than one thread at the same
+        time and the decoders are not thread-safe. Several methods in ImageDecoder need to decode partially the image,
+        so it's possible that one method calls frameBufferAtIndex at the same times as createFrameImageAtIndex that now
+        can be called from the image decoder thread. Use a Lock in ImageDecoder to protect calls to frameBufferAtIndex.
+
+        * platform/image-decoders/ImageDecoder.cpp:
+        (WebCore::ImageDecoder::frameIsCompleteAtIndex):
+        (WebCore::ImageDecoder::frameDurationAtIndex):
+        (WebCore::ImageDecoder::createFrameImageAtIndex):
+        * platform/image-decoders/ImageDecoder.h:
+
+2016-11-17  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Add an experimental API to find elements across shadow boundaries
+        https://bugs.webkit.org/show_bug.cgi?id=164851
+        <rdar://problem/28220092>
+
+        Reviewed by Sam Weinig.
+
+        Add window.collectMatchingElementsInFlatTree(Node node, DOMString selectors)
+        as an experimental API which finds a list of elements that matches the given CSS selectors
+        and expose it to a JSWorld on which WKBundleScriptWorldMakeAllShadowRootsOpen was called.
+
+        No new tests. More test cases are added to WebKit2.InjectedBundleMakeAllShadowRootsOpen.
+
+        * bindings/scripts/CodeGeneratorJS.pm:
+        (NeedsRuntimeCheck): Added. Abstracts checks for EnabledAtRuntime and EnabledForWorld.
+        (OperationShouldBeOnInstance):
+        (GeneratePropertiesHashTable):
+        (GetRuntimeEnableFunctionName): Use worldForDOMObject(this).condition() for EnabledForWorld.
+        Also split the line for EnabledAtRuntime and EnabledAtRuntime for a better readability.
+        (GenerateImplementation):
+        (addIterableProperties):
+        * bindings/scripts/IDLAttributes.txt:
+        * bindings/scripts/preprocess-idls.pl:
+        (GenerateConstructorAttribute):
+        * bindings/scripts/test/JS/JSTestGlobalObject.cpp:
+        (WebCore::JSTestGlobalObject::finishCreation):
+        (WebCore::jsTestGlobalObjectInstanceFunctionEnabledInSpecificWorld):
+        (WebCore::jsTestGlobalObjectInstanceFunctionEnabledInSpecificWorldCaller):
+        * bindings/scripts/test/JS/JSTestObj.cpp:
+        (WebCore::JSTestObjPrototype::finishCreation):
+        (WebCore::jsTestObjPrototypeFunctionWorldSpecificMethod):
+        (WebCore::jsTestObjPrototypeFunctionWorldSpecificMethodCaller):
+        * bindings/scripts/test/TestGlobalObject.idl: Added a test case.
+        * bindings/scripts/test/TestObj.idl: Ditto.
+        * page/DOMWindow.cpp:
+        (WebCore::DOMWindow::collectMatchingElementsInFlatTree): Added. Implements the feature by
+        calling SelectorQuery's matches on a node yielded by ComposedTreeIterator.
+        * page/DOMWindow.h:
+        * page/DOMWindow.idl:
+
+2016-11-17  Sam Weinig  <sam@webkit.org>
+
+        [WebIDL] Add support for ByteString
+        https://bugs.webkit.org/show_bug.cgi?id=164901
+
+        Reviewed by Darin Adler.
+
+        * bindings/generic/IDLTypes.h:
+        Make IDLByteString a IDLString.
+
+        * bindings/js/JSDOMBinding.cpp:
+        (WebCore::valueToByteString):
+        (WebCore::valueToUSVString):
+        * bindings/js/JSDOMBinding.h:
+        Add conversion function for ByteString and fix valueToUSVString to take an ExecState reference.
+
+        * bindings/js/JSDOMConvert.h:
+        (WebCore::Converter<IDLByteString>::convert):
+        (WebCore::JSConverter<IDLByteString>::convert):
+        Add conversion functions for ByteString, using valueToByteString.
+
+        (WebCore::Converter<IDLUSVString>::convert):
+        Update to pass the ExecState by reference.
+
+        * bindings/js/JSMessageEventCustom.cpp:
+        (WebCore::handleInitMessageEvent):
+        Update to pass the ExecState by reference.
+
+        * bindings/js/JSWorkerGlobalScopeCustom.cpp:
+        (WebCore::JSWorkerGlobalScope::importScripts):
+        Update to pass the ExecState by reference.
+
+        * bindings/scripts/CodeGenerator.pm:
+        Add ByteString as a string type.
+
+        * testing/TypeConversions.h:
+        (WebCore::TypeConversions::testByteString):
+        (WebCore::TypeConversions::setTestByteString):
+        * testing/TypeConversions.idl:
+        Add a testByteString attribute for testing.
+
+2016-11-17  Ryosuke Niwa  <rniwa@webkit.org>
+
+        WKBundleNodeHandleSetHTMLInputElementSpellcheckEnabled should keep text replacement enabled
+        https://bugs.webkit.org/show_bug.cgi?id=164857
+        <rdar://problem/27721742>
+
+        Reviewed by Wenson Hsieh.
+
+        It turns out that some users want text replacement to be always enabled so change the semantics of
+        WKBundleNodeHandleSetHTMLInputElementSpellcheckEnabled to only disable everything else.
+
+        Instead of completely disabling spellchecking, remove all text checking options but text replacement
+        when the user types into an input element on which this API is used to disable spellchecking.
+
+        No new tests since we don't have a good facility to test text replacement.
+
+        * dom/Element.h:
+        (WebCore::Element::isSpellCheckingEnabled): Made this non-virtual now that there is no override.
+        * editing/Editor.cpp:
+        (WebCore::Editor::replaceSelectionWithFragment):
+        (WebCore::Editor::markAllMisspellingsAndBadGrammarInRanges): Don't call resolveTextCheckingTypeMask twice.
+        (WebCore::Editor::resolveTextCheckingTypeMask): Filter out the text checking options if the root editable
+        element is inside an input element on which isSpellcheckDisabledExceptTextReplacement is set to true.
+        * editing/Editor.h:
+        * html/HTMLInputElement.cpp:
+        (WebCore::HTMLInputElement::HTMLInputElement):
+        (WebCore::HTMLInputElement::isSpellCheckingEnabled): Deleted.
+        * html/HTMLInputElement.h:
+        (WebCore::HTMLInputElement::setSpellcheckDisabledExceptTextReplacement): Renamed from setSpellcheckEnabled
+        to reflect the new semantics.
+        (WebCore::HTMLInputElement::isSpellcheckDisabledExceptTextReplacement): Ditto.
+
 2016-11-17  John Wilander  <wilander@apple.com>
 
         Resource load statistics: Cover further data records, count removed data records, and only fire handler when needed

@@ -1572,7 +1572,7 @@ void WebPageProxy::dispatchActivityStateChange()
         m_process->responsivenessTimer().stop();
 
 #if ENABLE(POINTER_LOCK)
-    if ((changed & ActivityState::IsVisible) && !isViewVisible())
+    if (((changed & ActivityState::IsVisible) && !isViewVisible()) || ((changed & ActivityState::WindowIsActive) && !m_pageClient.isViewWindowActive()))
         requestPointerUnlock();
 #endif
 
@@ -1809,7 +1809,7 @@ void WebPageProxy::performDragControllerAction(DragControllerAction action, Drag
     WebSelectionData selection(*dragData.platformData());
     m_process->send(Messages::WebPage::PerformDragControllerAction(action, dragData.clientPosition(), dragData.globalPosition(), dragData.draggingSourceOperationMask(), selection, dragData.flags()), m_pageID);
 #else
-    m_process->send(Messages::WebPage::PerformDragControllerAction(action, dragData.clientPosition(), dragData.globalPosition(), dragData.draggingSourceOperationMask(), dragStorageName, dragData.flags(), sandboxExtensionHandle, sandboxExtensionsForUpload), m_pageID);
+    m_process->send(Messages::WebPage::PerformDragControllerAction(action, dragData, sandboxExtensionHandle, sandboxExtensionsForUpload), m_pageID);
 #endif
 }
 
@@ -2601,6 +2601,14 @@ void WebPageProxy::setCustomDeviceScaleFactor(float customScaleFactor)
 
     if (deviceScaleFactor() != oldScaleFactor)
         m_drawingArea->deviceScaleFactorDidChange();
+}
+
+void WebPageProxy::accessibilitySettingsDidChange()
+{
+    if (!isValid())
+        return;
+
+    m_process->send(Messages::WebPage::AccessibilitySettingsDidChange(), m_pageID);
 }
 
 void WebPageProxy::setUseFixedLayout(bool fixed)
@@ -5493,6 +5501,10 @@ void WebPageProxy::resetStateAfterProcessExited()
     m_pageClient.dismissContentRelativeChildWindows();
 #endif
 
+#if ENABLE(POINTER_LOCK)
+    requestPointerUnlock();
+#endif
+
     PageLoadState::Transaction transaction = m_pageLoadState.transaction();
     m_pageLoadState.reset(transaction);
 
@@ -6710,31 +6722,53 @@ void WebPageProxy::hideValidationMessage()
 #if ENABLE(POINTER_LOCK)
 void WebPageProxy::requestPointerLock()
 {
+    ASSERT(!m_isPointerLockPending);
+    ASSERT(!m_isPointerLocked);
+    m_isPointerLockPending = true;
     if (!isViewVisible()) {
-        m_process->send(Messages::WebPage::DidNotAcquirePointerLock(), m_pageID);
+        didDenyPointerLock();
         return;
     }
-
-    didAllowPointerLock();
+    m_uiClient->requestPointerLock(this);
 }
     
 void WebPageProxy::didAllowPointerLock()
 {
+    ASSERT(m_isPointerLockPending && !m_isPointerLocked);
+    m_isPointerLocked = true;
+    m_isPointerLockPending = false;
+#if PLATFORM(MAC)
     CGDisplayHideCursor(CGMainDisplayID());
     CGAssociateMouseAndMouseCursorPosition(false);
+#endif
     m_process->send(Messages::WebPage::DidAcquirePointerLock(), m_pageID);
 }
     
 void WebPageProxy::didDenyPointerLock()
 {
+    ASSERT(m_isPointerLockPending && !m_isPointerLocked);
+    m_isPointerLockPending = false;
     m_process->send(Messages::WebPage::DidNotAcquirePointerLock(), m_pageID);
 }
 
 void WebPageProxy::requestPointerUnlock()
 {
-    CGDisplayShowCursor(CGMainDisplayID());
-    CGAssociateMouseAndMouseCursorPosition(true);
-    m_process->send(Messages::WebPage::DidLosePointerLock(), m_pageID);
+    if (m_isPointerLocked) {
+#if PLATFORM(MAC)
+        CGAssociateMouseAndMouseCursorPosition(true);
+        CGDisplayShowCursor(CGMainDisplayID());
+#endif
+        m_uiClient->didLosePointerLock(this);
+        m_process->send(Messages::WebPage::DidLosePointerLock(), m_pageID);
+    }
+
+    if (m_isPointerLockPending) {
+        m_uiClient->didLosePointerLock(this);
+        m_process->send(Messages::WebPage::DidNotAcquirePointerLock(), m_pageID);
+    }
+
+    m_isPointerLocked = false;
+    m_isPointerLockPending = false;
 }
 #endif
 

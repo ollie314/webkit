@@ -1,3 +1,361 @@
+2016-11-20  Megan Gardner  <megan_gardner@apple.com>
+
+        Add iOS text selection tests - long press clear and multi line selection tests
+        https://bugs.webkit.org/show_bug.cgi?id=164899
+
+        Reviewed by Darin Adler.
+
+        Test for clearing a selection after a long press.
+        Test for checking multi-line select, both increasing and decreasing, using the left selection.
+        Test for checking multi-line select, both increasing and decreasing, using the right selection.
+
+        * fast/events/touch/ios/long-press-then-drag-down-to-change-selected-text-expected.txt: Added.
+        * fast/events/touch/ios/long-press-then-drag-down-to-change-selected-text.html: Added.
+        * fast/events/touch/ios/long-press-then-drag-up-to-change-selected-text-expected.txt: Added.
+        * fast/events/touch/ios/long-press-then-drag-up-to-change-selected-text.html: Added.
+        * fast/events/touch/ios/long-press-to-select-and-tap-to-clear-expected.txt: Added.
+        * fast/events/touch/ios/long-press-to-select-and-tap-to-clear.html: Added.
+
+2016-11-19  Chris Dumez  <cdumez@apple.com>
+
+        Update HTML form validation messages
+        https://bugs.webkit.org/show_bug.cgi?id=164957
+        <rdar://problem/29338669>
+
+        Reviewed by Darin Adler.
+
+        Rebaseline existing tests.
+
+        * fast/forms/number/number-validation-message-expected.txt:
+        * fast/forms/number/number-validation-message.html:
+        * fast/forms/validation-custom-message-expected.txt:
+        * fast/forms/validation-custom-message.html:
+        * fast/forms/validation-messages-expected.txt:
+        * fast/forms/validation-messages.html:
+        * fast/forms/validationMessage-expected.txt:
+
+2016-11-19  Joanmarie Diggs  <jdiggs@igalia.com>
+
+        AX: [ATK] Implement selection interface and states for elements supporting aria-selected and for menu roles
+        https://bugs.webkit.org/show_bug.cgi?id=164865
+
+        Reviewed by Chris Fleizach.
+
+        New tests for the added support. In addition, update the expectations for
+        aria-combobox.html to reflect the corrected ATK mapping of ListBoxRole for
+        combobox descendants.
+
+        * accessibility/aria-combobox-expected.txt: Updated.
+        * accessibility/aria-combobox-hierarchy.html: Added.
+        * accessibility/aria-selected-menu-items.html: Added.
+        * accessibility/aria-selected.html: Added.
+        * platform/gtk/accessibility/aria-combobox-hierarchy-expected.txt: Added.
+        * platform/gtk/accessibility/aria-selected-expected.txt: Added.
+        * platform/gtk/accessibility/aria-selected-menu-items-expected.txt: Added.
+        * platform/mac/accessibility/aria-combobox-hierarchy-expected.txt: Added.
+        * platform/mac/accessibility/aria-selected-expected.txt: Added.
+        * platform/mac/accessibility/aria-selected-menu-items-expected.txt: Added.
+
+2016-11-18  Simon Fraser  <simon.fraser@apple.com>
+
+        Make it possible to test non-stable-state scrolling on iOS
+        https://bugs.webkit.org/show_bug.cgi?id=164905
+
+        Reviewed by Dan Bernstein.
+
+        * scrollingcoordinator/ios/non-stable-viewport-scroll-expected.txt: Added.
+        * scrollingcoordinator/ios/non-stable-viewport-scroll.html: Added.
+
+2016-11-19  Joanmarie Diggs  <jdiggs@igalia.com>
+
+        AX: [ATK] Expose aria-busy via ATK_STATE_BUSY
+        https://bugs.webkit.org/show_bug.cgi?id=164909
+
+        Reviewed by Chris Fleizach.
+
+        * accessibility/aria-busy-expected.txt: Added.
+        * accessibility/aria-busy.html: Added.
+
+2016-11-19  Ryosuke Niwa  <rniwa@webkit.org>
+
+        REGRESSION(r200964): Tab focus navigation is broken on results.en.voyages-sncf.com
+        https://bugs.webkit.org/show_bug.cgi?id=164888
+
+        Reviewed by Antti Koivisto.
+
+        Add regression tests for moving the focus across a shadow tree and a SVG use element
+        and the one that moves out of a slot element.
+
+        * fast/shadow-dom/focus-navigation-out-of-slot-expected.txt: Added.
+        * fast/shadow-dom/focus-navigation-out-of-slot.html: Added.
+        * fast/shadow-dom/focus-navigation-passes-shadow-host-expected.txt: Added.
+        * fast/shadow-dom/focus-navigation-passes-shadow-host.html: Added.
+        * fast/shadow-dom/focus-navigation-passes-svg-use-element-expected.txt: Added.
+        * fast/shadow-dom/focus-navigation-passes-svg-use-element.html: Added.
+        * platform/ios-simulator/TestExpectations: Skip the newly added tests on iOS.
+
+2016-11-18  Simon Fraser  <simon.fraser@apple.com>
+
+        [iOS WK2] Eliminate a source of flakiness in layout tests by forcing WebPage into "responsive" mode for all tests, with an internals override
+        https://bugs.webkit.org/show_bug.cgi?id=164980
+
+        Reviewed by Chris Dumez.
+
+        * fast/scrolling/ios/scroll-events-default-expected.txt: Added.
+        * fast/scrolling/ios/scroll-events-default.html: Added.
+        * fast/scrolling/ios/scroll-events-responsive-expected.txt: Added.
+        * fast/scrolling/ios/scroll-events-responsive.html: Added.
+        * fast/scrolling/ios/scroll-events-unresponsive-expected.txt: Added.
+        * fast/scrolling/ios/scroll-events-unresponsive.html: Added.
+
+2016-11-18  Jiewen Tan  <jiewen_tan@apple.com>
+
+        Update SubtleCrypto::decrypt to match the latest spec
+        https://bugs.webkit.org/show_bug.cgi?id=164739
+        <rdar://problem/29257848>
+
+        Reviewed by Brent Fulgham.
+
+        * crypto/subtle/aes-cbc-decrypt-malformed-parameters-expected.txt: Added.
+        * crypto/subtle/aes-cbc-decrypt-malformed-parameters.html: Added.
+        * crypto/subtle/aes-cbc-generate-key-encrypt-decrypt-expected.txt: Added.
+        * crypto/subtle/aes-cbc-generate-key-encrypt-decrypt.html: Added.
+        * crypto/subtle/aes-cbc-import-key-decrypt-expected.txt: Added.
+        * crypto/subtle/aes-cbc-import-key-decrypt.html: Added.
+        * crypto/subtle/decrypt-malformed-parameters-expected.txt: Added.
+        * crypto/subtle/decrypt-malformed-parameters.html: Added.
+        * crypto/subtle/rsa-oaep-decrypt-malformed-parameters-expected.txt: Added.
+        * crypto/subtle/rsa-oaep-decrypt-malformed-parameters.html: Added.
+        * crypto/subtle/rsa-oaep-generate-key-encrypt-decrypt-expected.txt: Added.
+        * crypto/subtle/rsa-oaep-generate-key-encrypt-decrypt-label-expected.txt: Added.
+        * crypto/subtle/rsa-oaep-generate-key-encrypt-decrypt-label.html: Added.
+        * crypto/subtle/rsa-oaep-generate-key-encrypt-decrypt.html: Added.
+        * crypto/subtle/rsa-oaep-import-key-decrypt-expected.txt: Added.
+        * crypto/subtle/rsa-oaep-import-key-decrypt-label-expected.txt: Added.
+        * crypto/subtle/rsa-oaep-import-key-decrypt-label.html: Added.
+        * crypto/subtle/rsa-oaep-import-key-decrypt.html: Added.
+        * crypto/subtle/rsaes-pkcs1-v1_5-generate-key-encrypt-decrypt-expected.txt: Added.
+        * crypto/subtle/rsaes-pkcs1-v1_5-generate-key-encrypt-decrypt.html: Added.
+        * crypto/subtle/rsaes-pkcs1-v1_5-import-key-decrypt-expected.txt: Added.
+        * crypto/subtle/rsaes-pkcs1-v1_5-import-key-decrypt.html: Added.
+        * crypto/workers/subtle/aes-cbc-import-key-decrypt-expected.txt: Added.
+        * crypto/workers/subtle/aes-cbc-import-key-decrypt.html: Added.
+        * crypto/workers/subtle/resources/aes-cbc-import-key-decrypt.js: Added.
+        * crypto/workers/subtle/resources/rsa-oaep-import-key-decrypt.js: Added.
+        * crypto/workers/subtle/resources/rsaes-pkcs1-v1_5-import-key-decrypt.js: Added.
+        * crypto/workers/subtle/rsa-oaep-import-key-decrypt-expected.txt: Added.
+        * crypto/workers/subtle/rsa-oaep-import-key-decrypt.html: Added.
+        * crypto/workers/subtle/rsaes-pkcs1-v1_5-import-key-decrypt-expected.txt: Added.
+        * crypto/workers/subtle/rsaes-pkcs1-v1_5-import-key-decrypt.html: Added.
+
+2016-11-18  Chris Dumez  <cdumez@apple.com>
+
+        Unreviewed, rolling out r208837.
+
+        The bots did not show a progression
+
+        Reverted changeset:
+
+        "REGRESSION(r208082): 1% Speedometer regression on iOS"
+        https://bugs.webkit.org/show_bug.cgi?id=164852
+        http://trac.webkit.org/changeset/208837
+
+2016-11-18  Dean Jackson  <dino@apple.com>
+
+        AX: "(inverted-colors)" media query only matches on page reload; should match on change
+        https://bugs.webkit.org/show_bug.cgi?id=163564
+        <rdar://problem/28807350>
+
+        Reviewed by Simon Fraser.
+
+        * fast/media/mq-inverted-colors-live-update-in-subframes-expected.html: Added.
+        * fast/media/mq-inverted-colors-live-update-in-subframes.html: Added.
+        * fast/media/mq-inverted-colors-live-update-expected.html: Added.
+        * fast/media/mq-inverted-colors-live-update.html: Added.
+        * fast/media/mq-monochrome-live-update-expected.html: Added.
+        * fast/media/mq-monochrome-live-update.html: Added.
+        * fast/media/mq-prefers-reduced-motion-live-update-expected.html: Added.
+        * fast/media/mq-prefers-reduced-motion-live-update.html: Added.
+
+2016-11-18  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        [WebGL2] Implement texStorage2D()
+        https://bugs.webkit.org/show_bug.cgi?id=164493
+
+        Reviewed by Dean Jackson.
+
+        * fast/canvas/webgl/webgl2-texStorage-expected.txt: Added.
+        * fast/canvas/webgl/webgl2-texStorage.html: Added.
+
+2016-11-17  Alex Christensen  <achristensen@webkit.org>
+
+        Support IDN2008 with UTS #46 instead of IDN2003
+        https://bugs.webkit.org/show_bug.cgi?id=144194
+
+        Reviewed by Darin Adler.
+
+        * fast/encoding/idn-security.html:
+        Move some characters with changed IDN encodings to inside the check for old ICU.
+        * fast/url/idna2003-expected.txt:
+        * fast/url/idna2008-expected.txt:
+        Update expected results.  We are now more compliant with IDN2008.
+
+2016-11-18  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking two js/dom/domjit-function-get-element-by-id-* tests as flaky.
+        https://bugs.webkit.org/show_bug.cgi?id=164797
+
+        Unreviewed test gardening.
+
+        * TestExpectations:
+
+2016-11-18  Dean Jackson  <dino@apple.com>
+
+        Better testing for accessibility media queries
+        https://bugs.webkit.org/show_bug.cgi?id=164954
+        <rdar://problem/29338292>
+
+        Reviewed by Myles Maxfield.
+
+        * fast/media/mq-inverted-colors-forced-value-expected.html: Added.
+        * fast/media/mq-inverted-colors-forced-value.html: Copied from LayoutTests/fast/media/mq-prefers-reduced-motion-forced-value.html.
+        * fast/media/mq-monochrome-forced-value-expected.html: Added.
+        * fast/media/mq-monochrome-forced-value.html: Added.
+        * fast/media/mq-prefers-reduced-motion-forced-value.html:
+
+2016-11-18  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking http/tests/misc/link-rel-icon-beforeload.html as failing on mac-wk1.
+        https://bugs.webkit.org/show_bug.cgi?id=164933
+
+        Unreviewed test gardening.
+
+        * platform/mac-wk1/TestExpectations:
+
+2016-11-18  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Unsupported emoji are invisible
+        https://bugs.webkit.org/show_bug.cgi?id=164944
+        <rdar://problem/28591608>
+
+        Reviewed by Dean Jackson.
+
+        * fast/text/emoji-draws-expected-mismatch.html: Added.
+        * fast/text/emoji-draws.html: Added.
+
+2016-11-18  Sam Weinig  <sam@webkit.org>
+
+        [WebIDL] Add support for record types
+        https://bugs.webkit.org/show_bug.cgi?id=164935
+
+        Reviewed by Tim Horton.
+
+        * js/dom/webidl-type-mapping-expected.txt:
+        * js/dom/webidl-type-mapping.html:
+        Add tests for WebIDL record types.
+
+2016-11-17  Jiewen Tan  <jiewen_tan@apple.com>
+
+        Update SubtleCrypto::encrypt to match the latest spec
+        https://bugs.webkit.org/show_bug.cgi?id=164738
+        <rdar://problem/29257812>
+
+        Reviewed by Brent Fulgham.
+
+        * TestExpectations:
+        * crypto/subtle/aes-cbc-encrypt-malformed-parameters-expected.txt: Added.
+        * crypto/subtle/aes-cbc-encrypt-malformed-parameters.html: Added.
+        * crypto/subtle/aes-cbc-import-key-encrypt-expected.txt: Added.
+        * crypto/subtle/aes-cbc-import-key-encrypt.html: Added.
+        * crypto/subtle/encrypt-malformed-parameters-expected.txt: Added.
+        * crypto/subtle/encrypt-malformed-parameters.html: Added.
+        * crypto/subtle/rsa-oaep-encrypt-malformed-parameters-expected.txt: Added.
+        * crypto/subtle/rsa-oaep-encrypt-malformed-parameters.html: Added.
+        * crypto/subtle/rsa-oaep-import-key-encrypt-expected.txt: Added.
+        * crypto/subtle/rsa-oaep-import-key-encrypt-label-expected.txt: Added.
+        * crypto/subtle/rsa-oaep-import-key-encrypt-label.html: Added.
+        * crypto/subtle/rsa-oaep-import-key-encrypt.html: Added.
+        * crypto/subtle/rsaes-pkcs1-v1_5-import-key-encrypt-expected.txt: Added.
+        * crypto/subtle/rsaes-pkcs1-v1_5-import-key-encrypt.html: Added.
+        * crypto/workers/subtle/aes-cbc-import-key-encrypt-expected.txt: Added.
+        * crypto/workers/subtle/aes-cbc-import-key-encrypt.html: Added.
+        * crypto/workers/subtle/resources/aes-cbc-import-key-encrypt.js: Added.
+        * crypto/workers/subtle/resources/rsa-oaep-import-key-encrypt.js: Added.
+        * crypto/workers/subtle/resources/rsaes-pkcs1-v1_5-import-key-encrypt.js: Added.
+        * crypto/workers/subtle/rsa-oaep-import-key-encrypt-expected.txt: Added.
+        * crypto/workers/subtle/rsa-oaep-import-key-encrypt.html: Added.
+        * crypto/workers/subtle/rsaes-pkcs1-v1_5-import-key-encrypt-expected.txt: Added.
+        * crypto/workers/subtle/rsaes-pkcs1-v1_5-import-key-encrypt.html: Added.
+
+2016-11-18  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        [CSS Font Loading] FontFaceSet.load() promises don't always fire
+        https://bugs.webkit.org/show_bug.cgi?id=164902
+
+        Reviewed by David Hyatt.
+
+        * fast/text/fontfaceset-rebuild-during-loading-expected.txt: Added.
+        * fast/text/fontfaceset-rebuild-during-loading.html: Added.
+
+2016-11-18  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        [SVG -> OTF Font Converter] Fonts advances are not internally consistent inside the generated font file
+        https://bugs.webkit.org/show_bug.cgi?id=164846
+        <rdar://problem/29031509>
+
+        Reviewed by Darin Adler.
+
+        * platform/ios-simulator/svg/W3C-SVG-1.1/fonts-elem-01-t-expected.txt:
+        * platform/ios-simulator/svg/W3C-SVG-1.1/fonts-elem-02-t-expected.txt:
+        * platform/ios-simulator/svg/W3C-SVG-1.1/fonts-elem-03-b-expected.txt:
+        * platform/ios-simulator/svg/W3C-SVG-1.1/fonts-elem-04-b-expected.txt:
+        * platform/ios-simulator/svg/W3C-SVG-1.1/fonts-elem-07-b-expected.txt:
+        * platform/ios-simulator/svg/W3C-SVG-1.1/text-intro-01-t-expected.txt:
+        * platform/ios-simulator/svg/W3C-SVG-1.1/text-intro-02-b-expected.txt:
+        * platform/ios-simulator/svg/W3C-SVG-1.1/text-intro-03-b-expected.txt:
+        * platform/ios-simulator/svg/W3C-SVG-1.1/text-intro-04-t-expected.txt:
+        * platform/ios-simulator/svg/batik/text/textEffect-expected.txt:
+        * platform/ios-simulator/svg/batik/text/textEffect3-expected.txt:
+        * platform/ios-simulator/svg/batik/text/textPosition2-expected.txt:
+        * platform/mac/svg/W3C-SVG-1.1/fonts-elem-01-t-expected.txt:
+        * platform/mac/svg/W3C-SVG-1.1/fonts-elem-02-t-expected.txt:
+        * platform/mac/svg/W3C-SVG-1.1/fonts-elem-03-b-expected.txt:
+        * platform/mac/svg/W3C-SVG-1.1/fonts-elem-04-b-expected.txt:
+        * platform/mac/svg/W3C-SVG-1.1/fonts-elem-07-b-expected.txt:
+        * platform/mac/svg/W3C-SVG-1.1/text-intro-01-t-expected.txt:
+        * platform/mac/svg/W3C-SVG-1.1/text-intro-02-b-expected.txt:
+        * platform/mac/svg/W3C-SVG-1.1/text-intro-03-b-expected.txt:
+        * platform/mac/svg/W3C-SVG-1.1/text-intro-04-t-expected.txt:
+        * platform/mac/svg/batik/text/textEffect3-expected.txt:
+        * platform/mac/svg/batik/text/textPosition2-expected.txt:
+        * platform/mac/svg/custom/svg-fonts-fallback-expected.txt:
+        * platform/mac/svg/wicd/test-rightsizing-b-expected.txt:
+        * svg/W3C-SVG-1.1/fonts-elem-04-b-expected.txt:
+
+2016-11-18  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Generator functions should have a displayable name when shown in stack traces
+        https://bugs.webkit.org/show_bug.cgi?id=164844
+        <rdar://problem/29300697>
+
+        Reviewed by Yusuke Suzuki.
+
+        * inspector/debugger/js-stacktrace-expected.txt:
+        * inspector/debugger/js-stacktrace.html:
+        Add a test case for console.trace() / Error stack inside of generators.
+        Modernize the test to reduce redundency and get nicer output.
+
+2016-11-17  Sam Weinig  <sam@webkit.org>
+
+        [WebIDL] Add support for ByteString
+        https://bugs.webkit.org/show_bug.cgi?id=164901
+
+        Reviewed by Darin Adler.
+
+        * js/dom/webidl-type-mapping-expected.txt:
+        * js/dom/webidl-type-mapping.html:
+        Add tests for ByteString using the new TypeConversions.testByteString attribute.
+
 2016-11-17  Alex Christensen  <achristensen@webkit.org>
 
         Implement TextDecoder and TextEncoder

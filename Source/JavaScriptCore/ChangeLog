@@ -1,3 +1,256 @@
+2016-11-20  Zan Dobersek  <zdobersek@igalia.com>
+
+        [EncryptedMedia] Make EME API runtime-enabled
+        https://bugs.webkit.org/show_bug.cgi?id=164927
+
+        Reviewed by Jer Noble.
+
+        * runtime/CommonIdentifiers.h: Add the necessary identifiers.
+
+2016-11-20  Mark Lam  <mark.lam@apple.com>
+
+        Fix exception scope verification failures in ConstructData.cpp.
+        https://bugs.webkit.org/show_bug.cgi?id=164976
+
+        Reviewed by Darin Adler.
+
+        * runtime/ConstructData.cpp:
+        (JSC::construct):
+
+2016-11-20  Mark Lam  <mark.lam@apple.com>
+
+        Fix exception scope verification failures in CommonSlowPaths.cpp/h.
+        https://bugs.webkit.org/show_bug.cgi?id=164975
+
+        Reviewed by Darin Adler.
+
+        * runtime/CommonSlowPaths.cpp:
+        (JSC::SLOW_PATH_DECL):
+        * runtime/CommonSlowPaths.h:
+        (JSC::CommonSlowPaths::opIn):
+
+2016-11-20  Mark Lam  <mark.lam@apple.com>
+
+        Fix exception scope verification failures in DateConstructor.cpp and DatePrototype.cpp.
+        https://bugs.webkit.org/show_bug.cgi?id=164995
+
+        Reviewed by Darin Adler.
+
+        * runtime/DateConstructor.cpp:
+        (JSC::millisecondsFromComponents):
+        (JSC::constructDate):
+        * runtime/DatePrototype.cpp:
+        (JSC::dateProtoFuncToPrimitiveSymbol):
+
+2016-11-20  Caitlin Potter  <caitp@igalia.com>
+
+        [JSC] speed up parsing of async functions
+        https://bugs.webkit.org/show_bug.cgi?id=164808
+
+        Reviewed by Yusuke Suzuki.
+
+        Minor adjustments to Parser in order to mitigate slowdown with async
+        function parsing enabled:
+
+          - Tokenize "async" as a keyword
+          - Perform less branching in various areas of the Parser
+
+        * parser/Keywords.table:
+        * parser/Parser.cpp:
+        (JSC::Parser<LexerType>::parseStatementListItem):
+        (JSC::Parser<LexerType>::parseStatement):
+        (JSC::Parser<LexerType>::maybeParseAsyncFunctionDeclarationStatement):
+        (JSC::Parser<LexerType>::parseClass):
+        (JSC::Parser<LexerType>::parseExportDeclaration):
+        (JSC::Parser<LexerType>::parseAssignmentExpression):
+        (JSC::Parser<LexerType>::parseProperty):
+        (JSC::Parser<LexerType>::createResolveAndUseVariable):
+        (JSC::Parser<LexerType>::parsePrimaryExpression):
+        (JSC::Parser<LexerType>::parseMemberExpression):
+        (JSC::Parser<LexerType>::printUnexpectedTokenText):
+        * parser/Parser.h:
+        (JSC::isAnyContextualKeyword):
+        (JSC::isIdentifierOrAnyContextualKeyword):
+        (JSC::isSafeContextualKeyword):
+        (JSC::Parser::matchSpecIdentifier):
+        * parser/ParserTokens.h:
+        * runtime/CommonIdentifiers.h:
+
+2016-11-19  Mark Lam  <mark.lam@apple.com>
+
+        Add --timeoutMultiplier option to allow some tests more time to run.
+        https://bugs.webkit.org/show_bug.cgi?id=164951
+
+        Reviewed by Yusuke Suzuki.
+
+        * jsc.cpp:
+        (timeoutThreadMain):
+        - Modified to factor in a timeout multiplier that can adjust the timeout duration.
+        (startTimeoutThreadIfNeeded):
+        - Moved the code that starts the timeout thread here from main() so that we can
+        call it after command line args have been parsed instead.
+        (main):
+        - Deleted old timeout thread starting code.
+        (CommandLine::parseArguments):
+        - Added parsing of the --timeoutMultiplier option.
+        (jscmain):
+        - Start the timeout thread if needed after we've parsed the command line args.
+
+2016-11-19  Mark Lam  <mark.lam@apple.com>
+
+        Fix missing exception checks in JSC inspector files.
+        https://bugs.webkit.org/show_bug.cgi?id=164959
+
+        Reviewed by Saam Barati.
+
+        * inspector/JSInjectedScriptHost.cpp:
+        (Inspector::JSInjectedScriptHost::getInternalProperties):
+        (Inspector::JSInjectedScriptHost::weakMapEntries):
+        (Inspector::JSInjectedScriptHost::weakSetEntries):
+        (Inspector::JSInjectedScriptHost::iteratorEntries):
+        * inspector/JSJavaScriptCallFrame.cpp:
+        (Inspector::JSJavaScriptCallFrame::scopeDescriptions):
+
+2016-11-18  Mark Lam  <mark.lam@apple.com>
+
+        Fix missing exception checks in DFGOperations.cpp.
+        https://bugs.webkit.org/show_bug.cgi?id=164958
+
+        Reviewed by Geoffrey Garen.
+
+        * dfg/DFGOperations.cpp:
+
+2016-11-18  Mark Lam  <mark.lam@apple.com>
+
+        Fix exception scope verification failures in ShadowChicken.cpp.
+        https://bugs.webkit.org/show_bug.cgi?id=164966
+
+        Reviewed by Saam Barati.
+
+        * interpreter/ShadowChicken.cpp:
+        (JSC::ShadowChicken::functionsOnStack):
+
+2016-11-18  Jeremy Jones  <jeremyj@apple.com>
+
+        Add runtime flag to enable pointer lock. Enable pointer lock feature for mac.
+        https://bugs.webkit.org/show_bug.cgi?id=163801
+
+        Reviewed by Simon Fraser.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2016-11-18  Filip Pizlo  <fpizlo@apple.com>
+
+        Unreviewed, fix cloop.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::stronglyVisitStrongReferences):
+
+2016-11-18  Filip Pizlo  <fpizlo@apple.com>
+
+        Concurrent GC should be able to run splay in debug mode and earley/raytrace in release mode with no perf regression
+        https://bugs.webkit.org/show_bug.cgi?id=164282
+
+        Reviewed by Geoffrey Garen and Oliver Hunt.
+        
+        The two three remaining bugs were:
+
+        - Improper ordering inside putDirectWithoutTransition() and friends. We need to make sure
+          that the GC doesn't see the store to Structure::m_offset until we've resized the butterfly.
+          That proved a bit tricky. On the other hand, this means that we could probably remove the
+          requirement that the GC holds the Structure lock in some cases. I haven't removed that lock
+          yet because I still think it might protect some weird cases, and it doesn't seem to cost us
+          anything.
+        
+        - CodeBlock's GC strategy needed to be made thread-safe (visitWeakly, visitChildren, and
+          their friends now hold locks) and incremental-safe (we need to update predictions in the
+          finalizer to make sure we clear anything that was put into a value profile towards the end
+          of GC).
+        
+        - The GC timeslicing scheduler needed to be made a bit more aggressive to deal with
+          generational workloads like earley, raytrace, and CDjs. Once I got those benchmarks to run,
+          I found that they would do many useless iterations of GC because they wouldn't pause long
+          enough after rescanning weak references and roots. I added a bunch of knobs for forcing a
+          pause. In the end, I realized that I could get the desired effect by putting a ceiling on
+          mutator utilization. We want the GC to finish quickly if it is possible to do so, even if
+          the amount of allocation that the mutator had done is low. Having a utilization ceiling
+          seems to accomplish this for benchmarks with trivial heaps (earley and raytrace) as well as
+          huge heaps (like CDjs in its "large" configuration).
+        
+        This preserves splay performance, makes the concurrent GC more stable, and makes the
+        concurrent GC not a perf regression on earley or raytrace. It seems to give us great CDjs
+        performance as well, but this is still hard to tell because we crash a lot in that benchmark.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::CodeBlock):
+        (JSC::CodeBlock::visitWeakly):
+        (JSC::CodeBlock::visitChildren):
+        (JSC::CodeBlock::shouldVisitStrongly):
+        (JSC::CodeBlock::shouldJettisonDueToOldAge):
+        (JSC::CodeBlock::propagateTransitions):
+        (JSC::CodeBlock::determineLiveness):
+        (JSC::CodeBlock::WeakReferenceHarvester::visitWeakReferences):
+        (JSC::CodeBlock::UnconditionalFinalizer::finalizeUnconditionally):
+        (JSC::CodeBlock::visitOSRExitTargets):
+        (JSC::CodeBlock::stronglyVisitStrongReferences):
+        (JSC::CodeBlock::stronglyVisitWeakReferences):
+        * bytecode/CodeBlock.h:
+        (JSC::CodeBlock::clearVisitWeaklyHasBeenCalled):
+        * heap/CodeBlockSet.cpp:
+        (JSC::CodeBlockSet::deleteUnmarkedAndUnreferenced):
+        * heap/Heap.cpp:
+        (JSC::Heap::ResumeTheWorldScope::ResumeTheWorldScope):
+        (JSC::Heap::markToFixpoint):
+        (JSC::Heap::beginMarking):
+        (JSC::Heap::addToRememberedSet):
+        (JSC::Heap::collectInThread):
+        * heap/Heap.h:
+        * heap/HeapInlines.h:
+        (JSC::Heap::mutatorFence):
+        * heap/MarkedBlock.cpp:
+        * runtime/JSCellInlines.h:
+        (JSC::JSCell::finishCreation):
+        * runtime/JSObjectInlines.h:
+        (JSC::JSObject::putDirectWithoutTransition):
+        (JSC::JSObject::putDirectInternal):
+        * runtime/Options.h:
+        * runtime/Structure.cpp:
+        (JSC::Structure::add):
+        * runtime/Structure.h:
+        * runtime/StructureInlines.h:
+        (JSC::Structure::add):
+
+2016-11-18  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Generator functions should have a displayable name when shown in stack traces
+        https://bugs.webkit.org/show_bug.cgi?id=164844
+        <rdar://problem/29300697>
+
+        Reviewed by Yusuke Suzuki.
+
+        * parser/SyntaxChecker.h:
+        (JSC::SyntaxChecker::createGeneratorFunctionBody):
+        * parser/ASTBuilder.h:
+        (JSC::ASTBuilder::createGeneratorFunctionBody):
+        New way to create a generator function with an inferred name.
+
+        * parser/Parser.cpp:
+        (JSC::Parser<LexerType>::parseInner):
+        (JSC::Parser<LexerType>::parseGeneratorFunctionSourceElements):
+        * parser/Parser.h:
+        Pass on the name of the generator wrapper function so we can
+        use it on the inner generator function.
+
+2016-11-17  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Add an experimental API to find elements across shadow boundaries
+        https://bugs.webkit.org/show_bug.cgi?id=164851
+        <rdar://problem/28220092>
+
+        Reviewed by Sam Weinig.
+
+        * runtime/CommonIdentifiers.h:
+
 2016-11-17  Yusuke Suzuki  <utatane.tea@gmail.com>
 
         [JSC] Drop arguments.caller

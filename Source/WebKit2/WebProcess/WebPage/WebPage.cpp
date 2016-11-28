@@ -151,7 +151,6 @@
 #include <WebCore/PageConfiguration.h>
 #include <WebCore/PlatformKeyboardEvent.h>
 #include <WebCore/PluginDocument.h>
-#include <WebCore/PointerLockController.h>
 #include <WebCore/PrintContext.h>
 #include <WebCore/Range.h>
 #include <WebCore/RenderLayer.h>
@@ -197,6 +196,10 @@
 
 #if ENABLE(VIBRATION)
 #include "WebVibrationClient.h"
+#endif
+
+#if ENABLE(POINTER_LOCK)
+#include <WebCore/PointerLockController.h>
 #endif
 
 #if ENABLE(PROXIMITY_EVENTS)
@@ -288,27 +291,11 @@ Ref<WebPage> WebPage::create(uint64_t pageID, const WebPageCreationParameters& p
 WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     : m_pageID(pageID)
     , m_viewSize(parameters.viewSize)
-    , m_hasSeenPlugin(false)
-    , m_useFixedLayout(false)
-    , m_drawsBackground(true)
-    , m_isInRedo(false)
-    , m_isClosed(false)
-    , m_tabToLinks(false)
-    , m_asynchronousPluginInitializationEnabled(false)
-    , m_asynchronousPluginInitializationEnabledForAllPlugins(false)
-    , m_artificialPluginInitializationDelayEnabled(false)
-    , m_scrollingPerformanceLoggingEnabled(false)
-    , m_mainFrameIsScrollable(true)
 #if ENABLE(PRIMARY_SNAPSHOTTED_PLUGIN_HEURISTIC)
-    , m_readyToFindPrimarySnapshottedPlugin(false)
-    , m_didFindPrimarySnapshottedPlugin(false)
-    , m_numberOfPrimarySnapshotDetectionAttempts(0)
     , m_determinePrimarySnapshottedPlugInTimer(RunLoop::main(), this, &WebPage::determinePrimarySnapshottedPlugInTimerFired)
 #endif
     , m_layerHostingMode(parameters.layerHostingMode)
 #if PLATFORM(COCOA)
-    , m_pdfPluginEnabled(false)
-    , m_hasCachedWindowFrame(false)
     , m_viewGestureGeometryCollector(*this)
 #elif HAVE(ACCESSIBILITY) && (PLATFORM(GTK) || PLATFORM(EFL))
     , m_accessibilityObject(nullptr)
@@ -320,9 +307,6 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     , m_formClient(std::make_unique<API::InjectedBundle::FormClient>())
     , m_uiClient(std::make_unique<API::InjectedBundle::PageUIClient>())
     , m_findController(this)
-#if ENABLE(INPUT_TYPE_COLOR)
-    , m_activeColorChooser(0)
-#endif
     , m_userContentController(WebUserContentController::getOrCreate(parameters.userContentControllerID))
 #if ENABLE(GEOLOCATION)
     , m_geolocationPermissionRequestManager(this)
@@ -333,53 +317,15 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     , m_pageScrolledHysteresis([this](HysteresisState state) { if (state == HysteresisState::Stopped) pageStoppedScrolling(); }, pageScrollHysteresisSeconds)
     , m_canRunBeforeUnloadConfirmPanel(parameters.canRunBeforeUnloadConfirmPanel)
     , m_canRunModal(parameters.canRunModal)
-    , m_isRunningModal(false)
-#if ENABLE(DRAG_SUPPORT)
-    , m_isStartingDrag(false)
-#endif
-    , m_cachedMainFrameIsPinnedToLeftSide(true)
-    , m_cachedMainFrameIsPinnedToRightSide(true)
-    , m_cachedMainFrameIsPinnedToTopSide(true)
-    , m_cachedMainFrameIsPinnedToBottomSide(true)
-    , m_canShortCircuitHorizontalWheelEvents(false)
-    , m_hasWheelEventHandlers(false)
-    , m_cachedPageCount(0)
-    , m_autoSizingShouldExpandToViewHeight(false)
-    , m_userIsInteracting(false)
-#if ENABLE(CONTEXT_MENUS)
-    , m_isShowingContextMenu(false)
-#endif
-    , m_hasPendingBlurNotification(false)
 #if PLATFORM(IOS)
-    , m_selectionAnchor(Start)
-    , m_hasReceivedVisibleContentRectsAfterDidCommitLoad(false)
-    , m_scaleWasSetByUIProcess(false)
-    , m_userHasChangedPageScaleFactor(false)
-    , m_hasStablePageScaleFactor(true)
-    , m_useTestingViewportConfiguration(false)
-    , m_isInStableState(true)
     , m_forceAlwaysUserScalable(parameters.ignoresViewportScaleLimits)
-    , m_oldestNonStableUpdateVisibleContentRectsTimestamp(std::chrono::milliseconds::zero())
-    , m_estimatedLatency(std::chrono::milliseconds::zero())
     , m_screenSize(parameters.screenSize)
     , m_availableScreenSize(parameters.availableScreenSize)
-    , m_deviceOrientation(0)
-    , m_inDynamicSizeUpdate(false)
 #endif
     , m_layerVolatilityTimer(*this, &WebPage::layerVolatilityTimerFired)
-    , m_backgroundColor(Color::white)
-    , m_maximumRenderingSuppressionToken(0)
-    , m_scrollPinningBehavior(DoNotPin)
-    , m_useAsyncScrolling(false)
     , m_activityState(parameters.activityState)
     , m_userActivity("Process suppression disabled for page.")
     , m_userActivityHysteresis([this](HysteresisState) { updateUserActivity(); })
-    , m_pendingNavigationID(0)
-#if ENABLE(WEBGL)
-    , m_systemWebGLPolicy(WebGLAllowCreation)
-#endif
-    , m_mainFrameProgressCompleted(false)
-    , m_shouldDispatchFakeMouseMoveEvents(true)
     , m_userInterfaceLayoutDirection(parameters.userInterfaceLayoutDirection)
 {
     ASSERT(m_pageID);
@@ -1669,6 +1615,11 @@ void WebPage::setDeviceScaleFactor(float scaleFactor)
 float WebPage::deviceScaleFactor() const
 {
     return m_page->deviceScaleFactor();
+}
+
+void WebPage::accessibilitySettingsDidChange()
+{
+    m_page->accessibilitySettingsDidChange();
 }
 
 void WebPage::setUseFixedLayout(bool fixed)
@@ -3027,6 +2978,9 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
 #if ENABLE(ATTACHMENT_ELEMENT)
     settings.setAttachmentElementEnabled(store.getBoolValueForKey(WebPreferencesKey::attachmentElementEnabledKey()));
 #endif
+#if ENABLE(POINTER_LOCK)
+    settings.setPointerLockEnabled(store.getBoolValueForKey(WebPreferencesKey::pointerLockEnabledKey()));
+#endif
     settings.setAllowsPictureInPictureMediaPlayback(store.getBoolValueForKey(WebPreferencesKey::allowsPictureInPictureMediaPlaybackKey()));
     settings.setMediaControlsScaleWithPageZoom(store.getBoolValueForKey(WebPreferencesKey::mediaControlsScaleWithPageZoomKey()));
     settings.setMockScrollbarsEnabled(store.getBoolValueForKey(WebPreferencesKey::mockScrollbarsEnabledKey()));
@@ -3233,6 +3187,10 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
 
     RuntimeEnabledFeatures::sharedFeatures().setModernMediaControlsEnabled(store.getBoolValueForKey(WebPreferencesKey::modernMediaControlsEnabledKey()));
 
+#if ENABLE(ENCRYPTED_MEDIA)
+    RuntimeEnabledFeatures::sharedFeatures().setEncryptedMediaAPIEnabled(store.getBoolValueForKey(WebPreferencesKey::encryptedMediaAPIEnabledKey()));
+#endif
+
     platformPreferencesDidChange(store);
 
     if (m_drawingArea)
@@ -3288,14 +3246,14 @@ void WebPage::willCommitLayerTree(RemoteLayerTreeTransaction& layerTransaction)
 #endif
 }
 
-void WebPage::didFlushLayerTreeAtTime(std::chrono::milliseconds timestamp)
+void WebPage::didFlushLayerTreeAtTime(MonotonicTime timestamp)
 {
 #if PLATFORM(IOS)
-    if (m_oldestNonStableUpdateVisibleContentRectsTimestamp != std::chrono::milliseconds::zero()) {
-        std::chrono::milliseconds elapsed = timestamp - m_oldestNonStableUpdateVisibleContentRectsTimestamp;
-        m_oldestNonStableUpdateVisibleContentRectsTimestamp = std::chrono::milliseconds::zero();
+    if (m_oldestNonStableUpdateVisibleContentRectsTimestamp != MonotonicTime()) {
+        Seconds elapsed = timestamp - m_oldestNonStableUpdateVisibleContentRectsTimestamp;
+        m_oldestNonStableUpdateVisibleContentRectsTimestamp = MonotonicTime();
 
-        m_estimatedLatency = std::chrono::milliseconds(static_cast<std::chrono::milliseconds::rep>(m_estimatedLatency.count() * 0.80 + elapsed.count() * 0.20));
+        m_estimatedLatency = m_estimatedLatency * 0.80 + elapsed * 0.20;
     }
 #else
     UNUSED_PARAM(timestamp);
@@ -3443,14 +3401,13 @@ void WebPage::performDragControllerAction(uint64_t action, const IntPoint& clien
     }
 }
 #else
-void WebPage::performDragControllerAction(uint64_t action, WebCore::IntPoint clientPosition, WebCore::IntPoint globalPosition, uint64_t draggingSourceOperationMask, const String& dragStorageName, uint32_t flags, const SandboxExtension::Handle& sandboxExtensionHandle, const SandboxExtension::HandleArray& sandboxExtensionsHandleArray)
+void WebPage::performDragControllerAction(uint64_t action, const WebCore::DragData& dragData, const SandboxExtension::Handle& sandboxExtensionHandle, const SandboxExtension::HandleArray& sandboxExtensionsHandleArray)
 {
     if (!m_page) {
         send(Messages::WebPageProxy::DidPerformDragControllerAction(DragOperationNone, false, 0));
         return;
     }
 
-    DragData dragData(dragStorageName, clientPosition, globalPosition, static_cast<DragOperation>(draggingSourceOperationMask), static_cast<DragApplicationFlags>(flags));
     switch (action) {
     case DragControllerActionEntered: {
         DragOperation resolvedDragOperation = m_page->dragController().dragEntered(dragData);
@@ -5161,7 +5118,7 @@ void WebPage::didCommitLoad(WebFrame* frame)
     m_hasReceivedVisibleContentRectsAfterDidCommitLoad = false;
     m_scaleWasSetByUIProcess = false;
     m_userHasChangedPageScaleFactor = false;
-    m_estimatedLatency = std::chrono::milliseconds(1000 / 60);
+    m_estimatedLatency = Seconds(1.0 / 60);
 
 #if ENABLE(IOS_TOUCH_EVENTS)
     WebProcess::singleton().eventDispatcher().clearQueuedTouchEventsForPage(*this);

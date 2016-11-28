@@ -26,6 +26,7 @@
 #pragma once
 
 #include <wtf/Brigand.h>
+#include <wtf/HashMap.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/WTFString.h>
 
@@ -86,7 +87,7 @@ struct IDLString : IDLType<String> {
     template <typename U> static U&& extractValueFromNullable(U&& value) { return std::forward<U>(value); }
 };
 struct IDLDOMString : IDLString { };
-struct IDLByteString : IDLUnsupportedType { };
+struct IDLByteString : IDLString { };
 struct IDLUSVString : IDLString { };
 
 struct IDLObject : IDLUnsupportedType { };
@@ -116,11 +117,15 @@ template<typename T> struct IDLFrozenArray : IDLType<Vector<typename T::Implemen
     using InnerType = T;
 };
 
+template<typename K, typename V> struct IDLRecord : IDLType<HashMap<typename K::ImplementationType, typename V::ImplementationType>> {
+    using KeyType = K;
+    using ValueType = V;
+};
+
 template<typename T> struct IDLPromise : IDLType<DOMPromise<T>> {
     using InnerType = T;
 };
 
-struct IDLRegExp : IDLUnsupportedType { };
 struct IDLError : IDLUnsupportedType { };
 struct IDLDOMException : IDLUnsupportedType { };
 
@@ -156,6 +161,9 @@ struct IsIDLSequence : public std::integral_constant<bool, WTF::IsTemplate<T, ID
 
 template<typename T>
 struct IsIDLFrozenArray : public std::integral_constant<bool, WTF::IsTemplate<T, IDLFrozenArray>::value> { };
+
+template<typename T>
+struct IsIDLRecord : public std::integral_constant<bool, WTF::IsTemplate<T, IDLRecord>::value> { };
 
 template<typename T>
 struct IsIDLNumber : public std::integral_constant<bool, WTF::IsBaseOfTemplate<IDLNumber, T>::value> { };
